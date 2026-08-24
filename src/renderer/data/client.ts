@@ -21,6 +21,17 @@ export interface ImportReportView {
   issues: Array<{ code: string; dictionaryType: string; sourceCell: string; message: string; value?: string; candidateIds?: string[] }>;
 }
 
+export interface PlanningRowInputView {
+  clientId: string; colorId: number; mainCategoryId: number; projectItemId: number; notes?: string;
+}
+export interface PlanningPreviewView {
+  productId: number; appearanceId: number;
+  rows: Array<{ clientId: string; fullCode: string; displayName: string; prefix: string; sequence: number; available: true }>;
+}
+export interface ReservedDrawingView {
+  id: number; fullCode: string; displayName: string; status: 'reserved';
+}
+
 export interface PlannerApi {
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingView>;
@@ -34,6 +45,9 @@ export interface PlannerApi {
   deactivateProduct(id: number): Promise<ProductView>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
   confirmImport(auditId: string, selections: string[]): Promise<{ imported: number; skipped: number }>;
+  previewPlan(input: { productId: number; appearanceId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
+  reservePlan(input: { productId: number; appearanceId?: number;
+    rows: Array<PlanningRowInputView & { expectedFullCode: string }> }): Promise<ReservedDrawingView[]>;
 }
 
 class ApiError extends Error {
@@ -96,4 +110,6 @@ export const apiClient: PlannerApi = {
     return request('/api/import/excel/audit', { method: 'POST', body: form });
   },
   confirmImport: (auditId, selections) => request('/api/import/excel/confirm', json('POST', { auditId, selections })),
+  previewPlan: (input) => request('/api/planning/preview', json('POST', input)),
+  reservePlan: async (input) => (await request<{ items: ReservedDrawingView[] }>('/api/planning/reserve', json('POST', input))).items,
 };

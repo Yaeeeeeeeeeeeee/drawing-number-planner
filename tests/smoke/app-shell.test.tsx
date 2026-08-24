@@ -9,5 +9,6 @@ describe('application shell', () => {
 
     expect(screen.getByText('图号规划器')).toBeVisible();
     expect(screen.getByRole('navigation')).toBeVisible();
+    expect(screen.getByRole('button', { name: /图号规划/ })).toBeEnabled();
   });
 });
