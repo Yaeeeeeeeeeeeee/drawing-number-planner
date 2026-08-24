@@ -1,0 +1,63 @@
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import { z } from 'zod';
+
+import { ProductError, type ProductService } from '../../core/products/product-service.js';
+
+const idSchema = z.object({ id: z.coerce.number().int().positive() });
+const inputSchema = z.object({
+  brandId: z.number().int().positive(),
+  productSizeId: z.number().int().positive(),
+  defaultAppearanceId: z.number().int().positive().nullable().optional(),
+  model: z.string().trim().min(1),
+  productCategory: z.string().trim().min(1),
+  referenceProductId: z.number().int().positive().nullable().optional(),
+});
+
+function sendProductError(error: unknown, reply: FastifyReply) {
+  if (error instanceof ProductError) {
+    const status = error.code === 'NOT_FOUND' ? 404 : error.code === 'DUPLICATE_MODEL' ? 409 : 400;
+    return reply.code(status).send({ error: { code: error.code, message: error.message } });
+  }
+  throw error;
+}
+
+export function registerProductRoutes(app: FastifyInstance, service: ProductService): void {
+  app.get('/api/products', async (request, reply) => {
+    const query = z.object({
+      search: z.string().optional(),
+      brandId: z.coerce.number().int().positive().optional(),
+      status: z.enum(['active', 'inactive', 'all']).optional(),
+    }).safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品筛选条件无效' } });
+    return service.list(query.data);
+  });
+
+  app.get('/api/products/:id', async (request, reply) => {
+    const params = idSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
+    try { return service.get(params.data.id); }
+    catch (error) { return sendProductError(error, reply); }
+  });
+
+  app.post('/api/products', async (request, reply) => {
+    const input = inputSchema.safeParse(request.body);
+    if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品数据不完整' } });
+    try { return reply.code(201).send(service.create(input.data)); }
+    catch (error) { return sendProductError(error, reply); }
+  });
+
+  app.put('/api/products/:id', async (request, reply) => {
+    const params = idSchema.safeParse(request.params);
+    const input = inputSchema.safeParse(request.body);
+    if (!params.success || !input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品数据不完整' } });
+    try { return service.update(params.data.id, input.data); }
+    catch (error) { return sendProductError(error, reply); }
+  });
+
+  app.post('/api/products/:id/deactivate', async (request, reply) => {
+    const params = idSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
+    try { return service.deactivate(params.data.id); }
+    catch (error) { return sendProductError(error, reply); }
+  });
+}
