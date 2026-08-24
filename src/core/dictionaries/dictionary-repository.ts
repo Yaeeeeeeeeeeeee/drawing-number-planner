@@ -1,5 +1,5 @@
-import type { PlannerDatabase } from '../../db/database';
-import type { CreateDictionaryItem, DictionaryItem, DictionaryType } from './dictionary-types';
+import type { PlannerDatabase } from '../../db/database.js';
+import type { CreateDictionaryItem, DictionaryItem, DictionaryType } from './dictionary-types.js';
 
 interface DictionaryRow {
   id: number; type: DictionaryType; code: string; name: string;

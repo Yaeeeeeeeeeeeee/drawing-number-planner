@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
-import { DictionaryError, type DictionaryService } from '../../core/dictionaries/dictionary-service';
-import { dictionaryTypes } from '../../core/dictionaries/dictionary-types';
+import { DictionaryError, type DictionaryService } from '../../core/dictionaries/dictionary-service.js';
+import { dictionaryTypes } from '../../core/dictionaries/dictionary-types.js';
 
 const typeSchema = z.enum(dictionaryTypes);
 const createSchema = z.object({ code: z.string().trim().min(1), name: z.string().trim().min(1), parentId: z.number().int().positive().optional() });

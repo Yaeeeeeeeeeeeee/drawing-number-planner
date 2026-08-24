@@ -1,6 +1,6 @@
-import type { PlannerDatabase } from '../../db/database';
-import { DictionaryRepository } from './dictionary-repository';
-import type { CreateDictionaryItem, DictionaryItem, DictionaryType } from './dictionary-types';
+import type { PlannerDatabase } from '../../db/database.js';
+import { DictionaryRepository } from './dictionary-repository.js';
+import type { CreateDictionaryItem, DictionaryItem, DictionaryType } from './dictionary-types.js';
 
 export type DictionaryErrorCode = 'DUPLICATE_CODE' | 'DICTIONARY_ITEM_REFERENCED' | 'INVALID_PARENT' | 'NOT_FOUND';
 

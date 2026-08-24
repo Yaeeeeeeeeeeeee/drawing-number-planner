@@ -1,5 +1,5 @@
-import type { PlannerDatabase } from './database';
-import { schemaVersionOne } from './schema.sql';
+import type { PlannerDatabase } from './database.js';
+import { schemaVersionOne } from './schema.sql.js';
 
 export interface MigrationSafety {
   databaseExists: boolean;

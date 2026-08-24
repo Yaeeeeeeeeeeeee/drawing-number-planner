@@ -6,7 +6,7 @@
 
 **Architecture:** Electron 作为桌面壳，本机 Fastify 服务承载业务与文件访问，React/Vite 提供桌面和浏览器共用界面。SQLite 只由服务端访问；浏览器与 Electron 均通过带本地令牌的 HTTP API 使用同一真实数据库。
 
-**Tech Stack:** Electron、React、TypeScript、Vite、Fastify、SQLite（better-sqlite3）、Vitest、Testing Library、Playwright、Zod、xlsx、pnpm
+**Tech Stack:** Electron、React、TypeScript、Vite、Fastify、SQLite（better-sqlite3）、Vitest、Testing Library、Playwright、Zod、read-excel-file、pnpm
 
 **Spec:** `docs/superpowers/specs/2026-08-24-drawing-number-planner-design.md`
 
@@ -108,18 +108,18 @@ expect(screen.getByRole('navigation')).toBeVisible();
 - Create: `src/core/import/excel-audit.ts`
 - Create: `src/core/import/excel-import.ts`
 - Create: `src/server/routes/import.ts`
-- Create: `tests/fixtures/drawing-number-plan.xlsx`
 - Create: `tests/core/excel-audit.test.ts`
 - Create: `tests/core/excel-import.test.ts`
 
 **Interfaces:**
 - Produces: `auditWorkbook(buffer): ImportAuditReport` and `importApprovedRows(report, selections, db): ImportResult`.
 
-- [ ] **Step 1: Create a minimal workbook fixture containing valid dictionary pairs, duplicate code `0209`, a blank-name row and dependent project items.**
+- [ ] **Step 1: Generate a temporary minimal workbook fixture in tests containing valid dictionary pairs, duplicate code `0209`, a blank-name row and dependent project items; do not commit company source data.**
 - [ ] **Step 2: Write tests proving audit reports duplicates and incomplete rows without changing the database.**
 - [ ] **Step 3: Implement worksheet mapping for the existing “新版图号” layout and preserve codes as text, including leading zeros.**
 - [ ] **Step 4: Write and implement import tests proving only explicitly approved, conflict-free rows enter one transaction.**
 - [ ] **Step 5: Add upload/audit and confirmed-import endpoints; never overwrite the source workbook.**
+- [ ] **Compatibility note: V1 reads `.xlsx`; legacy `.xls` is rejected with a clear “另存为 .xlsx” instruction and is never rewritten automatically.**
 - [ ] **Step 6: Run import tests and commit `feat: add audited Excel dictionary migration`.**
 
 ### Task 5: 产品档案领域规则和 API

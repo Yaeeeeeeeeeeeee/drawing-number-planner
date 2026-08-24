@@ -29,6 +29,19 @@ describe('DictionaryService', () => {
       .toThrowError(expect.objectContaining({ code: 'INVALID_PARENT' }));
   });
 
+  it('scopes project-item code uniqueness to its main category', () => {
+    const printing = service.create({ type: 'main_category', code: '04', name: '印刷件类' });
+    const packaging = service.create({ type: 'main_category', code: '05', name: '包装件类' });
+
+    service.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: printing.id });
+    expect(() => service.create({ type: 'project_item', code: '01', name: '说明书', parentId: printing.id }))
+      .toThrowError(expect.objectContaining({ code: 'DUPLICATE_CODE' }));
+
+    expect(service.create({
+      type: 'project_item', code: '01', name: '包装箱', parentId: packaging.id,
+    }).parentId).toBe(packaging.id);
+  });
+
   it('protects referenced values from semantic changes but allows deactivation', () => {
     const brand = service.create({ type: 'brand', code: '02', name: 'SAMKYO' });
     const size = service.create({ type: 'product_size', code: '0404', name: 'ZC200卧式冰柜2.0' });

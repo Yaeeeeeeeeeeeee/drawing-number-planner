@@ -13,8 +13,19 @@ export const schemaVersionOne = `
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     created_at TEXT NOT NULL,
     deactivated_at TEXT,
-    UNIQUE (type, code)
+    CHECK (
+      (type = 'project_item' AND parent_id IS NOT NULL)
+      OR (type <> 'project_item' AND parent_id IS NULL)
+    )
   );
+
+  CREATE UNIQUE INDEX dictionary_root_code_unique
+    ON dictionary_items(type, code)
+    WHERE parent_id IS NULL;
+
+  CREATE UNIQUE INDEX dictionary_child_code_unique
+    ON dictionary_items(type, parent_id, code)
+    WHERE parent_id IS NOT NULL;
 
   CREATE TABLE products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
