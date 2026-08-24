@@ -32,6 +32,29 @@ export interface ReservedDrawingView {
   id: number; fullCode: string; displayName: string; status: 'reserved';
 }
 
+export interface BomCandidateView {
+  id: number; fullCode: string; displayName: string; colorId: number; colorName: string;
+  projectItemId: number; projectItemName: string; status: 'reserved' | 'active';
+}
+export interface BomItemView {
+  bomItemId: number; drawingId: number; fullCode: string; displayName: string; colorId: number; colorName: string;
+  projectItemId: number; projectItemName: string; status: 'reserved' | 'active'; quantity: number;
+  notes: string | null; usesWhiteMaterial: boolean;
+}
+export interface BomVersionSummaryView {
+  id: number; productId: number; model: string; colorId: number; colorName: string; versionNumber: number;
+  previousVersionId: number | null; notes: string | null; createdAt: string;
+}
+export interface BomVersionView extends BomVersionSummaryView { items: BomItemView[] }
+export interface BomDiffView {
+  type: 'added' | 'replaced' | 'removed' | 'unchanged'; projectItemId: number; projectItemName: string;
+  previousDrawingId: number | null; previousFullCode: string | null; drawingId: number | null; fullCode: string | null;
+}
+export interface SaveBomView {
+  productId: number; colorId: number; expectedCurrentVersionId: number | null; notes?: string;
+  items: Array<{ projectItemId: number; drawingId: number; quantity: number; notes?: string; usesWhiteMaterial: boolean }>;
+}
+
 export interface PlannerApi {
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingView>;
@@ -48,6 +71,12 @@ export interface PlannerApi {
   previewPlan(input: { productId: number; appearanceId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
   reservePlan(input: { productId: number; appearanceId?: number;
     rows: Array<PlanningRowInputView & { expectedFullCode: string }> }): Promise<ReservedDrawingView[]>;
+  getCurrentBom(productId: number, colorId: number): Promise<BomVersionView | null>;
+  listBomVersions(productId: number, colorId: number): Promise<BomVersionSummaryView[]>;
+  getBomVersion(id: number): Promise<BomVersionView>;
+  listBomCandidates(input: { productId: number; bomColorId: number; projectItemId: number;
+    usesWhiteMaterial: boolean }): Promise<BomCandidateView[]>;
+  saveBomVersion(input: SaveBomView): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
 }
 
 class ApiError extends Error {
@@ -112,4 +141,12 @@ export const apiClient: PlannerApi = {
   confirmImport: (auditId, selections) => request('/api/import/excel/confirm', json('POST', { auditId, selections })),
   previewPlan: (input) => request('/api/planning/preview', json('POST', input)),
   reservePlan: async (input) => (await request<{ items: ReservedDrawingView[] }>('/api/planning/reserve', json('POST', input))).items,
+  getCurrentBom: async (productId, colorId) => (await request<{ version: BomVersionView | null }>(
+    `/api/boms/current${queryString({ productId, colorId })}`)).version,
+  listBomVersions: async (productId, colorId) => (await request<{ items: BomVersionSummaryView[] }>(
+    `/api/boms/versions${queryString({ productId, colorId })}`)).items,
+  getBomVersion: (id) => request(`/api/boms/versions/${id}`),
+  listBomCandidates: async (input) => (await request<{ items: BomCandidateView[] }>(
+    `/api/boms/candidates${queryString(input)}`)).items,
+  saveBomVersion: (input) => request('/api/boms/versions', json('POST', input)),
 };

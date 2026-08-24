@@ -86,5 +86,22 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .planning-preview { margin-top: 20px; padding-top: 8px; border-top: 1px solid #dce4ef; }
 .planning-preview table { background: #fff; }
 .code-cell { color: #123c72; font-family: Consolas, monospace; font-weight: 700; }
+.bom-basics { margin-bottom: 24px; }
+.bom-empty { display: flex; align-items: baseline; gap: 12px; padding: 22px 0; color: var(--muted); border-block: 1px solid var(--line); }
+.bom-empty strong { color: #172033; }
+.bom-row-fields { grid-template-columns: 1fr .8fr minmax(280px, 2fr) .55fr 1fr; }
+.bom-white-toggle > span:last-child { display: flex; min-height: 40px; align-items: center; gap: 8px; }
+.bom-white-toggle input { width: 16px; height: 16px; }
+.bom-actions { display: flex; gap: 10px; margin: 18px 0; }
+.bom-diff, .bom-history { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
+.bom-diff-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bom-diff-list span { padding: 6px 10px; border-radius: 4px; background: #eef4f8; color: #29465b; font-size: 13px; }
+.bom-diff-list .bom-diff-added { background: #e8f6ef; color: #16714a; }
+.bom-diff-list .bom-diff-removed { background: #fff0ed; color: #a43c2a; }
+.bom-diff-list .bom-diff-replaced { background: #fff7df; color: #805b08; }
+.bom-history-detail { margin-top: 16px; padding: 12px 14px 14px; border-left: 3px solid #3978c8; background: #f7faff; }
+.bom-history-detail h3 { margin: 0; font-size: 14px; }
+.muted-text { color: var(--muted); }
 @media (max-width: 1180px) { .app-shell { grid-template-columns: 218px minmax(0, 1fr); } .workspace { padding-inline: 26px; } .form-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
+@media (max-width: 1180px) { .bom-row-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bom-drawing-field { grid-column: 1 / -1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
