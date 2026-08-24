@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { BomPage } from '../../src/renderer/pages/BomPage';
+import { ApiError } from '../../src/renderer/data/client';
 
 const product = { id: 1, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
   defaultAppearanceId: 3, defaultAppearanceName: '一号外观', model: 'ZC100', productCategory: '冰柜',
@@ -103,8 +104,26 @@ describe('BomPage', () => {
     })));
   });
 
+  it('reloads eligible candidates after saving so the new version can be replaced immediately', async () => {
+    const api = apiFixture();
+    const replacement = { ...candidate, id: 11, fullCode: '02.0404.010.0401002', status: 'active' as const };
+    api.listBomCandidates.mockResolvedValue([candidate, replacement]);
+    render(<BomPage api={api as never} />); await selectGrayBom();
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+    fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
+    fireEvent.click(screen.getByLabelText('第 1 行引用白色图号'));
+    fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+
+    await waitFor(() => expect(api.listBomCandidates).toHaveBeenCalledTimes(3));
+    const drawingSelect = screen.getByLabelText('第 1 行图号') as HTMLSelectElement;
+    await waitFor(() => expect(Array.from(drawingSelect.options).map((option) => option.value)).toContain('11'));
+    fireEvent.change(drawingSelect, { target: { value: '11' } });
+    expect(drawingSelect).toHaveValue('11');
+  });
+
   it('keeps the draft and asks for refresh when the base version is stale', async () => {
-    const api = apiFixture(); api.saveBomVersion.mockRejectedValueOnce(new Error('当前 BOM 已变化，请刷新后重新保存'));
+    const api = apiFixture(); api.saveBomVersion.mockRejectedValueOnce(new ApiError('BOM_STALE', '当前 BOM 已变化，请刷新后重新保存'));
     render(<BomPage api={api as never} />); await selectGrayBom();
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
@@ -113,6 +132,19 @@ describe('BomPage', () => {
 
     expect(await screen.findByText('当前 BOM 已变化，请刷新后重新保存')).toBeVisible();
     expect(screen.getByRole('button', { name: '刷新当前 BOM' })).toBeVisible();
+    expect(screen.getByLabelText('第 1 行项目')).toHaveValue('7');
+  });
+
+  it('keeps a non-stale failed draft without suggesting a destructive refresh', async () => {
+    const api = apiFixture(); api.saveBomVersion.mockRejectedValueOnce(new ApiError('DRAWING_NOT_ELIGIBLE', '已作废图号不能加入 BOM'));
+    render(<BomPage api={api as never} />); await selectGrayBom();
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+    fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
+    fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+
+    expect(await screen.findByText('已作废图号不能加入 BOM')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '刷新当前 BOM' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('第 1 行项目')).toHaveValue('7');
   });
 });

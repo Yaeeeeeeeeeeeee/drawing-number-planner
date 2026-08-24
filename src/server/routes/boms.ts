@@ -34,7 +34,8 @@ const saveSchema = z.object({
 
 function sendBomError(reply: FastifyReply, error: unknown) {
   if (!(error instanceof BomError)) throw error;
-  const status = error.code === 'BOM_STALE' ? 409 : error.code === 'BOM_NOT_FOUND' ? 404 : 422;
+  const status = error.code === 'BOM_STALE' ? 409
+    : error.code === 'BOM_NOT_FOUND' || error.code === 'DRAWING_NOT_FOUND' ? 404 : 422;
   return reply.code(status).send({ error: { code: error.code, message: error.message } });
 }
 

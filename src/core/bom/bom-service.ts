@@ -49,7 +49,10 @@ export class BomService {
   }
 
   listCandidates(input: BomCandidateInput): BomCandidate[] {
-    this.validateContext(input.productId, input.bomColorId);
+    const context = this.validateContext(input.productId, input.bomColorId);
+    if (input.usesWhiteMaterial && context.colorCode === WHITE_COLOR_CODE) {
+      throw new BomError('WHITE_DRAWING_REQUIRED', '白色 BOM 不需要引用白色共用图号');
+    }
     return this.repository.listCandidates(input, WHITE_COLOR_CODE);
   }
 

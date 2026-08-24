@@ -79,7 +79,7 @@ export interface PlannerApi {
   saveBomVersion(input: SaveBomView): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(public readonly code: string, message: string) { super(message); }
 }
 

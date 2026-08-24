@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BomCandidateView, BomDiffView, BomItemView, BomVersionSummaryView, BomVersionView,
   DictionaryItemView, PlannerApi, ProductView } from '../data/client';
+import { ApiError } from '../data/client';
 
 interface DraftRow {
   clientId: string; projectItemId: string; drawingId: string; quantity: string; notes: string;
@@ -94,11 +95,20 @@ export function BomPage({ api }: { api: PlannerApi }) {
         usesWhiteMaterial: row.usesWhiteMaterial })) };
     try {
       const saved = await api.saveBomVersion(input); setBase(saved.version); setDiff(saved.diff);
-      setRows(saved.version.items.map((item) => fromItem(item, `bom-row-${nextRow.current++}`)));
+      const savedRows = saved.version.items.map((item) => fromItem(item, `bom-row-${nextRow.current++}`));
+      const candidateLists = await Promise.allSettled(saved.version.items.map((item) => api.listBomCandidates({
+        productId: Number(productId), bomColorId: Number(colorId), projectItemId: item.projectItemId,
+        usesWhiteMaterial: item.usesWhiteMaterial,
+      })));
+      candidateLists.forEach((result, index) => {
+        if (result.status === 'fulfilled') savedRows[index].candidates = result.value;
+      });
+      setRows(savedRows);
       setHistory((current) => [saved.version, ...current.filter((item) => item.id !== saved.version.id)]);
       setSavedMessage(`版本 ${saved.version.versionNumber} 已保存`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'BOM 保存失败'); setNeedsRefresh(true);
+      setError(reason instanceof Error ? reason.message : 'BOM 保存失败');
+      setNeedsRefresh(reason instanceof ApiError && reason.code === 'BOM_STALE');
     } finally { setBusy(false); }
   };
   const viewHistory = async (id: number) => {

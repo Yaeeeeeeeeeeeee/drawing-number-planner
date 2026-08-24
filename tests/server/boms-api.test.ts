@@ -90,5 +90,12 @@ describe('BOM API', () => {
     } });
     expect(invalid.statusCode).toBe(422);
     expect(invalid.json().error.code).toBe('DRAWING_NOT_ELIGIBLE');
+
+    const missing = await app.inject({ method: 'POST', url: '/api/boms/versions', payload: {
+      productId: refs.product.id, colorId: refs.gray.id, expectedCurrentVersionId: null,
+      items: [{ projectItemId: refs.logo.id, drawingId: 999999, quantity: 1, usesWhiteMaterial: true }],
+    } });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json().error.code).toBe('DRAWING_NOT_FOUND');
   });
 });

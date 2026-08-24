@@ -136,5 +136,8 @@ describe('BomService', () => {
       projectItemId: refs.logo.id, usesWhiteMaterial: false }).map((item) => item.id)).toEqual([grayLogo.id]);
     expect(service.listCandidates({ productId: refs.product.id, bomColorId: refs.gray.id,
       projectItemId: refs.logo.id, usesWhiteMaterial: true }).map((item) => item.id)).toEqual([whiteLogo.id]);
+    expect(() => service.listCandidates({ productId: refs.product.id, bomColorId: refs.white.id,
+      projectItemId: refs.logo.id, usesWhiteMaterial: true }))
+      .toThrowError(expect.objectContaining({ code: 'WHITE_DRAWING_REQUIRED' }));
   });
 });
