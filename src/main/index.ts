@@ -6,7 +6,7 @@ let runningServer: RunningServer | undefined;
 process.on('uncaughtException', (error) => console.error('[main] uncaught', error));
 
 async function createWindow() {
-  runningServer ??= await startServer();
+  runningServer ??= await startServer({ dataDir: app.getPath('userData') });
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
