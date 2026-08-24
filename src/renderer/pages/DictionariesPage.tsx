@@ -11,6 +11,7 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
   const [type, setType] = useState<string>('brand'); const [items, setItems] = useState<DictionaryItemView[]>([]);
   const [code, setCode] = useState(''); const [name, setName] = useState(''); const [parentId, setParentId] = useState('');
   const [parents, setParents] = useState<DictionaryItemView[]>([]); const [error, setError] = useState('');
+  const [editing, setEditing] = useState<DictionaryItemView | null>(null); const [editingName, setEditingName] = useState('');
   const load = async () => { setError(''); try { setItems(await api.listDictionaries(type, true));
     if (type === 'project_item') setParents(await api.listDictionaries('main_category', false)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '字典加载失败'); } };
@@ -19,17 +20,22 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
     const item = await api.createDictionary(type, { code, name, ...(parentId ? { parentId: Number(parentId) } : {}) });
     setItems((current) => [...current, item]); setCode(''); setName('');
   } catch (reason) { setError(reason instanceof Error ? reason.message : '保存失败'); } };
-  const deactivate = async (id: number) => { const updated = await api.deactivateDictionary(id);
-    setItems((current) => current.map((item) => item.id === id ? updated : item)); };
+  const deactivate = async (id: number) => { try { const updated = await api.deactivateDictionary(id);
+    setItems((current) => current.map((item) => item.id === id ? updated : item)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '停用失败'); } };
+  const saveName = async (event: FormEvent) => { event.preventDefault(); if (!editing) return; try {
+    const updated = await api.updateDictionaryName(editing.id, editingName); setItems((current) => current.map((item) => item.id === editing.id ? updated : item)); setEditing(null);
+  } catch (reason) { setError(reason instanceof Error ? reason.message : '名称保存失败'); } };
   return <section className="page-surface page-enter"><header className="page-header"><div><p className="eyebrow">CODE DICTIONARIES</p><h1>编码字典</h1><p>只增加必要编码；已使用项目通过停用保留历史语义。</p></div></header>
     <div className="segmented-tabs" role="tablist">{types.map(([value, label]) => <button role="tab" aria-selected={type === value} onClick={() => setType(value)} key={value}>{label}</button>)}</div>
     <form className="inline-form" onSubmit={create}><label><span>编码</span><input value={code} onChange={(e) => setCode(e.target.value)} required /></label>
       <label><span>名称</span><input value={name} onChange={(e) => setName(e.target.value)} required /></label>
       {type === 'project_item' && <label><span>所属主类别</span><select value={parentId} onChange={(e) => setParentId(e.target.value)} required><option value="">请选择</option>{parents.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}
       <button className="primary-button" type="submit">新增编码</button></form>{error && <p className="error-banner">{error}</p>}
+    {editing && <form className="editor-strip" onSubmit={saveName}><label><span>修改名称</span><input aria-label="修改名称" value={editingName} onChange={(event) => setEditingName(event.target.value)} required /></label><div className="form-actions"><button className="text-button" type="button" onClick={() => setEditing(null)}>取消</button><button className="primary-button" type="submit">保存名称</button></div></form>}
     {items.length === 0 ? <EmptyState title="当前字典暂无数据" description="可在上方录入第一条正式编码。" symbol="＋" /> :
       <DataTable items={items} columns={[{ key: 'code', label: '编码', render: (item) => <strong className="mono">{item.code}</strong> },
         { key: 'name', label: '名称', render: (item) => item.name }, { key: 'status', label: '状态', render: (item) => item.status === 'active' ? '启用中' : <span className="status-text inactive">已停用</span> },
-        { key: 'action', label: '操作', render: (item) => item.status === 'active' ? <button className="text-button danger" aria-label={`停用 ${item.name}`} onClick={() => void deactivate(item.id)} type="button">停用</button> : '—' }]} />}
+        { key: 'action', label: '操作', render: (item) => item.status === 'active' ? <div className="row-actions"><button className="text-button" aria-label={`修改 ${item.name}`} onClick={() => { setEditing(item); setEditingName(item.name); }} type="button">修改</button><button className="text-button danger" aria-label={`停用 ${item.name}`} onClick={() => void deactivate(item.id)} type="button">停用</button></div> : '—' }]} />}
   </section>;
 }

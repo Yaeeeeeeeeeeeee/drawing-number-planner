@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -28,5 +28,19 @@ describe('real application API', () => {
       items: [expect.objectContaining({ code: '02', name: 'SAMKYO' })],
     });
     await second.close();
+  });
+
+  it('serves the built renderer without a Vite development server', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'drawing-planner-renderer-'));
+    const rendererDir = join(root, 'renderer');
+    const { mkdirSync } = await import('node:fs'); mkdirSync(rendererDir);
+    writeFileSync(join(rendererDir, 'index.html'), '<!doctype html><title>图号规划器生产窗口</title>');
+    const server = await startServer({ port: 0, dataDir: join(root, 'data'), rendererDir });
+
+    const response = await fetch(`${server.url}/`);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('图号规划器生产窗口');
+    await server.close();
   });
 });

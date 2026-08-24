@@ -19,8 +19,9 @@ export function registerDictionaryRoutes(app: FastifyInstance, service: Dictiona
   app.get('/api/dictionaries/:type', async (request, reply) => {
     const parsed = z.object({ type: typeSchema }).safeParse(request.params);
     if (!parsed.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '无效字典类型' } });
-    const query = z.object({ includeInactive: z.string().optional() }).parse(request.query);
-    return { items: service.list({ type: parsed.data.type, includeInactive: query.includeInactive === 'true' }) };
+    const query = z.object({ includeInactive: z.enum(['true', 'false']).optional() }).safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '字典筛选条件无效' } });
+    return { items: service.list({ type: parsed.data.type, includeInactive: query.data.includeInactive === 'true' }) };
   });
 
   app.post('/api/dictionaries/:type', async (request, reply) => {

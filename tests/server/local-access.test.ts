@@ -32,4 +32,20 @@ describe('local access security', () => {
     expect((await app.inject({ method: 'GET', url: '/read', headers: { origin: 'http://127.0.0.1:5173' } })).statusCode).toBe(200);
     await app.close();
   });
+
+  it('issues the per-launch token only to the approved browser origin', async () => {
+    const app = Fastify();
+    registerLocalAccess(app, { token: 'fresh-launch-token', allowedOrigins: ['http://127.0.0.1:5173'] });
+    app.post('/api/session', async () => ({ token: 'fresh-launch-token' }));
+
+    const missingOrigin = await app.inject({ method: 'POST', url: '/api/session' });
+    const wrongOrigin = await app.inject({ method: 'POST', url: '/api/session', headers: { origin: 'https://unapproved.example' } });
+    const approved = await app.inject({ method: 'POST', url: '/api/session', headers: { origin: 'http://127.0.0.1:5173' } });
+
+    expect(missingOrigin.statusCode).toBe(403);
+    expect(wrongOrigin.statusCode).toBe(403);
+    expect(approved.statusCode).toBe(200);
+    expect(approved.json()).toEqual({ token: 'fresh-launch-token' });
+    await app.close();
+  });
 });

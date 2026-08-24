@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import writeXlsxFile from 'write-excel-file/node';
 
-import { auditRows, auditWorkbook } from '../../src/core/import/excel-audit';
+import { auditRows, auditWorkbook, includeDatabaseConflicts } from '../../src/core/import/excel-audit';
+import { openDatabase } from '../../src/db/database';
+import { migrateDatabase } from '../../src/db/migrations';
 
 type Cell = string | number | null;
 
@@ -52,5 +54,19 @@ describe('Excel dictionary audit', () => {
     await expect(auditWorkbook(legacyHeader)).rejects.toMatchObject({
       code: 'UNSUPPORTED_LEGACY_XLS',
     });
+  });
+
+  it('marks candidates that already conflict with the current database before confirmation', () => {
+    const database = openDatabase(':memory:');
+    migrateDatabase(database, { databaseExists: false, createBackup: () => undefined });
+    database.prepare(`insert into dictionary_items (type, code, name, created_at)
+      values ('brand', '01', '已有品牌', '2026-08-24T00:00:00Z')`).run();
+
+    const report = includeDatabaseConflicts(auditRows(sourceRows()), database);
+
+    expect(report.issues).toContainEqual(expect.objectContaining({
+      code: 'DATABASE_CONFLICT', dictionaryType: 'brand', value: '01', candidateIds: ['brand:F22'],
+    }));
+    database.close();
   });
 });

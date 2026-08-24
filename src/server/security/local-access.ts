@@ -19,6 +19,13 @@ export function registerLocalAccess(app: FastifyInstance, options: {
 
   app.addHook('onRequest', async (request, reply) => {
     const origin = request.headers.origin;
+    const isSessionBootstrap = request.method === 'POST' && request.url.split('?')[0] === '/api/session';
+    if (isSessionBootstrap) {
+      if (!origin || !allowedOrigins.has(origin)) {
+        return reply.code(403).send({ error: { code: 'ORIGIN_NOT_ALLOWED', message: '请求来源不受信任' } });
+      }
+      return;
+    }
     if (origin && !allowedOrigins.has(origin)) {
       return reply.code(403).send({ error: { code: 'ORIGIN_NOT_ALLOWED', message: '请求来源不受信任' } });
     }

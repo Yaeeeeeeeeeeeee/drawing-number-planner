@@ -2,13 +2,14 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import Fastify from 'fastify';
+import fastifyStatic from '@fastify/static';
 
 import { resolveAppPaths } from '../core/config/app-paths.js';
 import { ensureDailyBackup } from '../core/backup/daily-backup.js';
 import { DictionaryService } from '../core/dictionaries/dictionary-service.js';
 import { DrawingQueryService } from '../core/drawings/drawing-query-service.js';
 import { ProductService } from '../core/products/product-service.js';
-import { backupDatabaseFile } from '../db/backup.js';
+import { createDatabaseBackup } from '../db/backup.js';
 import { openDatabase } from '../db/database.js';
 import { migrateDatabase } from '../db/migrations.js';
 import { registerDictionaryRoutes } from './routes/dictionaries.js';
@@ -23,6 +24,7 @@ export interface ServerOptions {
   token?: string;
   dataDir?: string;
   allowedOrigins?: string[];
+  rendererDir?: string;
 }
 
 export interface RunningServer {
@@ -41,23 +43,29 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   const database = openDatabase(paths.database);
   migrateDatabase(database, {
     databaseExists,
-    createBackup: () => backupDatabaseFile(paths.database, paths.backups),
+    createBackup: () => createDatabaseBackup(database, paths.database, paths.backups, 'migration'),
   });
   if (databaseExists) {
-    const backup = ensureDailyBackup(paths.database, paths.backups);
+    const backup = ensureDailyBackup(database, paths.database, paths.backups);
     if (backup.status === 'failed') console.error(`[backup] ${backup.error}`);
   }
   const server = Fastify({ logger: false, forceCloseConnections: true });
 
   registerLocalAccess(server, {
     token,
-    allowedOrigins: options.allowedOrigins ?? ['http://127.0.0.1:5173', 'http://127.0.0.1:4173'],
+    allowedOrigins: options.allowedOrigins ?? ['http://127.0.0.1:4317', 'http://127.0.0.1:5173', 'http://127.0.0.1:4173'],
   });
+  server.post('/api/session', async () => ({ token }));
   server.get('/api/health', async () => ({ status: 'ok' }));
   registerDictionaryRoutes(server, new DictionaryService(database));
   registerProductRoutes(server, new ProductService(database));
   registerDrawingRoutes(server, new DrawingQueryService(database));
-  await registerImportRoutes(server, database);
+  await registerImportRoutes(server, database, () => {
+    createDatabaseBackup(database, paths.database, paths.backups, 'import');
+  });
+  if (options.rendererDir) {
+    await server.register(fastifyStatic, { root: options.rendererDir });
+  }
   const address = await server.listen({ host, port: options.port ?? 4317 });
 
   return {

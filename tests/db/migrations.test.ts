@@ -20,6 +20,11 @@ describe('database migrations', () => {
     expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 1, to: 1 });
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.prepare('select version from schema_migrations').all()).toEqual([{ version: 1 }]);
+    const drawingColumns = (db.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).map((column) => column.name);
+    expect(drawingColumns).toEqual(expect.arrayContaining([
+      'appearance_id', 'brand_code', 'product_size_code', 'appearance_code', 'color_code',
+      'main_category_code', 'project_item_code', 'notes',
+    ]));
     expect(backup).not.toHaveBeenCalled();
   });
 

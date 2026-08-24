@@ -2,7 +2,7 @@ import type { PlannerDatabase } from '../../db/database.js';
 import { ProductRepository } from './product-repository.js';
 import type { Product, ProductFilters, ProductInput } from './product-types.js';
 
-export type ProductErrorCode = 'DUPLICATE_MODEL' | 'INVALID_DICTIONARY_REFERENCE' | 'INVALID_REFERENCE_PRODUCT' | 'NOT_FOUND';
+export type ProductErrorCode = 'DUPLICATE_MODEL' | 'INVALID_DICTIONARY_REFERENCE' | 'INVALID_REFERENCE_PRODUCT' | 'PRODUCT_REFERENCED' | 'NOT_FOUND';
 
 export class ProductError extends Error {
   constructor(public readonly code: ProductErrorCode, message: string) { super(message); }
@@ -30,6 +30,9 @@ export class ProductService {
 
   update(id: number, input: ProductInput): Product {
     this.get(id);
+    if (this.repository.hasDrawingReferences(id)) {
+      throw new ProductError('PRODUCT_REFERENCED', '该产品已有图号记录，不能修改编码含义');
+    }
     const normalized = this.validateAndNormalize(input, id);
     try { return this.repository.update(id, normalized); }
     catch (error) { return this.mapDatabaseError(error); }

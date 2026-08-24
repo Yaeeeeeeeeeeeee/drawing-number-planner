@@ -35,6 +35,10 @@ nav { z-index: 1; display: grid; gap: 4px; }
 .text-button, .link-button { padding: 0; color: var(--blue); border: 0; background: transparent; } .text-button.danger { color: #b42318; }
 .link-button { font-family: Consolas, monospace; font-size: 12px; font-weight: 600; }
 .filter-bar, .inline-form, .upload-strip { display: flex; align-items: flex-end; gap: 12px; padding: 19px 0; }
+.filter-grid { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); }
+.check-field { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; min-height: 40px; }
+.check-field input { width: auto; }
+.row-actions { display: flex; gap: 8px; align-items: center; }
 label { display: grid; gap: 6px; color: #596579; font-size: 11px; font-weight: 600; }
 input, select { height: 40px; padding: 0 11px; color: #182235; border: 1px solid #cfd8e5; border-radius: 5px; background: #fff; outline: none; }
 input:focus, select:focus { border-color: #397dce; box-shadow: 0 0 0 3px rgba(57,125,206,.12); }

@@ -84,4 +84,10 @@ export class ProductRepository {
       where id = ? and type = ? and status = 'active'`).get(id, type) as { count: number };
     return row.count === 1;
   }
+
+  hasDrawingReferences(id: number): boolean {
+    const row = this.db.prepare('select count(*) as count from drawing_numbers where product_id = ?')
+      .get(id) as { count: number };
+    return row.count > 0;
+  }
 }

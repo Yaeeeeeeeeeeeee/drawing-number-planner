@@ -15,7 +15,7 @@ const inputSchema = z.object({
 
 function sendProductError(error: unknown, reply: FastifyReply) {
   if (error instanceof ProductError) {
-    const status = error.code === 'NOT_FOUND' ? 404 : error.code === 'DUPLICATE_MODEL' ? 409 : 400;
+    const status = error.code === 'NOT_FOUND' ? 404 : ['DUPLICATE_MODEL', 'PRODUCT_REFERENCED'].includes(error.code) ? 409 : 400;
     return reply.code(status).send({ error: { code: error.code, message: error.message } });
   }
   throw error;

@@ -24,7 +24,7 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
 
   await page.getByRole('button', { name: /产品档案/ }).click();
   await page.getByRole('button', { name: '新建产品' }).click();
-  await page.getByLabel('型号').fill('ZC220');
+  await page.getByRole('textbox', { name: '型号', exact: true }).fill('ZC220');
   await page.getByLabel('产品类别').fill('冰柜');
   await page.getByLabel('品牌').selectOption({ label: 'SAMKYO' });
   await page.getByLabel('品类尺寸').selectOption({ label: 'ZC220冰柜' });
@@ -43,6 +43,7 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
     name: '图号规划.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook,
   });
   await page.getByRole('button', { name: '开始检查' }).click();
-  await expect(page.getByText('发现 1 个问题')).toBeVisible();
+  await expect(page.getByText('发现 4 个问题')).toBeVisible();
   await expect(page.getByText('DUPLICATE_CODE')).toBeVisible();
+  await expect(page.getByText('DATABASE_CONFLICT').first()).toBeVisible();
 });

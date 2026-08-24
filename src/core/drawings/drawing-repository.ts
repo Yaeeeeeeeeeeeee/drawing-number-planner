@@ -4,16 +4,20 @@ import type { DrawingRecord, DrawingSearchFilters } from './drawing-types.js';
 interface DrawingRow {
   id: number; full_code: string; display_name: string; product_id: number; model: string;
   product_category: string; brand_id: number; brand_name: string; color_id: number; color_name: string;
+  appearance_id: number; appearance_name: string;
   main_category_id: number; main_category_name: string; project_item_id: number; project_item_name: string;
+  brand_code: string; product_size_code: string; appearance_code: string; color_code: string;
+  main_category_code: string; project_item_code: string;
   sequence: number; status: DrawingRecord['status']; previous_drawing_id: number | null;
   previous_full_code: string | null; change_reason: string | null; source_product_id: number | null;
   source_product_model: string | null; source_drawing_id: number | null;
-  source_drawing_full_code: string | null; created_at: string;
+  source_drawing_full_code: string | null; notes: string | null; created_at: string;
 }
 
 const fromClause = `from drawing_numbers drawing
   join products product on product.id = drawing.product_id
   join dictionary_items brand on brand.id = product.brand_id
+  join dictionary_items appearance on appearance.id = drawing.appearance_id
   join dictionary_items color on color.id = drawing.color_id
   join dictionary_items main_category on main_category.id = drawing.main_category_id
   join dictionary_items project_item on project_item.id = drawing.project_item_id
@@ -23,22 +27,29 @@ const fromClause = `from drawing_numbers drawing
 
 const selectClause = `select drawing.id, drawing.full_code, drawing.display_name,
   drawing.product_id, product.model, product.product_category, product.brand_id, brand.name as brand_name,
+  drawing.appearance_id, appearance.name as appearance_name,
   drawing.color_id, color.name as color_name, drawing.main_category_id, main_category.name as main_category_name,
   drawing.project_item_id, project_item.name as project_item_name, drawing.sequence, drawing.status,
+  drawing.brand_code, drawing.product_size_code, drawing.appearance_code, drawing.color_code,
+  drawing.main_category_code, drawing.project_item_code,
   drawing.previous_drawing_id, previous.full_code as previous_full_code, drawing.change_reason,
   drawing.source_product_id, source_product.model as source_product_model,
-  drawing.source_drawing_id, source_drawing.full_code as source_drawing_full_code, drawing.created_at`;
+  drawing.source_drawing_id, source_drawing.full_code as source_drawing_full_code, drawing.notes, drawing.created_at`;
 
 const mapRow = (row: DrawingRow): DrawingRecord => ({
   id: row.id, fullCode: row.full_code, displayName: row.display_name,
   productId: row.product_id, model: row.model, productCategory: row.product_category,
+  appearanceId: row.appearance_id, appearanceName: row.appearance_name,
   brandId: row.brand_id, brandName: row.brand_name, colorId: row.color_id, colorName: row.color_name,
   mainCategoryId: row.main_category_id, mainCategoryName: row.main_category_name,
   projectItemId: row.project_item_id, projectItemName: row.project_item_name,
+  brandCode: row.brand_code, productSizeCode: row.product_size_code, appearanceCode: row.appearance_code,
+  colorCode: row.color_code, mainCategoryCode: row.main_category_code, projectItemCode: row.project_item_code,
   sequence: row.sequence, status: row.status, previousDrawingId: row.previous_drawing_id,
   previousFullCode: row.previous_full_code, changeReason: row.change_reason,
   sourceProductId: row.source_product_id, sourceProductModel: row.source_product_model,
   sourceDrawingId: row.source_drawing_id, sourceDrawingFullCode: row.source_drawing_full_code,
+  notes: row.notes,
   createdAt: row.created_at,
 });
 

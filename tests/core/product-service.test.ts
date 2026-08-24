@@ -67,4 +67,21 @@ describe('ProductService', () => {
     const updated = products.update(product.id, { ...refs, model: 'ZC220A', productCategory: '卧式冰柜' });
     expect(updated).toEqual(expect.objectContaining({ model: 'ZC220A', productCategory: '卧式冰柜' }));
   });
+
+  it('blocks semantic edits after a drawing number references the product', () => {
+    const refs = validReferences();
+    const product = products.create({ ...refs, model: 'ZC220', productCategory: '冰柜' });
+    const color = dictionaries.create({ type: 'color', code: '0', name: '白色' });
+    const main = dictionaries.create({ type: 'main_category', code: '04', name: '印刷件类' });
+    const item = dictionaries.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
+    db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run('02.0209.10.0401001', 'SAMKYO-ZC220白色-LOGO', product.id, refs.defaultAppearanceId,
+        color.id, main.id, item.id, '02', '0209', '1', '0', '04', '01', 1, 'active', '2026-08-24T01:00:00Z');
+
+    expect(() => products.update(product.id, { ...refs, model: 'ZC220A', productCategory: '冰柜' }))
+      .toThrowError(expect.objectContaining({ code: 'PRODUCT_REFERENCED' }));
+  });
 });

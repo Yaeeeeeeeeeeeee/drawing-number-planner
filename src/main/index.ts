@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron';
+import { join } from 'node:path';
 
 import { startServer, type RunningServer } from '../server/start-server.js';
 
@@ -6,7 +7,12 @@ let runningServer: RunningServer | undefined;
 process.on('uncaughtException', (error) => console.error('[main] uncaught', error));
 
 async function createWindow() {
-  runningServer ??= await startServer({ dataDir: app.getPath('userData') });
+  const devArgument = process.argv.find((argument) => argument.startsWith('--dev-server-url='));
+  const devServerUrl = devArgument?.slice('--dev-server-url='.length);
+  runningServer ??= await startServer({
+    dataDir: app.getPath('userData'),
+    ...(devServerUrl ? {} : { rendererDir: join(app.getAppPath(), 'dist', 'renderer') }),
+  });
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -22,9 +28,7 @@ async function createWindow() {
   });
 
   window.once('ready-to-show', () => window.show());
-  const rendererUrl = new URL(process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173');
-  rendererUrl.searchParams.set('token', runningServer.token);
-  await window.loadURL(rendererUrl.toString());
+  await window.loadURL(devServerUrl ?? runningServer.url);
 }
 
 app.whenReady().then(createWindow).catch((error) => console.error('[main] startup failed', error));

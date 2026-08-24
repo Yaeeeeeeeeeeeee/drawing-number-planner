@@ -1,6 +1,7 @@
 import { readSheet } from 'read-excel-file/node';
 
 import type { DictionaryType } from '../dictionaries/dictionary-types.js';
+import type { PlannerDatabase } from '../../db/database.js';
 
 export type ExcelCell = string | number | boolean | Date | typeof Date | null | undefined;
 
@@ -14,7 +15,7 @@ export interface ImportCandidate {
 }
 
 export interface ImportIssue {
-  code: 'DUPLICATE_CODE' | 'INCOMPLETE_ROW';
+  code: 'DUPLICATE_CODE' | 'INCOMPLETE_ROW' | 'DATABASE_CONFLICT';
   dictionaryType: DictionaryType;
   sourceCell: string;
   message: string;
@@ -138,6 +139,27 @@ export function auditRows(rows: ExcelCell[][]): ImportAuditReport {
   }
 
   return { candidates, issues };
+}
+
+export function includeDatabaseConflicts(report: ImportAuditReport, database: PlannerDatabase): ImportAuditReport {
+  const issues = [...report.issues];
+  for (const candidate of report.candidates) {
+    const existing = candidate.type === 'project_item'
+      ? database.prepare(`select item.id from dictionary_items item
+          join dictionary_items parent on parent.id = item.parent_id
+          where item.type = ? and item.code = ? and parent.name = ? limit 1`)
+        .get(candidate.type, candidate.code, candidate.parentName)
+      : database.prepare(`select id from dictionary_items
+          where type = ? and code = ? and parent_id is null limit 1`)
+        .get(candidate.type, candidate.code);
+    if (existing) {
+      issues.push({
+        code: 'DATABASE_CONFLICT', dictionaryType: candidate.type, sourceCell: candidate.sourceCell,
+        message: '当前数据库中已存在相同编码', value: candidate.code, candidateIds: [candidate.id],
+      });
+    }
+  }
+  return { candidates: report.candidates, issues };
 }
 
 export async function auditWorkbook(buffer: Buffer): Promise<ImportAuditReport> {

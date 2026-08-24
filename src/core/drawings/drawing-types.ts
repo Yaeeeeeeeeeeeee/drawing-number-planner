@@ -7,6 +7,8 @@ export interface DrawingRecord {
   productId: number;
   model: string;
   productCategory: string;
+  appearanceId: number;
+  appearanceName: string;
   brandId: number;
   brandName: string;
   colorId: number;
@@ -15,6 +17,12 @@ export interface DrawingRecord {
   mainCategoryName: string;
   projectItemId: number;
   projectItemName: string;
+  brandCode: string;
+  productSizeCode: string;
+  appearanceCode: string;
+  colorCode: string;
+  mainCategoryCode: string;
+  projectItemCode: string;
   sequence: number;
   status: DrawingStatus;
   previousDrawingId: number | null;
@@ -24,6 +32,7 @@ export interface DrawingRecord {
   sourceProductModel: string | null;
   sourceDrawingId: number | null;
   sourceDrawingFullCode: string | null;
+  notes: string | null;
   createdAt: string;
 }
 

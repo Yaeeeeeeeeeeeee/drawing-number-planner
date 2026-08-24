@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { backupDatabaseFile } from '../../db/backup.js';
+import { createDatabaseBackup, isValidDatabaseBackup } from '../../db/backup.js';
+import type { PlannerDatabase } from '../../db/database.js';
 
 export type DailyBackupResult =
   | { status: 'created'; path: string }
@@ -15,18 +16,29 @@ const localDateKey = (date: Date) => {
   return `${year}${month}${day}`;
 };
 
+function pruneDailyBackups(backupsDir: string): void {
+  const daily = readdirSync(backupsDir)
+    .filter((name) => /^daily-\d{8}-\d{6}-\d{3}(?:-\d+)?\.db$/.test(name))
+    .sort();
+  for (const name of daily.slice(0, Math.max(0, daily.length - 30))) unlinkSync(join(backupsDir, name));
+}
+
 export function ensureDailyBackup(
+  database: PlannerDatabase,
   databasePath: string,
   backupsDir: string,
   now = new Date(),
-  createBackup: (source: string, destinationDir: string, date: Date) => string = backupDatabaseFile,
+  createBackup: typeof createDatabaseBackup = createDatabaseBackup,
 ): DailyBackupResult {
-  const marker = join(backupsDir, `.daily-${localDateKey(now)}`);
-  if (existsSync(marker)) return { status: 'skipped' };
   try {
-    const path = createBackup(databasePath, backupsDir, now);
     mkdirSync(backupsDir, { recursive: true });
-    writeFileSync(marker, path, 'utf8');
+    const prefix = `daily-${localDateKey(now)}-`;
+    const validExists = readdirSync(backupsDir)
+      .filter((name) => name.startsWith(prefix) && name.endsWith('.db'))
+      .some((name) => isValidDatabaseBackup(join(backupsDir, name)));
+    if (validExists) return { status: 'skipped' };
+    const path = createBackup(database, databasePath, backupsDir, 'daily', now);
+    pruneDailyBackups(backupsDir);
     return { status: 'created', path };
   } catch (error) {
     return { status: 'failed', error: error instanceof Error ? error.message : 'unknown backup error' };

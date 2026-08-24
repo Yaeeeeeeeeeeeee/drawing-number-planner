@@ -38,7 +38,8 @@ afterEach(() => db.close());
 describe('Excel import API', () => {
   it('audits an uploaded workbook then imports only confirmed candidates', async () => {
     const app = Fastify();
-    await registerImportRoutes(app, db);
+    let backups = 0;
+    await registerImportRoutes(app, db, () => { backups += 1; });
 
     const auditResponse = await app.inject({ method: 'POST', url: '/api/import/excel/audit', ...multipartFile(await workbook(), '规划.xlsx') });
     expect(auditResponse.statusCode).toBe(200);
@@ -52,14 +53,32 @@ describe('Excel import API', () => {
     });
     expect(importResponse.statusCode).toBe(200);
     expect(importResponse.json()).toEqual({ imported: 1, skipped: 3 });
+    expect(backups).toBe(1);
     expect(db.prepare("select name from dictionary_items where type = 'brand'").get()).toEqual({ name: 'SAMKYO' });
 
     await app.close();
   });
 
+  it('blocks an import when the mandatory pre-import backup fails', async () => {
+    const app = Fastify();
+    await registerImportRoutes(app, db, () => { throw new Error('disk unavailable'); });
+    const auditResponse = await app.inject({ method: 'POST', url: '/api/import/excel/audit', ...multipartFile(await workbook(), '规划.xlsx') });
+    const audit = auditResponse.json();
+
+    const response = await app.inject({
+      method: 'POST', url: '/api/import/excel/confirm',
+      payload: { auditId: audit.auditId, selections: ['brand:F22'] },
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: { code: 'BACKUP_FAILED', message: '导入前备份失败，未执行导入' } });
+    expect(db.prepare("select count(*) as count from dictionary_items where type = 'brand'").get()).toEqual({ count: 0 });
+    await app.close();
+  });
+
   it('returns a stable error when a legacy xls file is uploaded', async () => {
     const app = Fastify();
-    await registerImportRoutes(app, db);
+    await registerImportRoutes(app, db, () => undefined);
     const legacy = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 
     const response = await app.inject({ method: 'POST', url: '/api/import/excel/audit', ...multipartFile(legacy, '规划.xls') });

@@ -46,15 +46,23 @@ export const schemaVersionOne = `
     full_code TEXT NOT NULL UNIQUE,
     display_name TEXT NOT NULL,
     product_id INTEGER NOT NULL REFERENCES products(id),
+    appearance_id INTEGER NOT NULL REFERENCES dictionary_items(id),
     color_id INTEGER NOT NULL REFERENCES dictionary_items(id),
     main_category_id INTEGER NOT NULL REFERENCES dictionary_items(id),
     project_item_id INTEGER NOT NULL REFERENCES dictionary_items(id),
+    brand_code TEXT NOT NULL,
+    product_size_code TEXT NOT NULL,
+    appearance_code TEXT NOT NULL,
+    color_code TEXT NOT NULL,
+    main_category_code TEXT NOT NULL,
+    project_item_code TEXT NOT NULL,
     sequence INTEGER NOT NULL CHECK (sequence BETWEEN 1 AND 999),
     status TEXT NOT NULL CHECK (status IN ('reserved', 'active', 'voided')),
     previous_drawing_id INTEGER REFERENCES drawing_numbers(id),
     change_reason TEXT,
     source_product_id INTEGER REFERENCES products(id),
     source_drawing_id INTEGER REFERENCES drawing_numbers(id),
+    notes TEXT,
     created_at TEXT NOT NULL
   );
 

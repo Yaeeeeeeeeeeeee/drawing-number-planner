@@ -26,6 +26,7 @@ export interface PlannerApi {
   getDrawing(id: number): Promise<DrawingView>;
   listDictionaries(type: string, includeInactive?: boolean): Promise<DictionaryItemView[]>;
   createDictionary(type: string, input: { code: string; name: string; parentId?: number }): Promise<DictionaryItemView>;
+  updateDictionaryName(id: number, name: string): Promise<DictionaryItemView>;
   deactivateDictionary(id: number): Promise<DictionaryItemView>;
   listProducts(filters?: Record<string, string | number | undefined>): Promise<ProductView[]>;
   createProduct(input: Record<string, unknown>): Promise<ProductView>;
@@ -51,13 +52,23 @@ const queryString = (values: Record<string, unknown>) => {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = init?.method?.toUpperCase() ?? 'GET';
   const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-  const queryToken = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('token') ?? '';
-  const token = queryToken || (import.meta.env.DEV ? 'phase-one-development' : '');
+  const token = write ? await sessionToken() : '';
   const headers = { ...(init?.headers as Record<string, string> | undefined), ...(write && token ? { 'x-planner-token': token } : {}) };
   const response = await fetch(path, { ...init, headers });
   const body = await response.json();
   if (!response.ok) throw new ApiError(body.error?.code ?? 'REQUEST_FAILED', body.error?.message ?? '请求失败');
   return body as T;
+}
+
+let currentSessionToken: Promise<string> | undefined;
+function sessionToken(): Promise<string> {
+  currentSessionToken ??= fetch('/api/session', { method: 'POST' })
+    .then(async (response) => {
+      const body = await response.json();
+      if (!response.ok) throw new ApiError(body.error?.code ?? 'SESSION_FAILED', body.error?.message ?? '无法建立本机安全会话');
+      return String(body.token);
+    });
+  return currentSessionToken;
 }
 
 const json = (method: string, body?: unknown): RequestInit => ({
@@ -74,6 +85,7 @@ export const apiClient: PlannerApi = {
     return result.items;
   },
   createDictionary: (type, input) => request(`/api/dictionaries/${type}`, json('POST', input)),
+  updateDictionaryName: (id, name) => request(`/api/dictionaries/items/${id}`, json('PATCH', { name })),
   deactivateDictionary: (id) => request(`/api/dictionaries/items/${id}/deactivate`, json('POST')),
   listProducts: async (filters = {}) => (await request<{ items: ProductView[] }>(`/api/products${queryString(filters)}`)).items,
   createProduct: (input) => request('/api/products', json('POST', input)),

@@ -27,10 +27,13 @@ beforeEach(() => {
     model: 'ZC220', productCategory: '冰柜',
   });
   const insert = db.prepare(`insert into drawing_numbers
-    (full_code, display_name, product_id, color_id, main_category_id, project_item_id,
-     sequence, status, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  const first = insert.run('02.0209.10.0401001', 'SAMKYO-ZC220白色-LOGO', product.id, white.id, main.id, logo.id, 1, 'active', '2026-08-24T01:00:00Z');
-  const second = insert.run('02.0209.11.0402002', 'SAMKYO-ZC220黑色-说明书', product.id, black.id, main.id, manual.id, 2, 'reserved', '2026-08-24T02:00:00Z');
+    (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+     brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+     sequence, status, notes, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const first = insert.run('02.0209.10.0401001', 'SAMKYO-ZC220白色-LOGO', product.id, appearance.id, white.id, main.id, logo.id,
+    '02', '0209', '1', '0', '04', '01', 1, 'active', '首版', '2026-08-24T01:00:00Z');
+  const second = insert.run('02.0209.11.0402002', 'SAMKYO-ZC220黑色-说明书', product.id, appearance.id, black.id, main.id, manual.id,
+    '02', '0209', '1', '1', '04', '02', 2, 'reserved', null, '2026-08-24T02:00:00Z');
   ids = { brand: brand.id, main: main.id, logo: logo.id, manual: manual.id, white: white.id,
     first: Number(first.lastInsertRowid), second: Number(second.lastInsertRowid) };
   drawings = new DrawingQueryService(db);
@@ -65,6 +68,8 @@ describe('DrawingQueryService', () => {
   it('returns a joined detail record', () => {
     expect(drawings.get(ids.first)).toEqual(expect.objectContaining({
       fullCode: '02.0209.10.0401001', brandName: 'SAMKYO', productCategory: '冰柜', status: 'active',
+      appearanceName: '1号外观', brandCode: '02', productSizeCode: '0209', appearanceCode: '1',
+      colorCode: '0', mainCategoryCode: '04', projectItemCode: '01', notes: '首版',
     }));
   });
 });
