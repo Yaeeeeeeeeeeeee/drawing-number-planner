@@ -82,4 +82,31 @@ describe('Excel dictionary audit', () => {
       code: 'AMBIGUOUS_PARENT', dictionaryType: 'project_item', candidateIds: ['project_item:I22'],
     }));
   });
+
+  it('audits parent ambiguity across current database and workbook candidates', () => {
+    const database = openDatabase(':memory:');
+    migrateDatabase(database, { databaseExists: false, createBackup: () => undefined });
+    database.prepare(`insert into dictionary_items (type, code, name, created_at)
+      values ('main_category', '99', '电子元件类', '2026-08-24T00:00:00Z')`).run();
+
+    const report = includeDatabaseConflicts(auditRows(sourceRows()), database);
+
+    expect(report.issues).toContainEqual(expect.objectContaining({
+      code: 'AMBIGUOUS_PARENT', dictionaryType: 'project_item', candidateIds: ['project_item:I22'],
+    }));
+    database.close();
+  });
+
+  it('marks a project item with no importable or existing parent before confirmation', () => {
+    const database = openDatabase(':memory:');
+    migrateDatabase(database, { databaseExists: false, createBackup: () => undefined });
+    const rows = sourceRows(); rows[20][8] = '不存在的主类别';
+
+    const report = includeDatabaseConflicts(auditRows(rows), database);
+
+    expect(report.issues).toContainEqual(expect.objectContaining({
+      code: 'MISSING_PARENT', dictionaryType: 'project_item', candidateIds: ['project_item:I22'],
+    }));
+    database.close();
+  });
 });

@@ -11,11 +11,13 @@ export interface ImportCandidate {
   code: string;
   name: string;
   parentName?: string;
+  parentCandidateId?: string;
+  parentExistingId?: number;
   sourceCell: string;
 }
 
 export interface ImportIssue {
-  code: 'DUPLICATE_CODE' | 'INCOMPLETE_ROW' | 'DATABASE_CONFLICT' | 'AMBIGUOUS_PARENT';
+  code: 'DUPLICATE_CODE' | 'INCOMPLETE_ROW' | 'DATABASE_CONFLICT' | 'AMBIGUOUS_PARENT' | 'MISSING_PARENT';
   dictionaryType: DictionaryType;
   sourceCell: string;
   message: string;
@@ -143,6 +145,8 @@ export function auditRows(rows: ExcelCell[][]): ImportAuditReport {
     mainNames.set(candidate.name, (mainNames.get(candidate.name) ?? 0) + 1);
   }
   for (const candidate of candidates.filter((item) => item.type === 'project_item')) {
+    const parents = candidates.filter((item) => item.type === 'main_category' && item.name === candidate.parentName);
+    if (parents.length === 1) candidate.parentCandidateId = parents[0].id;
     if ((mainNames.get(candidate.parentName ?? '') ?? 0) > 1) {
       issues.push({
         code: 'AMBIGUOUS_PARENT', dictionaryType: 'project_item', sourceCell: candidate.sourceCell,
@@ -156,17 +160,32 @@ export function auditRows(rows: ExcelCell[][]): ImportAuditReport {
 
 export function includeDatabaseConflicts(report: ImportAuditReport, database: PlannerDatabase): ImportAuditReport {
   const issues = [...report.issues];
-  for (const candidate of report.candidates) {
+  const candidates = report.candidates.map((candidate) => ({ ...candidate }));
+  for (const candidate of candidates) {
     if (candidate.type === 'project_item') {
-      const parents = database.prepare(`select id from dictionary_items
-        where type = 'main_category' and name = ?`).all(candidate.parentName);
-      if (parents.length > 1) {
+      const existingParents = database.prepare(`select id from dictionary_items
+        where type = 'main_category' and name = ?`).all(candidate.parentName) as Array<{ id: number }>;
+      const workbookParents = candidates.filter((item) => item.type === 'main_category' && item.name === candidate.parentName);
+      const totalParents = existingParents.length + workbookParents.length;
+      delete candidate.parentCandidateId;
+      delete candidate.parentExistingId;
+      if (totalParents > 1) {
+        if (issues.some((issue) => issue.code === 'AMBIGUOUS_PARENT' && issue.candidateIds?.includes(candidate.id))) continue;
         issues.push({
           code: 'AMBIGUOUS_PARENT', dictionaryType: candidate.type, sourceCell: candidate.sourceCell,
-          message: '当前数据库中存在多个同名主类别，请先消除重名', value: candidate.parentName, candidateIds: [candidate.id],
+          message: '当前数据库与本次导入中存在多个同名主类别，请先消除重名', value: candidate.parentName, candidateIds: [candidate.id],
         });
         continue;
       }
+      if (totalParents === 0) {
+        issues.push({
+          code: 'MISSING_PARENT', dictionaryType: candidate.type, sourceCell: candidate.sourceCell,
+          message: '找不到所属主类别，请先导入或创建主类别', value: candidate.parentName, candidateIds: [candidate.id],
+        });
+        continue;
+      }
+      if (existingParents.length === 1) candidate.parentExistingId = existingParents[0].id;
+      else candidate.parentCandidateId = workbookParents[0].id;
     }
     const existing = candidate.type === 'project_item'
       ? database.prepare(`select item.id from dictionary_items item
@@ -183,7 +202,7 @@ export function includeDatabaseConflicts(report: ImportAuditReport, database: Pl
       });
     }
   }
-  return { candidates: report.candidates, issues };
+  return { candidates, issues };
 }
 
 export async function auditWorkbook(buffer: Buffer): Promise<ImportAuditReport> {

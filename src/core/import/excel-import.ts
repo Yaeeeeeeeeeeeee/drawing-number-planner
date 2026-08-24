@@ -14,9 +14,12 @@ export interface ImportResult {
   skipped: number;
 }
 
-function findParent(service: DictionaryService, candidate: ImportCandidate): DictionaryItem | undefined {
-  return service.list({ type: 'main_category', includeInactive: true })
-    .find((item) => item.name === candidate.parentName);
+function findParent(service: DictionaryService, candidate: ImportCandidate, imported: Map<string, DictionaryItem>): DictionaryItem | undefined {
+  if (candidate.parentExistingId !== undefined) {
+    return service.list({ type: 'main_category', includeInactive: true }).find((item) => item.id === candidate.parentExistingId);
+  }
+  if (candidate.parentCandidateId) return imported.get(candidate.parentCandidateId);
+  return undefined;
 }
 
 export function importApprovedRows(
@@ -33,6 +36,7 @@ export function importApprovedRows(
   }
 
   const service = new DictionaryService(database);
+  const imported = new Map<string, DictionaryItem>();
   const ordered = [
     ...selected.filter((candidate) => candidate.type !== 'project_item'),
     ...selected.filter((candidate) => candidate.type === 'project_item'),
@@ -41,13 +45,13 @@ export function importApprovedRows(
   database.transaction(() => {
     for (const candidate of ordered) {
       if (candidate.type === 'project_item') {
-        const parent = findParent(service, candidate);
+        const parent = findParent(service, candidate, imported);
         if (!parent) throw new ExcelImportError('MISSING_PARENT', `找不到主类别：${candidate.parentName}`);
-        service.create({
+        imported.set(candidate.id, service.create({
           type: candidate.type, code: candidate.code, name: candidate.name, parentId: parent.id,
-        });
+        }));
       } else {
-        service.create({ type: candidate.type, code: candidate.code, name: candidate.name });
+        imported.set(candidate.id, service.create({ type: candidate.type, code: candidate.code, name: candidate.name }));
       }
     }
   })();

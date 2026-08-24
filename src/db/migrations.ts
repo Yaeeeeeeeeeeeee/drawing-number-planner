@@ -20,25 +20,64 @@ function currentVersion(database: PlannerDatabase): number {
   return row.version ?? 0;
 }
 
+function hasDrawingColumn(database: PlannerDatabase, name: string): boolean {
+  return (database.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).some((column) => column.name === name);
+}
+
+function validateExpandedDrawingRows(database: PlannerDatabase): void {
+  const invalid = database.prepare(`select count(*) as count from drawing_numbers drawing
+    left join dictionary_items appearance on appearance.id = drawing.appearance_id
+    left join dictionary_items color on color.id = drawing.color_id
+    left join dictionary_items main_category on main_category.id = drawing.main_category_id
+    left join dictionary_items project_item on project_item.id = drawing.project_item_id
+    where appearance.id is null or color.id is null or main_category.id is null or project_item.id is null
+      or appearance.type <> 'appearance' or color.type <> 'color'
+      or main_category.type <> 'main_category' or project_item.type <> 'project_item'
+      or project_item.parent_id <> drawing.main_category_id
+      or trim(drawing.brand_code) = '' or trim(drawing.product_size_code) = ''
+      or trim(drawing.appearance_code) = '' or trim(drawing.color_code) = ''
+      or trim(drawing.main_category_code) = '' or trim(drawing.project_item_code) = ''
+      or drawing.full_code <> drawing.brand_code || '.' || drawing.product_size_code || '.'
+        || drawing.appearance_code || drawing.color_code || '.' || drawing.main_category_code
+        || drawing.project_item_code || printf('%03d', drawing.sequence)`).get() as { count: number };
+  if (invalid.count > 0) throw new Error('扩展版旧图号的编码快照不一致，数据库未升级');
+}
+
+function validateLegacyDrawingRows(database: PlannerDatabase): void {
+  const invalid = database.prepare(`select count(*) as count from drawing_numbers drawing
+    left join products product on product.id = drawing.product_id
+    left join dictionary_items brand on brand.id = product.brand_id
+    left join dictionary_items size on size.id = product.product_size_id
+    left join dictionary_items appearance on appearance.id = product.default_appearance_id
+    left join dictionary_items color on color.id = drawing.color_id
+    left join dictionary_items main_category on main_category.id = drawing.main_category_id
+    left join dictionary_items project_item on project_item.id = drawing.project_item_id
+    where product.id is null or brand.id is null or size.id is null or appearance.id is null
+      or color.id is null or main_category.id is null or project_item.id is null
+      or brand.type <> 'brand' or size.type <> 'product_size'
+      or appearance.type <> 'appearance' or color.type <> 'color'
+      or main_category.type <> 'main_category' or project_item.type <> 'project_item'
+      or project_item.parent_id <> drawing.main_category_id
+      or drawing.full_code <> brand.code || '.' || size.code || '.' || appearance.code || color.code || '.'
+        || main_category.code || project_item.code || printf('%03d', drawing.sequence)`).get() as { count: number };
+  if (invalid.count > 0) throw new Error('旧图号编码段无法可靠回填，数据库未升级');
+}
+
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
+  if (from > 2) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 2`);
   if (from >= 2) return { from, to: from };
   if (safety.databaseExists) safety.createBackup();
   database.transaction(() => {
     if (from < 1) database.exec(schemaVersionOne);
     if (from < 2) {
-      const incomplete = database.prepare(`select count(*) as count from drawing_numbers drawing
-        left join products product on product.id = drawing.product_id
-        left join dictionary_items brand on brand.id = product.brand_id
-        left join dictionary_items size on size.id = product.product_size_id
-        left join dictionary_items appearance on appearance.id = product.default_appearance_id
-        left join dictionary_items color on color.id = drawing.color_id
-        left join dictionary_items main_category on main_category.id = drawing.main_category_id
-        left join dictionary_items project_item on project_item.id = drawing.project_item_id
-        where product.id is null or brand.id is null or size.id is null or appearance.id is null
-          or color.id is null or main_category.id is null or project_item.id is null`).get() as { count: number };
-      if (incomplete.count > 0) throw new Error('旧图号缺少可回填的默认外观或编码字典，数据库未升级');
-      database.exec(schemaVersionTwo);
+      if (hasDrawingColumn(database, 'appearance_id')) {
+        validateExpandedDrawingRows(database);
+        database.prepare(`insert into schema_migrations (version, applied_at) values (2, ?)`).run(new Date().toISOString());
+      } else {
+        validateLegacyDrawingRows(database);
+        database.exec(schemaVersionTwo);
+      }
     }
   })();
   return { from, to: 2 };

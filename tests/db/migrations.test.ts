@@ -77,10 +77,63 @@ describe('database migrations', () => {
     const backup = vi.fn();
 
     expect(() => migrateDatabase(db, { databaseExists: true, createBackup: backup }))
-      .toThrow('旧图号缺少可回填的默认外观');
+      .toThrow('旧图号编码段无法可靠回填');
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 1 });
     expect(db.prepare('select count(*) as count from drawing_numbers').get()).toEqual({ count: 1 });
+  });
+
+  it('preserves expanded-v1 drawing snapshots and notes instead of backfilling them', () => {
+    const db = openDatabase(':memory:'); databases.push(db);
+    migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+    const now = '2026-08-24T00:00:00Z';
+    const insert = db.prepare(`insert into dictionary_items (type, code, name, parent_id, created_at) values (?, ?, ?, ?, ?)`);
+    const brand = Number(insert.run('brand', '02', 'SAMKYO', null, now).lastInsertRowid);
+    const size = Number(insert.run('product_size', '0209', '冰柜', null, now).lastInsertRowid);
+    const defaultAppearance = Number(insert.run('appearance', '1', '1号外观', null, now).lastInsertRowid);
+    const drawingAppearance = Number(insert.run('appearance', '2', '2号外观', null, now).lastInsertRowid);
+    const color = Number(insert.run('color', '0', '白色', null, now).lastInsertRowid);
+    const main = Number(insert.run('main_category', '04', '印刷件类', null, now).lastInsertRowid);
+    const item = Number(insert.run('project_item', '01', 'LOGO', main, now).lastInsertRowid);
+    const product = Number(db.prepare(`insert into products
+      (brand_id, product_size_id, default_appearance_id, model, product_category, created_at)
+      values (?, ?, ?, 'ZC220', '冰柜', ?)`).run(brand, size, defaultAppearance, now).lastInsertRowid);
+    db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, notes, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', '不得丢失', ?)`)
+      .run('02.0209.20.0401001', product, drawingAppearance, color, main, item, now);
+    db.prepare('delete from schema_migrations where version = 2').run();
+    const backup = vi.fn();
+
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 2 });
+
+    expect(db.prepare('select appearance_id, appearance_code, notes from drawing_numbers').get()).toEqual({
+      appearance_id: drawingAppearance, appearance_code: '2', notes: '不得丢失',
+    });
+  });
+
+  it('rejects a legacy backfill when the proposed segments do not reproduce the full code', () => {
+    const db = openDatabase(':memory:'); databases.push(db); db.exec(schemaVersionOne);
+    const now = '2026-08-24T00:00:00Z';
+    const insert = db.prepare(`insert into dictionary_items (type, code, name, parent_id, created_at) values (?, ?, ?, ?, ?)`);
+    const brand = Number(insert.run('brand', '02', 'SAMKYO', null, now).lastInsertRowid);
+    const size = Number(insert.run('product_size', '0209', '冰柜', null, now).lastInsertRowid);
+    const changedAppearance = Number(insert.run('appearance', '2', '2号外观', null, now).lastInsertRowid);
+    const color = Number(insert.run('color', '0', '白色', null, now).lastInsertRowid);
+    const main = Number(insert.run('main_category', '04', '印刷件类', null, now).lastInsertRowid);
+    const item = Number(insert.run('project_item', '01', 'LOGO', main, now).lastInsertRowid);
+    const product = Number(db.prepare(`insert into products
+      (brand_id, product_size_id, default_appearance_id, model, product_category, created_at)
+      values (?, ?, ?, 'ZC220', '冰柜', ?)`).run(brand, size, changedAppearance, now).lastInsertRowid);
+    db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, color_id, main_category_id, project_item_id, sequence, status, created_at)
+      values ('02.0209.10.0401001', '图号', ?, ?, ?, ?, 1, 'active', ?)`)
+      .run(product, color, main, item, now);
+
+    expect(() => migrateDatabase(db, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('旧图号编码段无法可靠回填');
+    expect(db.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 1 });
   });
 
   it('does not migrate an existing database when its safety backup fails', () => {
