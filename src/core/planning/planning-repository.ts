@@ -1,6 +1,6 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { PlanningError } from './planning-errors.js';
-import type { PlanningContext, PlanningInput, ResolvedPlanningRow } from './planning-types.js';
+import type { PlannedRow, PlanningContext, PlanningInput, ReservedDrawing, ResolvedPlanningRow } from './planning-types.js';
 
 interface DictionaryRow {
   id: number; code: string; name: string; parent_id: number | null; status: 'active' | 'inactive';
@@ -73,5 +73,20 @@ export class PlanningRepository {
   hasFullCode(fullCode: string): boolean {
     return (this.db.prepare('select count(*) as count from drawing_numbers where full_code = ?')
       .get(fullCode) as { count: number }).count > 0;
+  }
+
+  insertReserved(context: PlanningContext, row: ResolvedPlanningRow, planned: PlannedRow): ReservedDrawing {
+    const result = this.db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, notes, created_at)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?)`)
+      .run(planned.fullCode, planned.displayName, context.productId, context.appearanceId,
+        row.colorId, row.mainCategoryId, row.projectItemId,
+        context.brandCode, context.productSizeCode, context.appearanceCode,
+        row.colorCode, row.mainCategoryCode, row.projectItemCode, planned.sequence,
+        row.notes?.trim() || null, new Date().toISOString());
+    return { id: Number(result.lastInsertRowid), fullCode: planned.fullCode,
+      displayName: planned.displayName, status: 'reserved' };
   }
 }

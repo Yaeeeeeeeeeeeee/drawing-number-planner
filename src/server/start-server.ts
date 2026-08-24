@@ -8,6 +8,7 @@ import { resolveAppPaths } from '../core/config/app-paths.js';
 import { ensureDailyBackup } from '../core/backup/daily-backup.js';
 import { DictionaryService } from '../core/dictionaries/dictionary-service.js';
 import { DrawingQueryService } from '../core/drawings/drawing-query-service.js';
+import { PlanningService } from '../core/planning/planning-service.js';
 import { ProductService } from '../core/products/product-service.js';
 import { createDatabaseBackup } from '../db/backup.js';
 import { openDatabase } from '../db/database.js';
@@ -16,6 +17,7 @@ import { registerDictionaryRoutes } from './routes/dictionaries.js';
 import { registerDrawingRoutes } from './routes/drawings.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerProductRoutes } from './routes/products.js';
+import { registerPlanningRoutes } from './routes/planning.js';
 import { assertLoopbackHost, registerLocalAccess } from './security/local-access.js';
 
 export interface ServerOptions {
@@ -62,6 +64,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
+    registerPlanningRoutes(server, new PlanningService(database));
     await registerImportRoutes(server, database, () => {
       createDatabaseBackup(database, paths.database, paths.backups, 'import');
     });

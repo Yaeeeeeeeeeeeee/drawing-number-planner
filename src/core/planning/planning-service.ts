@@ -2,11 +2,11 @@ import type { PlannerDatabase } from '../../db/database.js';
 import { composeDrawingCode, composeDrawingPrefix, formatDisplayName } from './code-generator.js';
 import { PlanningError } from './planning-errors.js';
 import { PlanningRepository } from './planning-repository.js';
-import type { PlannedRow, PlanningInput, PlanningPreview } from './planning-types.js';
+import type { PlannedRow, PlanningInput, PlanningPreview, ReservePlanningInput, ReservedDrawing } from './planning-types.js';
 
 export class PlanningService {
   private readonly repository: PlanningRepository;
-  constructor(database: PlannerDatabase) { this.repository = new PlanningRepository(database); }
+  constructor(private readonly database: PlannerDatabase) { this.repository = new PlanningRepository(database); }
 
   private validateInput(input: PlanningInput): void {
     if (input.rows.length < 1 || input.rows.length > 100) {
@@ -43,5 +43,29 @@ export class PlanningService {
       };
     });
     return { productId: context.productId, appearanceId: context.appearanceId, rows };
+  }
+
+  reserve(input: ReservePlanningInput): ReservedDrawing[] {
+    const run = this.database.transaction(() => {
+      const planningInput: PlanningInput = {
+        productId: input.productId,
+        ...(input.appearanceId === undefined ? {} : { appearanceId: input.appearanceId }),
+        rows: input.rows.map(({ expectedFullCode: _expected, ...row }) => row),
+      };
+      const preview = this.preview(planningInput);
+      if (preview.rows.some((row, index) => row.fullCode !== input.rows[index].expectedFullCode)) {
+        throw new PlanningError('PLAN_STALE', '推荐图号已变化，请重新查重后再占号');
+      }
+      const context = this.repository.resolveContext(planningInput);
+      try {
+        return preview.rows.map((planned, index) => this.repository.insertReserved(context, context.rows[index], planned));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+          throw new PlanningError('DRAWING_CODE_CONFLICT', '图号已被占用，请重新查重');
+        }
+        throw error;
+      }
+    });
+    return run.immediate();
   }
 }

@@ -50,3 +50,20 @@ export interface PlanningPreview {
   appearanceId: number;
   rows: PlannedRow[];
 }
+
+export interface ReservePlanningRowInput extends PlanningRowInput {
+  expectedFullCode: string;
+}
+
+export interface ReservePlanningInput {
+  productId: number;
+  appearanceId?: number;
+  rows: ReservePlanningRowInput[];
+}
+
+export interface ReservedDrawing {
+  id: number;
+  fullCode: string;
+  displayName: string;
+  status: 'reserved';
+}
