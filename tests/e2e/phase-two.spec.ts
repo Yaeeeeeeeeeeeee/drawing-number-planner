@@ -3,6 +3,10 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 const headers = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'phase-one-development' };
 
 async function createDictionary(request: APIRequestContext, type: string, code: string, name: string, parentId?: number) {
+  const listed = await request.get(`/api/dictionaries/${type}?includeInactive=false`);
+  const existing = (await listed.json()).items.find((item: { code: string; parentId?: number | null }) =>
+    item.code === code && (parentId === undefined || item.parentId === parentId));
+  if (existing) return existing.id as number;
   const response = await request.post(`/api/dictionaries/${type}`, { headers, data: { code, name, ...(parentId ? { parentId } : {}) } });
   expect(response.ok()).toBeTruthy(); return (await response.json()).id as number;
 }
@@ -37,6 +41,8 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   await expect(page.getByText('已成功占用 2 个图号')).toBeVisible();
 
   await page.getByRole('button', { name: /图号库/ }).click();
+  await page.getByLabel('型号').fill('ZC200');
+  await page.getByRole('button', { name: '检索', exact: true }).click();
   await expect(page.getByText('2 条记录')).toBeVisible();
   await expect(page.getByText('12.0404.010.0401001')).toBeVisible();
   await expect(page.getByText('12.0404.010.0401002')).toBeVisible();
