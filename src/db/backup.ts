@@ -31,10 +31,12 @@ export function createDatabaseBackup(
   backupsDir: string,
   purpose: BackupPurpose,
   now = new Date(),
+  dateKey?: string,
 ): string {
   mkdirSync(backupsDir, { recursive: true });
   database.pragma('wal_checkpoint(TRUNCATE)');
-  const stem = `${purpose}-${timestamp(now)}`;
+  const precise = timestamp(now);
+  const stem = dateKey ? `${purpose}-${dateKey}-${precise.slice(9)}` : `${purpose}-${precise}`;
   let suffix = 0;
   while (true) {
     const destination = join(backupsDir, `${stem}${suffix ? `-${suffix}` : ''}.db`);

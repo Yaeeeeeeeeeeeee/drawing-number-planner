@@ -14,9 +14,9 @@ describe('real application API', () => {
     expect((await fetch(`${first.url}/api/dictionaries/brand`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: '02', name: 'SAMKYO' }),
-    })).status).toBe(401);
+    })).status).toBe(403);
     const created = await fetch(`${first.url}/api/dictionaries/brand`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-planner-token': 'restart-test-token' },
+      method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:5173', 'x-planner-token': 'restart-test-token' },
       body: JSON.stringify({ code: '02', name: 'SAMKYO' }),
     });
     expect(created.status).toBe(201);

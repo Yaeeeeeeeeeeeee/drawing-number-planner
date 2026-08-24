@@ -69,4 +69,17 @@ describe('Excel dictionary audit', () => {
     }));
     database.close();
   });
+
+  it('blocks project items whose parent category name is ambiguous', () => {
+    const rows = sourceRows();
+    rows[20][8] = '重复类别名';
+    rows[21][7] = '重复类别名';
+    rows[22][7] = '重复类别名';
+
+    const report = auditRows(rows);
+
+    expect(report.issues).toContainEqual(expect.objectContaining({
+      code: 'AMBIGUOUS_PARENT', dictionaryType: 'project_item', candidateIds: ['project_item:I22'],
+    }));
+  });
 });

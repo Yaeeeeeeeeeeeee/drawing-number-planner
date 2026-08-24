@@ -30,6 +30,9 @@ export function registerLocalAccess(app: FastifyInstance, options: {
       return reply.code(403).send({ error: { code: 'ORIGIN_NOT_ALLOWED', message: '请求来源不受信任' } });
     }
     if (writeMethods.has(request.method)) {
+      if (!origin) {
+        return reply.code(403).send({ error: { code: 'ORIGIN_NOT_ALLOWED', message: '请求来源不受信任' } });
+      }
       const supplied = request.headers['x-planner-token'];
       if (supplied !== options.token) {
         return reply.code(401).send({ error: { code: 'INVALID_TOKEN', message: '写操作令牌无效' } });

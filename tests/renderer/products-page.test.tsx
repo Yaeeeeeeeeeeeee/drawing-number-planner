@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProductsPage } from '../../src/renderer/pages/ProductsPage';
@@ -25,7 +25,7 @@ describe('ProductsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '新建产品' }));
     fireEvent.change(screen.getByLabelText('型号'), { target: { value: 'ZC220' } });
     fireEvent.change(screen.getByLabelText('产品类别'), { target: { value: '冰柜' } });
-    fireEvent.change(screen.getByLabelText('品牌'), { target: { value: '1' } });
+    fireEvent.change(screen.getByRole('combobox', { name: /^品牌$/ }), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('品类尺寸'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('默认外观'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: '保存产品' }));
@@ -45,7 +45,7 @@ describe('ProductsPage', () => {
       appearance: [{ id: 3, code: '1', name: '1号外观', status: 'active' }],
     };
     const api = {
-      listProducts: vi.fn().mockResolvedValue([source, target]),
+      listProducts: vi.fn().mockResolvedValueOnce([source, target]).mockResolvedValueOnce([target]),
       listDictionaries: vi.fn((type: keyof typeof dictionaries) => Promise.resolve(dictionaries[type])),
       createProduct: vi.fn(),
       updateProduct: vi.fn().mockResolvedValue({ ...target, model: 'ZC220A', referenceProductId: 1, referenceProductModel: 'ZC200' }),
@@ -55,8 +55,10 @@ describe('ProductsPage', () => {
     await screen.findByText('ZC220');
 
     fireEvent.change(screen.getByLabelText('搜索产品'), { target: { value: 'ZC22' } });
+    fireEvent.change(screen.getByLabelText('筛选品牌'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
-    expect(api.listProducts).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'ZC22' }));
+    await waitFor(() => expect(api.listProducts).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'ZC22', brandId: 1 })));
+    await waitFor(() => expect(screen.queryByText('ZC200', { exact: true })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: '编辑 ZC220' }));
     fireEvent.change(screen.getByLabelText('型号'), { target: { value: 'ZC220A' } });

@@ -19,6 +19,7 @@ const localDateKey = (date: Date) => {
 function pruneDailyBackups(backupsDir: string): void {
   const daily = readdirSync(backupsDir)
     .filter((name) => /^daily-\d{8}-\d{6}-\d{3}(?:-\d+)?\.db$/.test(name))
+    .filter((name) => isValidDatabaseBackup(join(backupsDir, name)))
     .sort();
   for (const name of daily.slice(0, Math.max(0, daily.length - 30))) unlinkSync(join(backupsDir, name));
 }
@@ -37,7 +38,7 @@ export function ensureDailyBackup(
       .filter((name) => name.startsWith(prefix) && name.endsWith('.db'))
       .some((name) => isValidDatabaseBackup(join(backupsDir, name)));
     if (validExists) return { status: 'skipped' };
-    const path = createBackup(database, databasePath, backupsDir, 'daily', now);
+    const path = createBackup(database, databasePath, backupsDir, 'daily', now, localDateKey(now));
     pruneDailyBackups(backupsDir);
     return { status: 'created', path };
   } catch (error) {

@@ -54,6 +54,28 @@ describe('DictionaryService', () => {
     expect(service.deactivate(brand.id).status).toBe('inactive');
   });
 
+  it('protects an appearance referenced directly by a drawing', () => {
+    const brand = service.create({ type: 'brand', code: '02', name: 'SAMKYO' });
+    const size = service.create({ type: 'product_size', code: '0209', name: '冰柜' });
+    const defaultAppearance = service.create({ type: 'appearance', code: '1', name: '1号外观' });
+    const drawingAppearance = service.create({ type: 'appearance', code: '2', name: '2号外观' });
+    const color = service.create({ type: 'color', code: '0', name: '白色' });
+    const main = service.create({ type: 'main_category', code: '04', name: '印刷件类' });
+    const item = service.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
+    const product = Number(db.prepare(`insert into products
+      (brand_id, product_size_id, default_appearance_id, model, product_category, created_at)
+      values (?, ?, ?, 'ZC220', '冰柜', '2026-08-24T00:00:00Z')`).run(brand.id, size.id, defaultAppearance.id).lastInsertRowid);
+    db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active', ?)`)
+      .run('02.0209.20.0401001', '图号', product, drawingAppearance.id, color.id, main.id, item.id,
+        '02', '0209', '2', '0', '04', '01', '2026-08-24T00:00:00Z');
+
+    expect(() => service.updateName(drawingAppearance.id, '新外观名称'))
+      .toThrowError(expect.objectContaining({ code: 'DICTIONARY_ITEM_REFERENCED' }));
+  });
+
   it('filters inactive items unless explicitly requested', () => {
     const item = service.create({ type: 'color', code: '0', name: '白色' });
     service.deactivate(item.id);

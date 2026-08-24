@@ -86,8 +86,8 @@ export class ProductRepository {
   }
 
   hasDrawingReferences(id: number): boolean {
-    const row = this.db.prepare('select count(*) as count from drawing_numbers where product_id = ?')
-      .get(id) as { count: number };
+    const row = this.db.prepare('select count(*) as count from drawing_numbers where product_id = ? or source_product_id = ?')
+      .get(id, id) as { count: number };
     return row.count > 0;
   }
 }

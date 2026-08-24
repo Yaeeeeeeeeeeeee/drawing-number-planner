@@ -46,8 +46,8 @@ export class DictionaryRepository {
   isReferenced(id: number): boolean {
     const row = this.db.prepare(`select (
       exists(select 1 from products where brand_id = ? or product_size_id = ? or default_appearance_id = ?)
-      or exists(select 1 from drawing_numbers where color_id = ? or main_category_id = ? or project_item_id = ?)
-    ) as referenced`).get(id, id, id, id, id, id) as { referenced: number };
+      or exists(select 1 from drawing_numbers where appearance_id = ? or color_id = ? or main_category_id = ? or project_item_id = ?)
+    ) as referenced`).get(id, id, id, id, id, id, id) as { referenced: number };
     return row.referenced === 1;
   }
 }

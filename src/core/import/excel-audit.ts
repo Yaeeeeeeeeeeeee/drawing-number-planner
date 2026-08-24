@@ -15,7 +15,7 @@ export interface ImportCandidate {
 }
 
 export interface ImportIssue {
-  code: 'DUPLICATE_CODE' | 'INCOMPLETE_ROW' | 'DATABASE_CONFLICT';
+  code: 'DUPLICATE_CODE' | 'INCOMPLETE_ROW' | 'DATABASE_CONFLICT' | 'AMBIGUOUS_PARENT';
   dictionaryType: DictionaryType;
   sourceCell: string;
   message: string;
@@ -138,12 +138,36 @@ export function auditRows(rows: ExcelCell[][]): ImportAuditReport {
     });
   }
 
+  const mainNames = new Map<string, number>();
+  for (const candidate of candidates.filter((item) => item.type === 'main_category')) {
+    mainNames.set(candidate.name, (mainNames.get(candidate.name) ?? 0) + 1);
+  }
+  for (const candidate of candidates.filter((item) => item.type === 'project_item')) {
+    if ((mainNames.get(candidate.parentName ?? '') ?? 0) > 1) {
+      issues.push({
+        code: 'AMBIGUOUS_PARENT', dictionaryType: 'project_item', sourceCell: candidate.sourceCell,
+        message: '所属主类别名称不唯一，请先消除重名', value: candidate.parentName, candidateIds: [candidate.id],
+      });
+    }
+  }
+
   return { candidates, issues };
 }
 
 export function includeDatabaseConflicts(report: ImportAuditReport, database: PlannerDatabase): ImportAuditReport {
   const issues = [...report.issues];
   for (const candidate of report.candidates) {
+    if (candidate.type === 'project_item') {
+      const parents = database.prepare(`select id from dictionary_items
+        where type = 'main_category' and name = ?`).all(candidate.parentName);
+      if (parents.length > 1) {
+        issues.push({
+          code: 'AMBIGUOUS_PARENT', dictionaryType: candidate.type, sourceCell: candidate.sourceCell,
+          message: '当前数据库中存在多个同名主类别，请先消除重名', value: candidate.parentName, candidateIds: [candidate.id],
+        });
+        continue;
+      }
+    }
     const existing = candidate.type === 'project_item'
       ? database.prepare(`select item.id from dictionary_items item
           join dictionary_items parent on parent.id = item.parent_id

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import writeXlsxFile from 'write-excel-file/node';
 
-const tokenHeaders = { 'x-planner-token': 'phase-one-development' };
+const tokenHeaders = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'phase-one-development' };
 
 test('Phase 1 browser workflow uses the real local database', async ({ page, request }) => {
   await page.goto('/');
@@ -26,7 +26,7 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
   await page.getByRole('button', { name: '新建产品' }).click();
   await page.getByRole('textbox', { name: '型号', exact: true }).fill('ZC220');
   await page.getByLabel('产品类别').fill('冰柜');
-  await page.getByLabel('品牌').selectOption({ label: 'SAMKYO' });
+  await page.getByRole('combobox', { name: '品牌', exact: true }).selectOption({ label: 'SAMKYO' });
   await page.getByLabel('品类尺寸').selectOption({ label: 'ZC220冰柜' });
   await page.getByLabel('默认外观').selectOption({ label: '1号外观' });
   await page.getByRole('button', { name: '保存产品' }).click();

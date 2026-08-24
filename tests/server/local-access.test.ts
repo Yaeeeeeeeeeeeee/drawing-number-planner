@@ -15,9 +15,10 @@ describe('local access security', () => {
     registerLocalAccess(app, { token: 'local-token', allowedOrigins: ['http://127.0.0.1:5173'] });
     app.post('/write', async () => ({ ok: true }));
 
-    expect((await app.inject({ method: 'POST', url: '/write' })).statusCode).toBe(401);
-    expect((await app.inject({ method: 'POST', url: '/write', headers: { 'x-planner-token': 'wrong' } })).statusCode).toBe(401);
-    expect((await app.inject({ method: 'POST', url: '/write', headers: { 'x-planner-token': 'local-token' } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: '/write' })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: '/write', headers: { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'wrong' } })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'POST', url: '/write', headers: { 'x-planner-token': 'local-token' } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: '/write', headers: { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'local-token' } })).statusCode).toBe(200);
     await app.close();
   });
 

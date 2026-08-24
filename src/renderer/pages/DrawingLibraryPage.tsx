@@ -4,7 +4,7 @@ import type { DictionaryItemView, DrawingView, PlannerApi } from '../data/client
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 
-const emptyFilters = { drawingNumber: '', model: '', brandId: '', mainCategoryId: '', projectItemId: '', colorId: '', status: '', exactDrawingNumber: false };
+const emptyFilters = { drawingNumber: '', model: '', keyword: '', brandId: '', mainCategoryId: '', projectItemId: '', colorId: '', status: '', exactDrawingNumber: false };
 
 export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [filters, setFilters] = useState(emptyFilters);
@@ -21,7 +21,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     void search();
     void Promise.all(['brand', 'main_category', 'project_item', 'color'].map((type) => api.listDictionaries(type, false)))
       .then(([brand, main_category, project_item, color]) => setOptions({ brand, main_category, project_item, color }))
-      .catch(() => undefined);
+      .catch((reason) => setError(reason instanceof Error ? reason.message : '筛选项加载失败'));
   }, []);
   const set = (key: keyof typeof filters, value: string | boolean) => setFilters((current) => ({ ...current, [key]: value }));
   const submit = (event: FormEvent) => {
@@ -40,6 +40,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     <form className="filter-bar filter-grid" onSubmit={submit}>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
+      <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}
       <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">已生效</option><option value="voided">已作废</option></select></label>
       <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
