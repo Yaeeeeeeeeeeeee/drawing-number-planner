@@ -35,3 +35,18 @@ export interface PlanningContext {
   appearanceName: string;
   rows: ResolvedPlanningRow[];
 }
+
+export interface PlannedRow {
+  clientId: string;
+  fullCode: string;
+  displayName: string;
+  prefix: string;
+  sequence: number;
+  available: true;
+}
+
+export interface PlanningPreview {
+  productId: number;
+  appearanceId: number;
+  rows: PlannedRow[];
+}

@@ -63,4 +63,15 @@ export class PlanningRepository {
       appearanceId: appearance.id, appearanceCode: appearance.code, appearanceName: appearance.name, rows,
     };
   }
+
+  findMaxSequence(prefix: string): number {
+    const row = this.db.prepare(`select max(sequence) as sequence from drawing_numbers
+      where substr(full_code, 1, length(full_code) - 3) = ?`).get(prefix) as { sequence: number | null };
+    return row.sequence ?? 0;
+  }
+
+  hasFullCode(fullCode: string): boolean {
+    return (this.db.prepare('select count(*) as count from drawing_numbers where full_code = ?')
+      .get(fullCode) as { count: number }).count > 0;
+  }
 }
