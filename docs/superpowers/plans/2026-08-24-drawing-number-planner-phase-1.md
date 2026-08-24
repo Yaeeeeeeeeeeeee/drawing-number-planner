@@ -18,6 +18,9 @@
 - 不使用 Mock 数据或无行为按钮冒充完成。
 - 本机服务只绑定 `127.0.0.1`；写操作必须校验启动令牌和请求来源。
 - 所有数据库结构通过有序迁移创建；数据库升级前必须备份。
+- 应用数据目录与业务资料根目录是两个独立概念；Phase 1 不创建业务文件表，不得把绝对业务文件路径引入数据库结构。
+- 后续文件阶段必须只持久化资料根目录内的相对路径，并通过集中路径解析器和目录策略模块访问文件。
+- V1 不实现服务器 API、上传或同步功能。
 - Phase 1 不实现占号、BOM、文件改名和外发，只提供清晰的“后续阶段”状态。
 
 ---
@@ -69,7 +72,7 @@ expect(screen.getByRole('navigation')).toBeVisible();
 - Create: `tests/db/backup.test.ts`
 
 **Interfaces:**
-- Produces: `resolveAppPaths(baseDir?: string): AppPaths`, `openDatabase(path: string): Database`, `migrateDatabase(db, backup): MigrationResult`.
+- Produces: `resolveAppPaths(baseDir?: string): AppPaths`, `openDatabase(path: string): Database`, `migrateDatabase(db, backup): MigrationResult`。这里的 `AppPaths` 只描述数据库、备份、日志和导出目录，不代表业务资料根目录。
 
 - [ ] **Step 1: Write tests proving a supplied temporary base directory produces `planner.db`, `backups`, `logs` and `exports` paths.**
 - [ ] **Step 2: Write migration tests proving a blank database reaches schema version 1 with foreign keys enabled and repeated migration is idempotent.**
