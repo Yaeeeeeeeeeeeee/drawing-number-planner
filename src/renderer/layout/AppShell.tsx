@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { PlannerApi } from '../api/client';
+import type { PlannerApi } from '../data/client';
 import { DictionariesPage } from '../pages/DictionariesPage';
 import { DrawingLibraryPage } from '../pages/DrawingLibraryPage';
 import { ImportPage } from '../pages/ImportPage';

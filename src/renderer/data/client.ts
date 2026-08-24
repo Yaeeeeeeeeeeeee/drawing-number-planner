@@ -49,7 +49,12 @@ const queryString = (values: Record<string, unknown>) => {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+  const method = init?.method?.toUpperCase() ?? 'GET';
+  const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  const queryToken = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('token') ?? '';
+  const token = queryToken || (import.meta.env.DEV ? 'phase-one-development' : '');
+  const headers = { ...(init?.headers as Record<string, string> | undefined), ...(write && token ? { 'x-planner-token': token } : {}) };
+  const response = await fetch(path, { ...init, headers });
   const body = await response.json();
   if (!response.ok) throw new ApiError(body.error?.code ?? 'REQUEST_FAILED', body.error?.message ?? '请求失败');
   return body as T;

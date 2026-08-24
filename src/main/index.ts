@@ -22,7 +22,9 @@ async function createWindow() {
   });
 
   window.once('ready-to-show', () => window.show());
-  await window.loadURL(process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173');
+  const rendererUrl = new URL(process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173');
+  rendererUrl.searchParams.set('token', runningServer.token);
+  await window.loadURL(rendererUrl.toString());
 }
 
 app.whenReady().then(createWindow).catch((error) => console.error('[main] startup failed', error));

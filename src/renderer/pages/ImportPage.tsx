@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import type { ImportReportView, PlannerApi } from '../api/client';
+import type { ImportReportView, PlannerApi } from '../data/client';
 import { DataTable } from '../components/DataTable';
 
 export function ImportPage({ api }: { api: PlannerApi }) {

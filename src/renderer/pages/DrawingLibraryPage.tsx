@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
-import type { DrawingView, PlannerApi } from '../api/client';
+import type { DrawingView, PlannerApi } from '../data/client';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 
