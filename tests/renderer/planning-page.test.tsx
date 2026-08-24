@@ -76,4 +76,29 @@ describe('PlanningPage', () => {
     expect(screen.getByRole('button', { name: '重新查重' })).toBeVisible();
     expect(screen.getByLabelText('第 1 行颜色')).toHaveValue('4');
   });
+
+  it('discards a preview response when the draft changes while the request is pending', async () => {
+    const api = apiFixture();
+    api.listProducts.mockResolvedValue([
+      { id: 1, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
+        defaultAppearanceId: 3, defaultAppearanceName: '一号外观', model: 'ZC200', productCategory: '冰柜',
+        referenceProductId: null, referenceProductModel: null, status: 'active' },
+      { id: 2, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
+        defaultAppearanceId: 3, defaultAppearanceName: '一号外观', model: 'ZC220', productCategory: '冰柜',
+        referenceProductId: null, referenceProductModel: null, status: 'active' },
+    ]);
+    let resolvePreview!: (value: Awaited<ReturnType<typeof api.previewPlan>>) => void;
+    api.previewPlan.mockImplementationOnce(() => new Promise((resolve) => { resolvePreview = resolve; }));
+    render(<PlanningPage api={api as never} />); await completeFirstRow();
+    fireEvent.click(screen.getByRole('button', { name: '查重并预览' }));
+    expect(screen.getByLabelText('产品型号')).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('产品型号'), { target: { value: '2' } });
+    resolvePreview({ productId: 1, appearanceId: 3, rows: [{ clientId: 'row-1',
+      fullCode: '02.0404.010.0401001', displayName: 'SAMKYO-ZC200白色-LOGO',
+      prefix: '02.0404.010.0401', sequence: 1, available: true }] });
+
+    await waitFor(() => expect(screen.queryByText('SAMKYO-ZC200白色-LOGO')).not.toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: '确认批量占号' })).not.toBeInTheDocument();
+  });
 });

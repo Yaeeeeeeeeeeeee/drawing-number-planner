@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { DictionaryItemView, PlannerApi, PlanningPreviewView, ProductView, ReservedDrawingView } from '../data/client';
+import type { DictionaryItemView, PlannerApi, PlanningPreviewView, PlanningRowInputView, ProductView, ReservedDrawingView } from '../data/client';
 
 interface DraftRow { clientId: string; colorId: string; mainCategoryId: string; projectItemId: string; notes: string }
+interface ApprovedInput { productId: number; appearanceId: number; rows: PlanningRowInputView[] }
 const blankRow = (id: number): DraftRow => ({ clientId: `row-${id}`, colorId: '', mainCategoryId: '', projectItemId: '', notes: '' });
 
 export function PlanningPage({ api }: { api: PlannerApi }) {
@@ -15,11 +16,13 @@ export function PlanningPage({ api }: { api: PlannerApi }) {
   const [appearanceId, setAppearanceId] = useState('');
   const [rows, setRows] = useState<DraftRow[]>([blankRow(1)]);
   const [preview, setPreview] = useState<PlanningPreviewView | null>(null);
+  const [approvedInput, setApprovedInput] = useState<ApprovedInput | null>(null);
   const [reserved, setReserved] = useState<ReservedDrawingView[]>([]);
   const [error, setError] = useState('');
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [busy, setBusy] = useState(false);
   const nextRow = useRef(2);
+  const draftVersion = useRef(0);
 
   useEffect(() => { void Promise.all([
     api.listProducts({ status: 'active' }), api.listDictionaries('appearance', false),
@@ -30,7 +33,10 @@ export function PlanningPage({ api }: { api: PlannerApi }) {
     setMains(mainItems); setProjects(projectItems);
   }).catch((reason) => setError(reason instanceof Error ? reason.message : '基础资料加载失败')); }, [api]);
 
-  const invalidate = () => { setPreview(null); setReserved([]); setNeedsRefresh(false); setError(''); };
+  const invalidate = () => {
+    draftVersion.current += 1;
+    setPreview(null); setApprovedInput(null); setReserved([]); setNeedsRefresh(false); setError('');
+  };
   const selectProduct = (value: string) => {
     setProductId(value); const product = products.find((item) => item.id === Number(value));
     setAppearanceId(product?.defaultAppearanceId ? String(product.defaultAppearanceId) : ''); invalidate();
@@ -48,35 +54,58 @@ export function PlanningPage({ api }: { api: PlannerApi }) {
   }));
   const check = async () => {
     if (!complete) return; setBusy(true); setError(''); setNeedsRefresh(false); setReserved([]);
-    try { setPreview(await api.previewPlan({ productId: Number(productId), appearanceId: Number(appearanceId), rows: planningRows() })); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '图号查重失败'); }
+    const version = draftVersion.current;
+    const input: ApprovedInput = { productId: Number(productId), appearanceId: Number(appearanceId), rows: planningRows() };
+    try {
+      const result = await api.previewPlan(input);
+      if (version === draftVersion.current) { setPreview(result); setApprovedInput(input); }
+    }
+    catch (reason) {
+      if (version === draftVersion.current) setError(reason instanceof Error ? reason.message : '图号查重失败');
+    }
     finally { setBusy(false); }
   };
   const reserve = async () => {
-    if (!preview) return; setBusy(true); setError('');
+    if (!preview || !approvedInput) return;
+    const currentInput: ApprovedInput = {
+      productId: Number(productId), appearanceId: Number(appearanceId), rows: planningRows(),
+    };
+    if (JSON.stringify(currentInput) !== JSON.stringify(approvedInput)) {
+      setPreview(null); setApprovedInput(null); setNeedsRefresh(true); setError('规划条件已变化，请重新查重');
+      return;
+    }
+    const expectedByClientId = new Map(preview.rows.map((row) => [row.clientId, row.fullCode]));
+    if (approvedInput.rows.some((row) => !expectedByClientId.has(row.clientId))) {
+      setPreview(null); setApprovedInput(null); setNeedsRefresh(true); setError('占号预览与当前项目不一致，请重新查重');
+      return;
+    }
+    const reservationRows = approvedInput.rows.map((row) => {
+      const expectedFullCode = expectedByClientId.get(row.clientId)!;
+      return { ...row, expectedFullCode };
+    });
+    setBusy(true); setError('');
     try {
-      const items = await api.reservePlan({ productId: Number(productId), appearanceId: Number(appearanceId),
-        rows: planningRows().map((row, index) => ({ ...row, expectedFullCode: preview.rows[index].fullCode })) });
-      setReserved(items); setPreview(null); setRows([blankRow(nextRow.current++)]);
+      const items = await api.reservePlan({ ...approvedInput, rows: reservationRows });
+      setReserved(items); setPreview(null); setApprovedInput(null); setRows([blankRow(nextRow.current++)]);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '批量占号失败'); setPreview(null); setNeedsRefresh(true);
+      setError(reason instanceof Error ? reason.message : '批量占号失败'); setPreview(null); setApprovedInput(null); setNeedsRefresh(true);
     } finally { setBusy(false); }
   };
 
   return <section className="page-surface page-enter planning-page">
     <header className="page-header"><div><p className="eyebrow">DRAWING PLANNING</p><h1>图号规划</h1><p>先统一查重预览，再一次性永久占用整批图号。</p></div><span className="record-count">{rows.length} 个项目</span></header>
     <div className="planning-basics form-grid">
-      <label><span>产品型号</span><select aria-label="产品型号" value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.map((item) => <option value={item.id} key={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
-      <label><span>外观</span><select aria-label="外观" value={appearanceId} onChange={(event) => { setAppearanceId(event.target.value); invalidate(); }}><option value="">请选择</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
+      <label><span>产品型号</span><select aria-label="产品型号" disabled={busy} value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.map((item) => <option value={item.id} key={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
+      <label><span>外观</span><select aria-label="外观" disabled={busy} value={appearanceId} onChange={(event) => { setAppearanceId(event.target.value); invalidate(); }}><option value="">请选择</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
     </div>
-    <div className="batch-toolbar"><h2>批量项目</h2><button className="secondary-button" type="button" onClick={() => setRows((current) => [...current, blankRow(nextRow.current++)])}>添加项目</button></div>
+    <div className="batch-toolbar"><h2>批量项目</h2><button className="secondary-button" type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidate(); }}>添加项目</button></div>
     <div className="planning-rows">{rows.map((row, index) => <article className="planning-row" key={row.clientId}>
-      <div className="planning-row-title"><strong>项目 {index + 1}</strong>{rows.length > 1 && <button className="link-button" aria-label={`删除项目 ${index + 1}`} type="button" onClick={() => { setRows((current) => current.filter((item) => item.clientId !== row.clientId)); invalidate(); }}>删除</button>}</div>
+      <div className="planning-row-title"><strong>项目 {index + 1}</strong>{rows.length > 1 && <button className="link-button" aria-label={`删除项目 ${index + 1}`} type="button" disabled={busy} onClick={() => { setRows((current) => current.filter((item) => item.clientId !== row.clientId)); invalidate(); }}>删除</button>}</div>
       <div className="form-grid planning-row-fields">
-        <label><span>主类别</span><select aria-label={`第 ${index + 1} 行主类别`} value={row.mainCategoryId} onChange={(event) => updateRow(row.clientId, 'mainCategoryId', event.target.value)}><option value="">请选择</option>{mains.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
-        <label><span>项目明细</span><select aria-label={`第 ${index + 1} 行项目明细`} value={row.projectItemId} onChange={(event) => updateRow(row.clientId, 'projectItemId', event.target.value)}><option value="">请选择</option>{projects.filter((item) => item.parentId === Number(row.mainCategoryId)).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-        <label><span>颜色</span><select aria-label={`第 ${index + 1} 行颜色`} value={row.colorId} onChange={(event) => updateRow(row.clientId, 'colorId', event.target.value)}><option value="">请选择</option>{colors.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
-        <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} value={row.notes} onChange={(event) => updateRow(row.clientId, 'notes', event.target.value)} /></label>
+        <label><span>主类别</span><select aria-label={`第 ${index + 1} 行主类别`} disabled={busy} value={row.mainCategoryId} onChange={(event) => updateRow(row.clientId, 'mainCategoryId', event.target.value)}><option value="">请选择</option>{mains.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
+        <label><span>项目明细</span><select aria-label={`第 ${index + 1} 行项目明细`} disabled={busy} value={row.projectItemId} onChange={(event) => updateRow(row.clientId, 'projectItemId', event.target.value)}><option value="">请选择</option>{projects.filter((item) => item.parentId === Number(row.mainCategoryId)).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+        <label><span>颜色</span><select aria-label={`第 ${index + 1} 行颜色`} disabled={busy} value={row.colorId} onChange={(event) => updateRow(row.clientId, 'colorId', event.target.value)}><option value="">请选择</option>{colors.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
+        <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes} onChange={(event) => updateRow(row.clientId, 'notes', event.target.value)} /></label>
       </div>
     </article>)}</div>
     <button className="primary-button planning-check" type="button" disabled={!complete || busy} onClick={() => void check()}>{busy ? '处理中…' : needsRefresh ? '重新查重' : '查重并预览'}</button>

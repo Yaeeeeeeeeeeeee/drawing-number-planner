@@ -71,4 +71,16 @@ describe('PlanningRepository context validation', () => {
     expect(() => repository.resolveContext({ productId: parentRefs.product.id, rows: [{ ...row(parentRefs), mainCategoryId: secondMain.id }] }))
       .toThrowError(expect.objectContaining({ code: 'INVALID_PROJECT_PARENT' }));
   });
+
+  it('rejects legacy products whose brand or size points to the wrong dictionary type', () => {
+    const brandRefs = fixture();
+    db.prepare('update products set brand_id = ? where id = ?').run(brandRefs.appearance.id, brandRefs.product.id);
+    expect(() => repository.resolveContext({ productId: brandRefs.product.id, rows: [row(brandRefs)] }))
+      .toThrowError(expect.objectContaining({ code: 'DICTIONARY_NOT_ACTIVE' }));
+
+    const sizeRefs = fixture(true, 'B');
+    db.prepare('update products set product_size_id = ? where id = ?').run(sizeRefs.color.id, sizeRefs.product.id);
+    expect(() => repository.resolveContext({ productId: sizeRefs.product.id, rows: [row(sizeRefs)] }))
+      .toThrowError(expect.objectContaining({ code: 'DICTIONARY_NOT_ACTIVE' }));
+  });
 });

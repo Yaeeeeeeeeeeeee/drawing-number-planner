@@ -8,8 +8,8 @@ interface DictionaryRow {
 
 interface ProductContextRow {
   id: number; model: string; product_category: string; status: 'active' | 'inactive';
-  brand_id: number; brand_code: string; brand_name: string; brand_status: 'active' | 'inactive';
-  product_size_id: number; product_size_code: string; size_status: 'active' | 'inactive';
+  brand_id: number; brand_code: string; brand_name: string; brand_status: 'active' | 'inactive'; brand_type: string;
+  product_size_id: number; product_size_code: string; size_status: 'active' | 'inactive'; size_type: string;
   default_appearance_id: number | null;
 }
 
@@ -27,8 +27,8 @@ export class PlanningRepository {
 
   resolveContext(input: PlanningInput): PlanningContext {
     const product = this.db.prepare(`select product.id, product.model, product.product_category, product.status,
-      brand.id as brand_id, brand.code as brand_code, brand.name as brand_name, brand.status as brand_status,
-      size.id as product_size_id, size.code as product_size_code, size.status as size_status,
+      brand.id as brand_id, brand.code as brand_code, brand.name as brand_name, brand.status as brand_status, brand.type as brand_type,
+      size.id as product_size_id, size.code as product_size_code, size.status as size_status, size.type as size_type,
       product.default_appearance_id
       from products product
       join dictionary_items brand on brand.id = product.brand_id
@@ -37,8 +37,9 @@ export class PlanningRepository {
     if (!product || product.status !== 'active') {
       throw new PlanningError('PRODUCT_NOT_ACTIVE', '产品不存在或已停用');
     }
-    if (product.brand_status !== 'active' || product.size_status !== 'active') {
-      throw new PlanningError('DICTIONARY_NOT_ACTIVE', '产品引用的品牌或品类尺寸已停用');
+    if (product.brand_status !== 'active' || product.size_status !== 'active'
+      || product.brand_type !== 'brand' || product.size_type !== 'product_size') {
+      throw new PlanningError('DICTIONARY_NOT_ACTIVE', '产品引用的品牌或品类尺寸无效或已停用');
     }
     const appearanceId = input.appearanceId ?? product.default_appearance_id;
     if (!appearanceId) throw new PlanningError('APPEARANCE_REQUIRED', '产品没有默认外观，请选择外观');
