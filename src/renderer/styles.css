@@ -1,0 +1,35 @@
+:root {
+  color: #172033;
+  background: #f3f6fa;
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 1080px; min-height: 100vh; }
+button, input { font: inherit; }
+
+.app-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+.sidebar { display: flex; flex-direction: column; padding: 24px 14px 18px; color: #fff; background: #072b5d; }
+.brand-mark { display: flex; align-items: center; gap: 12px; padding: 0 10px 24px; font-size: 21px; font-weight: 700; }
+.brand-icon { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid #7eb4ff; border-radius: 8px; background: #0d62c7; }
+nav { display: grid; gap: 6px; }
+.nav-item { display: flex; min-height: 46px; align-items: center; justify-content: space-between; padding: 0 14px; color: #dceaff; border: 0; border-radius: 7px; background: transparent; text-align: left; cursor: pointer; }
+.nav-item:hover:not(:disabled), .nav-item.active { color: #fff; background: #0d62c7; }
+.nav-item:disabled { color: #7f9bbd; cursor: not-allowed; }
+.nav-item small { font-size: 10px; }
+.phase-badge { margin-top: auto; padding: 14px 10px 0; color: #9bb7da; border-top: 1px solid #244a76; font-size: 12px; }
+.workspace { padding: 34px 40px; }
+.workspace-header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 28px; border-bottom: 1px solid #dce3ec; }
+.eyebrow { margin: 0 0 8px; color: #3978c8; font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+h1 { margin: 0 0 8px; font-size: 30px; }
+.workspace-header p:last-child { margin: 0; color: #667085; }
+.status-chip { padding: 7px 11px; color: #087552; border: 1px solid #b7e4d3; border-radius: 999px; background: #effaf6; font-size: 12px; }
+.toolbar { display: flex; gap: 10px; padding: 22px 0; }
+.toolbar input { width: min(600px, 60vw); height: 42px; padding: 0 14px; border: 1px solid #cfd8e5; border-radius: 6px; background: #fff; outline: none; }
+.toolbar input:focus { border-color: #1670d8; box-shadow: 0 0 0 3px #dcecff; }
+.toolbar button { height: 42px; padding: 0 24px; color: #fff; border: 0; border-radius: 6px; background: #0d62c7; font-weight: 600; }
+.empty-state { display: grid; min-height: 430px; place-items: center; align-content: center; border-top: 1px solid #e4e9f0; border-bottom: 1px solid #e4e9f0; background: #fff; text-align: center; }
+.empty-symbol { display: grid; width: 54px; height: 54px; place-items: center; margin-bottom: 16px; color: #3978c8; border-radius: 50%; background: #eef5ff; font-size: 30px; }
+.empty-state h2 { margin: 0 0 8px; font-size: 18px; }
+.empty-state p { margin: 0; color: #7a8495; font-size: 14px; }
