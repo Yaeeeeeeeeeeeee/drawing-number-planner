@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { openDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
-import { schemaVersionOne } from '../../src/db/schema.sql';
+import { schemaVersionOne, schemaVersionTwo } from '../../src/db/schema.sql';
 
 const databases: ReturnType<typeof openDatabase>[] = [];
 afterEach(() => databases.splice(0).forEach((db) => db.close()));
@@ -17,16 +17,42 @@ describe('database migrations', () => {
     databases.push(db);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 2 });
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 2, to: 2 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 3 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 3, to: 3 });
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
-    expect(db.prepare('select version from schema_migrations order by version').all()).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(db.prepare('select version from schema_migrations order by version').all()).toEqual([
+      { version: 1 }, { version: 2 }, { version: 3 },
+    ]);
     const drawingColumns = (db.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).map((column) => column.name);
     expect(drawingColumns).toEqual(expect.arrayContaining([
       'appearance_id', 'brand_code', 'product_size_code', 'appearance_code', 'color_code',
       'main_category_code', 'project_item_code', 'notes',
     ]));
+    expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
+      .toEqual([{ name: 'bom_current' }, { name: 'bom_items' }, { name: 'bom_versions' }]);
     expect(backup).not.toHaveBeenCalled();
+  });
+
+  it('backs up an existing v2 database before adding the BOM schema', () => {
+    const db = openDatabase(':memory:'); databases.push(db); db.exec(schemaVersionOne); db.exec(schemaVersionTwo);
+    const backup = vi.fn();
+
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 3 });
+
+    expect(backup).toHaveBeenCalledOnce();
+    expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
+      .toEqual([{ name: 'bom_current' }, { name: 'bom_items' }, { name: 'bom_versions' }]);
+  });
+
+  it('leaves an existing v2 database unchanged when its pre-v3 backup fails', () => {
+    const db = openDatabase(':memory:'); databases.push(db); db.exec(schemaVersionOne); db.exec(schemaVersionTwo);
+
+    expect(() => migrateDatabase(db, {
+      databaseExists: true,
+      createBackup: () => { throw new Error('backup unavailable'); },
+    })).toThrow('backup unavailable');
+    expect(db.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 2 });
+    expect(db.prepare("select count(*) as count from sqlite_master where name = 'bom_versions'").get()).toEqual({ count: 0 });
   });
 
   it('backs up and upgrades an old v1 database while backfilling drawing snapshots', () => {
@@ -48,7 +74,7 @@ describe('database migrations', () => {
       .run(product, color, main, item, now);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 2 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 3 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare(`select appearance_id, brand_code, product_size_code, appearance_code,
@@ -101,12 +127,13 @@ describe('database migrations', () => {
     db.prepare(`insert into drawing_numbers
       (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
        brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
-       sequence, status, notes, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', '不得丢失', ?)`)
+      sequence, status, notes, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', '不得丢失', ?)`)
       .run('02.0209.20.0401001', product, drawingAppearance, color, main, item, now);
-    db.prepare('delete from schema_migrations where version = 2').run();
+    db.exec('drop table bom_current; drop table bom_items; drop table bom_versions;');
+    db.prepare('delete from schema_migrations where version >= 2').run();
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 2 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 3 });
 
     expect(db.prepare('select appearance_id, appearance_code, notes from drawing_numbers').get()).toEqual({
       appearance_id: drawingAppearance, appearance_code: '2', notes: '不得丢失',
@@ -131,10 +158,11 @@ describe('database migrations', () => {
     db.prepare(`insert into drawing_numbers
       (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
        brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
-       sequence, status, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', ?)`)
+      sequence, status, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', ?)`)
       .run('02.0209.20.0401001', product, appearanceTwo, color, main, item, now);
     db.prepare('update drawing_numbers set appearance_id = ?').run(appearanceOne);
-    db.prepare('delete from schema_migrations where version = 2').run();
+    db.exec('drop table bom_current; drop table bom_items; drop table bom_versions;');
+    db.prepare('delete from schema_migrations where version >= 2').run();
 
     expect(() => migrateDatabase(db, { databaseExists: true, createBackup: vi.fn() }))
       .toThrow('扩展版旧图号的编码快照不一致');

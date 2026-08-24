@@ -112,3 +112,38 @@ export const schemaVersionTwo = `
   INSERT INTO schema_migrations (version, applied_at)
   VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 `;
+
+export const schemaVersionThree = `
+  CREATE TABLE bom_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    color_id INTEGER NOT NULL REFERENCES dictionary_items(id),
+    version_number INTEGER NOT NULL CHECK (version_number > 0),
+    previous_version_id INTEGER REFERENCES bom_versions(id),
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (product_id, color_id, version_number)
+  );
+
+  CREATE TABLE bom_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bom_version_id INTEGER NOT NULL REFERENCES bom_versions(id),
+    project_item_id INTEGER NOT NULL REFERENCES dictionary_items(id),
+    drawing_id INTEGER NOT NULL REFERENCES drawing_numbers(id),
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    notes TEXT,
+    uses_white_material INTEGER NOT NULL DEFAULT 0 CHECK (uses_white_material IN (0, 1)),
+    UNIQUE (bom_version_id, project_item_id)
+  );
+
+  CREATE TABLE bom_current (
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    color_id INTEGER NOT NULL REFERENCES dictionary_items(id),
+    version_id INTEGER NOT NULL UNIQUE REFERENCES bom_versions(id),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (product_id, color_id)
+  );
+
+  INSERT INTO schema_migrations (version, applied_at)
+  VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+`;
