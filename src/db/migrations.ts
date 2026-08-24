@@ -25,18 +25,26 @@ function hasDrawingColumn(database: PlannerDatabase, name: string): boolean {
 }
 
 function validateExpandedDrawingRows(database: PlannerDatabase): void {
+  const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
+  if (foreignKeyErrors.length > 0) throw new Error('扩展版旧图号存在无效关联，数据库未升级');
+
   const invalid = database.prepare(`select count(*) as count from drawing_numbers drawing
+    left join products product on product.id = drawing.product_id
+    left join dictionary_items brand on brand.id = product.brand_id
+    left join dictionary_items size on size.id = product.product_size_id
     left join dictionary_items appearance on appearance.id = drawing.appearance_id
     left join dictionary_items color on color.id = drawing.color_id
     left join dictionary_items main_category on main_category.id = drawing.main_category_id
     left join dictionary_items project_item on project_item.id = drawing.project_item_id
-    where appearance.id is null or color.id is null or main_category.id is null or project_item.id is null
+    where product.id is null or brand.id is null or size.id is null or appearance.id is null
+      or color.id is null or main_category.id is null or project_item.id is null
+      or brand.type <> 'brand' or size.type <> 'product_size'
       or appearance.type <> 'appearance' or color.type <> 'color'
       or main_category.type <> 'main_category' or project_item.type <> 'project_item'
       or project_item.parent_id <> drawing.main_category_id
-      or trim(drawing.brand_code) = '' or trim(drawing.product_size_code) = ''
-      or trim(drawing.appearance_code) = '' or trim(drawing.color_code) = ''
-      or trim(drawing.main_category_code) = '' or trim(drawing.project_item_code) = ''
+      or drawing.brand_code <> brand.code or drawing.product_size_code <> size.code
+      or drawing.appearance_code <> appearance.code or drawing.color_code <> color.code
+      or drawing.main_category_code <> main_category.code or drawing.project_item_code <> project_item.code
       or drawing.full_code <> drawing.brand_code || '.' || drawing.product_size_code || '.'
         || drawing.appearance_code || drawing.color_code || '.' || drawing.main_category_code
         || drawing.project_item_code || printf('%03d', drawing.sequence)`).get() as { count: number };

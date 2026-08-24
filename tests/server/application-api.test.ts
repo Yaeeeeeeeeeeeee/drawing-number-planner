@@ -43,6 +43,8 @@ describe('real application API', () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('图号规划器生产窗口');
+    const productionSession = await fetch(`${server.url}/api/session`, { method: 'POST', headers: { origin: server.url } });
+    expect(productionSession.status).toBe(200);
     const devOriginSession = await fetch(`${server.url}/api/session`, { method: 'POST', headers: { origin: 'http://127.0.0.1:5173' } });
     expect(devOriginSession.status).toBe(403);
     await server.close();

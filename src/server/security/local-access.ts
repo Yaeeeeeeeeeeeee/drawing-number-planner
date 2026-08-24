@@ -13,7 +13,7 @@ export function assertLoopbackHost(host: string): void {
 export function registerLocalAccess(app: FastifyInstance, options: {
   token: string;
   allowedOrigins: string[];
-}): void {
+}): { allowOrigin(origin: string): void } {
   const allowedOrigins = new Set(options.allowedOrigins);
   const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -39,4 +39,6 @@ export function registerLocalAccess(app: FastifyInstance, options: {
       }
     }
   });
+
+  return { allowOrigin: (origin) => allowedOrigins.add(origin) };
 }

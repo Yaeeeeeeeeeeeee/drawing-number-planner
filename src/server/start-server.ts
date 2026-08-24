@@ -53,9 +53,9 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     }
     server = Fastify({ logger: false, forceCloseConnections: true });
 
-    registerLocalAccess(server, {
+    const localAccess = registerLocalAccess(server, {
       token,
-      allowedOrigins: options.allowedOrigins ?? ['http://127.0.0.1:4317'],
+      allowedOrigins: options.allowedOrigins ?? [],
     });
     server.post('/api/session', async () => ({ token }));
     server.get('/api/health', async () => ({ status: 'ok' }));
@@ -67,6 +67,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     });
     if (options.rendererDir) await server.register(fastifyStatic, { root: options.rendererDir });
     const address = await server.listen({ host, port: options.port ?? 4317 });
+    if (!options.allowedOrigins) localAccess.allowOrigin(address);
 
     return {
       url: address,
