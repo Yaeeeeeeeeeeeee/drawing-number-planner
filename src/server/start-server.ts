@@ -5,6 +5,7 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 
 import { resolveAppPaths } from '../core/config/app-paths.js';
+import { BomService } from '../core/bom/bom-service.js';
 import { ensureDailyBackup } from '../core/backup/daily-backup.js';
 import { DictionaryService } from '../core/dictionaries/dictionary-service.js';
 import { DrawingQueryService } from '../core/drawings/drawing-query-service.js';
@@ -14,6 +15,7 @@ import { createDatabaseBackup } from '../db/backup.js';
 import { openDatabase } from '../db/database.js';
 import { migrateDatabase } from '../db/migrations.js';
 import { registerDictionaryRoutes } from './routes/dictionaries.js';
+import { registerBomRoutes } from './routes/boms.js';
 import { registerDrawingRoutes } from './routes/drawings.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerProductRoutes } from './routes/products.js';
@@ -65,6 +67,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerProductRoutes(server, new ProductService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
     registerPlanningRoutes(server, new PlanningService(database));
+    registerBomRoutes(server, new BomService(database));
     await registerImportRoutes(server, database, () => {
       createDatabaseBackup(database, paths.database, paths.backups, 'import');
     });
