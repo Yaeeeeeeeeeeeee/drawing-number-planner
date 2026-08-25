@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,9 +14,10 @@ describe('WorkspaceSettingsStore', () => {
     const path = join(dataDir, 'settings.json');
 
     expect(new WorkspaceSettingsStore(path).get()).toEqual({ workspaceRoot: null });
-    expect(new WorkspaceSettingsStore(path).setWorkspaceRoot(`${workspace}\\`)).toEqual({ workspaceRoot: workspace });
-    expect(new WorkspaceSettingsStore(path).get()).toEqual({ workspaceRoot: workspace });
-    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ workspaceRoot: workspace });
+    const normalized = realpathSync.native(workspace);
+    expect(new WorkspaceSettingsStore(path).setWorkspaceRoot(`${workspace}\\`)).toEqual({ workspaceRoot: normalized });
+    expect(new WorkspaceSettingsStore(path).get()).toEqual({ workspaceRoot: normalized });
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ workspaceRoot: normalized });
   });
 
   it('rejects relative, missing, and file paths without replacing the last valid setting', () => {
@@ -29,7 +30,7 @@ describe('WorkspaceSettingsStore', () => {
     for (const candidate of ['relative-folder', join(dataDir, 'missing'), file]) {
       expect(() => store.setWorkspaceRoot(candidate)).toThrowError(FileError);
     }
-    expect(store.get()).toEqual({ workspaceRoot: workspace });
+    expect(store.get()).toEqual({ workspaceRoot: realpathSync.native(workspace) });
   });
 
   it('reports malformed settings instead of silently losing configuration', () => {
@@ -50,6 +51,6 @@ describe('WorkspaceSettingsStore', () => {
 
     expect(existsSync(path)).toBe(true);
     expect(readdirSync(dataDir).filter((name) => name.includes('.tmp'))).toEqual([]);
-    expect(store.get()).toEqual({ workspaceRoot: second });
+    expect(store.get()).toEqual({ workspaceRoot: realpathSync.native(second) });
   });
 });

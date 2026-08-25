@@ -10,9 +10,9 @@ describe('workspace paths', () => {
   it('normalizes a real root and resolves a nested relative path inside it', () => {
     const root = mkdtempSync(join(tmpdir(), 'planner-root-')); mkdirSync(join(root, 'SAMKYO', 'ZC100'), { recursive: true });
 
-    expect(validateWorkspaceRoot(`${root}\\`)).toBe(realpathSync(root));
+    expect(validateWorkspaceRoot(`${root}\\`)).toBe(realpathSync.native(root));
     expect(resolveWorkspacePath(root, join('SAMKYO', 'ZC100', 'drawing.pdf')))
-      .toBe(join(realpathSync(root), 'SAMKYO', 'ZC100', 'drawing.pdf'));
+      .toBe(join(realpathSync.native(root), 'SAMKYO', 'ZC100', 'drawing.pdf'));
     expect(toWorkspaceRelativePath(root, join(root, 'SAMKYO', 'ZC100', 'drawing.pdf')))
       .toBe(join('SAMKYO', 'ZC100', 'drawing.pdf'));
   });

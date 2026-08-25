@@ -20,7 +20,7 @@ export function validateWorkspaceRoot(input: string): string {
     throw new FileError('WORKSPACE_INVALID', '资料根目录必须是已存在的本机绝对目录');
   }
   try {
-    const root = realpathSync(value);
+    const root = realpathSync.native(value);
     if (!statSync(root).isDirectory()) throw new FileError('WORKSPACE_INVALID', '资料根目录不能是文件');
     return root;
   } catch (error) {
@@ -37,6 +37,15 @@ function validateRelativeInput(relativePath: string): void {
   }
 }
 
+function canonicalizeWithExistingAncestor(input: string): string {
+  let probe = input; const missing: string[] = [];
+  while (!existsSync(probe) && probe !== dirname(probe)) {
+    missing.unshift(input.slice(dirname(probe).length + 1, probe.length));
+    probe = dirname(probe);
+  }
+  return resolve(realpathSync.native(probe), ...missing);
+}
+
 export function resolveWorkspacePath(rootInput: string, relativePath: string,
   options: { requireExistingParent?: boolean } = {}): string {
   validateRelativeInput(relativePath);
@@ -46,7 +55,7 @@ export function resolveWorkspacePath(rootInput: string, relativePath: string,
   if (options.requireExistingParent) {
     let probe = candidate;
     while (!existsSync(probe) && probe !== dirname(probe)) probe = dirname(probe);
-    const realProbe = realpathSync(probe);
+    const realProbe = realpathSync.native(probe);
     assertInside(root, realProbe);
   }
   return candidate;
@@ -57,7 +66,7 @@ export function toWorkspaceRelativePath(rootInput: string, absolutePath: string)
   if (!isAbsolute(absolutePath) && !win32.isAbsolute(absolutePath)) {
     throw new FileError('PATH_OUTSIDE_WORKSPACE', '扫描文件必须使用绝对路径');
   }
-  const candidate = resolve(absolutePath);
+  const candidate = canonicalizeWithExistingAncestor(resolve(absolutePath));
   assertInside(root, candidate);
   const result = relative(root, candidate);
   validateRelativeInput(result);
