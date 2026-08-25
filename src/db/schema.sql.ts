@@ -152,8 +152,17 @@ export const schemaVersionFour = `
   CREATE TABLE pdf_files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     relative_path TEXT NOT NULL UNIQUE CHECK (
+      length(relative_path) > 0
+      AND
       substr(relative_path, 1, 1) NOT IN ('/', '\\')
       AND relative_path NOT GLOB '[A-Za-z]:*'
+      AND relative_path NOT IN ('.', '..')
+      AND relative_path NOT LIKE '../%'
+      AND relative_path NOT LIKE '..\\%'
+      AND relative_path NOT LIKE '%/../%'
+      AND relative_path NOT LIKE '%\\..\\%'
+      AND relative_path NOT LIKE '%/..'
+      AND relative_path NOT LIKE '%\\..'
     ),
     file_name TEXT NOT NULL,
     drawing_id INTEGER REFERENCES drawing_numbers(id),

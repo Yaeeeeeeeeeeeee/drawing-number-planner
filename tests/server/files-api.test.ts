@@ -58,6 +58,9 @@ describe('PDF file API', () => {
     expect(invalid.status).toBe(422);
     expect((await invalid.json()).error.code).toBe('WORKSPACE_INVALID');
     expect((await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders })).status).toBe(422);
+    const scanWithBody = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ workspaceRoot: workspace }) });
+    expect(scanWithBody.status).toBe(400);
     expect((await fetch(`${server.url}/api/files?unknown=true`)).status).toBe(400);
   });
 });

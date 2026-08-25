@@ -118,6 +118,8 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .file-match.unmatched { color: #956200; } .file-match.conflict { color: #a33128; }
 .conversion-label.source { color: #40566f; } .conversion-label.outlined { color: #6a42a0; }
 .presence-label.present { color: #087552; } .presence-label.missing { color: #a33128; }
+.table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 16px 0; color: #5e6b7d; font-size: 12px; }
+.table-pagination .secondary-button { min-width: 82px; }
 @media (max-width: 1180px) { .app-shell { grid-template-columns: 218px minmax(0, 1fr); } .workspace { padding-inline: 26px; } .form-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
 @media (max-width: 1180px) { .bom-row-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bom-drawing-field { grid-column: 1 / -1; } }
 @media (max-width: 1280px) { .workspace-strip { grid-template-columns: minmax(280px, 1fr) auto auto; } .workspace-state { grid-column: 1 / -1; min-height: 48px; } .files-filter { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }

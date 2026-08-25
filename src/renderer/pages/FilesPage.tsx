@@ -5,6 +5,7 @@ import { EmptyState } from '../components/EmptyState';
 import type { PdfFileView, PdfScanSummaryView, PlannerApi, WorkspaceSettingsView } from '../data/client';
 
 const initialFilters = { keyword: '', matchStatus: '', conversionType: '', presence: 'present' };
+const pageSize = 50;
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -15,28 +16,28 @@ function formatSize(bytes: number): string {
 export function FilesPage({ api }: { api: PlannerApi }) {
   const [settings, setSettings] = useState<WorkspaceSettingsView>({ workspaceRoot: null, configured: false, available: false });
   const [rootInput, setRootInput] = useState(''); const [files, setFiles] = useState<PdfFileView[]>([]);
-  const [total, setTotal] = useState(0); const [filters, setFilters] = useState(initialFilters);
+  const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filters, setFilters] = useState(initialFilters);
   const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const searchRequest = useRef(0);
 
-  const search = async (values = filters) => {
-    const request = ++searchRequest.current;
+  const search = async (values = filters, requestedPage = 1) => {
+    const request = ++searchRequest.current; setLoading(true);
     try {
-      const result = await api.searchPdfFiles({ ...values, page: 1, pageSize: 50 });
+      const result = await api.searchPdfFiles({ ...values, page: requestedPage, pageSize });
       if (request !== searchRequest.current) return;
-      setFiles(result.items); setTotal(result.total);
+      setFiles(result.items); setTotal(result.total); setPage(result.page);
     } catch (reason) {
       if (request === searchRequest.current) setError(reason instanceof Error ? reason.message : 'PDF 文件加载失败');
-    }
+    } finally { if (request === searchRequest.current) setLoading(false); }
   };
 
   useEffect(() => {
     const request = ++searchRequest.current; setLoading(true); setError('');
-    void Promise.all([api.getWorkspaceSettings(), api.searchPdfFiles({ ...initialFilters, page: 1, pageSize: 50 })])
+    void Promise.all([api.getWorkspaceSettings(), api.searchPdfFiles({ ...initialFilters, page: 1, pageSize })])
       .then(([nextSettings, result]) => {
         if (request !== searchRequest.current) return;
-        setSettings(nextSettings); setRootInput(nextSettings.workspaceRoot ?? ''); setFiles(result.items); setTotal(result.total);
+        setSettings(nextSettings); setRootInput(nextSettings.workspaceRoot ?? ''); setFiles(result.items); setTotal(result.total); setPage(result.page);
       }).catch((reason) => { if (request === searchRequest.current) setError(reason instanceof Error ? reason.message : 'PDF 文件中心加载失败'); })
       .finally(() => { if (request === searchRequest.current) setLoading(false); });
   }, [api]);
@@ -54,8 +55,9 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : '资料库扫描失败'); }
     finally { setScanning(false); }
   };
-  const submit = (event: FormEvent) => { event.preventDefault(); setError(''); void search(); };
+  const submit = (event: FormEvent) => { event.preventDefault(); setError(''); void search(filters, 1); };
   const setFilter = (key: keyof typeof filters, value: string) => setFilters((current) => ({ ...current, [key]: value }));
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   return <section className="page-surface page-enter files-page">
     <header className="page-header"><div><p className="eyebrow">PDF WORKSPACE</p><h1>PDF 文件中心</h1><p>扫描本地资料库，按完整图号匹配并区分转曲前后。</p></div>
@@ -97,5 +99,12 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         { key: 'modified', label: '修改时间', render: (item) => new Date(item.modifiedAt).toLocaleString('zh-CN') },
         { key: 'presence', label: '文件状态', render: (item) => <span className={`presence-label ${item.isPresent ? 'present' : 'missing'}`}>{item.isPresent ? '存在' : '缺失'}</span> },
       ]} />}
+    {total > pageSize && <nav className="table-pagination" aria-label="PDF 分页">
+      <button className="secondary-button" type="button" disabled={loading || page <= 1}
+        onClick={() => void search(filters, page - 1)}>上一页</button>
+      <span>第 {page} / {pageCount} 页</span>
+      <button className="secondary-button" type="button" disabled={loading || page >= pageCount}
+        onClick={() => void search(filters, page + 1)}>下一页</button>
+    </nav>}
   </section>;
 }

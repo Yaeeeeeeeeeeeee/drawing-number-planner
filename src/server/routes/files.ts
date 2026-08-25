@@ -5,6 +5,7 @@ import { FileError } from '../../core/files/file-errors.js';
 import type { FileService } from '../../core/files/file-service.js';
 
 const settingsSchema = z.object({ workspaceRoot: z.string().trim().min(1).max(2000) }).strict();
+const emptyBodySchema = z.object({}).strict();
 const searchSchema = z.object({
   keyword: z.string().max(500).optional(),
   matchStatus: z.enum(['matched', 'unmatched', 'conflict']).optional(),
@@ -33,7 +34,9 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService): 
     catch (error) { return sendFileError(reply, error); }
   });
 
-  app.post('/api/files/scan', async (_request, reply) => {
+  app.post('/api/files/scan', async (request, reply) => {
+    const input = emptyBodySchema.safeParse(request.body ?? {});
+    if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '扫描请求不应包含额外参数' } });
     try { return await service.scan(); }
     catch (error) { return sendFileError(reply, error); }
   });

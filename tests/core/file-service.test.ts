@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -74,5 +74,24 @@ describe('FileService', () => {
 
     await expect(service.scan()).rejects.toMatchObject({ code: 'SCAN_IN_PROGRESS' });
     release([]); await first;
+  });
+
+  it('does not allow the workspace root to change during an active scan', async () => {
+    const firstRoot = join(dataDir, 'first'); const secondRoot = join(dataDir, 'second');
+    mkdirSync(firstRoot); mkdirSync(secondRoot); settings.setWorkspaceRoot(firstRoot);
+    let release!: (value: []) => void; const scanner = vi.fn(() => new Promise<[]>((resolve) => { release = resolve; }));
+    const service = new FileService(repository, settings, scanner); const scan = service.scan();
+
+    expect(() => service.updateSettings({ workspaceRoot: secondRoot }))
+      .toThrowError(expect.objectContaining({ code: 'SCAN_IN_PROGRESS' }));
+    expect(settings.get().workspaceRoot).toBe(realpathSync.native(firstRoot));
+    release([]); await scan;
+  });
+
+  it('reports a configured root as unavailable if it is no longer a directory', () => {
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const service = new FileService(repository, settings);
+    service.updateSettings({ workspaceRoot: workspace }); rmSync(workspace, { recursive: true }); writeFileSync(workspace, 'not a directory');
+
+    expect(service.getSettings()).toMatchObject({ configured: true, available: false });
   });
 });

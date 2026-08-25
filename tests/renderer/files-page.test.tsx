@@ -79,4 +79,19 @@ describe('FilesPage', () => {
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith({ keyword: 'unknown', matchStatus: 'unmatched',
       conversionType: '', presence: 'missing', page: 1, pageSize: 50 }));
   });
+
+  it('pages through more than fifty matching PDF records', async () => {
+    const api = apiFixture(true);
+    api.searchPdfFiles.mockImplementation(async (filters?: Record<string, unknown>) => ({
+      items: filters?.page === 2 ? [outlined] : [file], total: 51, page: Number(filters?.page ?? 1), pageSize: 50,
+    }));
+    render(<FilesPage api={api as never} />);
+    await screen.findByText(file.fileName, { selector: '.file-primary' });
+
+    expect(screen.getByText('第 1 / 2 页')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    expect(await screen.findByText(outlined.fileName, { selector: '.file-primary' })).toBeVisible();
+    expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 50 }));
+    expect(screen.getByRole('button', { name: '上一页' })).toBeEnabled();
+  });
 });

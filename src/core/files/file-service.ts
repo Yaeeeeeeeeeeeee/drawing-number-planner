@@ -1,11 +1,10 @@
-import { existsSync } from 'node:fs';
-
 import { FileError } from './file-errors.js';
 import { FileRepository } from './file-repository.js';
 import { matchPdfFilename } from './pdf-matcher.js';
 import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
 import type { FileSearchFilters, FileSearchResult, FileScanRecord } from './file-types.js';
 import { WorkspaceSettingsStore } from './workspace-settings.js';
+import { validateWorkspaceRoot } from './workspace-paths.js';
 
 export interface FileScanSummary {
   total: number; matched: number; unmatched: number; conflict: number;
@@ -19,11 +18,15 @@ export class FileService {
 
   getSettings(): { workspaceRoot: string | null; configured: boolean; available: boolean } {
     const current = this.settings.get();
-    return { workspaceRoot: current.workspaceRoot, configured: current.workspaceRoot !== null,
-      available: current.workspaceRoot !== null && existsSync(current.workspaceRoot) };
+    let available = false;
+    if (current.workspaceRoot !== null) {
+      try { validateWorkspaceRoot(current.workspaceRoot); available = true; } catch { available = false; }
+    }
+    return { workspaceRoot: current.workspaceRoot, configured: current.workspaceRoot !== null, available };
   }
 
   updateSettings(input: { workspaceRoot: string }) {
+    if (this.scanning) throw new FileError('SCAN_IN_PROGRESS', '资料库正在扫描，扫描完成后才能修改根目录');
     const current = this.settings.setWorkspaceRoot(input.workspaceRoot);
     return { ...current, configured: true, available: true };
   }

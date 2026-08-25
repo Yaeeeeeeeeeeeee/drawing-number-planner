@@ -29,12 +29,13 @@ export function validateWorkspaceRoot(input: string): string {
   }
 }
 
-function validateRelativeInput(relativePath: string): void {
+export function validateWorkspaceRelativePath(relativePath: string): string {
   const segments = relativePath.split(/[\\/]+/);
   if (!relativePath || relativePath.includes('\0') || isAbsolute(relativePath) || win32.isAbsolute(relativePath)
-    || /^[a-z]:/i.test(relativePath) || segments.includes('..')) {
+    || /^[a-z]:/i.test(relativePath) || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
     throw new FileError('PATH_OUTSIDE_WORKSPACE', '业务文件路径必须是资料根目录内的安全相对路径');
   }
+  return relativePath;
 }
 
 function canonicalizeWithExistingAncestor(input: string): string {
@@ -48,7 +49,7 @@ function canonicalizeWithExistingAncestor(input: string): string {
 
 export function resolveWorkspacePath(rootInput: string, relativePath: string,
   options: { requireExistingParent?: boolean } = {}): string {
-  validateRelativeInput(relativePath);
+  validateWorkspaceRelativePath(relativePath);
   const root = validateWorkspaceRoot(rootInput);
   const candidate = resolve(root, relativePath);
   assertInside(root, candidate);
@@ -69,6 +70,6 @@ export function toWorkspaceRelativePath(rootInput: string, absolutePath: string)
   const candidate = canonicalizeWithExistingAncestor(resolve(absolutePath));
   assertInside(root, candidate);
   const result = relative(root, candidate);
-  validateRelativeInput(result);
+  validateWorkspaceRelativePath(result);
   return result;
 }

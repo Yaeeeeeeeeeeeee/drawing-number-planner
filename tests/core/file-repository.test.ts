@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { FileRepository } from '../../src/core/files/file-repository';
+import { FileError } from '../../src/core/files/file-errors';
 import type { FileScanRecord } from '../../src/core/files/file-types';
 import { PlanningService } from '../../src/core/planning/planning-service';
 import { ProductService } from '../../src/core/products/product-service';
@@ -85,5 +86,22 @@ describe('FileRepository', () => {
       items: [expect.objectContaining({ fileName: 'unknown（转曲）.PDF' })] });
     expect(repository.search({ presence: 'all', page: 2, pageSize: 2 })).toMatchObject({ total: 3, page: 2, pageSize: 2 });
     expect(repository.listDrawingCodes()).toContainEqual({ id: drawing.id, fullCode: drawing.fullCode });
+  });
+
+  it.each(['', '.', '..\\outside.pdf', 'folder\\..\\outside.pdf', 'C:\\outside.pdf', '\\\\server\\share\\outside.pdf', 'bad\0name.pdf'])
+  ('rejects unsafe relative path %j before altering the current index', (relativePath) => {
+    const safe = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf' };
+    repository.replaceScan([safe], '2026-08-25T04:00:00.000Z');
+
+    expect(() => repository.replaceScan([{ ...safe, relativePath }], '2026-08-25T05:00:00.000Z'))
+      .toThrowError(FileError);
+    expect(repository.search({ presence: 'present' }).items).toEqual([expect.objectContaining({ relativePath: 'kept.pdf' })]);
+  });
+
+  it('also enforces traversal rejection in the SQLite schema', () => {
+    expect(() => db.prepare(`insert into pdf_files
+      (relative_path, file_name, drawing_id, match_status, detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at)
+      values ('..\\outside.pdf', 'outside.pdf', null, 'unmatched', '[]', 'source', 1, '2026-08-25', '2026-08-25')`).run())
+      .toThrow();
   });
 });

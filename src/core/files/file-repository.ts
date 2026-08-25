@@ -1,5 +1,6 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import type { DrawingCodeReference, FileScanRecord, FileSearchFilters, FileSearchResult, PdfFileView } from './file-types.js';
+import { validateWorkspaceRelativePath } from './workspace-paths.js';
 
 interface FileRow {
   id: number; relative_path: string; file_name: string; drawing_id: number | null;
@@ -29,6 +30,7 @@ export class FileRepository {
   }
 
   replaceScan(records: FileScanRecord[], scannedAt: string): { missing: number } {
+    for (const record of records) validateWorkspaceRelativePath(record.relativePath);
     return this.db.transaction(() => {
       this.db.prepare('update pdf_files set is_present = 0').run();
       const upsert = this.db.prepare(`insert into pdf_files
