@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { startServer, type RunningServer } from '../server/start-server.js';
 
 let runningServer: RunningServer | undefined;
+let mainWindow: BrowserWindow | undefined;
 process.on('uncaughtException', (error) => console.error('[main] uncaught', error));
 
 async function createWindow() {
@@ -14,7 +15,7 @@ async function createWindow() {
     ...(devServerUrl ? { allowedOrigins: [new URL(devServerUrl).origin] } : {}),
     ...(devServerUrl ? {} : { rendererDir: join(app.getAppPath(), 'dist', 'renderer') }),
   });
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1080,
@@ -28,8 +29,9 @@ async function createWindow() {
     },
   });
 
-  window.once('ready-to-show', () => window.show());
-  await window.loadURL(devServerUrl ?? runningServer.url);
+  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.once('closed', () => { mainWindow = undefined; });
+  await mainWindow.loadURL(devServerUrl ?? runningServer.url);
 }
 
 app.whenReady().then(createWindow).catch((error) => {
