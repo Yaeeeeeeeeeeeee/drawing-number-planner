@@ -11,6 +11,7 @@ describe('application shell', () => {
     expect(screen.getByRole('navigation')).toBeVisible();
     expect(screen.getByRole('button', { name: /图号规划/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /BOM 管理/ })).toBeEnabled();
-    expect(screen.getByText('Phase 3 · BOM 管理')).toBeVisible();
+    expect(screen.getByRole('button', { name: /PDF 文件中心/ })).toBeEnabled();
+    expect(screen.getByText('Phase 4 · PDF 文件中心')).toBeVisible();
   });
 });

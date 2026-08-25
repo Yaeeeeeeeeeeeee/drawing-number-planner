@@ -55,6 +55,20 @@ export interface SaveBomView {
   items: Array<{ projectItemId: number; drawingId: number; quantity: number; notes?: string; usesWhiteMaterial: boolean }>;
 }
 
+export interface WorkspaceSettingsView {
+  workspaceRoot: string | null; configured: boolean; available: boolean;
+}
+export interface PdfScanSummaryView {
+  total: number; matched: number; unmatched: number; conflict: number; source: number; outlined: number;
+  missing: number; scannedAt: string;
+}
+export interface PdfFileView {
+  id: number; relativePath: string; fileName: string; drawingId: number | null; fullCode: string | null;
+  displayName: string | null; model: string | null; brandName: string | null; projectItemName: string | null;
+  colorName: string | null; matchStatus: 'matched' | 'unmatched' | 'conflict'; detectedCodes: string[];
+  conversionType: 'source' | 'outlined'; sizeBytes: number; modifiedAt: string; scannedAt: string; isPresent: boolean;
+}
+
 export interface PlannerApi {
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingView>;
@@ -77,6 +91,12 @@ export interface PlannerApi {
   listBomCandidates(input: { productId: number; bomColorId: number; projectItemId: number;
     usesWhiteMaterial: boolean }): Promise<BomCandidateView[]>;
   saveBomVersion(input: SaveBomView): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
+  getWorkspaceSettings(): Promise<WorkspaceSettingsView>;
+  updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
+  scanPdfFiles(): Promise<PdfScanSummaryView>;
+  searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
+    items: PdfFileView[]; total: number; page: number; pageSize: number;
+  }>;
 }
 
 export class ApiError extends Error {
@@ -149,4 +169,8 @@ export const apiClient: PlannerApi = {
   listBomCandidates: async (input) => (await request<{ items: BomCandidateView[] }>(
     `/api/boms/candidates${queryString(input)}`)).items,
   saveBomVersion: (input) => request('/api/boms/versions', json('POST', input)),
+  getWorkspaceSettings: () => request('/api/files/settings'),
+  updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
+  scanPdfFiles: () => request('/api/files/scan', { method: 'POST' }),
+  searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
 };
