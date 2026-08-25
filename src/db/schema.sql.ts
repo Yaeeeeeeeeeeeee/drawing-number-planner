@@ -147,3 +147,32 @@ export const schemaVersionThree = `
   INSERT INTO schema_migrations (version, applied_at)
   VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 `;
+
+export const schemaVersionFour = `
+  CREATE TABLE pdf_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relative_path TEXT NOT NULL UNIQUE CHECK (
+      substr(relative_path, 1, 1) NOT IN ('/', '\\')
+      AND relative_path NOT GLOB '[A-Za-z]:*'
+    ),
+    file_name TEXT NOT NULL,
+    drawing_id INTEGER REFERENCES drawing_numbers(id),
+    match_status TEXT NOT NULL CHECK (match_status IN ('matched', 'unmatched', 'conflict')),
+    detected_codes_json TEXT NOT NULL DEFAULT '[]',
+    conversion_type TEXT NOT NULL CHECK (conversion_type IN ('source', 'outlined')),
+    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+    modified_at TEXT NOT NULL,
+    scanned_at TEXT NOT NULL,
+    is_present INTEGER NOT NULL DEFAULT 1 CHECK (is_present IN (0, 1)),
+    CHECK (
+      (match_status = 'matched' AND drawing_id IS NOT NULL)
+      OR (match_status <> 'matched' AND drawing_id IS NULL)
+    )
+  );
+
+  CREATE INDEX pdf_files_drawing_idx ON pdf_files(drawing_id);
+  CREATE INDEX pdf_files_filter_idx ON pdf_files(is_present, match_status, conversion_type);
+
+  INSERT INTO schema_migrations (version, applied_at)
+  VALUES (4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+`;

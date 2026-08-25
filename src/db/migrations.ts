@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from './database.js';
-import { schemaVersionOne, schemaVersionThree, schemaVersionTwo } from './schema.sql.js';
+import { schemaVersionFour, schemaVersionOne, schemaVersionThree, schemaVersionTwo } from './schema.sql.js';
 
 export interface MigrationSafety {
   databaseExists: boolean;
@@ -73,8 +73,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 3) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 3`);
-  if (from >= 3) return { from, to: from };
+  if (from > 4) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 4`);
+  if (from >= 4) return { from, to: from };
   if (safety.databaseExists) safety.createBackup();
   database.transaction(() => {
     if (from < 1) database.exec(schemaVersionOne);
@@ -88,6 +88,7 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       }
     }
     if (from < 3) database.exec(schemaVersionThree);
+    if (from < 4) database.exec(schemaVersionFour);
   })();
-  return { from, to: 3 };
+  return { from, to: 4 };
 }

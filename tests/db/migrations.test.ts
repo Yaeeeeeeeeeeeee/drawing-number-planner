@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { openDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
-import { schemaVersionOne, schemaVersionTwo } from '../../src/db/schema.sql';
+import { schemaVersionOne, schemaVersionThree, schemaVersionTwo } from '../../src/db/schema.sql';
 
 const databases: ReturnType<typeof openDatabase>[] = [];
 afterEach(() => databases.splice(0).forEach((db) => db.close()));
@@ -17,11 +17,11 @@ describe('database migrations', () => {
     databases.push(db);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 3 });
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 3, to: 3 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 4 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 4, to: 4 });
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.prepare('select version from schema_migrations order by version').all()).toEqual([
-      { version: 1 }, { version: 2 }, { version: 3 },
+      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
     ]);
     const drawingColumns = (db.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).map((column) => column.name);
     expect(drawingColumns).toEqual(expect.arrayContaining([
@@ -30,6 +30,11 @@ describe('database migrations', () => {
     ]));
     expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
       .toEqual([{ name: 'bom_current' }, { name: 'bom_items' }, { name: 'bom_versions' }]);
+    const pdfColumns = (db.pragma('table_info(pdf_files)') as Array<{ name: string }>).map((column) => column.name);
+    expect(pdfColumns).toEqual([
+      'id', 'relative_path', 'file_name', 'drawing_id', 'match_status', 'detected_codes_json',
+      'conversion_type', 'size_bytes', 'modified_at', 'scanned_at', 'is_present',
+    ]);
     expect(backup).not.toHaveBeenCalled();
   });
 
@@ -37,11 +42,23 @@ describe('database migrations', () => {
     const db = openDatabase(':memory:'); databases.push(db); db.exec(schemaVersionOne); db.exec(schemaVersionTwo);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 3 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 4 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
       .toEqual([{ name: 'bom_current' }, { name: 'bom_items' }, { name: 'bom_versions' }]);
+  });
+
+  it('backs up an existing v3 database before adding the relative PDF index', () => {
+    const db = openDatabase(':memory:'); databases.push(db);
+    db.exec(schemaVersionOne); db.exec(schemaVersionTwo); db.exec(schemaVersionThree);
+    const backup = vi.fn();
+
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 3, to: 4 });
+
+    expect(backup).toHaveBeenCalledOnce();
+    expect(db.prepare("select name from sqlite_master where type = 'table' and name = 'pdf_files'").get())
+      .toEqual({ name: 'pdf_files' });
   });
 
   it('leaves an existing v2 database unchanged when its pre-v3 backup fails', () => {
@@ -74,7 +91,7 @@ describe('database migrations', () => {
       .run(product, color, main, item, now);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 3 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 4 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare(`select appearance_id, brand_code, product_size_code, appearance_code,
@@ -129,11 +146,11 @@ describe('database migrations', () => {
        brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
       sequence, status, notes, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', '不得丢失', ?)`)
       .run('02.0209.20.0401001', product, drawingAppearance, color, main, item, now);
-    db.exec('drop table bom_current; drop table bom_items; drop table bom_versions;');
+    db.exec('drop table pdf_files; drop table bom_current; drop table bom_items; drop table bom_versions;');
     db.prepare('delete from schema_migrations where version >= 2').run();
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 3 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 4 });
 
     expect(db.prepare('select appearance_id, appearance_code, notes from drawing_numbers').get()).toEqual({
       appearance_id: drawingAppearance, appearance_code: '2', notes: '不得丢失',
@@ -161,7 +178,7 @@ describe('database migrations', () => {
       sequence, status, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', ?)`)
       .run('02.0209.20.0401001', product, appearanceTwo, color, main, item, now);
     db.prepare('update drawing_numbers set appearance_id = ?').run(appearanceOne);
-    db.exec('drop table bom_current; drop table bom_items; drop table bom_versions;');
+    db.exec('drop table pdf_files; drop table bom_current; drop table bom_items; drop table bom_versions;');
     db.prepare('delete from schema_migrations where version >= 2').run();
 
     expect(() => migrateDatabase(db, { databaseExists: true, createBackup: vi.fn() }))
