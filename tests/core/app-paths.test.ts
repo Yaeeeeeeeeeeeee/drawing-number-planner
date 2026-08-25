@@ -16,6 +16,7 @@ describe('resolveAppPaths', () => {
     expect(paths.backups).toBe(join(baseDir, 'backups'));
     expect(paths.logs).toBe(join(baseDir, 'logs'));
     expect(paths.exports).toBe(join(baseDir, 'exports'));
+    expect(paths.settings).toBe(join(baseDir, 'settings.json'));
     expect(Object.keys(paths)).not.toContain('workspaceRoot');
   });
 });

@@ -6,6 +6,7 @@ export interface AppPaths {
   backups: string;
   logs: string;
   exports: string;
+  settings: string;
 }
 
 export function resolveAppPaths(baseDir: string): AppPaths {
@@ -15,5 +16,6 @@ export function resolveAppPaths(baseDir: string): AppPaths {
     backups: join(baseDir, 'backups'),
     logs: join(baseDir, 'logs'),
     exports: join(baseDir, 'exports'),
+    settings: join(baseDir, 'settings.json'),
   };
 }
