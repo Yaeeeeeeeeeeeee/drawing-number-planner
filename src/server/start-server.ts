@@ -9,6 +9,9 @@ import { BomService } from '../core/bom/bom-service.js';
 import { ensureDailyBackup } from '../core/backup/daily-backup.js';
 import { DictionaryService } from '../core/dictionaries/dictionary-service.js';
 import { DrawingQueryService } from '../core/drawings/drawing-query-service.js';
+import { FileRepository } from '../core/files/file-repository.js';
+import { FileService } from '../core/files/file-service.js';
+import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
 import { PlanningService } from '../core/planning/planning-service.js';
 import { ProductService } from '../core/products/product-service.js';
 import { createDatabaseBackup } from '../db/backup.js';
@@ -17,6 +20,7 @@ import { migrateDatabase } from '../db/migrations.js';
 import { registerDictionaryRoutes } from './routes/dictionaries.js';
 import { registerBomRoutes } from './routes/boms.js';
 import { registerDrawingRoutes } from './routes/drawings.js';
+import { registerFileRoutes } from './routes/files.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerProductRoutes } from './routes/products.js';
 import { registerPlanningRoutes } from './routes/planning.js';
@@ -66,6 +70,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
+    registerFileRoutes(server, new FileService(new FileRepository(database), new WorkspaceSettingsStore(paths.settings)));
     registerPlanningRoutes(server, new PlanningService(database));
     registerBomRoutes(server, new BomService(database));
     await registerImportRoutes(server, database, () => {
