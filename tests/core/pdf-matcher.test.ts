@@ -18,15 +18,15 @@ describe('PDF filename matching', () => {
     });
   });
 
-  it('leaves files with no complete code unmatched, including partial or extended codes', () => {
+  it('leaves files without candidates unmatched and sends malformed candidates to pending', () => {
     expect(matchPdfFilename('ordinary.pdf', [first])).toMatchObject({ matchStatus: 'unmatched', drawingId: null, detectedCodes: [] });
-    expect(matchPdfFilename(`${first.fullCode.slice(0, -1)}.pdf`, [first])).toMatchObject({ matchStatus: 'unmatched' });
-    expect(matchPdfFilename(`${first.fullCode}9.pdf`, [first])).toMatchObject({ matchStatus: 'unmatched' });
+    expect(matchPdfFilename(`${first.fullCode.slice(0, -1)}.pdf`, [first])).toMatchObject({ matchStatus: 'pending' });
+    expect(matchPdfFilename(`${first.fullCode}9.pdf`, [first])).toMatchObject({ matchStatus: 'pending' });
   });
 
-  it('marks two distinct complete codes as a conflict without choosing a drawing', () => {
+  it('keeps two distinct complete codes pending without choosing a drawing', () => {
     expect(matchPdfFilename(`${first.fullCode}_${second.fullCode}.pdf`, [second, first])).toEqual({
-      matchStatus: 'conflict', drawingId: null, detectedCodes: [first.fullCode, second.fullCode], conversionType: 'source',
+      matchStatus: 'pending', drawingId: null, detectedCodes: [first.fullCode, second.fullCode], conversionType: 'source',
     });
   });
 

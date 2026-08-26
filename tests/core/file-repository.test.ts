@@ -4,6 +4,7 @@ import { DictionaryService } from '../../src/core/dictionaries/dictionary-servic
 import { FileRepository } from '../../src/core/files/file-repository';
 import { FileError } from '../../src/core/files/file-errors';
 import type { FileScanRecord } from '../../src/core/files/file-types';
+import { parseDrawingCode } from '../../src/core/drawings/drawing-code';
 import { PlanningService } from '../../src/core/planning/planning-service';
 import { ProductService } from '../../src/core/products/product-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
@@ -48,10 +49,55 @@ function records(drawingId: number): FileScanRecord[] {
 }
 
 describe('FileRepository', () => {
+  it('atomically registers only reliable historical codes and links their PDFs', () => {
+    const drawing = drawingFixture();
+    const historical = parseDrawingCode('02.0404.010.0401007')!;
+    const scan = [{ ...records(0)[1], relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\history.pdf',
+      fileName: 'history.pdf', matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
+      detectedCodes: [historical.fullCode], classificationWarning: null }];
+
+    repository.replaceScan(scan, [{ ...historical, directoryContext: {
+      productCategory: '冰柜', sku: 'TEST-FILE-REPOSITORY', model: 'ZC100',
+    } }], '2026-08-25T04:00:00.000Z');
+
+    const linkedProduct = db.prepare('select product_id from drawing_numbers where id = ?').get(drawing.id) as { product_id: number };
+    expect(db.prepare('select full_code, sequence, product_id, detected_sku, detected_model from historical_drawing_numbers').all())
+      .toEqual([{ full_code: historical.fullCode, sequence: 7, product_id: linkedProduct.product_id,
+        detected_sku: 'TEST-FILE-REPOSITORY', detected_model: 'ZC100' }]);
+    expect(db.prepare('select historical_drawing_id, match_status from pdf_files').get())
+      .toEqual({ historical_drawing_id: 1, match_status: 'matched' });
+  });
+
+  it('keeps historical occupancy after its PDF disappears', () => {
+    const historical = parseDrawingCode('02.0404.010.0401007')!;
+    const scan = [{ ...records(0)[1], relativePath: 'history.pdf', fileName: 'history.pdf', matchStatus: 'matched' as const,
+      historicalFullCode: historical.fullCode, detectedCodes: [historical.fullCode], classificationWarning: null }];
+    repository.replaceScan(scan, [{ ...historical, directoryContext: null }], '2026-08-25T04:00:00.000Z');
+
+    repository.replaceScan([], [], '2026-08-26T04:00:00.000Z');
+
+    expect(db.prepare('select full_code, first_seen_at, last_seen_at from historical_drawing_numbers').get())
+      .toEqual({ full_code: historical.fullCode, first_seen_at: '2026-08-25T04:00:00.000Z', last_seen_at: '2026-08-25T04:00:00.000Z' });
+    expect(db.prepare('select is_present from pdf_files').get()).toEqual({ is_present: 0 });
+  });
+
+  it('rolls back file and history changes together when a database constraint fails', () => {
+    const kept = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf' };
+    repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
+    const parsed = parseDrawingCode('02.0404.010.0401007')!;
+
+    expect(() => repository.replaceScan([], [{ ...parsed, appearanceCode: '1', directoryContext: null }],
+      '2026-08-26T04:00:00.000Z')).toThrow();
+
+    expect(repository.search({ presence: 'present' }).items)
+      .toEqual([expect.objectContaining({ relativePath: 'kept.pdf' })]);
+    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 0 });
+  });
   it('atomically upserts a complete scan using relative paths and drawing joins', () => {
     const drawing = drawingFixture();
 
-    expect(repository.replaceScan(records(drawing.id), '2026-08-25T04:00:00.000Z')).toEqual({ missing: 0 });
+    expect(repository.replaceScan(records(drawing.id), [], '2026-08-25T04:00:00.000Z'))
+      .toEqual({ missing: 0, historicalRegistered: 0 });
     const result = repository.search({ presence: 'all', page: 1, pageSize: 20 });
 
     expect(result.total).toBe(3);
@@ -65,10 +111,11 @@ describe('FileRepository', () => {
   });
 
   it('refreshes seen metadata and marks unseen records missing without deleting them', () => {
-    const drawing = drawingFixture(); repository.replaceScan(records(drawing.id), '2026-08-25T04:00:00.000Z');
+    const drawing = drawingFixture(); repository.replaceScan(records(drawing.id), [], '2026-08-25T04:00:00.000Z');
     const updated = { ...records(drawing.id)[0], sizeBytes: 999, modifiedAt: '2026-08-25T05:00:00.000Z' };
 
-    expect(repository.replaceScan([updated], '2026-08-25T06:00:00.000Z')).toEqual({ missing: 2 });
+    expect(repository.replaceScan([updated], [], '2026-08-25T06:00:00.000Z'))
+      .toEqual({ missing: 2, historicalRegistered: 0 });
 
     expect(repository.search({ presence: 'present', page: 1, pageSize: 20 })).toMatchObject({ total: 1,
       items: [expect.objectContaining({ sizeBytes: 999, scannedAt: '2026-08-25T06:00:00.000Z', isPresent: true })] });
@@ -79,7 +126,7 @@ describe('FileRepository', () => {
   });
 
   it('supports combined filters, stable pagination, and drawing-code listing', () => {
-    const drawing = drawingFixture(); repository.replaceScan(records(drawing.id), '2026-08-25T04:00:00.000Z');
+    const drawing = drawingFixture(); repository.replaceScan(records(drawing.id), [], '2026-08-25T04:00:00.000Z');
 
     expect(repository.search({ keyword: '转曲', matchStatus: 'unmatched', conversionType: 'outlined',
       presence: 'present', page: 1, pageSize: 1 })).toMatchObject({ total: 1, page: 1, pageSize: 1,
@@ -91,9 +138,9 @@ describe('FileRepository', () => {
   it.each(['', '.', '..\\outside.pdf', 'folder\\..\\outside.pdf', 'C:\\outside.pdf', '\\\\server\\share\\outside.pdf', 'bad\0name.pdf'])
   ('rejects unsafe relative path %j before altering the current index', (relativePath) => {
     const safe = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf' };
-    repository.replaceScan([safe], '2026-08-25T04:00:00.000Z');
+    repository.replaceScan([safe], [], '2026-08-25T04:00:00.000Z');
 
-    expect(() => repository.replaceScan([{ ...safe, relativePath }], '2026-08-25T05:00:00.000Z'))
+    expect(() => repository.replaceScan([{ ...safe, relativePath }], [], '2026-08-25T05:00:00.000Z'))
       .toThrowError(FileError);
     expect(repository.search({ presence: 'present' }).items).toEqual([expect.objectContaining({ relativePath: 'kept.pdf' })]);
   });

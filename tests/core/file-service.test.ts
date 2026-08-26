@@ -37,6 +37,20 @@ function createDrawing() {
 }
 
 describe('FileService', () => {
+  it('registers reliable history and leaves malformed or ambiguous codes pending', async () => {
+    const workspace = join(dataDir, 'library');
+    const source = join(workspace, '01.洗碗机', 'SKDWT040JP-T40', '02.未转曲源文件');
+    mkdirSync(source, { recursive: true });
+    writeFileSync(join(source, '02.0404.010.0401007-history.pdf'), '%PDF');
+    writeFileSync(join(source, '02.0404.010.0401000-invalid.pdf'), '%PDF');
+    writeFileSync(join(source, '02.0404.010.0401008_02.0404.010.0401009.pdf'), '%PDF');
+    const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
+
+    expect(await service.scan()).toMatchObject({ total: 3, matched: 1, pending: 2, historicalRegistered: 1 });
+    expect(db.prepare('select full_code from historical_drawing_numbers').all())
+      .toEqual([{ full_code: '02.0404.010.0401007' }]);
+    expect(service.search({ matchStatus: 'pending' }).items).toHaveLength(2);
+  });
   it('requires a configured workspace before scanning', async () => {
     await expect(new FileService(repository, settings).scan())
       .rejects.toMatchObject({ code: 'WORKSPACE_NOT_CONFIGURED' });
@@ -60,7 +74,7 @@ describe('FileService', () => {
     const workspace = join(dataDir, 'library'); mkdirSync(workspace); settings.setWorkspaceRoot(workspace);
     repository.replaceScan([{ relativePath: 'kept.pdf', fileName: 'kept.pdf', drawingId: null, matchStatus: 'unmatched',
       detectedCodes: [], conversionType: 'source', sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z' }],
-    '2026-08-25T00:00:00.000Z');
+    [], '2026-08-25T00:00:00.000Z');
     const scanner = vi.fn().mockRejectedValue(new Error('access denied'));
 
     await expect(new FileService(repository, settings, scanner).scan()).rejects.toMatchObject({ code: 'SCAN_FAILED' });

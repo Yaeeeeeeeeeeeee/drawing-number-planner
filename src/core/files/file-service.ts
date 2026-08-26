@@ -1,13 +1,13 @@
 import { FileError } from './file-errors.js';
 import { FileRepository } from './file-repository.js';
-import { matchPdfFilename } from './pdf-matcher.js';
+import { classifyHistoricalPdf } from './historical-file-classifier.js';
 import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
-import type { FileSearchFilters, FileSearchResult, FileScanRecord } from './file-types.js';
+import type { FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
 import { WorkspaceSettingsStore } from './workspace-settings.js';
 import { validateWorkspaceRoot } from './workspace-paths.js';
 
 export interface FileScanSummary {
-  total: number; matched: number; unmatched: number; conflict: number;
+  total: number; matched: number; pending: number; unmatched: number; conflict: number; historicalRegistered: number;
   source: number; outlined: number; missing: number; scannedAt: string;
 }
 
@@ -40,19 +40,27 @@ export class FileService {
     this.scanning = true;
     try {
       const files = await this.scanner(workspaceRoot); const drawings = this.repository.listDrawingCodes();
+      const historicalCodes: HistoricalDrawingScanRecord[] = [];
       const records = files.map((file): FileScanRecord => {
-        const match = matchPdfFilename(file.fileName, drawings);
-        if (!match) throw new Error('扫描器返回了非 PDF 文件');
-        return { ...file, ...match };
+        if (!file.fileName.toLocaleLowerCase('en-US').endsWith('.pdf')) throw new Error('扫描器返回了非 PDF 文件');
+        const classification = classifyHistoricalPdf({ ...file, drawings });
+        if (classification.historicalCode) historicalCodes.push({ ...classification.historicalCode,
+          directoryContext: classification.directoryContext });
+        return { ...file, drawingId: classification.drawingId,
+          historicalFullCode: classification.historicalCode?.fullCode ?? null,
+          matchStatus: classification.matchStatus, detectedCodes: classification.detectedCodes,
+          conversionType: classification.conversionType, classificationWarning: classification.classificationWarning };
       });
-      const scannedAt = new Date().toISOString(); const { missing } = this.repository.replaceScan(records, scannedAt);
+      const scannedAt = new Date().toISOString();
+      const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt);
       return { total: records.length,
         matched: records.filter((file) => file.matchStatus === 'matched').length,
+        pending: records.filter((file) => file.matchStatus === 'pending').length,
         unmatched: records.filter((file) => file.matchStatus === 'unmatched').length,
         conflict: records.filter((file) => file.matchStatus === 'conflict').length,
         source: records.filter((file) => file.conversionType === 'source').length,
         outlined: records.filter((file) => file.conversionType === 'outlined').length,
-        missing, scannedAt };
+        missing, historicalRegistered, scannedAt };
     } catch (error) {
       if (error instanceof FileError) throw error;
       throw new FileError('SCAN_FAILED', '资料库扫描失败，上次索引未更改', { cause: error });
