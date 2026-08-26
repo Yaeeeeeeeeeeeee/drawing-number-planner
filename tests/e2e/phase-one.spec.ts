@@ -24,6 +24,7 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
 
   await page.getByRole('button', { name: /产品档案/ }).click();
   await page.getByRole('button', { name: '新建产品' }).click();
+  await page.getByRole('textbox', { name: 'SKU', exact: true }).fill('PHASE1-ZC220');
   await page.getByRole('textbox', { name: '型号', exact: true }).fill('ZC220');
   await page.getByLabel('产品类别').fill('冰柜');
   await page.getByRole('combobox', { name: '品牌', exact: true }).selectOption({ label: 'SAMKYO' });

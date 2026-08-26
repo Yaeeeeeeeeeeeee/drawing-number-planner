@@ -10,8 +10,10 @@ import { startServer } from '../../src/server/start-server';
 export default async function globalSetup(_config: FullConfig) {
   const dataDir = mkdtempSync(join(tmpdir(), 'drawing-planner-e2e-'));
   const workspaceRoot = mkdtempSync(join(tmpdir(), 'drawing-planner-workspace-'));
+  const compatibilityWorkspaceRoot = mkdtempSync(join(tmpdir(), 'drawing-planner-compatibility-workspace-'));
   process.env.PHASE4_E2E_DATA_DIR = dataDir;
   process.env.PHASE4_WORKSPACE_ROOT = workspaceRoot;
+  process.env.COMPATIBILITY_WORKSPACE_ROOT = compatibilityWorkspaceRoot;
   const server = await startServer({
     port: 4317,
     token: 'phase-one-development',
@@ -27,6 +29,7 @@ export default async function globalSetup(_config: FullConfig) {
     await vite.close();
     await server.close();
     rmSync(workspaceRoot, { recursive: true, force: true });
+    rmSync(compatibilityWorkspaceRoot, { recursive: true, force: true });
     rmSync(dataDir, { recursive: true, force: true });
   };
 }

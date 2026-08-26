@@ -31,7 +31,7 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   const logoId = await ensureDictionary(request, 'project_item', '41', 'Phase4 LOGO', mainId);
   const manualId = await ensureDictionary(request, 'project_item', '42', 'Phase4 说明书', mainId);
   const productResponse = await request.post('/api/products', { headers, data: {
-    brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC400', productCategory: '冰柜',
+    sku: 'PHASE4-ZC400', brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC400', productCategory: '冰柜',
   } });
   expect(productResponse.ok()).toBeTruthy();
   const productId = (await productResponse.json()).id as number;
@@ -66,7 +66,8 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   await expect(page.getByText('4 个 PDF')).toBeVisible();
   await expect(page.getByText('2 已匹配')).toBeVisible();
   await expect(page.getByText('1 未匹配')).toBeVisible();
-  await expect(page.getByText('1 冲突')).toBeVisible();
+  await expect(page.getByText('1 待确认')).toBeVisible();
+  await expect(page.getByText('0 冲突')).toBeVisible();
   await expect(page.getByText('1 转曲后')).toBeVisible();
   await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO.pdf`, { exact: true })).toBeVisible();
   await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO（转曲）.pdf`, { exact: true })).toBeVisible();

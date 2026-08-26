@@ -31,7 +31,7 @@ test('Phase 3 versions a gray BOM while sharing white drawings from the same mod
   const logoId = await ensureDictionary(request, 'project_item', '01', 'LOGO', mainId);
   const manualId = await ensureDictionary(request, 'project_item', '02', '说明书', mainId);
   const productResponse = await request.post('/api/products', { headers, data: {
-    brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC100', productCategory: '冰柜',
+    sku: 'PHASE3-ZC100', brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC100', productCategory: '冰柜',
   } });
   expect(productResponse.ok()).toBeTruthy(); const productId = (await productResponse.json()).id as number;
   const planningInput = { productId, rows: [
@@ -58,21 +58,21 @@ test('Phase 3 versions a gray BOM while sharing white drawings from the same mod
   await page.getByLabel('第 2 行项目').selectOption(String(manualId));
   await page.getByLabel('第 2 行引用白色图号').check();
   await selectDrawing(page, '第 2 行图号', byClientId.get('white-manual')!);
-  await page.getByRole('button', { name: '保存为新版本' }).click();
-  await expect(page.getByText('版本 1 已保存')).toBeVisible();
+  await page.getByRole('button', { name: '保存当前 BOM' }).click();
+  await expect(page.getByText('当前 BOM 已保存')).toBeVisible();
 
   await page.getByRole('button', { name: '删除 BOM 项目 2' }).click();
   await page.getByLabel('第 1 行引用白色图号').check();
   await selectDrawing(page, '第 1 行图号', byClientId.get('white-logo')!);
-  await page.getByRole('button', { name: '保存为新版本' }).click();
-  await expect(page.getByText('版本 2 已保存')).toBeVisible();
-  await expect(page.getByText('替换 · LOGO')).toBeVisible();
-  await expect(page.getByText('移除 · 说明书')).toBeVisible();
+  await page.getByRole('button', { name: '保存当前 BOM' }).click();
+  await expect(page.getByText('当前 BOM 已保存')).toBeVisible();
+  await expect(page.getByText(`LOGO：${byClientId.get('gray-logo')} → ${byClientId.get('white-logo')}`)).toBeVisible();
+  await expect(page.getByText(`说明书：移除 ${byClientId.get('white-manual')}`)).toBeVisible();
 
-  await page.getByRole('button', { name: '查看版本 1' }).click();
-  await expect(page.getByText('版本 1 只读明细')).toBeVisible();
-  await expect(page.getByText(byClientId.get('gray-logo')!)).toBeVisible();
-  await expect(page.getByText(byClientId.get('white-manual')!)).toBeVisible();
+  await page.getByRole('button', { name: '查看变更' }).last().click();
+  await expect(page.getByText(/使用明细/)).toBeVisible();
+  await expect(page.getByRole('cell', { name: byClientId.get('gray-logo')!, exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: byClientId.get('white-manual')!, exact: true })).toBeVisible();
 
   const grayManual = await request.get(`/api/drawings?model=ZC100&colorId=${grayId}&projectItemId=${manualId}`);
   expect((await grayManual.json()).total).toBe(0);
