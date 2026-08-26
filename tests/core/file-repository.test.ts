@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
+import { DrawingQueryService } from '../../src/core/drawings/drawing-query-service';
 import { FileRepository } from '../../src/core/files/file-repository';
 import { FileError } from '../../src/core/files/file-errors';
 import type { FileScanRecord } from '../../src/core/files/file-types';
@@ -123,6 +124,58 @@ describe('FileRepository', () => {
       .toEqual(expect.arrayContaining([expect.objectContaining({ matchStatus: 'unmatched', isPresent: false }),
         expect.objectContaining({ matchStatus: 'conflict', isPresent: false })]));
     expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 3 });
+  });
+
+  it('preserves a valid manual planned association and explicit type across an unmatched rescan', () => {
+    const drawing = drawingFixture();
+    const initial = { ...records(0)[1], relativePath: 'manual.pdf', fileName: 'manual-v1.pdf',
+      classificationWarning: null };
+    repository.replaceScan([initial], [], '2026-08-25T04:00:00.000Z');
+    const pdfId = repository.search().items[0].id;
+    new DrawingQueryService(db).associatePdf(drawing.id, pdfId, 'outlined');
+
+    const rescanned = { ...initial, fileName: 'manual-v2.pdf', conversionType: 'source' as const,
+      detectedCodes: [], classificationWarning: '扫描仍未识别图号', sizeBytes: 777,
+      modifiedAt: '2026-08-26T05:00:00.000Z' };
+    repository.replaceScan([rescanned], [], '2026-08-26T06:00:00.000Z');
+
+    expect(repository.search().items).toEqual([expect.objectContaining({
+      id: pdfId, fileName: 'manual-v2.pdf', drawingId: drawing.id, historicalDrawingId: null,
+      matchStatus: 'matched', conversionType: 'outlined', detectedCodes: [],
+      classificationWarning: '扫描仍未识别图号', sizeBytes: 777,
+      modifiedAt: '2026-08-26T05:00:00.000Z', scannedAt: '2026-08-26T06:00:00.000Z', isPresent: true,
+    })]);
+  });
+
+  it('replaces a prior manual planned association when the rescan has a reliable historical match', () => {
+    const drawing = drawingFixture();
+    const initial = { ...records(0)[1], relativePath: 'reclassified.pdf', fileName: 'reclassified.pdf' };
+    repository.replaceScan([initial], [], '2026-08-25T04:00:00.000Z');
+    const pdfId = repository.search().items[0].id;
+    new DrawingQueryService(db).associatePdf(drawing.id, pdfId, 'source');
+    const historical = parseDrawingCode('02.0404.010.0401007')!;
+
+    repository.replaceScan([{ ...initial, matchStatus: 'matched', historicalFullCode: historical.fullCode,
+      detectedCodes: [historical.fullCode], conversionType: 'outlined', classificationWarning: null }],
+    [{ ...historical, directoryContext: null }], '2026-08-26T06:00:00.000Z');
+
+    expect(repository.search().items).toEqual([expect.objectContaining({ id: pdfId, drawingId: null,
+      historicalDrawingId: expect.any(Number), historicalFullCode: historical.fullCode,
+      matchStatus: 'matched', conversionType: 'outlined', detectedCodes: [historical.fullCode] })]);
+  });
+
+  it('does not preserve a planned drawing reference that no longer resolves', () => {
+    const initial = { ...records(0)[1], relativePath: 'invalid-reference.pdf', fileName: 'invalid-reference.pdf' };
+    repository.replaceScan([initial], [], '2026-08-25T04:00:00.000Z');
+    db.pragma('foreign_keys = OFF');
+    db.prepare("update pdf_files set drawing_id = 999999, match_status = 'matched'").run();
+    db.pragma('foreign_keys = ON');
+
+    repository.replaceScan([{ ...initial, classificationWarning: '仍未匹配' }], [], '2026-08-26T06:00:00.000Z');
+
+    expect(repository.search().items).toEqual([expect.objectContaining({ drawingId: null,
+      historicalDrawingId: null, matchStatus: 'unmatched', conversionType: 'outlined',
+      classificationWarning: '仍未匹配' })]);
   });
 
   it('cleans selected missing index rows atomically without releasing historical occupancy', () => {

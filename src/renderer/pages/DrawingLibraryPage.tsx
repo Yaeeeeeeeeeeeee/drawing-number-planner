@@ -37,7 +37,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const loadPdfCandidates = async (keyword = '') => {
     if (!api.searchPdfFiles) return;
     const result = await api.searchPdfFiles({ keyword, presence: 'present', page: 1, pageSize: 100 });
-    setPdfCandidates(result.items); setSelectedPdfId((current) => current || String(result.items[0]?.id ?? ''));
+    setPdfCandidates(result.items); setSelectedPdfId(String(result.items[0]?.id ?? ''));
   };
   const openDetail = async (item: DrawingView) => {
     try {

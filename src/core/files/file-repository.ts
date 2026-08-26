@@ -74,9 +74,20 @@ export class FileRepository {
           @matchStatus, @detectedCodesJson, @conversionType, @classificationWarning,
           @sizeBytes, @modifiedAt, @scannedAt, 1)
         on conflict(relative_path) do update set
-          file_name = excluded.file_name, drawing_id = excluded.drawing_id,
-          historical_drawing_id = excluded.historical_drawing_id, match_status = excluded.match_status,
-          detected_codes_json = excluded.detected_codes_json, conversion_type = excluded.conversion_type,
+          file_name = excluded.file_name,
+          drawing_id = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+            and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
+            then pdf_files.drawing_id else excluded.drawing_id end,
+          historical_drawing_id = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+            and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
+            then null else excluded.historical_drawing_id end,
+          match_status = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+            and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
+            then 'matched' else excluded.match_status end,
+          detected_codes_json = excluded.detected_codes_json,
+          conversion_type = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+            and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
+            then pdf_files.conversion_type else excluded.conversion_type end,
           classification_warning = excluded.classification_warning,
           size_bytes = excluded.size_bytes, modified_at = excluded.modified_at, scanned_at = excluded.scanned_at,
           is_present = 1`);
