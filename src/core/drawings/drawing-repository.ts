@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingRecord, DrawingSearchFilters } from './drawing-types.js';
+import type { DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingSearchFilters } from './drawing-types.js';
 
 interface DrawingRow {
   id: number; origin: DrawingRecord['origin']; sku: string | null; full_code: string; display_name: string;
@@ -12,6 +12,10 @@ interface DrawingRow {
   source_product_id: number | null; source_product_model: string | null; source_drawing_id: number | null;
   source_drawing_full_code: string | null; notes: string | null; created_at: string;
   has_source_file: number; has_outlined_file: number; dictionary_mapping_status: DrawingRecord['dictionaryMappingStatus'];
+}
+
+interface DrawingBomUsageRow extends Omit<DrawingBomUsage, 'usesWhiteMaterial'> {
+  usesWhiteMaterial: number;
 }
 
 const unifiedCte = `with drawing_records as (
@@ -143,5 +147,62 @@ export class DrawingRepository {
   get(id: number): DrawingRecord | undefined {
     const row = this.db.prepare(`${unifiedCte} select * from drawing_records where id = ?`).get(id) as DrawingRow | undefined;
     return row ? mapRow(row) : undefined;
+  }
+
+  getDetail(id: number): DrawingDetailRecord | undefined {
+    const drawing = this.get(id);
+    if (!drawing) return undefined;
+    const historicalId = drawing.origin === 'historical' ? -drawing.id : null;
+    const fileRows = this.db.prepare(`select file.id as pdfIndexId, file.file_name as fileName,
+      file.relative_path as relativePath, file.is_present as isPresent, file.conversion_type as conversionType
+      from pdf_files file left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
+      where (? is not null and file.historical_drawing_id = ?)
+        or (? is null and (file.drawing_id = ? or historical.full_code = ?))
+      order by file.file_name collate nocase, file.id`)
+      .all(historicalId, historicalId, historicalId, drawing.id, drawing.fullCode) as Array<{
+        pdfIndexId: number; fileName: string; relativePath: string; isPresent: number;
+        conversionType: DrawingFileRecord['conversionType'];
+      }>;
+    const files = fileRows.map((file): DrawingFileRecord => ({ ...file, isPresent: file.isPresent === 1 }));
+    const currentBomUsage = drawing.origin === 'planned' ? (this.db.prepare(`select version.id as bomVersionId,
+      version.product_id as productId, product.model, version.color_id as colorId, color.name as colorName,
+      version.version_number as versionNumber, item.project_item_id as projectItemId,
+      project.name as projectItemName, item.quantity, item.uses_white_material as usesWhiteMaterial
+      from bom_current current_bom
+      join bom_versions version on version.id = current_bom.version_id
+      join products product on product.id = version.product_id
+      join dictionary_items color on color.id = version.color_id
+      join bom_items item on item.bom_version_id = version.id
+      join dictionary_items project on project.id = item.project_item_id
+      where item.drawing_id = ? order by product.model, color.name, project.name`)
+      .all(drawing.id) as DrawingBomUsageRow[]).map((row): DrawingBomUsage => ({
+        ...row, usesWhiteMaterial: row.usesWhiteMaterial === 1,
+      })) : [];
+    return { ...drawing,
+      sourceFiles: files.filter((file) => file.conversionType === 'source'),
+      outlinedFiles: files.filter((file) => file.conversionType === 'outlined'),
+      currentBomUsage, readOnly: drawing.origin === 'historical',
+      readOnlyMessage: drawing.origin === 'historical' ? '永久占用的历史数据，不可修改' : null };
+  }
+
+  updateStatus(id: number, status: 'active' | 'voided'): void {
+    this.db.prepare('update drawing_numbers set status = ? where id = ?').run(status, id);
+  }
+
+  associatePdf(drawingId: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): boolean {
+    return this.db.transaction(() => {
+      const drawing = this.db.prepare('select full_code as fullCode from drawing_numbers where id = ?')
+        .get(drawingId) as { fullCode: string } | undefined;
+      const pdf = this.db.prepare(`select detected_codes_json as detectedCodesJson from pdf_files
+        where id = ? and is_present = 1`).get(pdfIndexId) as { detectedCodesJson: string } | undefined;
+      if (!drawing || !pdf) return false;
+      const parsed = JSON.parse(pdf.detectedCodesJson) as unknown;
+      const detectedCodes = Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+      if (!detectedCodes.includes(drawing.fullCode)) detectedCodes.push(drawing.fullCode);
+      this.db.prepare(`update pdf_files set drawing_id = ?, historical_drawing_id = null,
+        match_status = 'matched', conversion_type = ?, detected_codes_json = ? where id = ? and is_present = 1`)
+        .run(drawingId, conversionType, JSON.stringify(detectedCodes), pdfIndexId);
+      return true;
+    }).immediate();
   }
 }

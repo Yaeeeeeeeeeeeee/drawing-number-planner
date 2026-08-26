@@ -11,10 +11,22 @@ export interface ProductView {
 }
 
 export interface DrawingView {
-  id: number; origin: 'planned' | 'historical'; sku: string | null; fullCode: string; displayName: string; model: string; brandName: string;
+  id: number; origin: 'planned' | 'historical'; sku: string | null; fullCode: string; displayName: string;
+  productId: number | null; model: string; productCategory: string; brandName: string;
   colorName: string; mainCategoryName: string; projectItemName: string;
   status: 'reserved' | 'active' | 'voided' | 'historical'; hasSourceFile: boolean; hasOutlinedFile: boolean;
   dictionaryMappingStatus: 'mapped' | 'unmapped'; [key: string]: unknown;
+}
+export interface DrawingFileView {
+  pdfIndexId: number; fileName: string; relativePath: string; isPresent: boolean; conversionType: 'source' | 'outlined';
+}
+export interface DrawingBomUsageView {
+  bomVersionId: number; productId: number; model: string; colorId: number; colorName: string; versionNumber: number;
+  projectItemId: number; projectItemName: string; quantity: number; usesWhiteMaterial: boolean;
+}
+export interface DrawingDetailView extends DrawingView {
+  sourceFiles: DrawingFileView[]; outlinedFiles: DrawingFileView[]; currentBomUsage: DrawingBomUsageView[];
+  readOnly: boolean; readOnlyMessage: string | null;
 }
 
 export interface ImportReportView {
@@ -74,7 +86,10 @@ export interface PdfFileView {
 
 export interface PlannerApi {
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
-  getDrawing(id: number): Promise<DrawingView>;
+  getDrawing(id: number): Promise<DrawingDetailView>;
+  activateDrawing(id: number): Promise<DrawingDetailView>;
+  voidDrawing(id: number): Promise<DrawingDetailView>;
+  associateDrawingPdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): Promise<DrawingDetailView>;
   listDictionaries(type: string, includeInactive?: boolean): Promise<DictionaryItemView[]>;
   createDictionary(type: string, input: { code: string; name: string; parentId?: number }): Promise<DictionaryItemView>;
   updateDictionaryName(id: number, name: string): Promise<DictionaryItemView>;
@@ -160,6 +175,10 @@ const json = (method: string, body?: unknown): RequestInit => ({
 export const apiClient: PlannerApi = {
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),
   getDrawing: (id) => request(`/api/drawings/${id}`),
+  activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
+  voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
+  associateDrawingPdf: (id, pdfIndexId, conversionType) => request(`/api/drawings/${id}/associate-pdf`,
+    json('POST', { pdfIndexId, conversionType })),
   listDictionaries: async (type, includeInactive = true) => {
     const result = await request<{ items: DictionaryItemView[] }>(`/api/dictionaries/${type}?includeInactive=${includeInactive}`);
     return result.items;

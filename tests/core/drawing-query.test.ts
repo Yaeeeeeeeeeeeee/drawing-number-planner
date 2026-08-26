@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { DrawingQueryService } from '../../src/core/drawings/drawing-query-service';
 import { ProductService } from '../../src/core/products/product-service';
+import { OccupiedNumberRepository } from '../../src/core/planning/occupied-number-repository';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 
@@ -72,6 +73,111 @@ describe('DrawingQueryService', () => {
       appearanceName: '1号外观', brandCode: '02', productSizeCode: '0209', appearanceCode: '01',
       colorCode: '0', mainCategoryCode: '04', projectItemCode: '01', notes: '首版',
     }));
+  });
+
+  it('returns independent indexed PDF lists and only current BOM usage in planned detail', () => {
+    const now = '2026-08-26T03:00:00.000Z';
+    const sourceId = Number(db.prepare(`insert into pdf_files
+      (relative_path, file_name, drawing_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('source/current.pdf', 'current.pdf', ?, 'matched', '[]', 'source', 10, ?, ?, 1)`)
+      .run(ids.first, now, now).lastInsertRowid);
+    const outlinedId = Number(db.prepare(`insert into pdf_files
+      (relative_path, file_name, drawing_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('outlined/missing.pdf', 'missing.pdf', ?, 'matched', '[]', 'outlined', 20, ?, ?, 0)`)
+      .run(ids.first, now, now).lastInsertRowid);
+    const versionId = Number(db.prepare(`insert into bom_versions
+      (product_id, color_id, version_number, previous_version_id, notes, created_at)
+      select product_id, color_id, 1, null, 'current', ? from drawing_numbers where id = ?`)
+      .run(now, ids.first).lastInsertRowid);
+    db.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, notes, uses_white_material)
+      values (?, ?, ?, 2, 'used', 0)`).run(versionId, ids.logo, ids.first);
+    db.prepare(`insert into bom_current (product_id, color_id, version_id, updated_at)
+      select product_id, color_id, ?, ? from drawing_numbers where id = ?`).run(versionId, now, ids.first);
+    const staleVersionId = Number(db.prepare(`insert into bom_versions
+      (product_id, color_id, version_number, previous_version_id, notes, created_at)
+      select product_id, color_id, 2, ?, 'not current', ? from drawing_numbers where id = ?`)
+      .run(versionId, now, ids.first).lastInsertRowid);
+    db.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, notes, uses_white_material)
+      values (?, ?, ?, 9, 'stale', 0)`).run(staleVersionId, ids.logo, ids.first);
+
+    expect(drawings.get(ids.first)).toEqual(expect.objectContaining({
+      productId: expect.any(Number), sku: 'TEST-DRAWING-QUERY', model: 'ZC220', brandName: 'SAMKYO', status: 'active',
+      sourceFiles: [{ pdfIndexId: sourceId, fileName: 'current.pdf', relativePath: 'source/current.pdf',
+        isPresent: true, conversionType: 'source' }],
+      outlinedFiles: [{ pdfIndexId: outlinedId, fileName: 'missing.pdf', relativePath: 'outlined/missing.pdf',
+        isPresent: false, conversionType: 'outlined' }],
+      currentBomUsage: [expect.objectContaining({ bomVersionId: versionId, colorName: '白色', quantity: 2,
+        projectItemName: 'LOGO', usesWhiteMaterial: false })],
+      readOnly: false,
+    }));
+  });
+
+  it('allows only reserved-to-active and reserved-or-active-to-voided transitions', () => {
+    expect(drawings.transition(ids.second, 'active').status).toBe('active');
+    expect(() => drawings.transition(ids.second, 'voided')).not.toThrow();
+    expect(() => drawings.transition(ids.second, 'active')).toThrowError(expect.objectContaining({ code: 'INVALID_TRANSITION' }));
+
+    db.prepare("update drawing_numbers set status = 'reserved' where id = ?").run(ids.second);
+    expect(drawings.transition(ids.second, 'voided').status).toBe('voided');
+    expect(() => drawings.transition(ids.second, 'voided'))
+      .toThrowError(expect.objectContaining({ code: 'INVALID_TRANSITION' }));
+    expect(() => drawings.transition(ids.first, 'reserved' as never))
+      .toThrowError(expect.objectContaining({ code: 'INVALID_TRANSITION' }));
+  });
+
+  it('keeps code, PDFs, and occupied-number behavior unchanged when voiding', () => {
+    const now = '2026-08-26T03:00:00.000Z';
+    db.prepare(`insert into pdf_files
+      (relative_path, file_name, drawing_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('keep.pdf', 'keep.pdf', ?, 'matched', '[]', 'source', 1, ?, ?, 1)`).run(ids.second, now, now);
+    const before = drawings.get(ids.second);
+
+    drawings.transition(ids.second, 'voided');
+
+    expect(drawings.get(ids.second)).toEqual(expect.objectContaining({ fullCode: before.fullCode, status: 'voided' }));
+    expect(db.prepare('select count(*) as count from pdf_files where drawing_id = ?').get(ids.second)).toEqual({ count: 1 });
+    expect(new OccupiedNumberRepository(db).hasFullCode(before.fullCode)).toBe(true);
+  });
+
+  it('associates a present indexed PDF transactionally and rejects absent or historical targets', () => {
+    const now = '2026-08-26T03:00:00.000Z';
+    const historyId = Number(db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+       project_item_code, sequence, first_seen_at, last_seen_at)
+      values ('02.0209.010.0401007', '02', '0209', '01', '0', '04', '01', 7, ?, ?)`)
+      .run(now, now).lastInsertRowid);
+    const presentId = Number(db.prepare(`insert into pdf_files
+      (relative_path, file_name, historical_drawing_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('existing.pdf', 'existing.pdf', ?, 'matched', '["old"]', 'source', 5, ?, ?, 1)`)
+      .run(historyId, now, now).lastInsertRowid);
+    const absentId = Number(db.prepare(`insert into pdf_files
+      (relative_path, file_name, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('absent.pdf', 'absent.pdf', 'unmatched', '[]', 'source', 5, ?, ?, 0)`)
+      .run(now, now).lastInsertRowid);
+
+    drawings.associatePdf(ids.second, presentId, 'outlined');
+
+    expect(db.prepare(`select relative_path, file_name, drawing_id, historical_drawing_id, match_status,
+      detected_codes_json, conversion_type, is_present from pdf_files where id = ?`).get(presentId)).toEqual({
+      relative_path: 'existing.pdf', file_name: 'existing.pdf', drawing_id: ids.second,
+      historical_drawing_id: null, match_status: 'matched',
+      detected_codes_json: JSON.stringify(['old', '02.0209.011.0402002']), conversion_type: 'outlined', is_present: 1,
+    });
+    expect(() => drawings.associatePdf(ids.second, absentId, 'source'))
+      .toThrowError(expect.objectContaining({ code: 'PDF_NOT_AVAILABLE' }));
+    expect(() => drawings.associatePdf(-historyId, presentId, 'source'))
+      .toThrowError(expect.objectContaining({ code: 'HISTORICAL_READ_ONLY' }));
+    expect(() => drawings.transition(-historyId, 'voided'))
+      .toThrowError(expect.objectContaining({ code: 'HISTORICAL_READ_ONLY' }));
+    expect(drawings.get(-historyId)).toEqual(expect.objectContaining({ readOnly: true,
+      readOnlyMessage: '永久占用的历史数据，不可修改' }));
   });
 
   it('lists historical codes with planned records and prefers planned on duplicate full codes', () => {

@@ -62,4 +62,102 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getByText(/字典待映射/)).toBeVisible();
     expect(screen.getByText(/源文件缺失.*转曲后已有/)).toBeVisible();
   });
+
+  it('separates business status, file completeness, and current BOM usage in planned maintenance detail', async () => {
+    const row = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'SAMKYO-ZC220白色-LOGO', sku: 'SKU-220',
+      productId: 5, model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色',
+      mainCategoryName: '印刷件类', projectItemName: 'LOGO', status: 'reserved', origin: 'planned',
+      hasSourceFile: true, hasOutlinedFile: false, dictionaryMappingStatus: 'mapped' } as const;
+    const detail = { ...row, readOnly: false, readOnlyMessage: null,
+      sourceFiles: [{ pdfIndexId: 21, fileName: 'source.pdf', relativePath: 'SKU/source.pdf', isPresent: true, conversionType: 'source' }],
+      outlinedFiles: [], currentBomUsage: [{ bomVersionId: 31, productId: 5, model: 'ZC220', colorId: 4,
+        colorName: '白色', versionNumber: 2, projectItemId: 7, projectItemName: 'LOGO', quantity: 1, usesWhiteMaterial: false }] };
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [row], total: 1, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(detail),
+      searchPdfFiles: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 }) };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(row.fullCode));
+
+    const panel = await screen.findByRole('complementary', { name: '图号详情' });
+    expect(panel).toHaveTextContent('业务状态已占号');
+    expect(panel).toHaveTextContent('源文件已有');
+    expect(panel).toHaveTextContent('转曲后文件缺失');
+    expect(panel).toHaveTextContent('SKU/source.pdf');
+    expect(panel).toHaveTextContent('当前 BOM 使用');
+    expect(panel).toHaveTextContent('ZC220 · 白色 · BOM v2');
+  });
+
+  it('confirms lifecycle actions and refreshes both detail and its visible row', async () => {
+    const reserved = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
+      model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
+      projectItemName: 'LOGO', status: 'reserved', origin: 'planned', hasSourceFile: false, hasOutlinedFile: false,
+      dictionaryMappingStatus: 'mapped', readOnly: false, readOnlyMessage: null, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] } as const;
+    const active = { ...reserved, status: 'active' as const };
+    const voided = { ...reserved, status: 'voided' as const };
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [reserved], total: 1, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValueOnce(reserved).mockResolvedValueOnce(active).mockResolvedValueOnce(voided),
+      searchPdfFiles: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 }),
+      activateDrawing: vi.fn().mockResolvedValue(active), voidDrawing: vi.fn().mockResolvedValue(voided) };
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(reserved.fullCode));
+    fireEvent.click(await screen.findByRole('button', { name: '正式使用' }));
+
+    await waitFor(() => expect(api.activateDrawing).toHaveBeenCalledWith(10));
+    expect(confirm).toHaveBeenCalledWith('确认将该图号变更为正式使用？此操作会记录业务状态。');
+    expect(api.getDrawing).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText('正式使用').length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(screen.getByRole('button', { name: '作废' }));
+    await waitFor(() => expect(api.voidDrawing).toHaveBeenCalledWith(10));
+    expect(confirm).toHaveBeenLastCalledWith('确认作废该图号？作废后普通界面无法恢复，但图号仍永久占用。');
+    expect(api.getDrawing).toHaveBeenCalledTimes(3);
+    expect(screen.getAllByText('作废').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('associates a searched current PDF and refreshes detail and row while surfacing failures', async () => {
+    const detail = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
+      model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
+      projectItemName: 'LOGO', status: 'reserved', origin: 'planned', hasSourceFile: false, hasOutlinedFile: false,
+      dictionaryMappingStatus: 'mapped', readOnly: false, readOnlyMessage: null, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] } as const;
+    const candidate = { id: 81, relativePath: 'old/existing.pdf', fileName: 'existing.pdf', drawingId: null,
+      historicalDrawingId: null, historicalFullCode: null, fullCode: null, displayName: null, model: null, brandName: null,
+      projectItemName: null, colorName: null, matchStatus: 'unmatched', detectedCodes: [], classificationWarning: null,
+      conversionType: 'source', sizeBytes: 1, modifiedAt: '', scannedAt: '', isPresent: true } as const;
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [detail], total: 1, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(detail),
+      searchPdfFiles: vi.fn().mockResolvedValue({ items: [candidate], total: 1, page: 1, pageSize: 100 }),
+      associateDrawingPdf: vi.fn().mockResolvedValueOnce(detail).mockRejectedValueOnce(new Error('PDF 已在扫描后缺失')) };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(detail.fullCode));
+    fireEvent.change(await screen.findByLabelText('搜索现有 PDF'), { target: { value: 'existing' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜索 PDF' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith({ keyword: 'existing', presence: 'present', page: 1, pageSize: 100 }));
+    fireEvent.change(screen.getByLabelText('现有 PDF 索引'), { target: { value: '81' } });
+    fireEvent.click(screen.getByRole('button', { name: '关联为转曲后文件' }));
+
+    await waitFor(() => expect(api.associateDrawingPdf).toHaveBeenCalledWith(10, 81, 'outlined'));
+    expect(api.getDrawing).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole('button', { name: '关联为源文件' }));
+    expect(await screen.findByText('PDF 已在扫描后缺失')).toBeVisible();
+  });
+
+  it('shows historical detail as permanently occupied read-only data without maintenance controls', async () => {
+    const historical = { id: -4, fullCode: '02.0209.010.0401004', displayName: '02.0209.010.0401004', sku: 'OLD',
+      productId: null, model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色',
+      mainCategoryName: '印刷件类', projectItemName: 'LOGO', status: 'historical', origin: 'historical',
+      hasSourceFile: false, hasOutlinedFile: true, dictionaryMappingStatus: 'mapped', readOnly: true,
+      readOnlyMessage: '永久占用的历史数据，不可修改', sourceFiles: [], outlinedFiles: [], currentBomUsage: [] } as const;
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [historical], total: 1, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(historical) };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(historical.fullCode));
+
+    expect(await screen.findByText('永久占用的历史数据，不可修改')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '正式使用' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('搜索现有 PDF')).not.toBeInTheDocument();
+  });
 });

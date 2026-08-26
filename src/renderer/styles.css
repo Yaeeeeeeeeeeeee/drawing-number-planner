@@ -61,6 +61,17 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .detail-panel h2 { margin: 0 0 10px; font-family: Consolas, monospace; font-size: 19px; } .detail-name { margin: 0 0 28px; color: #526074; }
 .detail-panel dl { display: grid; gap: 0; margin: 0; border-top: 1px solid var(--line); } .detail-panel dl div { padding: 16px 0; border-bottom: 1px solid var(--line); }
 .detail-panel dt { margin-bottom: 5px; color: #7a8495; font-size: 11px; } .detail-panel dd { margin: 0; font-size: 13px; }
+.drawing-maintenance { width: min(520px, 46vw); overflow-y: auto; }
+.drawing-actions { display: flex; align-items: center; gap: 14px; margin: 16px 0; }
+.historical-read-only { margin: 18px 0; padding: 12px 14px; color: #795b13; border-left: 3px solid #c58b18; background: #fff8e6; font-size: 13px; }
+.drawing-detail-section { padding: 17px 0; border-bottom: 1px solid var(--line); }
+.drawing-detail-section h3 { display: flex; align-items: center; justify-content: space-between; margin: 0 0 10px; font-size: 13px; }
+.drawing-detail-section p { margin: 7px 0; font-size: 12px; }
+.drawing-detail-section ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.drawing-detail-section li { display: grid; gap: 3px; padding: 9px 10px; background: #f7f9fc; }
+.drawing-detail-section li small { color: var(--muted); overflow-wrap: anywhere; }
+.pdf-search { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 10px; }
+.pdf-association label select { width: 100%; }
 .segmented-tabs { display: flex; padding-top: 18px; border-bottom: 1px solid var(--line); }
 .segmented-tabs button { min-height: 38px; padding: 0 16px; color: #667085; border: 0; border-bottom: 2px solid transparent; background: transparent; }
 .segmented-tabs button[aria-selected="true"] { color: var(--blue); border-color: var(--blue); font-weight: 600; }

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import { DrawingQueryError, type DrawingQueryService } from '../../core/drawings/drawing-query-service.js';
@@ -19,7 +19,19 @@ const querySchema = z.object({
   keyword: z.string().optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
-});
+}).strict();
+const paramsSchema = z.object({ id: z.coerce.number().int().refine((value) => value !== 0) }).strict();
+const confirmedSchema = z.object({ confirmed: z.literal(true) }).strict();
+const associationSchema = z.object({
+  pdfIndexId: z.number().int().positive(), conversionType: z.enum(['source', 'outlined']),
+}).strict();
+
+function sendDrawingError(reply: FastifyReply, error: unknown) {
+  if (!(error instanceof DrawingQueryError)) throw error;
+  const status = error.code === 'NOT_FOUND' ? 404
+    : error.code === 'INVALID_TRANSITION' || error.code === 'HISTORICAL_READ_ONLY' ? 409 : 422;
+  return reply.code(status).send({ error: { code: error.code, message: error.message } });
+}
 
 export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQueryService): void {
   app.get('/api/drawings', async (request, reply) => {
@@ -31,14 +43,31 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   });
 
   app.get('/api/drawings/:id', async (request, reply) => {
-    const params = z.object({ id: z.coerce.number().int().refine((value) => value !== 0) }).safeParse(request.params);
+    const params = paramsSchema.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '图号编号无效' } });
     try { return service.get(params.data.id); }
     catch (error) {
-      if (error instanceof DrawingQueryError) {
-        return reply.code(404).send({ error: { code: error.code, message: error.message } });
-      }
-      throw error;
+      return sendDrawingError(reply, error);
     }
+  });
+
+  const transition = (target: 'active' | 'voided', invalidMessage: string) => async (request: any, reply: FastifyReply) => {
+    const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: invalidMessage } });
+    }
+    try { return service.transition(params.data.id, target); }
+    catch (error) { return sendDrawingError(reply, error); }
+  };
+  app.post('/api/drawings/:id/activate', transition('active', '正式使用确认请求无效'));
+  app.post('/api/drawings/:id/void', transition('voided', '作废确认请求无效'));
+
+  app.post('/api/drawings/:id/associate-pdf', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params); const input = associationSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 关联请求无效' } });
+    }
+    try { return service.associatePdf(params.data.id, input.data.pdfIndexId, input.data.conversionType); }
+    catch (error) { return sendDrawingError(reply, error); }
   });
 }

@@ -43,6 +43,35 @@ export interface DrawingRecord {
   dictionaryMappingStatus: 'mapped' | 'unmapped';
 }
 
+export interface DrawingFileRecord {
+  pdfIndexId: number;
+  fileName: string;
+  relativePath: string;
+  isPresent: boolean;
+  conversionType: 'source' | 'outlined';
+}
+
+export interface DrawingBomUsage {
+  bomVersionId: number;
+  productId: number;
+  model: string;
+  colorId: number;
+  colorName: string;
+  versionNumber: number;
+  projectItemId: number;
+  projectItemName: string;
+  quantity: number;
+  usesWhiteMaterial: boolean;
+}
+
+export interface DrawingDetailRecord extends DrawingRecord {
+  sourceFiles: DrawingFileRecord[];
+  outlinedFiles: DrawingFileRecord[];
+  currentBomUsage: DrawingBomUsage[];
+  readOnly: boolean;
+  readOnlyMessage: string | null;
+}
+
 export interface DrawingSearchFilters {
   drawingNumber?: string;
   exactDrawingNumber?: boolean;

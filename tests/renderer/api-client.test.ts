@@ -14,6 +14,30 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('uses strict drawing lifecycle and PDF-association action payloads', async () => {
+    const detail = { id: 7, status: 'active' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'drawing-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(detail), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(detail), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(detail), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiClient.activateDrawing(7);
+    await apiClient.voidDrawing(7);
+    await apiClient.associateDrawingPdf(7, 41, 'outlined');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/drawings/7/activate', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ confirmed: true }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/drawings/7/void', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ confirmed: true }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/drawings/7/associate-pdf', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ pdfIndexId: 41, conversionType: 'outlined' }),
+    }));
+  });
+
   it('sends selected PDF index IDs to the cleanup endpoint with the local session token', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'cleanup-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
