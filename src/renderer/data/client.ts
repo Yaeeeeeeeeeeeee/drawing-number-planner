@@ -60,13 +60,15 @@ export interface WorkspaceSettingsView {
   workspaceRoot: string | null; configured: boolean; available: boolean;
 }
 export interface PdfScanSummaryView {
-  total: number; matched: number; unmatched: number; conflict: number; source: number; outlined: number;
-  missing: number; scannedAt: string;
+  total: number; matched: number; pending: number; historicalRegistered: number; unmatched: number;
+  conflict: number; source: number; outlined: number; missing: number; scannedAt: string;
 }
 export interface PdfFileView {
-  id: number; relativePath: string; fileName: string; drawingId: number | null; fullCode: string | null;
+  id: number; relativePath: string; fileName: string; drawingId: number | null; historicalDrawingId: number | null;
+  historicalFullCode: string | null; fullCode: string | null;
   displayName: string | null; model: string | null; brandName: string | null; projectItemName: string | null;
-  colorName: string | null; matchStatus: 'matched' | 'unmatched' | 'conflict'; detectedCodes: string[];
+  colorName: string | null; matchStatus: 'matched' | 'pending' | 'unmatched' | 'conflict'; detectedCodes: string[];
+  classificationWarning: string | null;
   conversionType: 'source' | 'outlined'; sizeBytes: number; modifiedAt: string; scannedAt: string; isPresent: boolean;
 }
 

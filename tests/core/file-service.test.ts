@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -107,5 +107,17 @@ describe('FileService', () => {
     service.updateSettings({ workspaceRoot: workspace }); rmSync(workspace, { recursive: true }); writeFileSync(workspace, 'not a directory');
 
     expect(service.getSettings()).toMatchObject({ configured: true, available: false });
+  });
+
+  it('does not rename, move, or rewrite scanned PDF files', async () => {
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace);
+    const filePath = join(workspace, '02.0404.010.0401007-history.pdf'); writeFileSync(filePath, '%PDF unchanged');
+    const before = statSync(filePath); const service = new FileService(repository, settings);
+    service.updateSettings({ workspaceRoot: workspace });
+
+    await service.scan();
+
+    const after = statSync(filePath);
+    expect({ size: after.size, modifiedAt: after.mtimeMs }).toEqual({ size: before.size, modifiedAt: before.mtimeMs });
   });
 });

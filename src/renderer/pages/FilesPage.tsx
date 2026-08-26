@@ -60,7 +60,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   return <section className="page-surface page-enter files-page">
-    <header className="page-header"><div><p className="eyebrow">PDF WORKSPACE</p><h1>PDF 文件中心</h1><p>扫描本地资料库，按完整图号匹配并区分转曲前后。</p></div>
+    <header className="page-header"><div><p className="eyebrow">PDF WORKSPACE</p><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
       <span className="record-count">{total} 个索引文件</span></header>
     <section className="workspace-strip" aria-label="资料根目录设置">
       <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
@@ -75,12 +75,13 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     </section>
     {error && <p className="error-banner">{error}</p>}{message && <p className="success-banner"><strong>{message}</strong></p>}
     {summary && <div className="scan-summary" aria-label="扫描统计"><strong>{summary.total} 个 PDF</strong><span>{summary.matched} 已匹配</span>
+      <span>{summary.pending} 待确认</span><span>{summary.historicalRegistered} 个历史图号已登记</span>
       <span>{summary.unmatched} 未匹配</span><span>{summary.conflict} 冲突</span><span>{summary.source} 转曲前</span>
       <span>{summary.outlined} 转曲后</span><span>{summary.missing} 已缺失</span></div>}
     <form className="filter-bar files-filter" onSubmit={submit}>
       <label><span>文件关键词</span><input aria-label="文件关键词" value={filters.keyword} onChange={(event) => setFilter('keyword', event.target.value)} /></label>
       <label><span>匹配状态</span><select aria-label="匹配状态" value={filters.matchStatus} onChange={(event) => setFilter('matchStatus', event.target.value)}>
-        <option value="">全部</option><option value="matched">已匹配</option><option value="unmatched">未匹配</option><option value="conflict">冲突</option></select></label>
+        <option value="">全部</option><option value="matched">已匹配</option><option value="pending">待确认</option><option value="unmatched">未匹配</option><option value="conflict">冲突</option></select></label>
       <label><span>转曲类型</span><select aria-label="转曲类型" value={filters.conversionType} onChange={(event) => setFilter('conversionType', event.target.value)}>
         <option value="">全部</option><option value="source">转曲前</option><option value="outlined">转曲后</option></select></label>
       <label><span>存在状态</span><select aria-label="存在状态" value={filters.presence} onChange={(event) => setFilter('presence', event.target.value)}>
@@ -93,7 +94,8 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         { key: 'name', label: '文件名', render: (item) => <span className="file-primary">{item.fileName}</span> },
         { key: 'path', label: '相对路径', render: (item) => <span className="file-relative mono">{item.relativePath}</span> },
         { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="code-cell">{item.fullCode}</span>
-          : <span className={`file-match ${item.matchStatus}`}>{item.matchStatus === 'conflict' ? '多图号冲突' : '未匹配'}</span> },
+          : item.matchStatus === 'pending' ? <span className="file-match pending">待确认 · {item.detectedCodes.join(' / ')} · {item.classificationWarning}</span>
+            : <span className={`file-match ${item.matchStatus}`}>{item.matchStatus === 'conflict' ? '多图号冲突' : '未匹配'}</span> },
         { key: 'conversion', label: '类型', render: (item) => <span className={`conversion-label ${item.conversionType}`}>{item.conversionType === 'outlined' ? '转曲后' : '转曲前'}</span> },
         { key: 'size', label: '大小', render: (item) => formatSize(item.sizeBytes) },
         { key: 'modified', label: '修改时间', render: (item) => new Date(item.modifiedAt).toLocaleString('zh-CN') },

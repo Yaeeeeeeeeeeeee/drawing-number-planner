@@ -8,7 +8,7 @@ const settingsSchema = z.object({ workspaceRoot: z.string().trim().min(1).max(20
 const emptyBodySchema = z.object({}).strict();
 const searchSchema = z.object({
   keyword: z.string().max(500).optional(),
-  matchStatus: z.enum(['matched', 'unmatched', 'conflict']).optional(),
+  matchStatus: z.enum(['matched', 'pending', 'unmatched', 'conflict']).optional(),
   conversionType: z.enum(['source', 'outlined']).optional(),
   presence: z.enum(['present', 'missing', 'all']).optional(),
   page: z.coerce.number().int().positive().optional(),

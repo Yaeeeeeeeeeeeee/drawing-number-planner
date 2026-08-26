@@ -14,6 +14,9 @@ const outlined = { ...file, id: 2, relativePath: 'SAMKYO\\冰柜\\ZC100\\02.0404
 const unmatched = { ...file, id: 3, relativePath: 'unknown.pdf', fileName: 'unknown.pdf', drawingId: null, fullCode: null,
   displayName: null, model: null, brandName: null, projectItemName: null, colorName: null, matchStatus: 'unmatched' as const,
   detectedCodes: [], conversionType: 'source' as const };
+const pending = { ...unmatched, id: 4, relativePath: '02.0404.010.0401000-invalid.pdf',
+  fileName: '02.0404.010.0401000-invalid.pdf', matchStatus: 'pending' as const,
+  detectedCodes: ['02.0404.010.0401000'], classificationWarning: 'invalid-format' };
 
 function apiFixture(configured = false) {
   return {
@@ -21,9 +24,9 @@ function apiFixture(configured = false) {
       ? { workspaceRoot: 'X:\\Library', configured: true, available: true }
       : { workspaceRoot: null, configured: false, available: false }),
     updateWorkspaceSettings: vi.fn().mockResolvedValue({ workspaceRoot: 'X:\\Library', configured: true, available: true }),
-    scanPdfFiles: vi.fn().mockResolvedValue({ total: 3, matched: 2, unmatched: 1, conflict: 0, source: 2,
-      outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' }),
-    searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched], total: 3, page: 1, pageSize: 50 }),
+    scanPdfFiles: vi.fn().mockResolvedValue({ total: 4, matched: 2, pending: 1, historicalRegistered: 1,
+      unmatched: 1, conflict: 0, source: 3, outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' }),
+    searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
   };
 }
 
@@ -56,16 +59,27 @@ describe('FilesPage', () => {
     render(<FilesPage api={api as never} />); await screen.findByDisplayValue('X:\\Library');
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
     expect(screen.getByRole('button', { name: '扫描中…' })).toBeDisabled();
-    release({ total: 3, matched: 2, unmatched: 1, conflict: 0, source: 2, outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' });
+    release({ total: 4, matched: 2, pending: 1, historicalRegistered: 1, unmatched: 1, conflict: 0,
+      source: 3, outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' });
 
-    expect(await screen.findByText('3 个 PDF')).toBeVisible();
+    expect(await screen.findByText('4 个 PDF')).toBeVisible();
     expect(screen.getByText('2 已匹配')).toBeVisible();
     expect(screen.getByText('1 未匹配')).toBeVisible();
+    expect(screen.getByText('1 待确认')).toBeVisible();
+    expect(screen.getByText('1 个历史图号已登记')).toBeVisible();
     expect(screen.getByText('1 转曲后')).toBeVisible();
     expect(screen.getByText(file.fileName)).toBeVisible();
     expect(screen.getByText(outlined.fileName)).toBeVisible();
-    expect(screen.getAllByText('转曲前', { selector: '.conversion-label' })).toHaveLength(2);
+    expect(screen.getAllByText('转曲前', { selector: '.conversion-label' })).toHaveLength(3);
     expect(screen.getByText('转曲后', { selector: '.conversion-label' })).toBeVisible();
+  });
+
+  it('shows pending candidates and their reason without presenting them as occupied', async () => {
+    const api = apiFixture(true); render(<FilesPage api={api as never} />);
+
+    expect(await screen.findByText(pending.fileName, { selector: '.file-primary' })).toBeVisible();
+    expect(screen.getByText(/待确认.*02\.0404\.010\.0401000.*invalid-format/)).toBeVisible();
+    expect(screen.queryByText('历史已占号')).not.toBeInTheDocument();
   });
 
   it('submits combined filters and shows unmatched or missing states without stale requests winning', async () => {

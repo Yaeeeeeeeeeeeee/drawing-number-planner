@@ -35,14 +35,23 @@ describe('PDF file API', () => {
     expect(saved.status).toBe(200);
     expect(await saved.json()).toEqual({ workspaceRoot: realpathSync.native(workspace), configured: true, available: true });
     writeFileSync(join(workspace, 'unknown（转曲）.PDF'), '%PDF-1.4');
+    writeFileSync(join(workspace, '02.0404.010.0401007-history.pdf'), '%PDF-1.4');
+    writeFileSync(join(workspace, '02.0404.010.0401000-invalid.pdf'), '%PDF-1.4');
 
     const scan = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
     expect(scan.status).toBe(200);
-    expect(await scan.json()).toMatchObject({ total: 1, matched: 0, unmatched: 1, conflict: 0, outlined: 1, missing: 0 });
+    expect(await scan.json()).toMatchObject({ total: 3, matched: 1, pending: 1, historicalRegistered: 1,
+      unmatched: 1, conflict: 0, outlined: 1, missing: 0 });
     const listed = await fetch(`${server.url}/api/files?keyword=${encodeURIComponent('转曲')}&matchStatus=unmatched&conversionType=outlined&presence=present&page=1&pageSize=20`);
     expect(listed.status).toBe(200);
     expect(await listed.json()).toMatchObject({ total: 1, items: [expect.objectContaining({
       relativePath: 'unknown（转曲）.PDF', drawingId: null, conversionType: 'outlined', isPresent: true,
+    })] });
+    const pending = await fetch(`${server.url}/api/files?matchStatus=pending`);
+    expect(pending.status).toBe(200);
+    expect(await pending.json()).toMatchObject({ total: 1, items: [expect.objectContaining({
+      matchStatus: 'pending', classificationWarning: expect.stringContaining('invalid-format'),
+      detectedCodes: ['02.0404.010.0401000'],
     })] });
   });
 
