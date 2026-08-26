@@ -17,9 +17,9 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   const appearanceId = await createDictionary(request, 'appearance', '01', '一号外观');
   const colorId = await createDictionary(request, 'color', '0', '白色');
   const mainId = await createDictionary(request, 'main_category', '04', '印刷件类');
-  const itemId = await createDictionary(request, 'project_item', '01', 'LOGO', mainId);
+  const itemId = await createDictionary(request, 'project_item', '05', '顶部贴纸', mainId);
   const productResponse = await request.post('/api/products', { headers, data: {
-    brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC200', productCategory: '冰柜',
+    sku: 'PHASE2-ZC200', brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC200', productCategory: '冰柜',
   } });
   expect(productResponse.ok()).toBeTruthy();
 
@@ -35,8 +35,8 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   await page.getByLabel('第 2 行颜色').selectOption(String(colorId));
   await page.getByRole('button', { name: '查重并预览' }).click();
 
-  await expect(page.getByText('12.0404.010.0401001')).toBeVisible();
-  await expect(page.getByText('12.0404.010.0401002')).toBeVisible();
+  await expect(page.getByText('12.0404.010.0405001')).toBeVisible();
+  await expect(page.getByText('12.0404.010.0405002')).toBeVisible();
   await page.getByRole('button', { name: '确认批量占号' }).click();
   await expect(page.getByText('已成功占用 2 个图号')).toBeVisible();
 
@@ -44,6 +44,6 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   await page.getByLabel('型号').fill('ZC200');
   await page.getByRole('button', { name: '检索', exact: true }).click();
   await expect(page.getByText('2 条记录')).toBeVisible();
-  await expect(page.getByText('12.0404.010.0401001')).toBeVisible();
-  await expect(page.getByText('12.0404.010.0401002')).toBeVisible();
+  await expect(page.getByText('12.0404.010.0405001')).toBeVisible();
+  await expect(page.getByText('12.0404.010.0405002')).toBeVisible();
 });

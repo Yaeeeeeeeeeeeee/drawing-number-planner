@@ -13,6 +13,10 @@ function apiFixture() {
     main_category: [{ id: 5, code: '04', name: '印刷件类', status: 'active' }],
     project_item: [
       { id: 6, code: '01', name: 'LOGO', parentId: 5, status: 'active' },
+      { id: 8, code: '03', name: '面板', parentId: 5, status: 'active' },
+      { id: 9, code: '04', name: '顶部贴纸', parentId: 5, status: 'active' },
+      { id: 10, code: '05', name: '压缩机标签', parentId: 5, status: 'active' },
+      { id: 11, code: '06', name: '大外箱', parentId: 5, status: 'active' },
       { id: 7, code: '01', name: '纸箱', parentId: 99, status: 'active' },
     ],
   };
@@ -64,6 +68,28 @@ describe('PlanningPage', () => {
     expect(screen.getByText('项目 2')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '删除项目 2' }));
     expect(screen.queryByText('项目 2')).not.toBeInTheDocument();
+  });
+
+  it('allows any active packaging items supplied by the dictionary in one batch', async () => {
+    const api = apiFixture(); render(<PlanningPage api={api as never} />);
+    fireEvent.change(await screen.findByLabelText('产品型号'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('外观'), { target: { value: '3' } });
+    for (let index = 2; index <= 4; index += 1) fireEvent.click(screen.getByRole('button', { name: '添加项目' }));
+    const projectIds = ['8', '9', '10', '11'];
+    projectIds.forEach((projectId, index) => {
+      const row = index + 1;
+      fireEvent.change(screen.getByLabelText(`第 ${row} 行主类别`), { target: { value: '5' } });
+      fireEvent.change(screen.getByLabelText(`第 ${row} 行项目明细`), { target: { value: projectId } });
+      fireEvent.change(screen.getByLabelText(`第 ${row} 行颜色`), { target: { value: '4' } });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '查重并预览' }));
+
+    await waitFor(() => expect(api.previewPlan).toHaveBeenCalledWith(expect.objectContaining({
+      rows: projectIds.map((projectItemId, index) => expect.objectContaining({
+        clientId: `row-${index + 1}`, projectItemId: Number(projectItemId),
+      })),
+    })));
   });
 
   it('keeps the draft and asks for a fresh check when approval is stale', async () => {
