@@ -318,3 +318,15 @@ node node_modules/@playwright/test/cli.js test
 - [ ] **Step 8: 在独立 Windows 桌面窗口启动应用，并同时保持浏览器预览可访问。** 手工检查 SKU、历史扫描、图号库完整性筛选、任意项目规划和 BOM 简化表达。
 - [ ] **Step 9: 在本计划中记录实际测试数量、评审结论和预览入口；提交 `docs: close compatibility correction stage`。**
 - [ ] **Step 10: 使用 `superpowers:finishing-a-development-branch` 提供本地合并选择。** 只有用户验收并选择合并后才合并回 `master`；不开始下一正式 Phase。
+
+## 实施记录（2026-08-26）
+
+- 开始基线：`8389ba8`；实施分支：`compatibility-correction`；未合并到 `master`。
+- Task 1 至 Task 9 已按顺序以独立提交完成；Task 10 的真实 E2E、README、需求追溯、全量验证、代码审查和预览均已完成。
+- 自动化测试：Vitest `44` 个测试文件、`211` 项测试全部通过。
+- 静态与构建验证：TypeScript 全量类型检查通过；Vite 渲染端生产构建通过（`27` modules transformed）；Electron 主程序 TypeScript 构建通过。
+- 浏览器真实流程：Playwright `5/5` 通过，覆盖既有 Phase 1 至 Phase 4 以及兼容性修正完整流程。
+- 代码审查：首次审查无 P0/P1，提出 1 项 P2 和 1 项 P3；已在 `6a6ef32` 修复。复查的 2 个测试文件、25 项测试全部通过，未发现新的 P0/P1/P2。
+- 预览：独立 Windows 桌面窗口已启动（内部端口 `4317`）；浏览器预览保持在独立入口 `http://127.0.0.1:4327/`。已检查 SKU、新建产品必填、历史扫描待确认、图号库完整性筛选、动态添加项目和简化 BOM 表达。
+- 边界核对：未实现二维码、批量重命名、外发、服务器同步或历史文件移动/删除/重命名；BOM 数据库快照结构保持不变。
+- 下一步：等待用户验收并明确选择是否本地合并；不自动进入下一正式 Phase。
