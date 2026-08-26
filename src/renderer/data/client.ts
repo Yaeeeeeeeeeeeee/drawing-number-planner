@@ -11,9 +11,10 @@ export interface ProductView {
 }
 
 export interface DrawingView {
-  id: number; fullCode: string; displayName: string; model: string; brandName: string;
+  id: number; origin: 'planned' | 'historical'; sku: string | null; fullCode: string; displayName: string; model: string; brandName: string;
   colorName: string; mainCategoryName: string; projectItemName: string;
-  status: 'reserved' | 'active' | 'voided'; [key: string]: unknown;
+  status: 'reserved' | 'active' | 'voided' | 'historical'; hasSourceFile: boolean; hasOutlinedFile: boolean;
+  dictionaryMappingStatus: 'mapped' | 'unmapped'; [key: string]: unknown;
 }
 
 export interface ImportReportView {

@@ -1,21 +1,25 @@
-export type DrawingStatus = 'reserved' | 'active' | 'voided';
+export type DrawingStatus = 'reserved' | 'active' | 'voided' | 'historical';
+export type DrawingOrigin = 'planned' | 'historical';
+export type FilePresenceFilter = 'present' | 'missing' | 'all';
 
 export interface DrawingRecord {
   id: number;
+  origin: DrawingOrigin;
+  sku: string | null;
   fullCode: string;
   displayName: string;
-  productId: number;
+  productId: number | null;
   model: string;
   productCategory: string;
-  appearanceId: number;
+  appearanceId: number | null;
   appearanceName: string;
-  brandId: number;
+  brandId: number | null;
   brandName: string;
-  colorId: number;
+  colorId: number | null;
   colorName: string;
-  mainCategoryId: number;
+  mainCategoryId: number | null;
   mainCategoryName: string;
-  projectItemId: number;
+  projectItemId: number | null;
   projectItemName: string;
   brandCode: string;
   productSizeCode: string;
@@ -34,17 +38,24 @@ export interface DrawingRecord {
   sourceDrawingFullCode: string | null;
   notes: string | null;
   createdAt: string;
+  hasSourceFile: boolean;
+  hasOutlinedFile: boolean;
+  dictionaryMappingStatus: 'mapped' | 'unmapped';
 }
 
 export interface DrawingSearchFilters {
   drawingNumber?: string;
   exactDrawingNumber?: boolean;
   model?: string;
+  sku?: string;
+  productCategory?: string;
   brandId?: number;
   mainCategoryId?: number;
   projectItemId?: number;
   colorId?: number;
   status?: DrawingStatus;
+  sourcePresence?: FilePresenceFilter;
+  outlinedPresence?: FilePresenceFilter;
   keyword?: string;
   page?: number;
   pageSize?: number;

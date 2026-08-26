@@ -4,13 +4,14 @@ import type { DictionaryItemView, DrawingView, PlannerApi } from '../data/client
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 
-const emptyFilters = { drawingNumber: '', model: '', keyword: '', brandId: '', mainCategoryId: '', projectItemId: '', colorId: '', status: '', exactDrawingNumber: false };
+const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', mainCategoryId: '', projectItemId: '', colorId: '', status: '', exactDrawingNumber: false };
 
 export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [filters, setFilters] = useState(emptyFilters);
   const [options, setOptions] = useState<Record<string, DictionaryItemView[]>>({});
   const [items, setItems] = useState<DrawingView[]>([]); const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<DrawingView | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const [moreFilters, setMoreFilters] = useState(false);
   const search = async (values: Record<string, string | number | boolean> = {}) => {
     setLoading(true); setError('');
     try { const result = await api.searchDrawings(values); setItems(result.items); setTotal(result.total); }
@@ -36,23 +37,31 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     <label><span>{label}</span><select aria-label={label} value={filters[key]} onChange={(event) => set(key, event.target.value)}><option value="">全部</option>{(options[type] ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>;
 
   return <section className="page-surface page-enter">
-    <header className="page-header"><div><p className="eyebrow">DRAWING LIBRARY</p><h1>图号库</h1><p>组合检索正式图号，并在右侧核对完整编码信息。</p></div><span className="record-count">{total} 条记录</span></header>
+    <header className="page-header"><div><p className="eyebrow">DRAWING LIBRARY</p><h1>图号库</h1><p>统一检索正式规划与历史扫描图号，并核对文件完整性。</p></div><span className="record-count">{total} 条记录</span></header>
     <form className="filter-bar filter-grid" onSubmit={submit}>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}
-      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">已生效</option><option value="voided">已作废</option></select></label>
+      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">已生效</option><option value="voided">已作废</option><option value="historical">历史已用</option></select></label>
       <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
+      <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
+      {moreFilters && <><label><span>SKU</span><input aria-label="SKU" value={filters.sku} onChange={(event) => set('sku', event.target.value)} /></label>
+        <label><span>产品类别</span><input aria-label="产品类别" value={filters.productCategory} onChange={(event) => set('productCategory', event.target.value)} /></label>
+        <label><span>源文件</span><select aria-label="源文件" value={filters.sourcePresence} onChange={(event) => set('sourcePresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label>
+        <label><span>转曲后文件</span><select aria-label="转曲后文件" value={filters.outlinedPresence} onChange={(event) => set('outlinedPresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label></>}
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
     </form>
     {error && <p className="error-banner">{error}</p>}
     {!loading && items.length === 0 ? <EmptyState title="图号库尚无记录" description="Phase 2 完成正式占号后，记录会显示在这里。" /> :
       <DataTable items={items} onRowClick={(item) => void openDetail(item)} columns={[
         { key: 'code', label: '完整图号', render: (item) => <button className="link-button" type="button">{item.fullCode}</button> },
-        { key: 'model', label: '型号', render: (item) => item.model }, { key: 'brand', label: '品牌', render: (item) => item.brandName },
+        { key: 'sku', label: 'SKU', render: (item) => item.sku ?? '待补录' }, { key: 'model', label: '型号', render: (item) => item.model },
+        { key: 'origin', label: '来源', render: (item) => item.origin === 'planned' ? '正式规划' : '历史扫描' },
+        { key: 'brand', label: '品牌', render: (item) => item.dictionaryMappingStatus === 'unmapped' ? `${item.brandName} · 字典待映射` : item.brandName },
         { key: 'item', label: '项目', render: (item) => item.projectItemName }, { key: 'color', label: '颜色', render: (item) => item.colorName },
-        { key: 'status', label: '状态', render: (item) => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '已生效' : item.status === 'reserved' ? '已占号' : '已作废'}</span> },
+        { key: 'files', label: '文件完整性', render: (item) => <span>{item.hasSourceFile ? '源文件已有' : '源文件缺失'} · {item.hasOutlinedFile ? '转曲后已有' : '转曲后缺失'}</span> },
+        { key: 'status', label: '状态', render: (item) => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '已生效' : item.status === 'reserved' ? '已占号' : item.status === 'historical' ? '历史已用' : '已作废'}</span> },
       ]} />}
     {selected && <aside className="detail-panel panel-enter" aria-label="图号详情"><button className="panel-close" onClick={() => setSelected(null)} type="button">关闭</button>
       <p className="eyebrow">DRAWING DETAIL</p><h2>{selected.fullCode}</h2><p className="detail-name">{selected.displayName}</p>

@@ -32,6 +32,7 @@ describe('drawing library API', () => {
     expect(invalid.statusCode).toBe(400);
     expect(invalid.json()).toEqual({ error: { code: 'INVALID_REQUEST', message: '图号筛选条件无效' } });
     expect((await app.inject({ method: 'POST', url: '/api/drawings', payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/api/drawings?sourcePresence=yes' })).statusCode).toBe(400);
     await app.close();
   });
 
