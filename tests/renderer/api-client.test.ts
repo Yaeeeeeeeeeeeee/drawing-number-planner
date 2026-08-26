@@ -14,6 +14,19 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('sends selected PDF index IDs to the cleanup endpoint with the local session token', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'cleanup-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ cleaned: 2 }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.cleanupPdfFiles([31, 42])).resolves.toEqual({ cleaned: 2 });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/files/cleanup', expect.objectContaining({
+      method: 'POST', headers: expect.objectContaining({ 'content-type': 'application/json', 'x-planner-token': 'cleanup-token' }),
+      body: JSON.stringify({ ids: [31, 42] }),
+    }));
+  });
+
   it('obtains a per-launch session token without placing it in the URL', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'fresh-launch-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))

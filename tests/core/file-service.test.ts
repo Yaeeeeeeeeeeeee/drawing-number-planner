@@ -120,4 +120,17 @@ describe('FileService', () => {
     const after = statSync(filePath);
     expect({ size: after.size, modifiedAt: after.mtimeMs }).toEqual({ size: before.size, modifiedAt: before.mtimeMs });
   });
+
+  it('validates cleanup IDs before removing only missing PDF index records', () => {
+    repository.replaceScan([{ relativePath: 'stale.pdf', fileName: 'stale.pdf', drawingId: null, matchStatus: 'unmatched',
+      detectedCodes: [], conversionType: 'source', sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z' }], [], '2026-08-25T00:00:00.000Z');
+    repository.replaceScan([], [], '2026-08-26T00:00:00.000Z');
+    const service = new FileService(repository, settings);
+    const id = service.search({ presence: 'missing' }).items[0].id;
+
+    for (const ids of [[], [id, id], [0], Array.from({ length: 501 }, (_, index) => index + 1)]) {
+      expect(() => service.cleanup(ids)).toThrowError(expect.objectContaining({ code: 'INVALID_CLEANUP_IDS' }));
+    }
+    expect(service.cleanup([id])).toEqual({ cleaned: 1 });
+  });
 });

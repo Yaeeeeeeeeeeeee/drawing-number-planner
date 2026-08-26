@@ -125,6 +125,26 @@ describe('FileRepository', () => {
     expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 3 });
   });
 
+  it('cleans selected missing index rows atomically without releasing historical occupancy', () => {
+    const historical = parseDrawingCode('02.0404.010.0401007')!;
+    const historicalPdf = { ...records(0)[1], relativePath: 'history.pdf', fileName: 'history.pdf',
+      matchStatus: 'matched' as const, historicalFullCode: historical.fullCode, detectedCodes: [historical.fullCode] };
+    const presentPdf = { ...records(0)[1], relativePath: 'present.pdf', fileName: 'present.pdf' };
+    repository.replaceScan([historicalPdf, presentPdf], [{ ...historical, directoryContext: null }], '2026-08-25T04:00:00.000Z');
+    repository.replaceScan([presentPdf], [], '2026-08-26T04:00:00.000Z');
+    const missingId = repository.search({ presence: 'missing' }).items[0].id;
+    const presentId = repository.search({ presence: 'present' }).items[0].id;
+
+    expect(() => repository.cleanupMissing([missingId, presentId])).toThrowError(expect.objectContaining({
+      code: 'PDF_CLEANUP_NOT_ALLOWED',
+    }));
+    expect(repository.search({ presence: 'all' }).total).toBe(2);
+
+    expect(repository.cleanupMissing([missingId])).toEqual({ cleaned: 1 });
+    expect(repository.search({ presence: 'all' }).items).toEqual([expect.objectContaining({ id: presentId, isPresent: true })]);
+    expect(db.prepare('select full_code from historical_drawing_numbers').all()).toEqual([{ full_code: historical.fullCode }]);
+  });
+
   it('supports combined filters, stable pagination, and drawing-code listing', () => {
     const drawing = drawingFixture(); repository.replaceScan(records(drawing.id), [], '2026-08-25T04:00:00.000Z');
 

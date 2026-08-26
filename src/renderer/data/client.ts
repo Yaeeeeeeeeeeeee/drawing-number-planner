@@ -97,6 +97,7 @@ export interface PlannerApi {
   getWorkspaceSettings(): Promise<WorkspaceSettingsView>;
   updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
   scanPdfFiles(): Promise<PdfScanSummaryView>;
+  cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
   searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
     items: PdfFileView[]; total: number; page: number; pageSize: number;
   }>;
@@ -188,5 +189,6 @@ export const apiClient: PlannerApi = {
   getWorkspaceSettings: () => request('/api/files/settings'),
   updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
   scanPdfFiles: () => request('/api/files/scan', { method: 'POST' }),
+  cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),
   searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
 };

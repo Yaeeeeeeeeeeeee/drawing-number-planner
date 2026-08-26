@@ -18,6 +18,7 @@ const pending = { ...unmatched, id: 4, relativePath: '02.0404.010.0401000-invali
   fileName: '02.0404.010.0401000-invalid.pdf', matchStatus: 'pending' as const,
   detectedCodes: ['02.0404.010.0401000'], classificationWarning: 'invalid-format' };
 const conversionConflict = { ...file, id: 5, classificationWarning: 'conversion-conflict' };
+const missing = { ...unmatched, id: 6, relativePath: 'stale.pdf', fileName: 'stale.pdf', isPresent: false };
 
 function apiFixture(configured = false) {
   return {
@@ -27,6 +28,7 @@ function apiFixture(configured = false) {
     updateWorkspaceSettings: vi.fn().mockResolvedValue({ workspaceRoot: 'X:\\Library', configured: true, available: true }),
     scanPdfFiles: vi.fn().mockResolvedValue({ total: 4, matched: 2, pending: 1, historicalRegistered: 1,
       unmatched: 1, conflict: 0, source: 3, outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' }),
+    cleanupPdfFiles: vi.fn().mockResolvedValue({ cleaned: 1 }),
     searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
   };
 }
@@ -117,5 +119,36 @@ describe('FilesPage', () => {
     expect(await screen.findByText(outlined.fileName, { selector: '.file-primary' })).toBeVisible();
     expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 50 }));
     expect(screen.getByRole('button', { name: '上一页' })).toBeEnabled();
+  });
+
+  it('confirms a single missing-index cleanup and refreshes the displayed count', async () => {
+    const api = apiFixture(true);
+    api.searchPdfFiles.mockResolvedValue({ items: [missing], total: 1, page: 1, pageSize: 50 });
+    render(<FilesPage api={api as never} />);
+    await screen.findByText(missing.fileName, { selector: '.file-primary' });
+
+    fireEvent.click(screen.getByRole('button', { name: `清理 ${missing.fileName} 的索引记录` }));
+    expect(await screen.findByText('此操作只清理数据库索引记录，不会删除磁盘文件，也不会释放历史图号。')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '确认清理索引记录' }));
+
+    await waitFor(() => expect(api.cleanupPdfFiles).toHaveBeenCalledWith([missing.id]));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('1 个索引文件')).toBeVisible();
+  });
+
+  it('selects only missing rows on the current page for a confirmed batch cleanup', async () => {
+    const api = apiFixture(true);
+    api.searchPdfFiles.mockResolvedValue({ items: [file, missing], total: 2, page: 1, pageSize: 50 });
+    render(<FilesPage api={api as never} />);
+    await screen.findByText(missing.fileName, { selector: '.file-primary' });
+
+    expect(screen.queryByRole('checkbox', { name: `选择 ${file.fileName}` })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '全选本页缺失记录' }));
+    expect(screen.getByRole('checkbox', { name: `选择 ${missing.fileName}` })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: '清理已选索引记录 (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认清理索引记录' }));
+
+    await waitFor(() => expect(api.cleanupPdfFiles).toHaveBeenCalledWith([missing.id]));
+    expect(screen.getByRole('button', { name: '清理已选索引记录 (0)' })).toBeDisabled();
   });
 });

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -71,5 +71,36 @@ describe('PDF file API', () => {
       body: JSON.stringify({ workspaceRoot: workspace }) });
     expect(scanWithBody.status).toBe(400);
     expect((await fetch(`${server.url}/api/files?unknown=true`)).status).toBe(400);
+  });
+
+  it('authenticates and atomically cleans only selected missing PDF index records', async () => {
+    const { server, workspace } = await serverFixture();
+    const filePath = join(workspace, '02.0404.010.0401007-history.pdf');
+    await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
+      body: JSON.stringify({ workspaceRoot: workspace }) });
+    writeFileSync(filePath, '%PDF-1.4');
+    await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+    unlinkSync(filePath);
+    await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+    const missing = await (await fetch(`${server.url}/api/files?presence=missing`)).json() as { items: Array<{ id: number }> };
+    const id = missing.items[0].id;
+
+    expect((await fetch(`${server.url}/api/files/cleanup`, { method: 'POST', body: JSON.stringify({ ids: [id] }) })).status).toBe(403);
+    const invalid = await fetch(`${server.url}/api/files/cleanup`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ ids: [] }) });
+    expect(invalid.status).toBe(400);
+    expect((await invalid.json()).error.code).toBe('INVALID_REQUEST');
+
+    const mixed = await fetch(`${server.url}/api/files/cleanup`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ ids: [id, 999999] }) });
+    expect(mixed.status).toBe(422);
+    expect((await mixed.json()).error.code).toBe('PDF_CLEANUP_NOT_ALLOWED');
+    expect((await (await fetch(`${server.url}/api/files?presence=missing`)).json()).total).toBe(1);
+
+    const cleaned = await fetch(`${server.url}/api/files/cleanup`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ ids: [id] }) });
+    expect(cleaned.status).toBe(200);
+    expect(await cleaned.json()).toEqual({ cleaned: 1 });
+    expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(0);
   });
 });

@@ -1,5 +1,6 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import type { DrawingCodeReference, FileScanRecord, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
+import { FileError } from './file-errors.js';
 import { validateWorkspaceRelativePath } from './workspace-paths.js';
 
 interface FileRow {
@@ -86,6 +87,19 @@ export class FileRepository {
         sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, scannedAt });
       const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
       return { missing, historicalRegistered };
+    }).immediate();
+  }
+
+  cleanupMissing(ids: number[]): { cleaned: number } {
+    return this.db.transaction(() => {
+      const placeholders = ids.map(() => '?').join(', ');
+      const { count } = this.db.prepare(`select count(*) as count from pdf_files
+        where id in (${placeholders}) and is_present = 0`).get(...ids) as { count: number };
+      if (count !== ids.length) {
+        throw new FileError('PDF_CLEANUP_NOT_ALLOWED', '只能清理已缺失的 PDF 索引记录');
+      }
+      const result = this.db.prepare(`delete from pdf_files where id in (${placeholders}) and is_present = 0`).run(...ids);
+      return { cleaned: result.changes };
     }).immediate();
   }
 

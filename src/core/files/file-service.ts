@@ -33,6 +33,15 @@ export class FileService {
 
   search(filters: FileSearchFilters = {}): FileSearchResult { return this.repository.search(filters); }
 
+  cleanup(ids: unknown): { cleaned: number } {
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500
+      || !ids.every((id) => Number.isInteger(id) && id > 0)
+      || new Set(ids).size !== ids.length) {
+      throw new FileError('INVALID_CLEANUP_IDS', '请选择不超过 500 条不重复的 PDF 索引记录');
+    }
+    return this.repository.cleanupMissing(ids);
+  }
+
   async scan(): Promise<FileScanSummary> {
     if (this.scanning) throw new FileError('SCAN_IN_PROGRESS', '资料库正在扫描，请等待当前扫描完成');
     const workspaceRoot = this.settings.get().workspaceRoot;

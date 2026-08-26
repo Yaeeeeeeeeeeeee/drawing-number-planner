@@ -19,6 +19,8 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filters, setFilters] = useState(initialFilters);
   const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]); const [pendingCleanupIds, setPendingCleanupIds] = useState<number[] | null>(null);
+  const [cleaning, setCleaning] = useState(false);
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const searchRequest = useRef(0);
 
   const search = async (values = filters, requestedPage = 1) => {
@@ -58,6 +60,24 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   const submit = (event: FormEvent) => { event.preventDefault(); setError(''); void search(filters, 1); };
   const setFilter = (key: keyof typeof filters, value: string) => setFilters((current) => ({ ...current, [key]: value }));
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const missingOnPage = files.filter((file) => !file.isPresent);
+  const toggleSelection = (id: number) => setSelectedIds((current) => current.includes(id)
+    ? current.filter((selected) => selected !== id) : [...current, id]);
+  const requestCleanup = (ids: number[]) => {
+    if (!ids.length) return;
+    setError(''); setMessage(''); setPendingCleanupIds([...new Set(ids)]);
+  };
+  const confirmCleanup = async () => {
+    if (!pendingCleanupIds) return;
+    const ids = pendingCleanupIds; setCleaning(true); setError('');
+    try {
+      const result = await api.cleanupPdfFiles(ids);
+      setSelectedIds((current) => current.filter((id) => !ids.includes(id)));
+      setPendingCleanupIds(null); setMessage(`已清理 ${result.cleaned} 条缺失 PDF 索引记录`);
+      await search(filters, page);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'PDF 索引清理失败'); }
+    finally { setCleaning(false); }
+  };
 
   return <section className="page-surface page-enter files-page">
     <header className="page-header"><div><p className="eyebrow">PDF WORKSPACE</p><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
@@ -88,9 +108,29 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         <option value="present">当前存在</option><option value="missing">已缺失</option><option value="all">全部</option></select></label>
       <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
     </form>
+    {missingOnPage.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
+      <span>本页有 {missingOnPage.length} 条缺失索引记录</span>
+      <div>
+        <button className="secondary-button" type="button" disabled={cleaning}
+          onClick={() => setSelectedIds(missingOnPage.map((file) => file.id))}>全选本页缺失记录</button>
+        <button className="secondary-button" type="button" disabled={cleaning || selectedIds.length === 0}
+          onClick={() => setSelectedIds([])}>取消选择</button>
+        <button className="text-button danger" type="button" disabled={cleaning || selectedIds.length === 0}
+          onClick={() => requestCleanup(selectedIds)}>清理已选索引记录 ({selectedIds.length})</button>
+      </div>
+    </section>}
+    {pendingCleanupIds && <section className="file-cleanup-confirmation" role="dialog" aria-label="确认清理 PDF 索引记录">
+      <strong>请再次确认清理 {pendingCleanupIds.length} 条缺失 PDF 索引记录</strong>
+      <p>此操作只清理数据库索引记录，不会删除磁盘文件，也不会释放历史图号。</p>
+      <div><button className="secondary-button" type="button" disabled={cleaning} onClick={() => setPendingCleanupIds(null)}>取消</button>
+        <button className="primary-button" type="button" disabled={cleaning} onClick={() => void confirmCleanup()}>{cleaning ? '清理中…' : '确认清理索引记录'}</button></div>
+    </section>}
     {!loading && files.length === 0 ? <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
       description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} /> :
       <DataTable items={files} columns={[
+        { key: 'select', label: '选择', render: (item) => item.isPresent ? <span className="muted-text">—</span> : <input type="checkbox"
+          aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning}
+          onChange={() => toggleSelection(item.id)} /> },
         { key: 'name', label: '文件名', render: (item) => <span className="file-primary">{item.fileName}</span> },
         { key: 'path', label: '相对路径', render: (item) => <span className="file-relative mono">{item.relativePath}</span> },
         { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="file-match matched">
@@ -104,6 +144,8 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         { key: 'size', label: '大小', render: (item) => formatSize(item.sizeBytes) },
         { key: 'modified', label: '修改时间', render: (item) => new Date(item.modifiedAt).toLocaleString('zh-CN') },
         { key: 'presence', label: '文件状态', render: (item) => <span className={`presence-label ${item.isPresent ? 'present' : 'missing'}`}>{item.isPresent ? '存在' : '缺失'}</span> },
+        { key: 'actions', label: '操作', render: (item) => item.isPresent ? <span className="muted-text">—</span> : <button className="text-button danger" type="button" disabled={cleaning}
+          aria-label={`清理 ${item.fileName} 的索引记录`} onClick={() => requestCleanup([item.id])}>清理索引</button> },
       ]} />}
     {total > pageSize && <nav className="table-pagination" aria-label="PDF 分页">
       <button className="secondary-button" type="button" disabled={loading || page <= 1}

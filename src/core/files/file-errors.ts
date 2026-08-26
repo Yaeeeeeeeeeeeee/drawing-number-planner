@@ -4,7 +4,9 @@ export type FileErrorCode =
   | 'SETTINGS_INVALID'
   | 'PATH_OUTSIDE_WORKSPACE'
   | 'SCAN_IN_PROGRESS'
-  | 'SCAN_FAILED';
+  | 'SCAN_FAILED'
+  | 'INVALID_CLEANUP_IDS'
+  | 'PDF_CLEANUP_NOT_ALLOWED';
 
 export class FileError extends Error {
   constructor(public readonly code: FileErrorCode, message: string, options?: ErrorOptions) {
