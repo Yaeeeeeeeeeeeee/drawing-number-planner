@@ -5,6 +5,7 @@ import { ProductError, type ProductService } from '../../core/products/product-s
 
 const idSchema = z.object({ id: z.coerce.number().int().positive() });
 const inputSchema = z.object({
+  sku: z.string().trim().min(1),
   brandId: z.number().int().positive(),
   productSizeId: z.number().int().positive(),
   defaultAppearanceId: z.number().int().positive().nullable().optional(),
@@ -15,7 +16,7 @@ const inputSchema = z.object({
 
 function sendProductError(error: unknown, reply: FastifyReply) {
   if (error instanceof ProductError) {
-    const status = error.code === 'NOT_FOUND' ? 404 : ['DUPLICATE_MODEL', 'PRODUCT_REFERENCED'].includes(error.code) ? 409 : 400;
+    const status = error.code === 'NOT_FOUND' ? 404 : ['DUPLICATE_MODEL', 'DUPLICATE_SKU', 'PRODUCT_REFERENCED'].includes(error.code) ? 409 : 400;
     return reply.code(status).send({ error: { code: error.code, message: error.message } });
   }
   throw error;

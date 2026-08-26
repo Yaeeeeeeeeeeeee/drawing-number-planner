@@ -27,7 +27,7 @@ function fixture(defaultAppearance = true, prefix = '') {
   const color = dictionaries.create({ type: 'color', code: `${prefix}0`, name: `${prefix}白色` });
   const main = dictionaries.create({ type: 'main_category', code: `${prefix}04`, name: `${prefix}印刷件类` });
   const item = dictionaries.create({ type: 'project_item', code: `${prefix}01`, name: `${prefix}LOGO`, parentId: main.id });
-  const product = products.create({ brandId: brand.id, productSizeId: size.id,
+  const product = products.create({ sku: `TEST-PLANNING-REPOSITORY-${prefix || 'A'}`, brandId: brand.id, productSizeId: size.id,
     ...(defaultAppearance ? { defaultAppearanceId: appearance.id } : {}), model: `${prefix}ZC200`, productCategory: '冰柜' });
   return { brand, size, appearance, color, main, item, product };
 }

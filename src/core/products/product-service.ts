@@ -2,7 +2,7 @@ import type { PlannerDatabase } from '../../db/database.js';
 import { ProductRepository } from './product-repository.js';
 import type { Product, ProductFilters, ProductInput } from './product-types.js';
 
-export type ProductErrorCode = 'DUPLICATE_MODEL' | 'INVALID_DICTIONARY_REFERENCE' | 'INVALID_REFERENCE_PRODUCT' | 'PRODUCT_REFERENCED' | 'NOT_FOUND';
+export type ProductErrorCode = 'DUPLICATE_MODEL' | 'DUPLICATE_SKU' | 'INVALID_SKU' | 'INVALID_DICTIONARY_REFERENCE' | 'INVALID_REFERENCE_PRODUCT' | 'PRODUCT_REFERENCED' | 'NOT_FOUND';
 
 export class ProductError extends Error {
   constructor(public readonly code: ProductErrorCode, message: string) { super(message); }
@@ -29,11 +29,11 @@ export class ProductService {
   }
 
   update(id: number, input: ProductInput): Product {
-    this.get(id);
-    if (this.repository.hasDrawingReferences(id)) {
+    const current = this.get(id);
+    const normalized = this.validateAndNormalize(input, id);
+    if (this.repository.hasDrawingReferences(id) && this.changesReferencedMeaning(current, normalized)) {
       throw new ProductError('PRODUCT_REFERENCED', '该产品已有图号记录，不能修改编码含义');
     }
-    const normalized = this.validateAndNormalize(input, id);
     try { return this.repository.update(id, normalized); }
     catch (error) { return this.mapDatabaseError(error); }
   }
@@ -44,6 +44,8 @@ export class ProductService {
   }
 
   private validateAndNormalize(input: ProductInput, currentId?: number): ProductInput {
+    const sku = input.sku?.trim();
+    if (!sku) throw new ProductError('INVALID_SKU', '新建产品必须填写 SKU');
     const valid = this.repository.isActiveDictionary(input.brandId, 'brand')
       && this.repository.isActiveDictionary(input.productSizeId, 'product_size')
       && (input.defaultAppearanceId == null
@@ -58,6 +60,7 @@ export class ProductService {
     }
     return {
       ...input,
+      sku,
       model: input.model.trim(),
       productCategory: input.productCategory.trim(),
       defaultAppearanceId: input.defaultAppearanceId ?? null,
@@ -66,9 +69,21 @@ export class ProductService {
   }
 
   private mapDatabaseError(error: unknown): never {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed: products.sku')) {
+      throw new ProductError('DUPLICATE_SKU', 'SKU 已存在');
+    }
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed: products.brand_id, products.model')) {
       throw new ProductError('DUPLICATE_MODEL', '同一品牌下型号已存在');
     }
     throw error;
+  }
+
+  private changesReferencedMeaning(current: Product, next: ProductInput): boolean {
+    return current.brandId !== next.brandId
+      || current.productSizeId !== next.productSizeId
+      || current.defaultAppearanceId !== next.defaultAppearanceId
+      || current.model !== next.model
+      || current.productCategory !== next.productCategory
+      || current.referenceProductId !== next.referenceProductId;
   }
 }

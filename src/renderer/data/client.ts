@@ -4,7 +4,7 @@ export interface DictionaryItemView {
 }
 
 export interface ProductView {
-  id: number; brandId: number; brandName: string; productSizeId: number; productSizeName: string;
+  id: number; sku: string | null; brandId: number; brandName: string; productSizeId: number; productSizeName: string;
   defaultAppearanceId: number | null; defaultAppearanceName: string | null;
   model: string; productCategory: string; referenceProductId: number | null;
   referenceProductModel: string | null; status: 'active' | 'inactive';

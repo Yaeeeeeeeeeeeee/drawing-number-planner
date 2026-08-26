@@ -31,7 +31,7 @@ describe('BomService concurrent drafts', () => {
     const main = dictionaries.create({ type: 'main_category', code: '04', name: '印刷件类' });
     const logo = dictionaries.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
     const manual = dictionaries.create({ type: 'project_item', code: '02', name: '说明书', parentId: main.id });
-    const product = products.create({ brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
+    const product = products.create({ sku: 'TEST-BOM-CONCURRENT', brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
       model: 'ZC100', productCategory: '冰柜' });
     const planning = new PlanningService(firstDb);
     const reserve = (clientId: string, projectItemId: number) => {

@@ -23,6 +23,7 @@ beforeEach(() => {
   const logo = dictionary.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
   const manual = dictionary.create({ type: 'project_item', code: '02', name: '说明书', parentId: main.id });
   const product = new ProductService(db).create({
+    sku: 'TEST-DRAWING-QUERY',
     brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
     model: 'ZC220', productCategory: '冰柜',
   });

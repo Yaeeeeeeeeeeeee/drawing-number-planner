@@ -26,7 +26,7 @@ function fixture() {
   const main = dictionaries.create({ type: 'main_category', code: '04', name: '印刷件类' });
   const logo = dictionaries.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
   const label = dictionaries.create({ type: 'project_item', code: '02', name: '铭牌', parentId: main.id });
-  const product = products.create({ brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
+  const product = products.create({ sku: 'TEST-PLANNING-SERVICE', brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
     model: 'ZC200', productCategory: '冰柜' });
   return { brand, size, appearance, white, gray, main, logo, label, product };
 }

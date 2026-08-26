@@ -29,9 +29,9 @@ function fixture() {
   const main = dictionaries.create({ type: 'main_category', code: '04', name: '印刷件类' });
   const logo = dictionaries.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
   const manual = dictionaries.create({ type: 'project_item', code: '02', name: '说明书', parentId: main.id });
-  const product = products.create({ brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
+  const product = products.create({ sku: 'TEST-BOM-MAIN', brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
     model: 'ZC100', productCategory: '冰柜' });
-  const otherProduct = products.create({ brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
+  const otherProduct = products.create({ sku: 'TEST-BOM-OTHER', brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
     model: 'ZC220', productCategory: '冰柜' });
   return { appearance, white, gray, main, logo, manual, product, otherProduct };
 }

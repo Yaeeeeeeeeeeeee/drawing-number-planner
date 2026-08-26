@@ -1,5 +1,6 @@
 export interface Product {
   id: number;
+  sku: string | null;
   brandId: number;
   brandName: string;
   productSizeId: number;
@@ -14,6 +15,7 @@ export interface Product {
 }
 
 export interface ProductInput {
+  sku: string | null;
   brandId: number;
   productSizeId: number;
   defaultAppearanceId?: number | null;

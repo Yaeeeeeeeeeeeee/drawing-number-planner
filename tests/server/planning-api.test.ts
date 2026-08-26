@@ -22,7 +22,7 @@ beforeEach(() => {
   const color = dictionaries.create({ type: 'color', code: '0', name: '白色' });
   const main = dictionaries.create({ type: 'main_category', code: '04', name: '印刷件类' });
   const item = dictionaries.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
-  const product = products.create({ brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
+  const product = products.create({ sku: 'TEST-PLANNING-API', brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id,
     model: 'ZC200', productCategory: '冰柜' });
   payload = { productId: product.id, rows: [{ clientId: 'row-1', colorId: color.id,
     mainCategoryId: main.id, projectItemId: item.id }] };

@@ -12,7 +12,7 @@ describe('ProductsPage', () => {
     };
     const created = { id: 9, brandId: 1, brandName: 'SAMKYO', productSizeId: 2,
       productSizeName: 'ZC220冰柜', defaultAppearanceId: 3, defaultAppearanceName: '1号外观',
-      model: 'ZC220', productCategory: '冰柜', referenceProductId: null, referenceProductModel: null, status: 'active' };
+      sku: 'SKDZC220JP', model: 'ZC220', productCategory: '冰柜', referenceProductId: null, referenceProductModel: null, status: 'active' };
     const api = {
       listProducts: vi.fn().mockResolvedValue([]),
       listDictionaries: vi.fn((type: keyof typeof dictionaries) => Promise.resolve(dictionaries[type])),
@@ -23,6 +23,7 @@ describe('ProductsPage', () => {
     await screen.findByText('还没有产品档案');
 
     fireEvent.click(screen.getByRole('button', { name: '新建产品' }));
+    fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 'SKDZC220JP' } });
     fireEvent.change(screen.getByLabelText('型号'), { target: { value: 'ZC220' } });
     fireEvent.change(screen.getByLabelText('产品类别'), { target: { value: '冰柜' } });
     fireEvent.change(screen.getByRole('combobox', { name: /^品牌$/ }), { target: { value: '1' } });
@@ -31,12 +32,12 @@ describe('ProductsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存产品' }));
 
     expect(await screen.findByText('ZC220')).toBeVisible();
-    expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ model: 'ZC220', brandId: 1 }));
+    expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ sku: 'SKDZC220JP', model: 'ZC220', brandId: 1 }));
   });
 
   it('searches, edits, deactivates and stores a reference product', async () => {
     const source = { id: 1, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
-      defaultAppearanceId: 3, defaultAppearanceName: '1号外观', model: 'ZC200', productCategory: '冰柜',
+      defaultAppearanceId: 3, defaultAppearanceName: '1号外观', sku: 'SKDZC200JP', model: 'ZC200', productCategory: '冰柜',
       referenceProductId: null, referenceProductModel: null, status: 'active' };
     const target = { ...source, id: 2, model: 'ZC220' };
     const dictionaries = {

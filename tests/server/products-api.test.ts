@@ -24,19 +24,27 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('product API', () => {
+  it('requires sku when creating a product', async () => {
+    const app = Fastify(); registerProductRoutes(app, new ProductService(db));
+    const response = await app.inject({ method: 'POST', url: '/api/products',
+      payload: { ...refs, model: 'ZC220', productCategory: '03.冰柜' } });
+    expect(response.statusCode).toBe(400);
+    await app.close();
+  });
+
   it('creates, retrieves and searches persisted product records', async () => {
     const app = Fastify();
     registerProductRoutes(app, new ProductService(db));
     const created = await app.inject({
       method: 'POST', url: '/api/products',
-      payload: { ...refs, model: 'ZC220', productCategory: '冰柜' },
+      payload: { ...refs, sku: 'SKDZC220JP', model: 'ZC220', productCategory: '冰柜' },
     });
     expect(created.statusCode).toBe(201);
     const id = created.json().id as number;
 
     const detail = await app.inject({ method: 'GET', url: `/api/products/${id}` });
-    expect(detail.json()).toEqual(expect.objectContaining({ model: 'ZC220', brandName: 'SAMKYO' }));
-    const listed = await app.inject({ method: 'GET', url: '/api/products?search=ZC2&brandId=' + refs.brandId });
+    expect(detail.json()).toEqual(expect.objectContaining({ sku: 'SKDZC220JP', model: 'ZC220', brandName: 'SAMKYO' }));
+    const listed = await app.inject({ method: 'GET', url: '/api/products?search=SKDZC220JP&brandId=' + refs.brandId });
     expect(listed.json()).toEqual({ items: [expect.objectContaining({ id })] });
     await app.close();
   });
@@ -44,12 +52,12 @@ describe('product API', () => {
   it('updates and deactivates through explicit routes', async () => {
     const app = Fastify();
     registerProductRoutes(app, new ProductService(db));
-    const created = await app.inject({ method: 'POST', url: '/api/products', payload: { ...refs, model: 'ZC220', productCategory: '冰柜' } });
+    const created = await app.inject({ method: 'POST', url: '/api/products', payload: { ...refs, sku: 'SKDZC220JP', model: 'ZC220', productCategory: '冰柜' } });
     const id = created.json().id as number;
 
     const updated = await app.inject({
       method: 'PUT', url: `/api/products/${id}`,
-      payload: { ...refs, model: 'ZC220A', productCategory: '卧式冰柜' },
+      payload: { ...refs, sku: 'SKDZC220JP', model: 'ZC220A', productCategory: '卧式冰柜' },
     });
     expect(updated.json()).toEqual(expect.objectContaining({ model: 'ZC220A' }));
     const deactivated = await app.inject({ method: 'POST', url: `/api/products/${id}/deactivate` });
@@ -62,7 +70,7 @@ describe('product API', () => {
     registerProductRoutes(app, new ProductService(db));
     const response = await app.inject({
       method: 'POST', url: '/api/products',
-      payload: { ...refs, brandId: refs.productSizeId, model: 'ZC220', productCategory: '冰柜' },
+      payload: { ...refs, brandId: refs.productSizeId, sku: 'SKDZC220JP', model: 'ZC220', productCategory: '冰柜' },
     });
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({

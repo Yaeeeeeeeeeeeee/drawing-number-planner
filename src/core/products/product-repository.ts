@@ -2,7 +2,7 @@ import type { PlannerDatabase } from '../../db/database.js';
 import type { Product, ProductFilters, ProductInput } from './product-types.js';
 
 interface ProductRow {
-  id: number; brand_id: number; brand_name: string;
+  id: number; sku: string | null; brand_id: number; brand_name: string;
   product_size_id: number; product_size_name: string;
   default_appearance_id: number | null; default_appearance_name: string | null;
   model: string; product_category: string;
@@ -13,7 +13,7 @@ interface ProductRow {
 const selectProducts = `select product.id, product.brand_id, brand.name as brand_name,
   product.product_size_id, size.name as product_size_name,
   product.default_appearance_id, appearance.name as default_appearance_name,
-  product.model, product.product_category, product.reference_product_id,
+  product.sku, product.model, product.product_category, product.reference_product_id,
   reference.model as reference_product_model, product.status
   from products product
   join dictionary_items brand on brand.id = product.brand_id
@@ -22,7 +22,7 @@ const selectProducts = `select product.id, product.brand_id, brand.name as brand
   left join products reference on reference.id = product.reference_product_id`;
 
 const mapRow = (row: ProductRow): Product => ({
-  id: row.id, brandId: row.brand_id, brandName: row.brand_name,
+  id: row.id, sku: row.sku, brandId: row.brand_id, brandName: row.brand_name,
   productSizeId: row.product_size_id, productSizeName: row.product_size_name,
   defaultAppearanceId: row.default_appearance_id, defaultAppearanceName: row.default_appearance_name,
   model: row.model, productCategory: row.product_category,
@@ -35,9 +35,9 @@ export class ProductRepository {
 
   create(input: ProductInput): Product {
     const result = this.db.prepare(`insert into products
-      (brand_id, product_size_id, default_appearance_id, model, product_category,
-       reference_product_id, created_at) values (?, ?, ?, ?, ?, ?, ?)`)
-      .run(input.brandId, input.productSizeId, input.defaultAppearanceId ?? null,
+      (sku, brand_id, product_size_id, default_appearance_id, model, product_category,
+       reference_product_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(input.sku, input.brandId, input.productSizeId, input.defaultAppearanceId ?? null,
         input.model, input.productCategory, input.referenceProductId ?? null, new Date().toISOString());
     return this.get(Number(result.lastInsertRowid))!;
   }
@@ -57,8 +57,8 @@ export class ProductRepository {
       conditions.push('product.brand_id = ?'); values.push(filters.brandId);
     }
     if (filters.search?.trim()) {
-      conditions.push('(product.model like ? or product.product_category like ?)');
-      values.push(`%${filters.search.trim()}%`, `%${filters.search.trim()}%`);
+      conditions.push('(product.sku like ? or product.model like ? or product.product_category like ?)');
+      values.push(`%${filters.search.trim()}%`, `%${filters.search.trim()}%`, `%${filters.search.trim()}%`);
     }
     const where = conditions.length ? ` where ${conditions.join(' and ')}` : '';
     return (this.db.prepare(`${selectProducts}${where} order by brand.name, product.model`).all(...values) as ProductRow[])
@@ -66,9 +66,9 @@ export class ProductRepository {
   }
 
   update(id: number, input: ProductInput): Product {
-    this.db.prepare(`update products set brand_id = ?, product_size_id = ?, default_appearance_id = ?,
+    this.db.prepare(`update products set sku = ?, brand_id = ?, product_size_id = ?, default_appearance_id = ?,
       model = ?, product_category = ?, reference_product_id = ? where id = ?`)
-      .run(input.brandId, input.productSizeId, input.defaultAppearanceId ?? null,
+      .run(input.sku, input.brandId, input.productSizeId, input.defaultAppearanceId ?? null,
         input.model, input.productCategory, input.referenceProductId ?? null, id);
     return this.get(id)!;
   }
