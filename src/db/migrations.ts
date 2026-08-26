@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from './database.js';
-import { schemaVersionFour, schemaVersionOne, schemaVersionThree, schemaVersionTwo } from './schema.sql.js';
+import { schemaVersionFive, schemaVersionFour, schemaVersionOne, schemaVersionThree, schemaVersionTwo } from './schema.sql.js';
 
 export interface MigrationSafety {
   databaseExists: boolean;
@@ -22,6 +22,10 @@ function currentVersion(database: PlannerDatabase): number {
 
 function hasDrawingColumn(database: PlannerDatabase, name: string): boolean {
   return (database.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).some((column) => column.name === name);
+}
+
+function hasProductColumn(database: PlannerDatabase, name: string): boolean {
+  return (database.pragma('table_info(products)') as Array<{ name: string }>).some((column) => column.name === name);
 }
 
 function validateExpandedDrawingRows(database: PlannerDatabase): void {
@@ -73,8 +77,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 4) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 4`);
-  if (from >= 4) return { from, to: from };
+  if (from > 5) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 5`);
+  if (from >= 5) return { from, to: from };
   if (safety.databaseExists) safety.createBackup();
   database.transaction(() => {
     if (from < 1) database.exec(schemaVersionOne);
@@ -89,6 +93,19 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
     }
     if (from < 3) database.exec(schemaVersionThree);
     if (from < 4) database.exec(schemaVersionFour);
+    if (from < 5) {
+      const before = (database.prepare('select count(*) as count from pdf_files').get() as { count: number }).count;
+      if (!hasProductColumn(database, 'sku')) database.exec('alter table products add column sku text');
+      database.exec(schemaVersionFive);
+      const after = (database.prepare('select count(*) as count from pdf_files').get() as { count: number }).count;
+      if (before !== after) throw new Error('PDF 索引迁移行数不一致，数据库未升级');
+      const duplicatePaths = database.prepare(`select count(*) as count from (
+        select relative_path from pdf_files group by relative_path having count(*) > 1
+      )`).get() as { count: number };
+      if (duplicatePaths.count > 0 || (database.pragma('foreign_key_check') as Array<unknown>).length > 0) {
+        throw new Error('兼容性数据校验失败，数据库未升级');
+      }
+    }
   })();
-  return { from, to: 4 };
+  return { from, to: 5 };
 }

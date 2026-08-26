@@ -185,3 +185,81 @@ export const schemaVersionFour = `
   INSERT INTO schema_migrations (version, applied_at)
   VALUES (4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 `;
+
+export const schemaVersionFive = `
+  CREATE UNIQUE INDEX IF NOT EXISTS products_sku_unique
+    ON products(sku COLLATE NOCASE)
+    WHERE sku IS NOT NULL AND length(trim(sku)) > 0;
+
+  CREATE TABLE historical_drawing_numbers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    full_code TEXT NOT NULL UNIQUE,
+    brand_code TEXT NOT NULL CHECK (length(brand_code) = 2),
+    product_size_code TEXT NOT NULL CHECK (length(product_size_code) = 4),
+    appearance_code TEXT NOT NULL CHECK (length(appearance_code) = 2),
+    color_code TEXT NOT NULL CHECK (length(color_code) = 1),
+    main_category_code TEXT NOT NULL CHECK (length(main_category_code) = 2),
+    project_item_code TEXT NOT NULL CHECK (length(project_item_code) = 2),
+    sequence INTEGER NOT NULL CHECK (sequence BETWEEN 1 AND 999),
+    product_id INTEGER REFERENCES products(id),
+    detected_sku TEXT,
+    detected_model TEXT,
+    detected_product_category TEXT,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL
+  );
+
+  CREATE INDEX historical_drawing_prefix_idx ON historical_drawing_numbers (
+    brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code, sequence
+  );
+
+  ALTER TABLE pdf_files RENAME TO pdf_files_v4;
+
+  CREATE TABLE pdf_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relative_path TEXT NOT NULL UNIQUE CHECK (
+      length(relative_path) > 0
+      AND substr(relative_path, 1, 1) NOT IN ('/', '\\')
+      AND relative_path NOT GLOB '[A-Za-z]:*'
+      AND relative_path NOT IN ('.', '..')
+      AND relative_path NOT LIKE '../%'
+      AND relative_path NOT LIKE '..\\%'
+      AND relative_path NOT LIKE '%/../%'
+      AND relative_path NOT LIKE '%\\..\\%'
+      AND relative_path NOT LIKE '%/..'
+      AND relative_path NOT LIKE '%\\..'
+    ),
+    file_name TEXT NOT NULL,
+    drawing_id INTEGER REFERENCES drawing_numbers(id),
+    historical_drawing_id INTEGER REFERENCES historical_drawing_numbers(id),
+    match_status TEXT NOT NULL CHECK (match_status IN ('matched', 'pending', 'unmatched', 'conflict')),
+    detected_codes_json TEXT NOT NULL DEFAULT '[]',
+    conversion_type TEXT NOT NULL CHECK (conversion_type IN ('source', 'outlined')),
+    classification_warning TEXT,
+    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+    modified_at TEXT NOT NULL,
+    scanned_at TEXT NOT NULL,
+    is_present INTEGER NOT NULL DEFAULT 1 CHECK (is_present IN (0, 1)),
+    CHECK (
+      (match_status = 'matched' AND ((drawing_id IS NOT NULL) <> (historical_drawing_id IS NOT NULL)))
+      OR (match_status <> 'matched' AND drawing_id IS NULL AND historical_drawing_id IS NULL)
+    )
+  );
+
+  INSERT INTO pdf_files (
+    id, relative_path, file_name, drawing_id, historical_drawing_id, match_status,
+    detected_codes_json, conversion_type, classification_warning, size_bytes,
+    modified_at, scanned_at, is_present
+  )
+  SELECT id, relative_path, file_name, drawing_id, NULL, match_status,
+    detected_codes_json, conversion_type, NULL, size_bytes, modified_at, scanned_at, is_present
+  FROM pdf_files_v4;
+
+  DROP TABLE pdf_files_v4;
+  CREATE INDEX pdf_files_drawing_idx ON pdf_files(drawing_id);
+  CREATE INDEX pdf_files_historical_drawing_idx ON pdf_files(historical_drawing_id);
+  CREATE INDEX pdf_files_filter_idx ON pdf_files(is_present, match_status, conversion_type);
+
+  INSERT INTO schema_migrations (version, applied_at)
+  VALUES (5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+`;
