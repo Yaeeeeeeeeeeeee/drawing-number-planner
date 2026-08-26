@@ -118,12 +118,25 @@ const queryString = (values: Record<string, unknown>) => {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = init?.method?.toUpperCase() ?? 'GET';
   const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-  const token = write ? await sessionToken() : '';
-  const headers = { ...(init?.headers as Record<string, string> | undefined), ...(write && token ? { 'x-planner-token': token } : {}) };
-  const response = await fetch(path, { ...init, headers });
-  const body = await response.json();
-  if (!response.ok) throw new ApiError(body.error?.code ?? 'REQUEST_FAILED', body.error?.message ?? '请求失败');
-  return body as T;
+  const send = async (token = ''): Promise<{ response: Response; body: any }> => {
+    const headers = { ...(init?.headers as Record<string, string> | undefined), ...(write && token ? { 'x-planner-token': token } : {}) };
+    const response = await fetch(path, { ...init, headers });
+    return { response, body: await response.json() };
+  };
+  const tokenRequest = write ? sessionToken() : undefined;
+  const first = await send(tokenRequest ? await tokenRequest : '');
+  if (!first.response.ok && write && first.response.status === 401 && first.body.error?.code === 'INVALID_TOKEN') {
+    if (currentSessionToken === tokenRequest) currentSessionToken = undefined;
+    const replay = await send(await sessionToken());
+    if (!replay.response.ok) {
+      throw new ApiError(replay.body.error?.code ?? 'REQUEST_FAILED', replay.body.error?.message ?? '请求失败');
+    }
+    return replay.body as T;
+  }
+  if (!first.response.ok) {
+    throw new ApiError(first.body.error?.code ?? 'REQUEST_FAILED', first.body.error?.message ?? '请求失败');
+  }
+  return first.body as T;
 }
 
 let currentSessionToken: Promise<string> | undefined;

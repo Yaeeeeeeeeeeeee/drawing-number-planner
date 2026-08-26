@@ -1,6 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiClient } from '../../src/renderer/data/client';
+let apiClient: typeof import('../../src/renderer/data/client').apiClient;
+let ApiError: typeof import('../../src/renderer/data/client').ApiError;
+
+beforeEach(async () => {
+  vi.resetModules();
+  ({ apiClient, ApiError } = await import('../../src/renderer/data/client'));
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -44,5 +50,95 @@ describe('renderer API client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/files?keyword=%E8%BD%AC%E6%9B%B2&matchStatus=unmatched&page=1&pageSize=20', {
       headers: {},
     });
+  });
+
+  it('replays a stale-token write once after refreshing the local session', async () => {
+    const requestBody = { code: '02', name: 'SAMKYO' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'stale-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'INVALID_TOKEN', message: '会话已失效' } }), { status: 401, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'fresh-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 1, code: '02', name: 'SAMKYO', status: 'active' }), { status: 201, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.createDictionary('brand', requestBody)).resolves.toMatchObject({ id: 1, code: '02' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/session', { method: 'POST' });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/dictionaries/brand', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ 'content-type': 'application/json', 'x-planner-token': 'stale-token' }),
+      body: JSON.stringify(requestBody),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/session', { method: 'POST' });
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/dictionaries/brand', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ 'content-type': 'application/json', 'x-planner-token': 'fresh-token' }),
+      body: JSON.stringify(requestBody),
+    }));
+  });
+
+  it('surfaces INVALID_TOKEN returned by the single replay without another refresh', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'stale-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'INVALID_TOKEN', message: '会话已失效' } }), { status: 401, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'fresh-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'INVALID_TOKEN', message: '会话仍然失效' } }), { status: 401, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' }))
+      .rejects.toMatchObject({ code: 'INVALID_TOKEN' } satisfies Partial<InstanceType<typeof ApiError>>);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/session')).toHaveLength(2);
+  });
+
+  it('does not refresh a write session for a different authorization failure', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'current-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'FORBIDDEN', message: '没有权限' } }), { status: 403, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' }))
+      .rejects.toMatchObject({ code: 'FORBIDDEN' } satisfies Partial<InstanceType<typeof ApiError>>);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/session')).toHaveLength(1);
+  });
+
+  it('shares one fresh bootstrap when concurrent writes reject the same stale token', async () => {
+    let sessionBootstrapCount = 0;
+    const fetchMock = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === '/api/session') {
+        sessionBootstrapCount += 1;
+        return new Response(JSON.stringify({ token: sessionBootstrapCount === 1 ? 'stale-token' : 'fresh-token' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      const token = (init?.headers as Record<string, string>)['x-planner-token'];
+      if (token === 'stale-token') {
+        return new Response(JSON.stringify({ error: { code: 'INVALID_TOKEN', message: '会话已失效' } }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ id: path.endsWith('brand') ? 1 : 2, code: '02', name: 'SAMKYO', status: 'active' }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await Promise.all([
+      apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' }),
+      apiClient.createDictionary('category', { code: '03', name: '配件' }),
+    ]);
+
+    expect(sessionBootstrapCount).toBe(2);
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/session')).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([path]) => path !== '/api/session')).toHaveLength(4);
   });
 });
