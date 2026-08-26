@@ -73,6 +73,9 @@ describe('BOM API', () => {
     expect(stale.statusCode).toBe(409);
     expect(stale.json()).toEqual({ error: { code: 'BOM_STALE', message: '当前 BOM 已变化，请刷新后重新保存' } });
     expect(db.prepare('select count(*) as count from bom_versions').get()).toEqual({ count: 1 });
+    expect(db.prepare(`select name from sqlite_master where type = 'table' and name in
+      ('bom_versions', 'bom_items', 'bom_current') order by name`).all())
+      .toEqual([{ name: 'bom_current' }, { name: 'bom_items' }, { name: 'bom_versions' }]);
   });
 
   it('rejects malformed input and maps business eligibility failures', async () => {

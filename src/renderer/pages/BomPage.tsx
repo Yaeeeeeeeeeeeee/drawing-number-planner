@@ -20,7 +20,12 @@ const fromItem = (item: BomItemView, clientId: string): DraftRow => ({
     projectItemName: item.projectItemName, status: item.status }],
 });
 
-const diffLabel = { added: '新增', replaced: '替换', removed: '移除', unchanged: '未变化' } as const;
+const describeDiff = (item: BomDiffView): string => {
+  if (item.type === 'added') return `${item.projectItemName}：新增 ${item.fullCode}`;
+  if (item.type === 'removed') return `${item.projectItemName}：移除 ${item.previousFullCode}`;
+  if (item.type === 'replaced') return `${item.projectItemName}：${item.previousFullCode} → ${item.fullCode}`;
+  return `${item.projectItemName}：未变化`;
+};
 
 export function BomPage({ api }: { api: PlannerApi }) {
   const [products, setProducts] = useState<ProductView[]>([]);
@@ -105,7 +110,7 @@ export function BomPage({ api }: { api: PlannerApi }) {
       });
       setRows(savedRows);
       setHistory((current) => [saved.version, ...current.filter((item) => item.id !== saved.version.id)]);
-      setSavedMessage(`版本 ${saved.version.versionNumber} 已保存`);
+      setSavedMessage('当前 BOM 已保存');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'BOM 保存失败');
       setNeedsRefresh(reason instanceof ApiError && reason.code === 'BOM_STALE');
@@ -118,8 +123,8 @@ export function BomPage({ api }: { api: PlannerApi }) {
   };
 
   return <section className="page-surface page-enter bom-page">
-    <header className="page-header"><div><p className="eyebrow">BILL OF MATERIALS</p><h1>BOM 管理</h1><p>每次保存生成完整新版本；其他颜色可明确引用同型号白色图号。</p></div>
-      <span className="record-count">{base ? `当前版本 ${base.versionNumber}` : '尚无版本'}</span></header>
+    <header className="page-header"><div><p className="eyebrow">BILL OF MATERIALS</p><h1>BOM 管理</h1><p>维护某型号和颜色当前实际使用的图号；其他颜色可明确引用同型号白色图号。</p></div>
+      <span className="record-count">{base ? `当前 BOM · ${new Date(base.createdAt).toLocaleDateString('zh-CN')}` : '尚无当前 BOM'}</span></header>
     <div className="form-grid bom-basics">
       <label><span>产品型号</span><select aria-label="BOM 产品型号" disabled={busy} value={productId}
         onChange={(event) => setProductId(event.target.value)}><option value="">请选择</option>
@@ -129,9 +134,9 @@ export function BomPage({ api }: { api: PlannerApi }) {
         {colors.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
     </div>
     {loaded && <>
-      <div className="batch-toolbar"><div><h2>当前 BOM 明细</h2><small>保存后旧版本保持只读</small></div>
+      <div className="batch-toolbar"><div><h2>当前 BOM</h2><small>保存后自动记录本次变更</small></div>
         <button className="secondary-button" type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidateResult(); }}>添加 BOM 项目</button></div>
-      {!base && rows.length === 0 && <div className="bom-empty"><strong>尚未建立 BOM</strong><span>添加第一个项目后保存为版本 1。</span></div>}
+      {!base && rows.length === 0 && <div className="bom-empty"><strong>尚未建立 BOM</strong><span>添加项目后保存为当前 BOM。</span></div>}
       <div className="planning-rows">{rows.map((row, index) => <article className="planning-row bom-row" key={row.clientId}>
         <div className="planning-row-title"><strong>项目 {index + 1}</strong><button className="link-button" type="button"
           disabled={busy} aria-label={`删除 BOM 项目 ${index + 1}`} onClick={() => { setRows((current) => current.filter((item) => item.clientId !== row.clientId)); invalidateResult(); }}>删除</button></div>
@@ -151,16 +156,16 @@ export function BomPage({ api }: { api: PlannerApi }) {
             onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, notes: event.target.value } : item)); invalidateResult(); }} /></label>
         </div>
       </article>)}</div>
-      <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete} onClick={() => void save()}>{busy ? '保存中…' : '保存为新版本'}</button>
+      <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete} onClick={() => void save()}>{busy ? '保存中…' : '保存当前 BOM'}</button>
         {needsRefresh && <button className="secondary-button" type="button" disabled={busy} onClick={() => setReloadNonce((value) => value + 1)}>刷新当前 BOM</button>}</div>
       {error && <p className="error-banner">{error}</p>}{savedMessage && <p className="success-banner"><strong>{savedMessage}</strong></p>}
-      {diff.length > 0 && <section className="bom-diff"><p className="eyebrow">VERSION DIFFERENCE</p><h2>本次版本变化</h2>
-        <div className="bom-diff-list">{diff.filter((item) => item.type !== 'unchanged').map((item) => <span className={`bom-diff-${item.type}`} key={item.projectItemId}>{diffLabel[item.type]} · {item.projectItemName}</span>)}</div></section>}
-      <section className="bom-history"><div className="batch-toolbar"><div><p className="eyebrow">VERSION HISTORY</p><h2>历史版本</h2></div><span>{history.length} 个版本</span></div>
-        {history.length === 0 ? <p className="muted-text">保存后将在这里保留只读历史。</p> : <table><thead><tr><th>版本</th><th>型号</th><th>颜色</th><th>建立时间</th><th>查看</th></tr></thead>
-          <tbody>{history.map((item) => <tr key={item.id}><td>版本 {item.versionNumber}</td><td>{item.model}</td><td>{item.colorName}</td><td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td>
-            <td><button className="text-button" type="button" aria-label={`查看版本 ${item.versionNumber}`} onClick={() => void viewHistory(item.id)}>查看明细</button></td></tr>)}</tbody></table>}
-        {historyDetail && <div className="bom-history-detail"><div className="batch-toolbar"><h3>版本 {historyDetail.versionNumber} 只读明细</h3><span>{historyDetail.items.length} 个项目</span></div>
+      {diff.length > 0 && <section className="bom-diff"><p className="eyebrow">LATEST CHANGE</p><h2>本次变更</h2>
+        <div className="bom-diff-list">{diff.filter((item) => item.type !== 'unchanged').map((item) => <span className={`bom-diff-${item.type}`} key={item.projectItemId}>{describeDiff(item)}</span>)}</div></section>}
+      <section className="bom-history"><div className="batch-toolbar"><div><p className="eyebrow">CHANGE HISTORY</p><h2>最近变更</h2></div><span>{history.length} 条记录</span></div>
+        {history.length === 0 ? <p className="muted-text">保存后将在这里保留简单的变更记录。</p> : <table><thead><tr><th>变更日期</th><th>型号</th><th>颜色</th><th>查看</th></tr></thead>
+          <tbody>{history.map((item) => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td><td>{item.model}</td><td>{item.colorName}</td>
+            <td><button className="text-button" type="button" aria-label="查看变更" onClick={() => void viewHistory(item.id)}>查看变更</button></td></tr>)}</tbody></table>}
+        {historyDetail && <div className="bom-history-detail"><div className="batch-toolbar"><h3>{new Date(historyDetail.createdAt).toLocaleString('zh-CN')} 使用明细</h3><span>{historyDetail.items.length} 个项目</span></div>
           <table><thead><tr><th>项目</th><th>图号</th><th>颜色</th><th>数量</th><th>共用</th></tr></thead><tbody>
             {historyDetail.items.map((item) => <tr key={item.bomItemId}><td>{item.projectItemName}</td><td className="code-cell">{item.fullCode}</td><td>{item.colorName}</td><td>{item.quantity}</td><td>{item.usesWhiteMaterial ? '引用白色' : '本色'}</td></tr>)}
           </tbody></table></div>}

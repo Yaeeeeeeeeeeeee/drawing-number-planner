@@ -48,14 +48,15 @@ describe('BomPage', () => {
     fireEvent.click(screen.getByLabelText('第 1 行引用白色图号'));
     expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401001/ })).toBeVisible();
     fireEvent.change(screen.getByLabelText('第 1 行图号'), { target: { value: '10' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
     await waitFor(() => expect(api.saveBomVersion).toHaveBeenCalledWith({
       productId: 1, colorId: 5, expectedCurrentVersionId: null,
       items: [{ projectItemId: 7, drawingId: 10, quantity: 1, usesWhiteMaterial: true }],
     }));
-    expect(await screen.findByText('版本 1 已保存')).toBeVisible();
-    expect(screen.getByText('新增 · LOGO')).toBeVisible();
+    expect(await screen.findByText('当前 BOM 已保存')).toBeVisible();
+    expect(screen.getByText(`LOGO：新增 ${candidate.fullCode}`)).toBeVisible();
+    expect(screen.getByText('当前 BOM')).toBeVisible();
   });
 
   it('loads an existing immutable version and saves removal against its exact id', async () => {
@@ -70,15 +71,16 @@ describe('BomPage', () => {
     render(<BomPage api={api as never} />); await selectGrayBom(false);
     expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401001/ })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '删除 BOM 项目 1' }));
-    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
     await waitFor(() => expect(api.saveBomVersion).toHaveBeenLastCalledWith({
       productId: 1, colorId: 5, expectedCurrentVersionId: 20, items: [],
     }));
-    expect(await screen.findByText('移除 · LOGO')).toBeVisible();
-    expect(screen.getByText('版本 1')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '查看版本 1' }));
-    expect(await screen.findByText('版本 1 只读明细')).toBeVisible();
+    expect(await screen.findByText(`LOGO：移除 ${candidate.fullCode}`)).toBeVisible();
+    expect(screen.getByText('最近变更')).toBeVisible();
+    expect(screen.queryByText(/版本 1/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '查看变更' })[0]);
+    expect(await screen.findByText(/使用明细/)).toBeVisible();
     expect(screen.getByText(candidate.fullCode)).toBeVisible();
   });
 
@@ -96,12 +98,13 @@ describe('BomPage', () => {
 
     expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401002/ })).toBeVisible();
     fireEvent.change(screen.getByLabelText('第 1 行图号'), { target: { value: '11' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
     await waitFor(() => expect(api.saveBomVersion).toHaveBeenLastCalledWith(expect.objectContaining({
       expectedCurrentVersionId: 20,
       items: [expect.objectContaining({ drawingId: 11 })],
     })));
+    expect(screen.getByText(`LOGO：${candidate.fullCode} → ${replacement.fullCode}`)).toBeVisible();
   });
 
   it('reloads eligible candidates after saving so the new version can be replaced immediately', async () => {
@@ -113,7 +116,7 @@ describe('BomPage', () => {
     fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
     fireEvent.click(screen.getByLabelText('第 1 行引用白色图号'));
     fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: '10' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
     await waitFor(() => expect(api.listBomCandidates).toHaveBeenCalledTimes(3));
     const drawingSelect = screen.getByLabelText('第 1 行图号') as HTMLSelectElement;
@@ -128,7 +131,7 @@ describe('BomPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
     fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: '10' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
     expect(await screen.findByText('当前 BOM 已变化，请刷新后重新保存')).toBeVisible();
     expect(screen.getByRole('button', { name: '刷新当前 BOM' })).toBeVisible();
@@ -141,7 +144,7 @@ describe('BomPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
     fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: '10' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存为新版本' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
     expect(await screen.findByText('已作废图号不能加入 BOM')).toBeVisible();
     expect(screen.queryByRole('button', { name: '刷新当前 BOM' })).not.toBeInTheDocument();
