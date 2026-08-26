@@ -1,5 +1,6 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { PlanningError } from './planning-errors.js';
+import { OccupiedNumberRepository } from './occupied-number-repository.js';
 import type { PlannedRow, PlanningContext, PlanningInput, ReservedDrawing, ResolvedPlanningRow } from './planning-types.js';
 
 interface DictionaryRow {
@@ -14,7 +15,11 @@ interface ProductContextRow {
 }
 
 export class PlanningRepository {
-  constructor(private readonly db: PlannerDatabase) {}
+  private readonly occupied: OccupiedNumberRepository;
+
+  constructor(private readonly db: PlannerDatabase) {
+    this.occupied = new OccupiedNumberRepository(db);
+  }
 
   private activeDictionary(id: number, type: string): DictionaryRow {
     const row = this.db.prepare(`select id, code, name, parent_id, status from dictionary_items
@@ -66,14 +71,11 @@ export class PlanningRepository {
   }
 
   findMaxSequence(prefix: string): number {
-    const row = this.db.prepare(`select max(sequence) as sequence from drawing_numbers
-      where substr(full_code, 1, length(full_code) - 3) = ?`).get(prefix) as { sequence: number | null };
-    return row.sequence ?? 0;
+    return this.occupied.findMaxSequence(prefix);
   }
 
   hasFullCode(fullCode: string): boolean {
-    return (this.db.prepare('select count(*) as count from drawing_numbers where full_code = ?')
-      .get(fullCode) as { count: number }).count > 0;
+    return this.occupied.hasFullCode(fullCode);
   }
 
   insertReserved(context: PlanningContext, row: ResolvedPlanningRow, planned: PlannedRow): ReservedDrawing {

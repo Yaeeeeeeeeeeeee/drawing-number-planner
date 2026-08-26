@@ -45,6 +45,15 @@ function insertExisting(refs: ReturnType<typeof fixture>, sequence: number, stat
       refs.white.id, refs.main.id, refs.logo.id, sequence, status, '2026-08-24T00:00:00Z');
 }
 
+function insertHistorical(sequence: number, appearanceCode = '01') {
+  const prefix = `02.0404.${appearanceCode}0.0401`;
+  db.prepare(`insert into historical_drawing_numbers
+    (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+     project_item_code, sequence, first_seen_at, last_seen_at)
+    values (?, '02', '0404', ?, '0', '04', '01', ?, '2026-08-26', '2026-08-26')`)
+    .run(`${prefix}${String(sequence).padStart(3, '0')}`, appearanceCode, sequence);
+}
+
 describe('PlanningService preview', () => {
   it('recommends 001 for an unused prefix without writing the database', () => {
     const refs = fixture();
@@ -58,6 +67,16 @@ describe('PlanningService preview', () => {
   it.each(['reserved', 'active', 'voided'] as const)('treats %s numbers as permanently occupied', (status) => {
     const refs = fixture(); insertExisting(refs, 1, status);
     expect(service.preview(input(refs)).rows[0].fullCode).toBe('02.0404.010.0401002');
+  });
+
+  it('continues after a reliably scanned historical number', () => {
+    const refs = fixture(); insertHistorical(7);
+    expect(service.preview(input(refs)).rows[0].fullCode).toBe('02.0404.010.0401008');
+  });
+
+  it('keeps different appearance codes in separate sequence groups', () => {
+    const refs = fixture(); insertHistorical(7, '02');
+    expect(service.preview(input(refs)).rows[0].fullCode).toBe('02.0404.010.0401001');
   });
 
   it('allocates consecutive numbers per prefix in request order', () => {

@@ -78,4 +78,18 @@ describe('PlanningService reservation', () => {
       .toThrowError(expect.objectContaining({ code: 'PLAN_STALE' }));
     expect(db.prepare('select full_code from drawing_numbers order by id').all()).toEqual([{ full_code: preview.rows[0].fullCode }]);
   });
+
+  it('rejects a preview made stale by a historical scan', () => {
+    const refs = fixture(); const input = { productId: refs.product.id, rows: [batch(refs).rows[0]] };
+    const preview = service.preview(input);
+    db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+       project_item_code, sequence, first_seen_at, last_seen_at)
+      values (?, '02', '0404', '01', '0', '04', '01', 1, '2026-08-26', '2026-08-26')`)
+      .run(preview.rows[0].fullCode);
+
+    expect(() => service.reserve({ ...input, rows: [{ ...input.rows[0], expectedFullCode: preview.rows[0].fullCode }] }))
+      .toThrowError(expect.objectContaining({ code: 'PLAN_STALE' }));
+    expect(db.prepare('select count(*) as count from drawing_numbers').get()).toEqual({ count: 0 });
+  });
 });
