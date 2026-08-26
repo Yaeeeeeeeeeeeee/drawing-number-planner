@@ -17,6 +17,7 @@ const unmatched = { ...file, id: 3, relativePath: 'unknown.pdf', fileName: 'unkn
 const pending = { ...unmatched, id: 4, relativePath: '02.0404.010.0401000-invalid.pdf',
   fileName: '02.0404.010.0401000-invalid.pdf', matchStatus: 'pending' as const,
   detectedCodes: ['02.0404.010.0401000'], classificationWarning: 'invalid-format' };
+const conversionConflict = { ...file, id: 5, classificationWarning: 'conversion-conflict' };
 
 function apiFixture(configured = false) {
   return {
@@ -80,6 +81,15 @@ describe('FilesPage', () => {
     expect(await screen.findByText(pending.fileName, { selector: '.file-primary' })).toBeVisible();
     expect(screen.getByText(/待确认.*02\.0404\.010\.0401000.*invalid-format/)).toBeVisible();
     expect(screen.queryByText('历史已占号')).not.toBeInTheDocument();
+  });
+
+  it('shows directory and filename conversion conflicts for reliably matched files', async () => {
+    const api = apiFixture(true);
+    api.searchPdfFiles.mockResolvedValueOnce({ items: [conversionConflict], total: 1, page: 1, pageSize: 50 });
+    render(<FilesPage api={api as never} />);
+
+    expect(await screen.findByText('目录与文件名的转曲标记冲突')).toBeVisible();
+    expect(screen.getByText(conversionConflict.fullCode)).toBeVisible();
   });
 
   it('submits combined filters and shows unmatched or missing states without stale requests winning', async () => {

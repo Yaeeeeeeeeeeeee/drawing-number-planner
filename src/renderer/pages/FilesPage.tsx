@@ -93,7 +93,11 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       <DataTable items={files} columns={[
         { key: 'name', label: '文件名', render: (item) => <span className="file-primary">{item.fileName}</span> },
         { key: 'path', label: '相对路径', render: (item) => <span className="file-relative mono">{item.relativePath}</span> },
-        { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="code-cell">{item.fullCode}</span>
+        { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="file-match matched">
+          <span className="code-cell">{item.fullCode}</span>
+          {item.classificationWarning && <span className="file-warning">{item.classificationWarning === 'conversion-conflict'
+            ? '目录与文件名的转曲标记冲突' : item.classificationWarning}</span>}
+        </span>
           : item.matchStatus === 'pending' ? <span className="file-match pending">待确认 · {item.detectedCodes.join(' / ')} · {item.classificationWarning}</span>
             : <span className={`file-match ${item.matchStatus}`}>{item.matchStatus === 'conflict' ? '多图号冲突' : '未匹配'}</span> },
         { key: 'conversion', label: '类型', render: (item) => <span className={`conversion-label ${item.conversionType}`}>{item.conversionType === 'outlined' ? '转曲后' : '转曲前'}</span> },

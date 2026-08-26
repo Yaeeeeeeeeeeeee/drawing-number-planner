@@ -57,7 +57,12 @@ describe('drawing codes found in PDF filenames', () => {
     });
   });
 
-  it.each(['02.0404.010.0401000-LOGO.pdf', '02.0404.010.04010-LOGO.pdf'])
+  it.each([
+    '02.0404.010.0401000-LOGO.pdf',
+    '02.0404.010.04010-LOGO.pdf',
+    '1022.0404.010.0401007.pdf',
+    '02.0404.010.0401007x.pdf',
+  ])
     ('sends a code-like but invalid token to pending: %s', (fileName) => {
       expect(inspectDrawingCodesInFilename(fileName)).toMatchObject({ status: 'pending', reason: 'invalid-format' });
     });

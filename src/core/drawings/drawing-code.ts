@@ -19,7 +19,7 @@ export type FilenameCodeInspection =
   | { status: 'unmatched'; candidates: [] };
 
 const completePattern = /^(\d{2})\.(\d{4})\.(\d{2})(\d)\.(\d{2})(\d{2})(\d{3})$/;
-const codeLikePattern = /\d{1,3}\.\d{1,6}\.\d{1,5}\.\d{1,10}/g;
+const codeLikePattern = /[a-z0-9]*\d+\.\d+\.\d+\.\d+[a-z0-9]*/gi;
 
 function validParts(parts: DrawingCodeParts): boolean {
   return /^\d{2}$/.test(parts.brandCode) && /^\d{4}$/.test(parts.productSizeCode)
@@ -51,16 +51,10 @@ export function parseDrawingCode(fullCode: string): ParsedDrawingCode | null {
   return { ...parts, fullCode, prefix: composeDrawingPrefix(parts), sequence };
 }
 
-function isCodeCharacter(value: string | undefined): boolean {
-  return value !== undefined && /[a-z0-9]/i.test(value);
-}
-
 export function inspectDrawingCodesInFilename(fileName: string): FilenameCodeInspection {
   const tokens: string[] = [];
   for (const match of fileName.matchAll(codeLikePattern)) {
-    const start = match.index ?? 0;
     const token = match[0];
-    if (isCodeCharacter(fileName[start - 1]) || isCodeCharacter(fileName[start + token.length])) continue;
     if (!tokens.includes(token)) tokens.push(token);
   }
   if (tokens.length === 0) return { status: 'unmatched', candidates: [] };

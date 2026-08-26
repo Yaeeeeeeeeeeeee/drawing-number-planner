@@ -116,6 +116,8 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .file-primary { color: #1c2d43; font-weight: 600; } .file-relative { display: inline-block; max-width: 390px; overflow: hidden; color: #5e6b7d; text-overflow: ellipsis; }
 .file-match, .conversion-label, .presence-label { font-size: 11px; font-weight: 600; }
 .file-match.unmatched { color: #956200; } .file-match.conflict { color: #a33128; }
+.file-match.matched { display: grid; gap: 2px; }
+.file-warning { color: #a33128; font-size: 11px; }
 .conversion-label.source { color: #40566f; } .conversion-label.outlined { color: #6a42a0; }
 .presence-label.present { color: #087552; } .presence-label.missing { color: #a33128; }
 .table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 16px 0; color: #5e6b7d; font-size: 12px; }
