@@ -70,6 +70,8 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .drawing-detail-section ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
 .drawing-detail-section li { display: grid; gap: 3px; padding: 9px 10px; background: #f7f9fc; }
 .drawing-detail-section li small { color: var(--muted); overflow-wrap: anywhere; }
+.drawing-detail-section li.drawing-file-row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.drawing-file-row > span { display: grid; min-width: 0; gap: 3px; }
 .pdf-search { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 10px; }
 .pdf-association label select { width: 100%; }
 .segmented-tabs { display: flex; padding-top: 18px; border-bottom: 1px solid var(--line); }
@@ -129,6 +131,7 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .file-cleanup-confirmation { margin: 0 0 14px; padding: 15px; border: 1px solid #e8b7a9; border-left: 3px solid #b54732; background: #fff; }
 .file-cleanup-confirmation strong { color: #7a271a; font-size: 13px; }.file-cleanup-confirmation p { margin: 8px 0 14px; color: #5f6875; font-size: 12px; }
 .file-primary { color: #1c2d43; font-weight: 600; } .file-relative { display: inline-block; max-width: 390px; overflow: hidden; color: #5e6b7d; text-overflow: ellipsis; }
+.file-row-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .file-match, .conversion-label, .presence-label { font-size: 11px; font-weight: 600; }
 .file-match.unmatched { color: #956200; } .file-match.conflict { color: #a33128; }
 .file-match.matched { display: grid; gap: 2px; }

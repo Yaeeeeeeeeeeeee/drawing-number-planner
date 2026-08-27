@@ -11,6 +11,7 @@ import { DictionaryService } from '../core/dictionaries/dictionary-service.js';
 import { DrawingQueryService } from '../core/drawings/drawing-query-service.js';
 import { FileRepository } from '../core/files/file-repository.js';
 import { FileService } from '../core/files/file-service.js';
+import { IndexedPdfResolver } from '../core/files/indexed-pdf-resolver.js';
 import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
 import { PlanningService } from '../core/planning/planning-service.js';
 import { ProductService } from '../core/products/product-service.js';
@@ -38,6 +39,7 @@ export interface ServerOptions {
 export interface RunningServer {
   url: string;
   token: string;
+  resolvePdfFilePath(id: unknown): string;
   close(): Promise<void>;
 }
 
@@ -67,10 +69,13 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     });
     server.post('/api/session', async () => ({ token }));
     server.get('/api/health', async () => ({ status: 'ok' }));
+    const fileRepository = new FileRepository(database);
+    const workspaceSettings = new WorkspaceSettingsStore(paths.settings);
+    const indexedPdfResolver = new IndexedPdfResolver(fileRepository, workspaceSettings);
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
-    registerFileRoutes(server, new FileService(new FileRepository(database), new WorkspaceSettingsStore(paths.settings)));
+    registerFileRoutes(server, new FileService(fileRepository, workspaceSettings));
     registerPlanningRoutes(server, new PlanningService(database));
     registerBomRoutes(server, new BomService(database));
     await registerImportRoutes(server, database, () => {
@@ -83,6 +88,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     return {
       url: address,
       token,
+      resolvePdfFilePath: (id) => indexedPdfResolver.resolve(id),
       close: async () => {
         server!.server.closeAllConnections();
         await server!.close();

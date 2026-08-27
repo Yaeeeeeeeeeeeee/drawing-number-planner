@@ -4,6 +4,35 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
 describe('DrawingLibraryPage', () => {
+  it('offers a separate open-location action for each present source/outlined file and disables missing rows', async () => {
+    const row = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
+      model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
+      projectItemName: 'LOGO', status: 'active', origin: 'planned', hasSourceFile: true, hasOutlinedFile: true,
+      dictionaryMappingStatus: 'mapped' } as const;
+    const detail = { ...row, readOnly: false, readOnlyMessage: null,
+      sourceFiles: [{ pdfIndexId: 21, fileName: 'source.pdf', relativePath: 'SKU/source.pdf', isPresent: true, conversionType: 'source' }],
+      outlinedFiles: [
+        { pdfIndexId: 22, fileName: 'outlined.pdf', relativePath: 'SKU/outlined.pdf', isPresent: true, conversionType: 'outlined' },
+        { pdfIndexId: 23, fileName: 'missing.pdf', relativePath: 'SKU/missing.pdf', isPresent: false, conversionType: 'outlined' },
+      ], currentBomUsage: [] } as const;
+    const showFileInFolder = vi.fn().mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false,
+      error: { code: 'PDF_FILE_UNAVAILABLE', message: '文件已不存在，请重新扫描资料库' } });
+    window.plannerDesktop = { showFileInFolder };
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [row], total: 1, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(detail),
+      searchPdfFiles: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 }) };
+
+    render(<DrawingLibraryPage api={api as never} />); fireEvent.click(await screen.findByText(row.fullCode));
+    fireEvent.click(await screen.findByRole('button', { name: '打开源文件 source.pdf 的位置' }));
+    fireEvent.click(screen.getByRole('button', { name: '打开转曲后文件 outlined.pdf 的位置' }));
+
+    await waitFor(() => expect(showFileInFolder).toHaveBeenNthCalledWith(1, 21));
+    expect(showFileInFolder).toHaveBeenNthCalledWith(2, 22);
+    expect(await screen.findByText('文件已不存在，请重新扫描资料库')).toBeVisible();
+    expect(screen.getByRole('button', { name: '打开转曲后文件 missing.pdf 的位置' })).toBeDisabled();
+    expect(screen.getByText('文件缺失')).toBeVisible();
+  });
+
   it('runs real filters and opens the selected drawing detail', async () => {
     const drawing = { id: 1, fullCode: '02.0209.010.0401001', displayName: 'SAMKYO-ZC220白色-LOGO', sku: 'SKDZC220JP',
       model: 'ZC220', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',

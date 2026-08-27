@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 import type { PdfFileView, PdfScanSummaryView, PlannerApi, WorkspaceSettingsView } from '../data/client';
+import { openIndexedPdfLocation } from '../desktop-files';
 
 const initialFilters = { keyword: '', matchStatus: '', conversionType: '', presence: 'present' };
 const pageSize = 50;
@@ -78,6 +79,11 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'PDF 索引清理失败'); }
     finally { setCleaning(false); }
   };
+  const openLocation = async (id: number) => {
+    setError(''); setMessage('');
+    const result = await openIndexedPdfLocation(id);
+    if (!result.ok) setError(result.error?.message ?? '打开文件位置失败');
+  };
 
   return <section className="page-surface page-enter files-page">
     <header className="page-header"><div><p className="eyebrow">PDF WORKSPACE</p><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
@@ -144,8 +150,12 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         { key: 'size', label: '大小', render: (item) => formatSize(item.sizeBytes) },
         { key: 'modified', label: '修改时间', render: (item) => new Date(item.modifiedAt).toLocaleString('zh-CN') },
         { key: 'presence', label: '文件状态', render: (item) => <span className={`presence-label ${item.isPresent ? 'present' : 'missing'}`}>{item.isPresent ? '存在' : '缺失'}</span> },
-        { key: 'actions', label: '操作', render: (item) => item.isPresent ? <span className="muted-text">—</span> : <button className="text-button danger" type="button" disabled={cleaning}
-          aria-label={`清理 ${item.fileName} 的索引记录`} onClick={() => requestCleanup([item.id])}>清理索引</button> },
+        { key: 'actions', label: '操作', render: (item) => <div className="file-row-actions">
+          <button className="text-button" type="button" disabled={!item.isPresent}
+            aria-label={`打开 ${item.fileName} 的位置`} onClick={() => void openLocation(item.id)}>{item.isPresent ? '打开位置' : '文件缺失'}</button>
+          {!item.isPresent && <button className="text-button danger" type="button" disabled={cleaning}
+            aria-label={`清理 ${item.fileName} 的索引记录`} onClick={() => requestCleanup([item.id])}>清理索引</button>}
+        </div> },
       ]} />}
     {total > pageSize && <nav className="table-pagination" aria-label="PDF 分页">
       <button className="secondary-button" type="button" disabled={loading || page <= 1}

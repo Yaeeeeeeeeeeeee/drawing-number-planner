@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { DictionaryItemView, DrawingDetailView, DrawingFileView, DrawingView, PdfFileView, PlannerApi } from '../data/client';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
+import { openIndexedPdfLocation } from '../desktop-files';
 
 const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', mainCategoryId: '', projectItemId: '', colorId: '', status: '', exactDrawingNumber: false };
 
@@ -67,6 +68,10 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : 'PDF 关联失败'); }
     finally { setMaintaining(false); }
   };
+  const openLocation = async (id: number) => {
+    setError(''); const result = await openIndexedPdfLocation(id);
+    if (!result.ok) setError(result.error?.message ?? '打开文件位置失败');
+  };
   const dictionarySelect = (label: string, key: 'brandId' | 'mainCategoryId' | 'projectItemId' | 'colorId', type: string) =>
     <label><span>{label}</span><select aria-label={label} value={filters[key]} onChange={(event) => set(key, event.target.value)}><option value="">全部</option>{(options[type] ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>;
 
@@ -106,8 +111,8 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         <div className="drawing-actions">{selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void changeStatus('active')} type="button">正式使用</button>}
           {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void changeStatus('voided')} type="button">作废</button>}</div>
       </>}
-      <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} />
-      <FileSection title="转曲后文件" present={selected.hasOutlinedFile} files={selected.outlinedFiles ?? []} />
+      <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={openLocation} />
+      <FileSection title="转曲后文件" present={selected.hasOutlinedFile} files={selected.outlinedFiles ?? []} onOpen={openLocation} />
       <section className="drawing-detail-section"><h3>当前 BOM 使用</h3>{(selected.currentBomUsage ?? []).length === 0 ? <p className="muted-text">当前 BOM 未使用此图号</p>
         : <ul>{selected.currentBomUsage.map((usage) => <li key={`${usage.bomVersionId}-${usage.projectItemId}`}>{usage.model} · {usage.colorName} · BOM v{usage.versionNumber}<small>{usage.projectItemName} · 数量 {usage.quantity}{usage.usesWhiteMaterial ? ' · 引用白色物料' : ''}</small></li>)}</ul>}</section>
       {!selected.readOnly && <section className="drawing-detail-section pdf-association"><h3>关联现有 PDF 索引</h3>
@@ -124,7 +129,11 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
 
 const statusLabel = (status: DrawingView['status']) => status === 'active' ? '正式使用' : status === 'reserved' ? '已占号' : status === 'historical' ? '历史已用' : '作废';
 
-function FileSection({ title, present, files }: { title: string; present: boolean; files: DrawingFileView[] }) {
+function FileSection({ title, present, files, onOpen }: { title: string; present: boolean; files: DrawingFileView[]; onOpen(id: number): Promise<void> }) {
   return <section className="drawing-detail-section"><h3>{title}<span className={`presence-label ${present ? 'present' : 'missing'}`}>{present ? '已有' : '缺失'}</span></h3>
-    {files.length === 0 ? <p className="muted-text">暂无索引记录</p> : <ul>{files.map((file) => <li key={file.pdfIndexId}>{file.fileName}<small>{file.relativePath} · {file.isPresent ? '当前存在' : '当前缺失'}</small></li>)}</ul>}</section>;
+    {files.length === 0 ? <p className="muted-text">暂无索引记录</p> : <ul>{files.map((file) => <li key={file.pdfIndexId} className="drawing-file-row">
+      <span>{file.fileName}<small>{file.relativePath} · {file.isPresent ? '当前存在' : '当前缺失'}</small></span>
+      <button className="text-button" type="button" disabled={!file.isPresent}
+        aria-label={`打开${title} ${file.fileName} 的位置`} onClick={() => void onOpen(file.pdfIndexId)}>{file.isPresent ? '打开位置' : '文件缺失'}</button>
+    </li>)}</ul>}</section>;
 }

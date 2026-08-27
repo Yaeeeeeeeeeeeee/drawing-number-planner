@@ -29,6 +29,12 @@ function toView(row: FileRow): PdfFileView {
 export class FileRepository {
   constructor(private readonly db: PlannerDatabase) {}
 
+  getIndexedFile(id: number): { relativePath: string; isPresent: boolean } | null {
+    const row = this.db.prepare('select relative_path as relativePath, is_present as isPresent from pdf_files where id = ?')
+      .get(id) as { relativePath: string; isPresent: number } | undefined;
+    return row ? { relativePath: row.relativePath, isPresent: row.isPresent === 1 } : null;
+  }
+
   listDrawingCodes(): DrawingCodeReference[] {
     return this.db.prepare('select id, full_code as fullCode from drawing_numbers order by id').all() as DrawingCodeReference[];
   }

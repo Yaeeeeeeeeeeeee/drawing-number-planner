@@ -34,6 +34,27 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('opens a present file by PDF index ID and disables missing file locations', async () => {
+    const showFileInFolder = vi.fn().mockResolvedValue({ ok: true }); window.plannerDesktop = { showFileInFolder };
+    const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [file, missing], total: 2, page: 1, pageSize: 50 });
+    render(<FilesPage api={api as never} />); await screen.findByText(file.fileName, { selector: '.file-primary' });
+
+    fireEvent.click(screen.getByRole('button', { name: `打开 ${file.fileName} 的位置` }));
+    await waitFor(() => expect(showFileInFolder).toHaveBeenCalledWith(file.id));
+    expect(screen.getByRole('button', { name: `打开 ${missing.fileName} 的位置` })).toBeDisabled();
+    expect(screen.getByText('文件缺失')).toBeVisible();
+  });
+
+  it('shows the desktop-only browser message without calling the API', async () => {
+    delete window.plannerDesktop; const api = apiFixture(true);
+    render(<FilesPage api={api as never} />); await screen.findByText(file.fileName, { selector: '.file-primary' });
+
+    fireEvent.click(screen.getByRole('button', { name: `打开 ${file.fileName} 的位置` }));
+
+    expect(await screen.findByText('请在 Windows 桌面版打开文件位置')).toBeVisible();
+    expect(api.searchPdfFiles).toHaveBeenCalledTimes(1);
+  });
+
   it('shows an unconfigured workspace and enables scanning only after a valid root is saved', async () => {
     const api = apiFixture(); render(<FilesPage api={api as never} />);
     expect(await screen.findByText('尚未设置资料根目录')).toBeVisible();

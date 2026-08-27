@@ -1,7 +1,9 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { startServer, type RunningServer } from '../server/start-server.js';
+import { createShowFileInFolderHandler } from './open-file-location.js';
 
 let runningServer: RunningServer | undefined;
 let mainWindow: BrowserWindow | undefined;
@@ -26,6 +28,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: fileURLToPath(new URL('./preload.cjs', import.meta.url)),
     },
   });
 
@@ -34,7 +37,16 @@ async function createWindow() {
   await mainWindow.loadURL(devServerUrl ?? runningServer.url);
 }
 
-app.whenReady().then(createWindow).catch((error) => {
+app.whenReady().then(() => {
+  ipcMain.handle('planner:show-file-in-folder', createShowFileInFolderHandler({
+    resolvePdfFilePath: (id) => {
+      if (!runningServer) throw new Error('本机文件服务尚未启动');
+      return runningServer.resolvePdfFilePath(id);
+    },
+    showItemInFolder: (path) => shell.showItemInFolder(path),
+  }));
+  return createWindow();
+}).catch((error) => {
   console.error('[main] startup failed', error);
   dialog.showErrorBox('图号规划器无法启动', error instanceof Error ? error.message : '本机数据库启动失败');
   app.quit();

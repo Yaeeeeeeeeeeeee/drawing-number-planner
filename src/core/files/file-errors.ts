@@ -6,7 +6,11 @@ export type FileErrorCode =
   | 'SCAN_IN_PROGRESS'
   | 'SCAN_FAILED'
   | 'INVALID_CLEANUP_IDS'
-  | 'PDF_CLEANUP_NOT_ALLOWED';
+  | 'PDF_CLEANUP_NOT_ALLOWED'
+  | 'INVALID_PDF_FILE_ID'
+  | 'PDF_FILE_NOT_FOUND'
+  | 'PDF_FILE_MISSING'
+  | 'PDF_FILE_UNAVAILABLE';
 
 export class FileError extends Error {
   constructor(public readonly code: FileErrorCode, message: string, options?: ErrorOptions) {
