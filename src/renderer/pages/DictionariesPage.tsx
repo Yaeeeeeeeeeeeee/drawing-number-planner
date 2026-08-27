@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import type { DictionaryItemView, PlannerApi } from '../data/client';
 import { DataTable } from '../components/DataTable';
@@ -21,23 +21,37 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
   const [projectCode, setProjectCode] = useState(''); const [projectName, setProjectName] = useState('');
   const [layerCode, setLayerCode] = useState(''); const [layerName, setLayerName] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<DictionaryItemView | null>(null); const [editingName, setEditingName] = useState('');
+  const requestGeneration = useRef(0);
 
   const load = async () => {
-    setError('');
+    const generation = ++requestGeneration.current;
+    setItems([]); setProjects([]); setLayers([]); setSelectedMainId(null); setEditing(null); setError(''); setLoading(true);
     try {
       if (type === 'main_category') {
         const [mainCategories, projectItems, layerCounts] = await Promise.all([
           api.listDictionaries('main_category', true), api.listDictionaries('project_item', true), api.listDictionaries('layer_count', true),
         ]);
+        if (generation !== requestGeneration.current) return;
         setItems(mainCategories); setProjects(projectItems); setLayers(layerCounts);
-        setSelectedMainId((current) => mainCategories.some((item) => item.id === current) ? current : null);
         return;
       }
-      setItems(await api.listDictionaries(type, true)); setProjects([]); setLayers([]); setSelectedMainId(null);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : '字典加载失败'); }
+      const rootItems = await api.listDictionaries(type, true);
+      if (generation !== requestGeneration.current) return;
+      setItems(rootItems);
+    } catch (reason) {
+      if (generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : '字典加载失败');
+    } finally { if (generation === requestGeneration.current) setLoading(false); }
   };
   useEffect(() => { void load(); }, [type]);
+
+  const selectType = (next: RootDictionaryType) => {
+    if (next === type) return;
+    ++requestGeneration.current;
+    setItems([]); setProjects([]); setLayers([]); setSelectedMainId(null); setEditing(null); setError(''); setLoading(true);
+    setType(next);
+  };
 
   const selectedMain = useMemo(() => items.find((item) => item.id === selectedMainId) ?? null, [items, selectedMainId]);
   const selectedProjects = useMemo(() => projects.filter((item) => item.parentId === selectedMainId), [projects, selectedMainId]);
@@ -86,5 +100,5 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
     <section className="dictionary-detail"><h2>项目明细{selectedMain ? ` · ${selectedMain.name}` : ''}</h2>{selectedMain ? <><p>项目明细按所选主类别归属；停用类别仍可查阅历史项目，但不能新增。</p><form className="inline-form" onSubmit={createProject}><label><span>项目明细编码</span><input aria-label="项目明细编码" value={projectCode} onChange={(event) => setProjectCode(event.target.value)} disabled={selectedMain.status !== 'active'} required /></label><label><span>项目明细名称</span><input aria-label="项目明细名称" value={projectName} onChange={(event) => setProjectName(event.target.value)} disabled={selectedMain.status !== 'active'} required /></label><button className="primary-button" type="submit" disabled={selectedMain.status !== 'active'}>新增项目明细</button></form>{selectedProjects.length === 0 ? <p className="muted-text">该主类别暂无项目明细。</p> : dictionaryTable(selectedProjects)}</> : <p className="muted-text">请在左侧主类别中选择一项，查看并维护对应项目明细。</p>}</section>
     <section className="dictionary-auxiliary"><h2>层数</h2><p>层数为主类别业务区的辅助字典，不隶属于任何主类别。</p><form className="inline-form" onSubmit={createLayer}><label><span>层数编码</span><input aria-label="层数编码" value={layerCode} onChange={(event) => setLayerCode(event.target.value)} required /></label><label><span>层数名称</span><input aria-label="层数名称" value={layerName} onChange={(event) => setLayerName(event.target.value)} required /></label><button className="primary-button" type="submit">新增层数</button></form>{layers.length === 0 ? <p className="muted-text">暂未维护层数。</p> : dictionaryTable(layers)}</section>
   </div>;
-  return <section className="page-surface page-enter"><header className="page-header"><div><p className="eyebrow">CODE DICTIONARIES</p><h1>编码字典</h1><p>只增加必要编码；已使用项目通过停用保留历史语义。</p></div></header><div className="segmented-tabs" role="tablist">{rootTypes.map(([value, label]) => <button role="tab" aria-selected={type === value} onClick={() => setType(value)} key={value}>{label}</button>)}</div>{type === 'main_category' ? mainCategoryView : <><form className="inline-form" onSubmit={createRoot}><label><span>编码</span><input value={code} onChange={(event) => setCode(event.target.value)} required /></label><label><span>名称</span><input value={name} onChange={(event) => setName(event.target.value)} required /></label><button className="primary-button" type="submit">新增编码</button></form>{items.length === 0 ? <EmptyState title="当前字典暂无数据" description="可在上方录入第一条正式编码。" symbol="＋" /> : dictionaryTable(items)}</>}{error && <p className="error-banner">{error}</p>}{editing && <form className="editor-strip" onSubmit={saveName}><label><span>修改名称</span><input aria-label="修改名称" value={editingName} onChange={(event) => setEditingName(event.target.value)} required /></label><div className="form-actions"><button className="text-button" type="button" onClick={() => setEditing(null)}>取消</button><button className="primary-button" type="submit">保存名称</button></div></form>}</section>;
+  return <section className="page-surface page-enter"><header className="page-header"><div><p className="eyebrow">CODE DICTIONARIES</p><h1>编码字典</h1><p>只增加必要编码；已使用项目通过停用保留历史语义。</p></div></header><div className="segmented-tabs" role="tablist">{rootTypes.map(([value, label]) => <button role="tab" aria-selected={type === value} onClick={() => selectType(value)} key={value}>{label}</button>)}</div>{loading ? <p className="dictionary-loading" role="status">正在加载字典…</p> : type === 'main_category' ? mainCategoryView : <><form className="inline-form" onSubmit={createRoot}><label><span>编码</span><input value={code} onChange={(event) => setCode(event.target.value)} required /></label><label><span>名称</span><input value={name} onChange={(event) => setName(event.target.value)} required /></label><button className="primary-button" type="submit">新增编码</button></form>{items.length === 0 ? <EmptyState title="当前字典暂无数据" description="可在上方录入第一条正式编码。" symbol="＋" /> : dictionaryTable(items)}</>}{error && <p className="error-banner">{error}</p>}{editing && <form className="editor-strip" onSubmit={saveName}><label><span>修改名称</span><input aria-label="修改名称" value={editingName} onChange={(event) => setEditingName(event.target.value)} required /></label><div className="form-actions"><button className="text-button" type="button" onClick={() => setEditing(null)}>取消</button><button className="primary-button" type="submit">保存名称</button></div></form>}</section>;
 }

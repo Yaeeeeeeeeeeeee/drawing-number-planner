@@ -1,7 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DictionariesPage } from '../../src/renderer/pages/DictionariesPage';
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => { resolve = resolvePromise; reject = rejectPromise; });
+  return { promise, resolve, reject };
+}
 
 describe('DictionariesPage', () => {
   const mainCategories = [
@@ -35,6 +42,89 @@ describe('DictionariesPage', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['品牌', '品类尺寸', '外观', '颜色', '主类别']);
     expect(screen.queryByRole('tab', { name: '项目明细' })).toBeNull();
     expect(screen.queryByRole('tab', { name: '层数' })).toBeNull();
+  });
+
+  it('clears prior rows while the current tab is loading and ignores an older successful response', async () => {
+    const initialBrand = deferred<never[]>(); const mainLoad = deferred<typeof mainCategories>();
+    const projectLoad = deferred<typeof projects>(); const layerLoad = deferred<typeof layers>();
+    const api = {
+      listDictionaries: vi.fn((type: string) => {
+        if (type === 'brand') return initialBrand.promise;
+        if (type === 'main_category') return mainLoad.promise;
+        if (type === 'project_item') return projectLoad.promise;
+        return layerLoad.promise;
+      }), createDictionary: vi.fn(), deactivateDictionary: vi.fn(), updateDictionaryName: vi.fn(),
+    };
+    render(<DictionariesPage api={api as never} />);
+    await waitFor(() => expect(api.listDictionaries).toHaveBeenCalledWith('brand', true));
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('正在加载');
+    await act(async () => { mainLoad.resolve(mainCategories); projectLoad.resolve(projects); layerLoad.resolve(layers); });
+    expect(await screen.findByText('印刷件类')).toBeVisible();
+    await act(async () => { initialBrand.resolve([{ id: 3, type: 'brand', code: '02', name: '过期品牌', parentId: null, status: 'active' }] as never[]); });
+    await waitFor(() => expect(screen.queryByText('过期品牌')).toBeNull());
+    expect(screen.getByText('印刷件类')).toBeVisible();
+  });
+
+  it('shows a current loading failure without retaining stale actionable rows', async () => {
+    const mainFailure = deferred<never[]>(); const projectsPending = deferred<never[]>(); const layersPending = deferred<never[]>();
+    const brand = { id: 3, type: 'brand', code: '02', name: 'SAMKYO', parentId: null, status: 'active' as const };
+    const api = {
+      listDictionaries: vi.fn((type: string) => {
+        if (type === 'brand') return Promise.resolve([brand]);
+        if (type === 'main_category') return mainFailure.promise;
+        if (type === 'project_item') return projectsPending.promise;
+        return layersPending.promise;
+      }), createDictionary: vi.fn(), deactivateDictionary: vi.fn(), updateDictionaryName: vi.fn(),
+    };
+    render(<DictionariesPage api={api as never} />);
+    await screen.findByText('SAMKYO');
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    expect(screen.queryByRole('button', { name: '停用 SAMKYO' })).toBeNull();
+    await act(async () => { mainFailure.reject(new Error('主类别加载失败')); });
+    expect(await screen.findByText('主类别加载失败')).toBeVisible();
+    expect(screen.queryByText('SAMKYO')).toBeNull();
+  });
+
+  it('ignores a superseded loading failure after the current category data is ready', async () => {
+    const oldBrandFailure = deferred<never[]>();
+    const api = {
+      listDictionaries: vi.fn((type: string) => {
+        if (type === 'brand') return oldBrandFailure.promise;
+        if (type === 'main_category') return Promise.resolve(mainCategories);
+        if (type === 'project_item') return Promise.resolve(projects);
+        return Promise.resolve(layers);
+      }), createDictionary: vi.fn(), deactivateDictionary: vi.fn(), updateDictionaryName: vi.fn(),
+    };
+    render(<DictionariesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    expect(await screen.findByText('印刷件类')).toBeVisible();
+    await act(async () => { oldBrandFailure.reject(new Error('过期请求失败')); });
+    await waitFor(() => expect(screen.queryByText('过期请求失败')).toBeNull());
+    expect(screen.getByText('印刷件类')).toBeVisible();
+  });
+
+  it('does not retain a selected main category across an incompatible tab transition', async () => {
+    const laterBrand = deferred<never[]>(); let brandCalls = 0;
+    const api = hierarchyApi();
+    api.listDictionaries.mockImplementation((type: string) => {
+      if (type === 'brand') return ++brandCalls === 1 ? Promise.resolve([]) : laterBrand.promise;
+      if (type === 'main_category') return Promise.resolve(mainCategories);
+      if (type === 'project_item') return Promise.resolve(projects);
+      if (type === 'layer_count') return Promise.resolve(layers);
+      return Promise.resolve([]);
+    });
+    render(<DictionariesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    await screen.findByText('印刷件类');
+    fireEvent.click(screen.getByRole('button', { name: '查看 印刷件类 的项目明细' }));
+    expect(screen.getByRole('heading', { name: '项目明细 · 印刷件类' })).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: '品牌' }));
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: '项目明细 · 印刷件类' })).toBeNull());
+    expect(screen.getByText('请在左侧主类别中选择一项，查看并维护对应项目明细。')).toBeVisible();
   });
 
   it('filters project details by selected main category ID', async () => {
@@ -96,6 +186,23 @@ describe('DictionariesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '停用 新 LOGO' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: '停用 新 LOGO' })).toBeNull());
     expect(api.deactivateDictionary).toHaveBeenCalledWith(20);
+  });
+
+  it('renames and deactivates layer counts through the same shared actions', async () => {
+    const api = hierarchyApi();
+    api.updateDictionaryName.mockResolvedValue({ id: 30, type: 'layer_count', code: '3', name: '三层加强', parentId: null, status: 'active' } as never);
+    api.deactivateDictionary.mockResolvedValue({ id: 30, type: 'layer_count', code: '3', name: '三层加强', parentId: null, status: 'inactive' } as never);
+    render(<DictionariesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    await screen.findByText('三层');
+    fireEvent.click(screen.getByRole('button', { name: '修改 三层' }));
+    fireEvent.change(screen.getByLabelText('修改名称'), { target: { value: '三层加强' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存名称' }));
+    expect(await screen.findByText('三层加强')).toBeVisible();
+    expect(api.updateDictionaryName).toHaveBeenCalledWith(30, '三层加强');
+    fireEvent.click(screen.getByRole('button', { name: '停用 三层加强' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: '停用 三层加强' })).toBeNull());
+    expect(api.deactivateDictionary).toHaveBeenCalledWith(30);
   });
 
   it('deactivates a dictionary item through the API', async () => {
