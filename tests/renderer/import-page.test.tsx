@@ -117,4 +117,40 @@ describe('ImportPage', () => {
     expect(screen.getByText('已选择 1 条')).toBeVisible();
     expect(screen.getByRole('button', { name: '确认导入' })).toBeEnabled();
   });
+
+  it('locks every selectable candidate until a batch confirmation settles', async () => {
+    const report = {
+      candidates: [
+        { id: 'brand:F22', type: 'brand', code: '01', name: 'SAMKYO', sourceCell: 'E22:F22' },
+        { id: 'color:C10', type: 'color', code: '03', name: '白色', sourceCell: 'C10:D10' },
+      ],
+      issues: [],
+    };
+    let rejectImport: (reason?: unknown) => void = () => undefined;
+    const api = {
+      auditWorkbook: vi.fn().mockResolvedValue({ auditId: 'audit-1', report }),
+      confirmImport: vi.fn().mockImplementation(() => new Promise((_, reject) => { rejectImport = reject; })),
+    };
+    render(<ImportPage api={api as never} />);
+
+    const file = new File(['xlsx'], '图号规划.xlsx');
+    fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
+    expect(await screen.findByText('可导入 2 条')).toBeVisible();
+    fireEvent.click(screen.getByLabelText('选择 SAMKYO'));
+    fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
+
+    expect(screen.getByLabelText('选择 SAMKYO')).toBeDisabled();
+    expect(screen.getByLabelText('选择 白色')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '全选可导入项' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '取消全选' })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('选择 白色'));
+    expect(screen.getByText('已选择 1 条')).toBeVisible();
+
+    rejectImport(new Error('导入被拒绝'));
+    expect(await screen.findByText('导入被拒绝')).toBeVisible();
+    expect(screen.getByText('已选择 1 条')).toBeVisible();
+    expect(screen.getByLabelText('选择 SAMKYO')).toBeChecked();
+    expect(screen.getByLabelText('选择 白色')).toBeEnabled();
+  });
 });
