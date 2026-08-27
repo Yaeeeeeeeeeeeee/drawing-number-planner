@@ -114,7 +114,10 @@ describe('BomPage', () => {
     render(<BomPage api={api as never} />); await selectGrayBom();
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
+    fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: '10' } });
+    expect(screen.getByLabelText('第 1 行图号')).toHaveValue('10');
     fireEvent.click(screen.getByLabelText('第 1 行引用白色图号'));
+    expect(screen.getByLabelText('第 1 行图号')).toHaveValue('');
     await waitFor(() => expect(api.listBomCandidates).toHaveBeenLastCalledWith({
       productId: 1, bomColorId: 5, projectItemId: 7, usesWhiteMaterial: true,
     }));
