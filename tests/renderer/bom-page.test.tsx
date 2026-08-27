@@ -41,12 +41,20 @@ async function selectGrayBom(expectEmpty = true) {
 }
 
 describe('BomPage', () => {
+  it('does not allow an empty BOM draft to be saved', async () => {
+    const api = apiFixture(); render(<BomPage api={api as never} />); await selectGrayBom();
+
+    expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeDisabled();
+    expect(api.saveBomVersion).not.toHaveBeenCalled();
+  });
+
   it('creates a gray BOM row by explicitly selecting a shared white drawing', async () => {
     const api = apiFixture(); render(<BomPage api={api as never} />); await selectGrayBom();
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
     fireEvent.click(screen.getByLabelText('第 1 行引用白色图号'));
-    expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401001/ })).toBeVisible();
+    expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401001.*已占号.*白色/ })).toBeVisible();
+    expect(screen.getByText('可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会列出。')).toBeVisible();
     fireEvent.change(screen.getByLabelText('第 1 行图号'), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
@@ -59,7 +67,7 @@ describe('BomPage', () => {
     expect(screen.getByText('当前 BOM')).toBeVisible();
   });
 
-  it('loads an existing immutable version and saves removal against its exact id', async () => {
+  it('keeps an existing BOM from being saved empty after its last item is removed', async () => {
     const api = apiFixture();
     const current = (await api.saveBomVersion())!.version;
     api.getCurrentBom.mockResolvedValue(current);
@@ -70,18 +78,60 @@ describe('BomPage', () => {
       previousDrawingId: 10, previousFullCode: candidate.fullCode, drawingId: null, fullCode: null }] });
     render(<BomPage api={api as never} />); await selectGrayBom(false);
     expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401001/ })).toBeVisible();
+    const savesBeforeRemoval = api.saveBomVersion.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '删除 BOM 项目 1' }));
-    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
-
-    await waitFor(() => expect(api.saveBomVersion).toHaveBeenLastCalledWith({
-      productId: 1, colorId: 5, expectedCurrentVersionId: 20, items: [],
-    }));
-    expect(await screen.findByText(`LOGO：移除 ${candidate.fullCode}`)).toBeVisible();
+    expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeDisabled();
+    expect(api.saveBomVersion).toHaveBeenCalledTimes(savesBeforeRemoval);
     expect(screen.getByText('最近变更')).toBeVisible();
     expect(screen.queryByText(/版本 1/)).not.toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: '查看变更' })[0]);
-    expect(await screen.findByText(/使用明细/)).toBeVisible();
+    expect(await screen.findByRole('region', { name: 'BOM 历史明细' })).toBeVisible();
     expect(screen.getByText(candidate.fullCode)).toBeVisible();
+  });
+
+  it('explains when no formal planned drawing matches and keeps historical/file states outside candidate eligibility', async () => {
+    const api = apiFixture(); api.listBomCandidates.mockResolvedValue([]);
+    render(<BomPage api={api as never} />); await selectGrayBom();
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+    fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
+
+    expect(await screen.findByText('没有符合当前产品、项目和颜色规则的正式规划图号。历史已用图号不会自动进入候选；源文件或转曲后文件是否存在不影响候选资格。')).toBeVisible();
+  });
+
+  it('keeps the white-reference switch disabled for a white BOM and explains why', async () => {
+    const api = apiFixture(); render(<BomPage api={api as never} />);
+    fireEvent.change(await screen.findByLabelText('BOM 产品型号'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('BOM 颜色'), { target: { value: '4' } });
+    await screen.findByText('尚未建立 BOM');
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+
+    expect(screen.getByLabelText('第 1 行引用白色图号')).toBeDisabled();
+    expect(screen.getByText('当前 BOM 已是白色，无需引用白色图号')).toBeVisible();
+  });
+
+  it('reloads candidates with white material selected', async () => {
+    const api = apiFixture();
+    render(<BomPage api={api as never} />); await selectGrayBom();
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+    fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
+    fireEvent.click(screen.getByLabelText('第 1 行引用白色图号'));
+    await waitFor(() => expect(api.listBomCandidates).toHaveBeenLastCalledWith({
+      productId: 1, bomColorId: 5, projectItemId: 7, usesWhiteMaterial: true,
+    }));
+  });
+
+  it('visibly preserves item notes in the current BOM and history detail', async () => {
+    const api = apiFixture(); const saved = (await api.saveBomVersion())!.version;
+    const notedItem = { ...saved.items[0], notes: '贴纸位置以最新图纸为准' };
+    const notedVersion = { ...saved, items: [notedItem] };
+    api.getCurrentBom.mockResolvedValue(notedVersion);
+    api.listBomVersions.mockResolvedValue([notedVersion]);
+    api.getBomVersion.mockResolvedValue(notedVersion);
+    render(<BomPage api={api as never} />); await selectGrayBom(false);
+    expect(await screen.findByDisplayValue('贴纸位置以最新图纸为准')).toBeVisible();
+    fireEvent.click(screen.getAllByRole('button', { name: '查看变更' })[0]);
+    expect(await screen.findByRole('region', { name: 'BOM 历史明细' })).toBeVisible();
+    expect(screen.getByText('贴纸位置以最新图纸为准')).toBeVisible();
   });
 
   it('loads all eligible candidates for an existing row so its drawing can be replaced', async () => {

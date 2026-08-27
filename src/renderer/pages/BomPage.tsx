@@ -6,18 +6,18 @@ import { ApiError } from '../data/client';
 
 interface DraftRow {
   clientId: string; projectItemId: string; drawingId: string; quantity: string; notes: string;
-  usesWhiteMaterial: boolean; candidates: BomCandidateView[];
+  usesWhiteMaterial: boolean; candidates: BomCandidateView[]; candidatesLoaded: boolean;
 }
 
 const blankRow = (id: number): DraftRow => ({ clientId: `bom-row-${id}`, projectItemId: '', drawingId: '',
-  quantity: '1', notes: '', usesWhiteMaterial: false, candidates: [] });
+  quantity: '1', notes: '', usesWhiteMaterial: false, candidates: [], candidatesLoaded: false });
 
 const fromItem = (item: BomItemView, clientId: string): DraftRow => ({
   clientId, projectItemId: String(item.projectItemId), drawingId: String(item.drawingId), quantity: String(item.quantity),
   notes: item.notes ?? '', usesWhiteMaterial: item.usesWhiteMaterial,
   candidates: [{ id: item.drawingId, fullCode: item.fullCode, displayName: item.displayName,
     colorId: item.colorId, colorName: item.colorName, projectItemId: item.projectItemId,
-    projectItemName: item.projectItemName, status: item.status }],
+    projectItemName: item.projectItemName, status: item.status }], candidatesLoaded: true,
 });
 
 const describeDiff = (item: BomDiffView): string => {
@@ -61,7 +61,7 @@ export function BomPage({ api }: { api: PlannerApi }) {
           productId: Number(productId), bomColorId: Number(colorId), projectItemId: item.projectItemId,
           usesWhiteMaterial: item.usesWhiteMaterial,
         })));
-        candidateLists.forEach((items, index) => { draftRows[index].candidates = items; });
+        candidateLists.forEach((items, index) => { draftRows[index].candidates = items; draftRows[index].candidatesLoaded = true; });
       }
       if (request !== loadRequest.current) return;
       setBase(current); setHistory(versions); setRows(draftRows); setLoaded(true);
@@ -76,20 +76,21 @@ export function BomPage({ api }: { api: PlannerApi }) {
     void api.listBomCandidates({ productId: Number(productId), bomColorId: Number(colorId),
       projectItemId: Number(projectItemId), usesWhiteMaterial }).then((items) => {
       if (candidateRequests.current[clientId] !== request) return;
-      setRows((current) => current.map((row) => row.clientId === clientId ? { ...row, candidates: items } : row));
+      setRows((current) => current.map((row) => row.clientId === clientId
+        ? { ...row, candidates: items, candidatesLoaded: true } : row));
     }).catch((reason) => setError(reason instanceof Error ? reason.message : '候选图号加载失败'));
   };
   const changeProject = (row: DraftRow, value: string) => {
     setRows((current) => current.map((item) => item.clientId === row.clientId
-      ? { ...item, projectItemId: value, drawingId: '', candidates: [] } : item));
+      ? { ...item, projectItemId: value, drawingId: '', candidates: [], candidatesLoaded: false } : item));
     invalidateResult(); loadCandidates(row.clientId, value, row.usesWhiteMaterial);
   };
   const changeWhite = (row: DraftRow, value: boolean) => {
     setRows((current) => current.map((item) => item.clientId === row.clientId
-      ? { ...item, usesWhiteMaterial: value, drawingId: '', candidates: [] } : item));
+      ? { ...item, usesWhiteMaterial: value, drawingId: '', candidates: [], candidatesLoaded: false } : item));
     invalidateResult(); loadCandidates(row.clientId, row.projectItemId, value);
   };
-  const complete = useMemo(() => Boolean(productId && colorId && rows.every((row) => row.projectItemId && row.drawingId
+  const complete = useMemo(() => Boolean(productId && colorId && rows.length > 0 && rows.every((row) => row.projectItemId && row.drawingId
     && Number.isInteger(Number(row.quantity)) && Number(row.quantity) > 0)), [productId, colorId, rows]);
 
   const save = async () => {
@@ -106,7 +107,7 @@ export function BomPage({ api }: { api: PlannerApi }) {
         usesWhiteMaterial: item.usesWhiteMaterial,
       })));
       candidateLists.forEach((result, index) => {
-        if (result.status === 'fulfilled') savedRows[index].candidates = result.value;
+        if (result.status === 'fulfilled') { savedRows[index].candidates = result.value; savedRows[index].candidatesLoaded = true; }
       });
       setRows(savedRows);
       setHistory((current) => [saved.version, ...current.filter((item) => item.id !== saved.version.id)]);
@@ -146,10 +147,13 @@ export function BomPage({ api }: { api: PlannerApi }) {
             {projects.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
           <label className="bom-white-toggle"><span>颜色共用</span><span><input type="checkbox" aria-label={`第 ${index + 1} 行引用白色图号`}
             disabled={busy || colors.find((item) => item.id === Number(colorId))?.code === '0'} checked={row.usesWhiteMaterial}
-            onChange={(event) => changeWhite(row, event.target.checked)} /> 引用白色图号</span></label>
+            onChange={(event) => changeWhite(row, event.target.checked)} /> 引用白色图号</span>
+            {colors.find((item) => item.id === Number(colorId))?.code === '0' && <small>当前 BOM 已是白色，无需引用白色图号</small>}</label>
           <label className="bom-drawing-field"><span>正式图号</span><select aria-label={`第 ${index + 1} 行图号`} disabled={busy || !row.projectItemId}
             value={row.drawingId} onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, drawingId: event.target.value } : item)); invalidateResult(); }}>
-            <option value="">请选择</option>{row.candidates.map((item) => <option key={item.id} value={item.id}>{item.fullCode} · {item.displayName}</option>)}</select></label>
+            <option value="">请选择</option>{row.candidates.map((item) => <option key={item.id} value={item.id}>{item.fullCode} · {item.displayName} · {item.status === 'reserved' ? '已占号' : '正式使用'} · {item.colorName}</option>)}</select>
+            <small className="bom-candidate-rule">可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会列出。</small>
+            {row.projectItemId && row.candidatesLoaded && row.candidates.length === 0 && <small className="bom-candidate-empty">没有符合当前产品、项目和颜色规则的正式规划图号。历史已用图号不会自动进入候选；源文件或转曲后文件是否存在不影响候选资格。</small>}</label>
           <label><span>数量</span><input aria-label={`第 ${index + 1} 行数量`} type="number" min="1" step="1" disabled={busy}
             value={row.quantity} onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, quantity: event.target.value } : item)); invalidateResult(); }} /></label>
           <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes}
@@ -165,10 +169,10 @@ export function BomPage({ api }: { api: PlannerApi }) {
         {history.length === 0 ? <p className="muted-text">保存后将在这里保留简单的变更记录。</p> : <table><thead><tr><th>变更日期</th><th>型号</th><th>颜色</th><th>查看</th></tr></thead>
           <tbody>{history.map((item) => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td><td>{item.model}</td><td>{item.colorName}</td>
             <td><button className="text-button" type="button" aria-label="查看变更" onClick={() => void viewHistory(item.id)}>查看变更</button></td></tr>)}</tbody></table>}
-        {historyDetail && <div className="bom-history-detail"><div className="batch-toolbar"><h3>{new Date(historyDetail.createdAt).toLocaleString('zh-CN')} 使用明细</h3><span>{historyDetail.items.length} 个项目</span></div>
-          <table><thead><tr><th>项目</th><th>图号</th><th>颜色</th><th>数量</th><th>共用</th></tr></thead><tbody>
-            {historyDetail.items.map((item) => <tr key={item.bomItemId}><td>{item.projectItemName}</td><td className="code-cell">{item.fullCode}</td><td>{item.colorName}</td><td>{item.quantity}</td><td>{item.usesWhiteMaterial ? '引用白色' : '本色'}</td></tr>)}
-          </tbody></table></div>}
+        {historyDetail && <section className="bom-history-detail" aria-label="BOM 历史明细"><div className="batch-toolbar"><div><p className="eyebrow">HISTORY DETAIL</p><h3>历史 BOM 明细 · {new Date(historyDetail.createdAt).toLocaleString('zh-CN')}</h3></div><span>{historyDetail.items.length} 个项目</span></div>
+          <table><thead><tr><th>项目</th><th>图号</th><th>颜色</th><th>数量</th><th>共用</th><th>备注</th></tr></thead><tbody>
+            {historyDetail.items.map((item) => <tr key={item.bomItemId}><td>{item.projectItemName}</td><td className="code-cell">{item.fullCode}</td><td>{item.colorName}</td><td>{item.quantity}</td><td>{item.usesWhiteMaterial ? '引用白色' : '本色'}</td><td>{item.notes || '—'}</td></tr>)}
+          </tbody></table></section>}
       </section>
     </>}
   </section>;

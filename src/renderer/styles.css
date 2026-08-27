@@ -105,6 +105,8 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .bom-row-fields { grid-template-columns: 1fr .8fr minmax(280px, 2fr) .55fr 1fr; }
 .bom-white-toggle > span:last-child { display: flex; min-height: 40px; align-items: center; gap: 8px; }
 .bom-white-toggle input { width: 16px; height: 16px; }
+.bom-white-toggle small, .bom-candidate-rule, .bom-candidate-empty { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.bom-candidate-empty { color: #8a5b14; }
 .bom-actions { display: flex; gap: 10px; margin: 18px 0; }
 .bom-diff, .bom-history { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
 .bom-diff-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -112,8 +114,9 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .bom-diff-list .bom-diff-added { background: #e8f6ef; color: #16714a; }
 .bom-diff-list .bom-diff-removed { background: #fff0ed; color: #a43c2a; }
 .bom-diff-list .bom-diff-replaced { background: #fff7df; color: #805b08; }
-.bom-history-detail { margin-top: 16px; padding: 12px 14px 14px; border-left: 3px solid #3978c8; background: #f7faff; }
-.bom-history-detail h3 { margin: 0; font-size: 14px; }
+.bom-history-detail { margin-top: 16px; padding: 16px; border: 1px solid #b8cde7; border-left: 4px solid #3978c8; border-radius: 8px; background: #f7faff; box-shadow: 0 6px 18px rgb(42 81 123 / 8%); }
+.bom-history-detail h3 { margin: 0; font-size: 15px; }
+.bom-history-detail .eyebrow { margin-bottom: 4px; }
 .muted-text { color: var(--muted); }
 .secondary-button { min-height: 40px; padding: 0 17px; color: #244566; border: 1px solid #bfccdc; border-radius: 5px; background: #fff; font-weight: 600; }
 .secondary-button:hover:not(:disabled) { border-color: #8eacd0; background: #f7faff; } .secondary-button:disabled { opacity: .55; }
