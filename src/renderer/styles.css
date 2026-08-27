@@ -79,6 +79,14 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .segmented-tabs button { min-height: 38px; padding: 0 16px; color: #667085; border: 0; border-bottom: 2px solid transparent; background: transparent; }
 .segmented-tabs button[aria-selected="true"] { color: var(--blue); border-color: var(--blue); font-weight: 600; }
 .editor-strip { margin: 18px 0; padding: 18px; border-top: 1px solid #cfd9e7; border-bottom: 1px solid #cfd9e7; background: #eef3f8; }
+.dictionary-hierarchy { display: grid; grid-template-columns: minmax(340px, .9fr) minmax(460px, 1.25fr); gap: 18px; padding-top: 20px; }
+.dictionary-hierarchy > section { padding: 18px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+.dictionary-hierarchy > .dictionary-auxiliary { grid-column: 1 / -1; }
+.dictionary-hierarchy h2 { margin: 0 0 6px; font-size: 16px; }
+.dictionary-hierarchy p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.dictionary-hierarchy .inline-form { padding: 16px 0; }
+.dictionary-hierarchy .inline-form label { min-width: 0; flex: 1; }
+.dictionary-hierarchy .inline-form .primary-button { margin-left: 0; }
 .form-grid { display: grid; grid-template-columns: repeat(5, minmax(140px, 1fr)); gap: 12px; } .form-actions { display: flex; justify-content: flex-end; gap: 16px; margin-top: 16px; }
 .file-picker span { display: inline-flex; height: 40px; align-items: center; padding: 0 16px; color: var(--blue); border: 1px solid #b7cbea; border-radius: 5px; background: #f6faff; }
 .file-picker input { position: absolute; width: 1px; height: 1px; opacity: 0; } .file-name { min-width: 280px; color: #626e80; font-size: 12px; }
@@ -146,6 +154,7 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 16px 0; color: #5e6b7d; font-size: 12px; }
 .table-pagination .secondary-button { min-width: 82px; }
 @media (max-width: 1180px) { .app-shell { grid-template-columns: 218px minmax(0, 1fr); } .workspace { padding-inline: 26px; } .form-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
+@media (max-width: 1280px) { .dictionary-hierarchy { grid-template-columns: 1fr; } .dictionary-hierarchy > .dictionary-auxiliary { grid-column: auto; } }
 @media (max-width: 1180px) { .bom-row-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bom-drawing-field { grid-column: 1 / -1; } }
 @media (max-width: 1280px) { .workspace-strip { grid-template-columns: minmax(280px, 1fr) auto auto; } .workspace-state { grid-column: 1 / -1; min-height: 48px; } .files-filter { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
