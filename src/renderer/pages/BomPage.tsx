@@ -167,7 +167,7 @@ export function BomPage({ api }: { api: PlannerApi }) {
           <label className="bom-drawing-field"><span>正式图号</span><select aria-label={`第 ${index + 1} 行图号`} disabled={busy || !row.projectItemId}
             value={row.drawingId} onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, drawingId: event.target.value } : item)); invalidateResult(); }}>
             <option value="">请选择</option>{row.candidates.map((item) => <option disabled={item.status === 'voided'} key={item.id} value={item.id}>{item.fullCode} · {item.displayName} · {item.status === 'reserved' ? '已占号' : item.status === 'active' ? '正式使用' : '作废，需替换'} · {item.colorName}</option>)}</select>
-            <small className="bom-candidate-rule">可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会列出。</small>
+            <small className="bom-candidate-rule">可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会作为新候选。</small>
             {row.candidates.some((item) => item.id === Number(row.drawingId) && item.status === 'voided') && <small className="bom-candidate-empty">当前引用图号已作废，请选择可用图号替换后再保存。</small>}
             {row.projectItemId && row.candidatesLoaded && row.candidates.length === 0 && <small className="bom-candidate-empty">没有符合当前产品、项目和颜色规则的正式规划图号。历史已用图号不会自动进入候选；源文件或转曲后文件是否存在不影响候选资格。</small>}</label>
           <label><span>数量</span><input aria-label={`第 ${index + 1} 行数量`} type="number" min="1" step="1" disabled={busy}

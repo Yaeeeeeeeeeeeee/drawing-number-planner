@@ -63,7 +63,7 @@ describe('BomPage', () => {
     fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
     fireEvent.click(screen.getByLabelText('第 1 行引用白色图号'));
     expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401001.*已占号.*白色/ })).toBeVisible();
-    expect(screen.getByText('可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会列出。')).toBeVisible();
+    expect(screen.getByText('可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会作为新候选。')).toBeVisible();
     fireEvent.change(screen.getByLabelText('第 1 行图号'), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
 
