@@ -41,6 +41,15 @@ async function selectGrayBom(expectEmpty = true) {
 }
 
 describe('BomPage', () => {
+  it('shows a current BOM load failure before any BOM content has loaded', async () => {
+    const api = apiFixture();
+    api.getCurrentBom.mockRejectedValue(new Error('当前 BOM 读取失败'));
+    render(<BomPage api={api as never} />); await selectGrayBom(false);
+
+    expect(await screen.findByText('当前 BOM 读取失败')).toBeVisible();
+    expect(screen.queryByText('当前 BOM')).not.toBeInTheDocument();
+  });
+
   it('does not allow an empty BOM draft to be saved', async () => {
     const api = apiFixture(); render(<BomPage api={api as never} />); await selectGrayBom();
 
@@ -137,6 +146,16 @@ describe('BomPage', () => {
     expect(screen.getByText('贴纸位置以最新图纸为准')).toBeVisible();
   });
 
+  it('labels createdAt as system save time rather than a business change date', async () => {
+    const api = apiFixture(); const current = (await api.saveBomVersion())!.version;
+    api.getCurrentBom.mockResolvedValue(current); api.listBomVersions.mockResolvedValue([current]);
+    render(<BomPage api={api as never} />); await selectGrayBom(false);
+
+    expect(await screen.findByRole('columnheader', { name: '保存时间' })).toBeVisible();
+    expect(screen.queryByText('变更日期')).not.toBeInTheDocument();
+    expect(screen.getByText(/当前 BOM · 保存于/)).toBeVisible();
+  });
+
   it('loads all eligible candidates for an existing row so its drawing can be replaced', async () => {
     const api = apiFixture(); const current = (await api.saveBomVersion())!.version;
     const replacement = { ...candidate, id: 11, fullCode: '02.0404.010.0401002', status: 'active' as const };
@@ -158,6 +177,25 @@ describe('BomPage', () => {
       items: [expect.objectContaining({ drawingId: 11 })],
     })));
     expect(screen.getByText(`LOGO：${candidate.fullCode} → ${replacement.fullCode}`)).toBeVisible();
+  });
+
+  it('keeps an existing voided drawing visible but requires replacement before saving', async () => {
+    const api = apiFixture(); const current = (await api.saveBomVersion())!.version;
+    const voidedCurrent = { ...current, items: [{ ...current.items[0], status: 'voided' as const }] };
+    const replacement = { ...candidate, id: 11, fullCode: '02.0404.010.0401002', status: 'active' as const };
+    api.getCurrentBom.mockResolvedValue(voidedCurrent); api.listBomVersions.mockResolvedValue([voidedCurrent]);
+    api.listBomCandidates.mockResolvedValue([replacement]);
+    render(<BomPage api={api as never} />); await selectGrayBom(false);
+
+    const drawingSelect = await screen.findByLabelText('第 1 行图号');
+    expect(drawingSelect).toHaveValue('10');
+    expect(screen.getByRole('option', { name: /02\.0404\.010\.0401001.*作废，需替换/ })).toBeDisabled();
+    expect(screen.getByText('当前引用图号已作废，请选择可用图号替换后再保存。')).toBeVisible();
+    expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeDisabled();
+
+    fireEvent.change(drawingSelect, { target: { value: '11' } });
+    expect(drawingSelect).toHaveValue('11');
+    expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeEnabled();
   });
 
   it('reloads eligible candidates after saving so the new version can be replaced immediately', async () => {

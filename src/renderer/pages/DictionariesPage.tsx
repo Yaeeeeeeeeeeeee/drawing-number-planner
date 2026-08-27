@@ -62,29 +62,54 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
     else setItems(replace);
   };
   const createRoot = async (event: FormEvent) => {
-    event.preventDefault(); setError('');
-    try { const item = await api.createDictionary(type, { code, name }); setItems((current) => [...current, item]); setCode(''); setName(''); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '保存失败'); }
+    event.preventDefault(); setError(''); const generation = requestGeneration.current;
+    try {
+      const item = await api.createDictionary(type, { code, name });
+      if (generation !== requestGeneration.current) return;
+      setItems((current) => [...current, item]); setCode(''); setName('');
+    } catch (reason) {
+      if (generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : '保存失败');
+    }
   };
   const createProject = async (event: FormEvent) => {
-    event.preventDefault(); setError('');
+    event.preventDefault(); setError(''); const generation = requestGeneration.current;
     if (!selectedMain || selectedMain.status !== 'active') { setError('请选择启用中的主类别后再新增项目明细'); return; }
-    try { const item = await api.createDictionary('project_item', { code: projectCode, name: projectName, parentId: selectedMain.id }); setProjects((current) => [...current, item]); setProjectCode(''); setProjectName(''); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '保存失败'); }
+    try {
+      const item = await api.createDictionary('project_item', { code: projectCode, name: projectName, parentId: selectedMain.id });
+      if (generation !== requestGeneration.current) return;
+      setProjects((current) => [...current, item]); setProjectCode(''); setProjectName('');
+    } catch (reason) {
+      if (generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : '保存失败');
+    }
   };
   const createLayer = async (event: FormEvent) => {
-    event.preventDefault(); setError('');
-    try { const item = await api.createDictionary('layer_count', { code: layerCode, name: layerName }); setLayers((current) => [...current, item]); setLayerCode(''); setLayerName(''); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '保存失败'); }
+    event.preventDefault(); setError(''); const generation = requestGeneration.current;
+    try {
+      const item = await api.createDictionary('layer_count', { code: layerCode, name: layerName });
+      if (generation !== requestGeneration.current) return;
+      setLayers((current) => [...current, item]); setLayerCode(''); setLayerName('');
+    } catch (reason) {
+      if (generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : '保存失败');
+    }
   };
   const deactivate = async (id: number) => {
-    try { updateStoredItem(await api.deactivateDictionary(id)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '停用失败'); }
+    const generation = requestGeneration.current;
+    try {
+      const updated = await api.deactivateDictionary(id);
+      if (generation === requestGeneration.current) updateStoredItem(updated);
+    } catch (reason) {
+      if (generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : '停用失败');
+    }
   };
   const saveName = async (event: FormEvent) => {
-    event.preventDefault(); if (!editing) return;
-    try { updateStoredItem(await api.updateDictionaryName(editing.id, editingName)); setEditing(null); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '名称保存失败'); }
+    event.preventDefault(); if (!editing) return; const generation = requestGeneration.current;
+    try {
+      const updated = await api.updateDictionaryName(editing.id, editingName);
+      if (generation !== requestGeneration.current) return;
+      updateStoredItem(updated); setEditing(null);
+    } catch (reason) {
+      if (generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : '名称保存失败');
+    }
   };
   const itemActions = (item: DictionaryItemView) => item.status === 'active'
     ? <div className="row-actions"><button className="text-button" aria-label={`修改 ${item.name}`} onClick={() => { setEditing(item); setEditingName(item.name); }} type="button">修改</button><button className="text-button danger" aria-label={`停用 ${item.name}`} onClick={() => void deactivate(item.id)} type="button">停用</button></div>

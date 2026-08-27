@@ -32,7 +32,7 @@ interface VersionRow {
 
 interface ItemRow {
   bom_item_id: number; id: number; full_code: string; display_name: string; color_id: number; color_name: string;
-  project_item_id: number; project_item_name: string; status: 'reserved' | 'active'; quantity: number;
+  project_item_id: number; project_item_name: string; status: 'reserved' | 'active' | 'voided'; quantity: number;
   notes: string | null; uses_white_material: 0 | 1;
 }
 

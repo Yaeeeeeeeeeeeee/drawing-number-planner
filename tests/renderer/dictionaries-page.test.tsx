@@ -105,6 +105,24 @@ describe('DictionariesPage', () => {
     expect(screen.getByText('印刷件类')).toBeVisible();
   });
 
+  it('does not append a completed create mutation into a different dictionary tab', async () => {
+    const createdBrand = deferred<{ id: number; type: string; code: string; name: string; parentId: null; status: 'active' }>();
+    const api = hierarchyApi();
+    api.createDictionary.mockReturnValue(createdBrand.promise as never);
+    render(<DictionariesPage api={api as never} />);
+    await waitFor(() => expect(api.listDictionaries).toHaveBeenCalledWith('brand', true));
+
+    fireEvent.change(screen.getByLabelText('编码'), { target: { value: '02' } });
+    fireEvent.change(screen.getByLabelText('名称'), { target: { value: '延迟品牌' } });
+    fireEvent.click(screen.getByRole('button', { name: '新增编码' }));
+    fireEvent.click(screen.getByRole('tab', { name: '颜色' }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: '颜色' })).toHaveAttribute('aria-selected', 'true'));
+
+    await act(async () => createdBrand.resolve({ id: 88, type: 'brand', code: '02', name: '延迟品牌', parentId: null, status: 'active' }));
+    await waitFor(() => expect(screen.queryByText('延迟品牌')).toBeNull());
+    expect(screen.getByText('当前字典暂无数据')).toBeVisible();
+  });
+
   it('does not retain a selected main category across an incompatible tab transition', async () => {
     const laterBrand = deferred<never[]>(); let brandCalls = 0;
     const api = hierarchyApi();

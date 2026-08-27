@@ -60,7 +60,7 @@ export interface BomCandidateView {
 }
 export interface BomItemView {
   bomItemId: number; drawingId: number; fullCode: string; displayName: string; colorId: number; colorName: string;
-  projectItemId: number; projectItemName: string; status: 'reserved' | 'active'; quantity: number;
+  projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'voided'; quantity: number;
   notes: string | null; usesWhiteMaterial: boolean;
 }
 export interface BomVersionSummaryView {
@@ -169,13 +169,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 let currentSessionToken: Promise<string> | undefined;
 function sessionToken(): Promise<string> {
-  currentSessionToken ??= fetch('/api/session', { method: 'POST' })
+  if (currentSessionToken) return currentSessionToken;
+  const pending = fetch('/api/session', { method: 'POST' })
     .then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new ApiError(body.error?.code ?? 'SESSION_FAILED', body.error?.message ?? '无法建立本机安全会话');
       return String(body.token);
     });
-  return currentSessionToken;
+  currentSessionToken = pending;
+  void pending.catch(() => {
+    if (currentSessionToken === pending) currentSessionToken = undefined;
+  });
+  return pending;
 }
 
 const json = (method: string, body?: unknown): RequestInit => ({

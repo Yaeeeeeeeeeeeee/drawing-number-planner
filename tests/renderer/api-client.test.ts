@@ -115,6 +115,30 @@ describe('renderer API client', () => {
     }));
   });
 
+  it('retries session bootstrap on a later write after the previous bootstrap failed', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'SESSION_FAILED', message: '会话启动失败' } }), {
+        status: 503, headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'recovered-token' }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 1, code: '02', name: 'SAMKYO', status: 'active' }), {
+        status: 201, headers: { 'content-type': 'application/json' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.createDictionary('brand', { code: '01', name: '首次失败' }))
+      .rejects.toMatchObject({ code: 'SESSION_FAILED' } satisfies Partial<InstanceType<typeof ApiError>>);
+    await expect(apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' }))
+      .resolves.toMatchObject({ id: 1, code: '02' });
+
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/session')).toHaveLength(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/dictionaries/brand', expect.objectContaining({
+      headers: expect.objectContaining({ 'x-planner-token': 'recovered-token' }),
+    }));
+  });
+
   it('surfaces INVALID_TOKEN returned by the single replay without another refresh', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'stale-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))

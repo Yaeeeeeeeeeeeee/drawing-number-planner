@@ -4,9 +4,11 @@ import type { BomCandidateView, BomDiffView, BomItemView, BomVersionSummaryView,
   DictionaryItemView, PlannerApi, ProductView } from '../data/client';
 import { ApiError } from '../data/client';
 
+type DraftCandidate = Omit<BomCandidateView, 'status'> & { status: BomItemView['status'] };
+
 interface DraftRow {
   clientId: string; projectItemId: string; drawingId: string; quantity: string; notes: string;
-  usesWhiteMaterial: boolean; candidates: BomCandidateView[]; candidatesLoaded: boolean;
+  usesWhiteMaterial: boolean; candidates: DraftCandidate[]; candidatesLoaded: boolean;
 }
 
 const blankRow = (id: number): DraftRow => ({ clientId: `bom-row-${id}`, projectItemId: '', drawingId: '',
@@ -19,6 +21,12 @@ const fromItem = (item: BomItemView, clientId: string): DraftRow => ({
     colorId: item.colorId, colorName: item.colorName, projectItemId: item.projectItemId,
     projectItemName: item.projectItemName, status: item.status }], candidatesLoaded: true,
 });
+
+const withCurrentVoidedReference = (row: DraftRow, eligible: BomCandidateView[]): DraftCandidate[] => {
+  const current = row.candidates.find((item) => item.id === Number(row.drawingId));
+  return current?.status === 'voided' && !eligible.some((item) => item.id === current.id)
+    ? [current, ...eligible] : eligible;
+};
 
 const describeDiff = (item: BomDiffView): string => {
   if (item.type === 'added') return `${item.projectItemName}：新增 ${item.fullCode}`;
@@ -61,7 +69,10 @@ export function BomPage({ api }: { api: PlannerApi }) {
           productId: Number(productId), bomColorId: Number(colorId), projectItemId: item.projectItemId,
           usesWhiteMaterial: item.usesWhiteMaterial,
         })));
-        candidateLists.forEach((items, index) => { draftRows[index].candidates = items; draftRows[index].candidatesLoaded = true; });
+        candidateLists.forEach((items, index) => {
+          draftRows[index].candidates = withCurrentVoidedReference(draftRows[index], items);
+          draftRows[index].candidatesLoaded = true;
+        });
       }
       if (request !== loadRequest.current) return;
       setBase(current); setHistory(versions); setRows(draftRows); setLoaded(true);
@@ -90,8 +101,11 @@ export function BomPage({ api }: { api: PlannerApi }) {
       ? { ...item, usesWhiteMaterial: value, drawingId: '', candidates: [], candidatesLoaded: false } : item));
     invalidateResult(); loadCandidates(row.clientId, row.projectItemId, value);
   };
-  const complete = useMemo(() => Boolean(productId && colorId && rows.length > 0 && rows.every((row) => row.projectItemId && row.drawingId
-    && Number.isInteger(Number(row.quantity)) && Number(row.quantity) > 0)), [productId, colorId, rows]);
+  const complete = useMemo(() => Boolean(productId && colorId && rows.length > 0 && rows.every((row) => {
+    const selected = row.candidates.find((item) => item.id === Number(row.drawingId));
+    return row.projectItemId && row.drawingId && selected?.status !== 'voided'
+      && Number.isInteger(Number(row.quantity)) && Number(row.quantity) > 0;
+  })), [productId, colorId, rows]);
 
   const save = async () => {
     if (!complete) return; setBusy(true); setError(''); setNeedsRefresh(false);
@@ -125,7 +139,7 @@ export function BomPage({ api }: { api: PlannerApi }) {
 
   return <section className="page-surface page-enter bom-page">
     <header className="page-header"><div><p className="eyebrow">BILL OF MATERIALS</p><h1>BOM 管理</h1><p>维护某型号和颜色当前实际使用的图号；其他颜色可明确引用同型号白色图号。</p></div>
-      <span className="record-count">{base ? `当前 BOM · ${new Date(base.createdAt).toLocaleDateString('zh-CN')}` : '尚无当前 BOM'}</span></header>
+      <span className="record-count">{base ? `当前 BOM · 保存于 ${new Date(base.createdAt).toLocaleDateString('zh-CN')}` : '尚无当前 BOM'}</span></header>
     <div className="form-grid bom-basics">
       <label><span>产品型号</span><select aria-label="BOM 产品型号" disabled={busy} value={productId}
         onChange={(event) => setProductId(event.target.value)}><option value="">请选择</option>
@@ -134,6 +148,7 @@ export function BomPage({ api }: { api: PlannerApi }) {
         onChange={(event) => setColorId(event.target.value)}><option value="">请选择</option>
         {colors.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
     </div>
+    {error && <p className="error-banner">{error}</p>}
     {loaded && <>
       <div className="batch-toolbar"><div><h2>当前 BOM</h2><small>保存后自动记录本次变更</small></div>
         <button className="secondary-button" type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidateResult(); }}>添加 BOM 项目</button></div>
@@ -151,8 +166,9 @@ export function BomPage({ api }: { api: PlannerApi }) {
             {colors.find((item) => item.id === Number(colorId))?.code === '0' && <small>当前 BOM 已是白色，无需引用白色图号</small>}</label>
           <label className="bom-drawing-field"><span>正式图号</span><select aria-label={`第 ${index + 1} 行图号`} disabled={busy || !row.projectItemId}
             value={row.drawingId} onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, drawingId: event.target.value } : item)); invalidateResult(); }}>
-            <option value="">请选择</option>{row.candidates.map((item) => <option key={item.id} value={item.id}>{item.fullCode} · {item.displayName} · {item.status === 'reserved' ? '已占号' : '正式使用'} · {item.colorName}</option>)}</select>
+            <option value="">请选择</option>{row.candidates.map((item) => <option disabled={item.status === 'voided'} key={item.id} value={item.id}>{item.fullCode} · {item.displayName} · {item.status === 'reserved' ? '已占号' : item.status === 'active' ? '正式使用' : '作废，需替换'} · {item.colorName}</option>)}</select>
             <small className="bom-candidate-rule">可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会列出。</small>
+            {row.candidates.some((item) => item.id === Number(row.drawingId) && item.status === 'voided') && <small className="bom-candidate-empty">当前引用图号已作废，请选择可用图号替换后再保存。</small>}
             {row.projectItemId && row.candidatesLoaded && row.candidates.length === 0 && <small className="bom-candidate-empty">没有符合当前产品、项目和颜色规则的正式规划图号。历史已用图号不会自动进入候选；源文件或转曲后文件是否存在不影响候选资格。</small>}</label>
           <label><span>数量</span><input aria-label={`第 ${index + 1} 行数量`} type="number" min="1" step="1" disabled={busy}
             value={row.quantity} onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, quantity: event.target.value } : item)); invalidateResult(); }} /></label>
@@ -162,14 +178,14 @@ export function BomPage({ api }: { api: PlannerApi }) {
       </article>)}</div>
       <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete} onClick={() => void save()}>{busy ? '保存中…' : '保存当前 BOM'}</button>
         {needsRefresh && <button className="secondary-button" type="button" disabled={busy} onClick={() => setReloadNonce((value) => value + 1)}>刷新当前 BOM</button>}</div>
-      {error && <p className="error-banner">{error}</p>}{savedMessage && <p className="success-banner"><strong>{savedMessage}</strong></p>}
+      {savedMessage && <p className="success-banner"><strong>{savedMessage}</strong></p>}
       {diff.length > 0 && <section className="bom-diff"><p className="eyebrow">LATEST CHANGE</p><h2>本次变更</h2>
         <div className="bom-diff-list">{diff.filter((item) => item.type !== 'unchanged').map((item) => <span className={`bom-diff-${item.type}`} key={item.projectItemId}>{describeDiff(item)}</span>)}</div></section>}
       <section className="bom-history"><div className="batch-toolbar"><div><p className="eyebrow">CHANGE HISTORY</p><h2>最近变更</h2></div><span>{history.length} 条记录</span></div>
-        {history.length === 0 ? <p className="muted-text">保存后将在这里保留简单的变更记录。</p> : <table><thead><tr><th>变更日期</th><th>型号</th><th>颜色</th><th>查看</th></tr></thead>
+        {history.length === 0 ? <p className="muted-text">保存后将在这里保留简单的变更记录。</p> : <table><thead><tr><th>保存时间</th><th>型号</th><th>颜色</th><th>查看</th></tr></thead>
           <tbody>{history.map((item) => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td><td>{item.model}</td><td>{item.colorName}</td>
             <td><button className="text-button" type="button" aria-label="查看变更" onClick={() => void viewHistory(item.id)}>查看变更</button></td></tr>)}</tbody></table>}
-        {historyDetail && <section className="bom-history-detail" aria-label="BOM 历史明细"><div className="batch-toolbar"><div><p className="eyebrow">HISTORY DETAIL</p><h3>历史 BOM 明细 · {new Date(historyDetail.createdAt).toLocaleString('zh-CN')}</h3></div><span>{historyDetail.items.length} 个项目</span></div>
+        {historyDetail && <section className="bom-history-detail" aria-label="BOM 历史明细"><div className="batch-toolbar"><div><p className="eyebrow">HISTORY DETAIL</p><h3>历史 BOM 明细 · 保存于 {new Date(historyDetail.createdAt).toLocaleString('zh-CN')}</h3></div><span>{historyDetail.items.length} 个项目</span></div>
           <table><thead><tr><th>项目</th><th>图号</th><th>颜色</th><th>数量</th><th>共用</th><th>备注</th></tr></thead><tbody>
             {historyDetail.items.map((item) => <tr key={item.bomItemId}><td>{item.projectItemName}</td><td className="code-cell">{item.fullCode}</td><td>{item.colorName}</td><td>{item.quantity}</td><td>{item.usesWhiteMaterial ? '引用白色' : '本色'}</td><td>{item.notes || '—'}</td></tr>)}
           </tbody></table></section>}

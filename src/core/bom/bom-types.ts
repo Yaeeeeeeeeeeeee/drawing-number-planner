@@ -36,7 +36,7 @@ export interface BomItemRecord {
   colorName: string;
   projectItemId: number;
   projectItemName: string;
-  status: 'reserved' | 'active';
+  status: 'reserved' | 'active' | 'voided';
   quantity: number;
   notes: string | null;
   usesWhiteMaterial: boolean;
