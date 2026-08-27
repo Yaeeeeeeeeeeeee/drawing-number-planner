@@ -106,6 +106,7 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .file-picker input { position: absolute; width: 1px; height: 1px; opacity: 0; } .file-name { min-width: 280px; color: #626e80; font-size: 12px; }
 .audit-summary { display: flex; justify-content: space-between; margin: 2px 0 12px; padding: 13px 15px; border-left: 3px solid #1e9d70; background: #eefaf5; font-size: 12px; }
 .audit-summary.warning { border-color: #d18a16; background: #fff8e9; }
+.selection-actions { display: flex; gap: 10px; margin: 0 0 12px; }
 .issue-row { display: grid; grid-template-columns: 150px 120px 1fr; align-items: center; min-height: 46px; padding: 0 14px; border-top: 1px solid #f0dfbd; background: #fffbf2; font-size: 12px; }
 .issue-row span { color: #a15c00; font-family: Consolas, monospace; } .issue-row p { margin: 0; color: #6b7280; }
 .bottom-actions { display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding: 18px 0; color: #667085; font-size: 12px; }
