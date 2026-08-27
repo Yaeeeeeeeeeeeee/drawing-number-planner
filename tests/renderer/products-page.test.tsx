@@ -21,6 +21,7 @@ describe('ProductsPage', () => {
     };
     render(<ProductsPage api={api as never} />);
     await screen.findByText('还没有产品档案');
+    expect(screen.getByText('产品档案是图号、BOM 与 PDF 记录共用的产品身份来源。')).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: '新建产品' }));
     fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 'SKDZC220JP' } });

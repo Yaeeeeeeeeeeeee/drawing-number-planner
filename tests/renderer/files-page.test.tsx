@@ -6,13 +6,13 @@ import { FilesPage } from '../../src/renderer/pages/FilesPage';
 
 const file = { id: 1, relativePath: 'SAMKYO\\冰柜\\ZC100\\02.0404.010.0401001-LOGO.pdf',
   fileName: '02.0404.010.0401001-LOGO.pdf', drawingId: 10, fullCode: '02.0404.010.0401001',
-  displayName: 'SAMKYO-ZC100白色-LOGO', model: 'ZC100', brandName: 'SAMKYO', projectItemName: 'LOGO', colorName: '白色',
+  displayName: 'SAMKYO-ZC100白色-LOGO', productId: 9, sku: 'SKDZC100JP', model: 'ZC100', productCategory: '冰柜', brandName: 'SAMKYO', projectItemName: 'LOGO', colorName: '白色',
   matchStatus: 'matched' as const, detectedCodes: ['02.0404.010.0401001'], conversionType: 'source' as const,
   sizeBytes: 1024, modifiedAt: '2026-08-25T00:00:00Z', scannedAt: '2026-08-25T01:00:00Z', isPresent: true };
 const outlined = { ...file, id: 2, relativePath: 'SAMKYO\\冰柜\\ZC100\\02.0404.010.0401001-LOGO（转曲）.pdf',
   fileName: '02.0404.010.0401001-LOGO（转曲）.pdf', conversionType: 'outlined' as const, sizeBytes: 2048 };
 const unmatched = { ...file, id: 3, relativePath: 'unknown.pdf', fileName: 'unknown.pdf', drawingId: null, fullCode: null,
-  displayName: null, model: null, brandName: null, projectItemName: null, colorName: null, matchStatus: 'unmatched' as const,
+  displayName: null, productId: null, sku: null, model: null, productCategory: null, brandName: null, projectItemName: null, colorName: null, matchStatus: 'unmatched' as const,
   detectedCodes: [], conversionType: 'source' as const };
 const pending = { ...unmatched, id: 4, relativePath: '02.0404.010.0401000-invalid.pdf',
   fileName: '02.0404.010.0401000-invalid.pdf', matchStatus: 'pending' as const,
@@ -30,10 +30,21 @@ function apiFixture(configured = false) {
       unmatched: 1, conflict: 0, source: 3, outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' }),
     cleanupPdfFiles: vi.fn().mockResolvedValue({ cleaned: 1 }),
     searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
+    listProducts: vi.fn().mockResolvedValue([{ id: 9, sku: 'SKDZC100JP', model: 'ZC100', productCategory: '冰柜', status: 'active' }]),
   };
 }
 
 describe('FilesPage', () => {
+  it('shows canonical product identity, uses product IDs to filter, and labels unlinked files', async () => {
+    const api = apiFixture(true);
+    render(<FilesPage api={api as never} />);
+
+    expect((await screen.findAllByText('SKDZC100JP · ZC100')).some((item) => item.tagName === 'STRONG')).toBe(true);
+    expect(screen.getAllByText('待关联').length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('产品档案'), { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9 })));
+  });
   it('opens a present file by PDF index ID and disables missing file locations', async () => {
     const showFileInFolder = vi.fn().mockResolvedValue({ ok: true }); window.plannerDesktop = { showFileInFolder };
     const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [file, missing], total: 2, page: 1, pageSize: 50 });

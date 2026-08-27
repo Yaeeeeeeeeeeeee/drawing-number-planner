@@ -78,7 +78,8 @@ export interface PdfScanSummaryView {
 export interface PdfFileView {
   id: number; relativePath: string; fileName: string; drawingId: number | null; historicalDrawingId: number | null;
   historicalFullCode: string | null; fullCode: string | null;
-  displayName: string | null; model: string | null; brandName: string | null; projectItemName: string | null;
+  displayName: string | null; productId: number | null; sku: string | null; model: string | null;
+  productCategory: string | null; brandName: string | null; projectItemName: string | null;
   colorName: string | null; matchStatus: 'matched' | 'pending' | 'unmatched' | 'conflict'; detectedCodes: string[];
   classificationWarning: string | null;
   conversionType: 'source' | 'outlined'; sizeBytes: number; modifiedAt: string; scannedAt: string; isPresent: boolean;

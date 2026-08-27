@@ -7,7 +7,8 @@ interface FileRow {
   id: number; relative_path: string; file_name: string; drawing_id: number | null; historical_drawing_id: number | null;
   match_status: PdfFileView['matchStatus']; detected_codes_json: string;
   conversion_type: PdfFileView['conversionType']; size_bytes: number; modified_at: string; scanned_at: string;
-  is_present: number; full_code: string | null; display_name: string | null; model: string | null;
+  is_present: number; full_code: string | null; display_name: string | null; product_id: number | null;
+  sku: string | null; model: string | null; product_category: string | null;
   brand_name: string | null; project_item_name: string | null; color_name: string | null;
   historical_full_code: string | null; classification_warning: string | null;
 }
@@ -23,7 +24,8 @@ function toView(row: FileRow): PdfFileView {
     classificationWarning: row.classification_warning,
     sizeBytes: row.size_bytes, modifiedAt: row.modified_at, scannedAt: row.scanned_at,
     isPresent: row.is_present === 1, fullCode: row.full_code, displayName: row.display_name,
-    model: row.model, brandName: row.brand_name, projectItemName: row.project_item_name, colorName: row.color_name };
+    productId: row.product_id, sku: row.sku, model: row.model, productCategory: row.product_category,
+    brandName: row.brand_name, projectItemName: row.project_item_name, colorName: row.color_name };
 }
 
 export class FileRepository {
@@ -128,6 +130,7 @@ export class FileRepository {
         or drawing.full_code like @keyword escape '\\')`);
       parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
     }
+    if (filters.productId != null) { where.push('coalesce(drawing.product_id, historical.product_id) = @productId'); parameters.productId = filters.productId; }
     if (filters.matchStatus) { where.push('file.match_status = @matchStatus'); parameters.matchStatus = filters.matchStatus; }
     if (filters.conversionType) { where.push('file.conversion_type = @conversionType'); parameters.conversionType = filters.conversionType; }
     const presence = filters.presence ?? 'present';
@@ -136,13 +139,14 @@ export class FileRepository {
     const joins = `from pdf_files file
       left join drawing_numbers drawing on drawing.id = file.drawing_id
       left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
-      left join products product on product.id = drawing.product_id
+      left join products product on product.id = coalesce(drawing.product_id, historical.product_id)
       left join dictionary_items brand on brand.id = product.brand_id
       left join dictionary_items project on project.id = drawing.project_item_id
       left join dictionary_items color on color.id = drawing.color_id`;
     const total = (this.db.prepare(`select count(*) as total ${joins} ${whereSql}`).get(parameters) as { total: number }).total;
     const rows = this.db.prepare(`select file.*, coalesce(drawing.full_code, historical.full_code) as full_code,
-        historical.full_code as historical_full_code, drawing.display_name, product.model,
+        historical.full_code as historical_full_code, drawing.display_name, product.id as product_id, product.sku, product.model,
+        product.product_category,
         brand.name as brand_name, project.name as project_item_name, color.name as color_name
       ${joins} ${whereSql} order by file.file_name collate nocase, file.id limit @limit offset @offset`)
       .all({ ...parameters, limit: pageSize, offset: (page - 1) * pageSize }) as FileRow[];

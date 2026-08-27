@@ -126,6 +126,26 @@ describe('FileRepository', () => {
     expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 3 });
   });
 
+  it('exposes canonical product identity for planned and historical PDFs and filters by product ID', () => {
+    const drawing = drawingFixture();
+    const historical = parseDrawingCode('02.0404.010.0401007')!;
+    const planned = { ...records(drawing.id)[0], relativePath: 'planned.pdf', fileName: 'planned.pdf' };
+    const historicalPdf = { ...records(0)[1], relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\historical.pdf',
+      fileName: 'historical.pdf', matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
+      detectedCodes: [historical.fullCode], classificationWarning: null };
+
+    repository.replaceScan([planned, historicalPdf], [{ ...historical, directoryContext: {
+      productCategory: '冰柜', sku: 'TEST-FILE-REPOSITORY', model: 'ZC100',
+    } }], '2026-08-25T04:00:00.000Z');
+
+    const productId = (db.prepare('select product_id as productId from drawing_numbers where id = ?').get(drawing.id) as { productId: number }).productId;
+    expect(repository.search({ productId }).items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fileName: 'planned.pdf', productId, sku: 'TEST-FILE-REPOSITORY', model: 'ZC100', productCategory: '冰柜' }),
+      expect.objectContaining({ fileName: 'historical.pdf', productId, sku: 'TEST-FILE-REPOSITORY', model: 'ZC100', productCategory: '冰柜' }),
+    ]));
+    expect(repository.search({ productId: productId + 1000 }).items).toHaveLength(0);
+  });
+
   it('preserves a valid manual planned association and explicit type across an unmatched rescan', () => {
     const drawing = drawingFixture();
     const initial = { ...records(0)[1], relativePath: 'manual.pdf', fileName: 'manual-v1.pdf',

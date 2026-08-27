@@ -26,6 +26,7 @@ export interface HistoricalDrawingScanRecord extends ParsedDrawingCode {
 
 export interface FileSearchFilters {
   keyword?: string;
+  productId?: number;
   matchStatus?: FileMatchStatus;
   conversionType?: ConversionType;
   presence?: FilePresence;
@@ -40,7 +41,10 @@ export interface PdfFileView extends FileScanRecord {
   classificationWarning: string | null;
   fullCode: string | null;
   displayName: string | null;
+  productId: number | null;
+  sku: string | null;
   model: string | null;
+  productCategory: string | null;
   brandName: string | null;
   projectItemName: string | null;
   colorName: string | null;

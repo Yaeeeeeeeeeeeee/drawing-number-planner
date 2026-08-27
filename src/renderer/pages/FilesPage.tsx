@@ -2,11 +2,16 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
-import type { PdfFileView, PdfScanSummaryView, PlannerApi, WorkspaceSettingsView } from '../data/client';
+import type { PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
 import { openIndexedPdfLocation } from '../desktop-files';
 
-const initialFilters = { keyword: '', matchStatus: '', conversionType: '', presence: 'present' };
+const initialFilters = { keyword: '', productId: '', matchStatus: '', conversionType: '', presence: 'present' };
 const pageSize = 50;
+
+function searchInput(values: typeof initialFilters, page: number) {
+  return { keyword: values.keyword, matchStatus: values.matchStatus, conversionType: values.conversionType, presence: values.presence,
+    ...(values.productId ? { productId: Number(values.productId) } : {}), page, pageSize };
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -17,6 +22,7 @@ function formatSize(bytes: number): string {
 export function FilesPage({ api }: { api: PlannerApi }) {
   const [settings, setSettings] = useState<WorkspaceSettingsView>({ workspaceRoot: null, configured: false, available: false });
   const [rootInput, setRootInput] = useState(''); const [files, setFiles] = useState<PdfFileView[]>([]);
+  const [products, setProducts] = useState<ProductView[]>([]);
   const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filters, setFilters] = useState(initialFilters);
   const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
@@ -27,7 +33,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   const search = async (values = filters, requestedPage = 1) => {
     const request = ++searchRequest.current; setLoading(true);
     try {
-      const result = await api.searchPdfFiles({ ...values, page: requestedPage, pageSize });
+      const result = await api.searchPdfFiles(searchInput(values, requestedPage));
       if (request !== searchRequest.current) return;
       setFiles(result.items); setTotal(result.total); setPage(result.page);
     } catch (reason) {
@@ -37,10 +43,10 @@ export function FilesPage({ api }: { api: PlannerApi }) {
 
   useEffect(() => {
     const request = ++searchRequest.current; setLoading(true); setError('');
-    void Promise.all([api.getWorkspaceSettings(), api.searchPdfFiles({ ...initialFilters, page: 1, pageSize })])
-      .then(([nextSettings, result]) => {
+    void Promise.all([api.getWorkspaceSettings(), api.searchPdfFiles(searchInput(initialFilters, 1)), api.listProducts({ status: 'all' }).catch(() => [])])
+      .then(([nextSettings, result, productItems]) => {
         if (request !== searchRequest.current) return;
-        setSettings(nextSettings); setRootInput(nextSettings.workspaceRoot ?? ''); setFiles(result.items); setTotal(result.total); setPage(result.page);
+        setSettings(nextSettings); setRootInput(nextSettings.workspaceRoot ?? ''); setFiles(result.items); setTotal(result.total); setPage(result.page); setProducts(productItems);
       }).catch((reason) => { if (request === searchRequest.current) setError(reason instanceof Error ? reason.message : 'PDF 文件中心加载失败'); })
       .finally(() => { if (request === searchRequest.current) setLoading(false); });
   }, [api]);
@@ -106,6 +112,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       <span>{summary.outlined} 转曲后</span><span>{summary.missing} 已缺失</span></div>}
     <form className="filter-bar files-filter" onSubmit={submit}>
       <label><span>文件关键词</span><input aria-label="文件关键词" value={filters.keyword} onChange={(event) => setFilter('keyword', event.target.value)} /></label>
+      <label><span>产品档案</span><select aria-label="产品档案" value={filters.productId} onChange={(event) => setFilter('productId', event.target.value)}><option value="">全部</option>{products.map((product) => <option value={product.id} key={product.id}>{product.sku ?? '待补录'} · {product.model}</option>)}</select></label>
       <label><span>匹配状态</span><select aria-label="匹配状态" value={filters.matchStatus} onChange={(event) => setFilter('matchStatus', event.target.value)}>
         <option value="">全部</option><option value="matched">已匹配</option><option value="pending">待确认</option><option value="unmatched">未匹配</option><option value="conflict">冲突</option></select></label>
       <label><span>转曲类型</span><select aria-label="转曲类型" value={filters.conversionType} onChange={(event) => setFilter('conversionType', event.target.value)}>
@@ -139,6 +146,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
           onChange={() => toggleSelection(item.id)} /> },
         { key: 'name', label: '文件名', render: (item) => <span className="file-primary">{item.fileName}</span> },
         { key: 'path', label: '相对路径', render: (item) => <span className="file-relative mono">{item.relativePath}</span> },
+        { key: 'product', label: '产品', render: (item) => item.productId ? <span className="file-product"><strong>{item.sku ?? '待补录'} · {item.model}</strong><small>{item.productCategory}</small></span> : <span className="muted-text">待关联</span> },
         { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="file-match matched">
           <span className="code-cell">{item.fullCode}</span>
           {item.classificationWarning && <span className="file-warning">{item.classificationWarning === 'conversion-conflict'
