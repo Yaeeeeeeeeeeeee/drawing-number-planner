@@ -78,4 +78,27 @@ describe('product API', () => {
     });
     await app.close();
   });
+
+  it('lists and explicitly confirms historical product candidates', async () => {
+    db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+       project_item_code, sequence, detected_sku, detected_model, detected_product_category, first_seen_at, last_seen_at)
+      values ('02.0209.010.0401001', '02', '0209', '01', '0', '04', '01', 1,
+        'SKDZC220JP', 'ZC220', '03.冰柜', '2026-08-26', '2026-08-26')`).run();
+    const app = Fastify(); registerProductRoutes(app, new ProductService(db));
+
+    expect((await app.inject({ method: 'GET', url: '/api/products/historical-candidates' })).json()).toEqual({ items: [
+      { productCategory: '03.冰柜', sku: 'SKDZC220JP', model: 'ZC220', historicalDrawingCount: 1, ambiguous: false },
+    ] });
+    const invalid = await app.inject({ method: 'POST', url: '/api/products/historical-candidates/confirm', payload: {
+      productCategory: '03.冰柜', sku: 'SKDZC220JP', model: 'ZC220', ...refs, defaultAppearanceId: null,
+    } });
+    expect(invalid.statusCode).toBe(400);
+    const confirmed = await app.inject({ method: 'POST', url: '/api/products/historical-candidates/confirm', payload: {
+      productCategory: '03.冰柜', sku: 'SKDZC220JP', model: 'ZC220', ...refs,
+    } });
+    expect(confirmed.statusCode).toBe(201);
+    expect(confirmed.json()).toEqual({ product: expect.objectContaining({ sku: 'SKDZC220JP' }), linkedHistoricalCount: 1 });
+    await app.close();
+  });
 });

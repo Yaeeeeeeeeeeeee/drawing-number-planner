@@ -15,6 +15,7 @@ describe('ProductsPage', () => {
       sku: 'SKDZC220JP', model: 'ZC220', productCategory: '冰柜', referenceProductId: null, referenceProductModel: null, status: 'active' };
     const api = {
       listProducts: vi.fn().mockResolvedValue([]),
+      listHistoricalProductCandidates: vi.fn().mockResolvedValue([]),
       listDictionaries: vi.fn((type: keyof typeof dictionaries) => Promise.resolve(dictionaries[type])),
       createProduct: vi.fn().mockResolvedValue(created),
       updateProduct: vi.fn(), deactivateProduct: vi.fn(),
@@ -48,6 +49,7 @@ describe('ProductsPage', () => {
     };
     const api = {
       listProducts: vi.fn().mockResolvedValueOnce([source, target]).mockResolvedValueOnce([target]),
+      listHistoricalProductCandidates: vi.fn().mockResolvedValue([]),
       listDictionaries: vi.fn((type: keyof typeof dictionaries) => Promise.resolve(dictionaries[type])),
       createProduct: vi.fn(),
       updateProduct: vi.fn().mockResolvedValue({ ...target, model: 'ZC220A', referenceProductId: 1, referenceProductModel: 'ZC200' }),
@@ -70,5 +72,60 @@ describe('ProductsPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '停用 ZC220A' }));
     expect(api.deactivateProduct).toHaveBeenCalledWith(2);
+  });
+
+  it('keeps historical product recognition secondary and requires explicit dictionary-backed confirmation', async () => {
+    const candidate = { productCategory: '03.冰柜', sku: 'SKDZU070JP', model: 'ZU70SD', historicalDrawingCount: 4, ambiguous: false };
+    const dictionaries = {
+      brand: [{ id: 1, code: '02', name: 'SAMKYO', status: 'active' }],
+      product_size: [{ id: 2, code: '0209', name: '冰柜', status: 'active' }],
+      appearance: [{ id: 3, code: '01', name: '1号外观', status: 'active' }],
+    };
+    const created = { id: 12, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
+      defaultAppearanceId: 3, defaultAppearanceName: '1号外观', sku: candidate.sku, model: candidate.model,
+      productCategory: candidate.productCategory, referenceProductId: null, referenceProductModel: null, status: 'active' };
+    const api = {
+      listProducts: vi.fn().mockResolvedValue([]),
+      listHistoricalProductCandidates: vi.fn().mockResolvedValue([candidate]),
+      confirmHistoricalProductCandidate: vi.fn().mockResolvedValue({ product: created, linkedHistoricalCount: 4 }),
+      listDictionaries: vi.fn((type: keyof typeof dictionaries) => Promise.resolve(dictionaries[type])),
+      createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn(),
+    };
+    render(<ProductsPage api={api as never} />);
+    await screen.findByText('还没有产品档案');
+    expect(screen.queryByText('SKDZU070JP')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '从资料库识别历史产品' }));
+    expect(await screen.findByText('SKDZU070JP')).toBeVisible();
+    expect(screen.getByText('4 个历史图号')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '确认建立 ZU70SD' }));
+    expect(screen.getByRole('button', { name: '确认建立产品档案' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('历史产品品牌'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('历史产品品类尺寸'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('历史产品默认外观'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认建立产品档案' }));
+
+    await waitFor(() => expect(api.confirmHistoricalProductCandidate).toHaveBeenCalledWith({
+      productCategory: candidate.productCategory, sku: candidate.sku, model: candidate.model,
+      brandId: 1, productSizeId: 2, defaultAppearanceId: 3,
+    }));
+    expect(await screen.findByText('已建立 ZU70SD，并关联 4 个历史图号。')).toBeVisible();
+    expect(screen.getByText('ZU70SD')).toBeVisible();
+  });
+
+  it('labels ambiguous historical candidates and does not offer confirmation', async () => {
+    const api = {
+      listProducts: vi.fn().mockResolvedValue([]),
+      listHistoricalProductCandidates: vi.fn().mockResolvedValue([
+        { productCategory: '03.冰柜', sku: 'DUP-SKU', model: 'A', historicalDrawingCount: 1, ambiguous: true },
+      ]),
+      confirmHistoricalProductCandidate: vi.fn(),
+      listDictionaries: vi.fn().mockResolvedValue([]), createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn(),
+    };
+    render(<ProductsPage api={api as never} />);
+    await screen.findByText('还没有产品档案');
+    fireEvent.click(screen.getByRole('button', { name: '从资料库识别历史产品' }));
+    expect(await screen.findByText('目录信息有歧义，请先人工整理或补充确认')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '确认建立 A' })).not.toBeInTheDocument();
   });
 });

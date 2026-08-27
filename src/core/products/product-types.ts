@@ -29,3 +29,23 @@ export interface ProductFilters {
   brandId?: number;
   status?: 'active' | 'inactive' | 'all';
 }
+
+export interface HistoricalProductCandidate {
+  productCategory: string;
+  sku: string;
+  model: string;
+  historicalDrawingCount: number;
+  ambiguous: boolean;
+}
+
+export interface HistoricalProductCandidateIdentity {
+  productCategory: string;
+  sku: string;
+  model: string;
+}
+
+export interface ConfirmHistoricalProductCandidateInput extends HistoricalProductCandidateIdentity {
+  brandId: number;
+  productSizeId: number;
+  defaultAppearanceId: number;
+}

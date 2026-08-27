@@ -10,6 +10,15 @@ export interface ProductView {
   referenceProductModel: string | null; status: 'active' | 'inactive';
 }
 
+export interface HistoricalProductCandidateView {
+  productCategory: string; sku: string; model: string; historicalDrawingCount: number; ambiguous: boolean;
+}
+
+export interface ConfirmHistoricalProductCandidateView {
+  productCategory: string; sku: string; model: string;
+  brandId: number; productSizeId: number; defaultAppearanceId: number;
+}
+
 export interface DrawingView {
   id: number; origin: 'planned' | 'historical'; sku: string | null; fullCode: string; displayName: string;
   productId: number | null; model: string; productCategory: string; brandName: string;
@@ -99,6 +108,8 @@ export interface PlannerApi {
   createProduct(input: Record<string, unknown>): Promise<ProductView>;
   updateProduct(id: number, input: Record<string, unknown>): Promise<ProductView>;
   deactivateProduct(id: number): Promise<ProductView>;
+  listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
+  confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
   confirmImport(auditId: string, selections: string[]): Promise<{ imported: number; skipped: number }>;
   previewPlan(input: { productId: number; appearanceId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
@@ -191,6 +202,9 @@ export const apiClient: PlannerApi = {
   createProduct: (input) => request('/api/products', json('POST', input)),
   updateProduct: (id, input) => request(`/api/products/${id}`, json('PUT', input)),
   deactivateProduct: (id) => request(`/api/products/${id}/deactivate`, json('POST')),
+  listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(
+    '/api/products/historical-candidates')).items,
+  confirmHistoricalProductCandidate: (input) => request('/api/products/historical-candidates/confirm', json('POST', input)),
   auditWorkbook: async (file) => {
     const form = new FormData(); form.append('file', file);
     return request('/api/import/excel/audit', { method: 'POST', body: form });

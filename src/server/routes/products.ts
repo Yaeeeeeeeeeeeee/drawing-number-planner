@@ -13,6 +13,15 @@ const inputSchema = z.object({
   productCategory: z.string().trim().min(1),
   referenceProductId: z.number().int().positive().nullable().optional(),
 });
+const exactNonBlank = z.string().min(1).refine((value) => value.trim().length > 0);
+const historicalCandidateSchema = z.object({
+  productCategory: exactNonBlank,
+  sku: exactNonBlank,
+  model: exactNonBlank,
+  brandId: z.number().int().positive(),
+  productSizeId: z.number().int().positive(),
+  defaultAppearanceId: z.number().int().positive(),
+}).strict();
 
 function sendProductError(error: unknown, reply: FastifyReply) {
   if (error instanceof ProductError) {
@@ -31,6 +40,15 @@ export function registerProductRoutes(app: FastifyInstance, service: ProductServ
     }).safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品筛选条件无效' } });
     return service.list(query.data);
+  });
+
+  app.get('/api/products/historical-candidates', async () => service.listHistoricalCandidates());
+
+  app.post('/api/products/historical-candidates/confirm', async (request, reply) => {
+    const input = historicalCandidateSchema.safeParse(request.body);
+    if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '历史产品确认信息不完整' } });
+    try { return reply.code(201).send(service.confirmHistoricalCandidate(input.data)); }
+    catch (error) { return sendProductError(error, reply); }
   });
 
   app.get('/api/products/:id', async (request, reply) => {

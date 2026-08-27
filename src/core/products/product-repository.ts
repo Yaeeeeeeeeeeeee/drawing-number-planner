@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { Product, ProductFilters, ProductInput } from './product-types.js';
+import type { HistoricalProductCandidateIdentity, Product, ProductFilters, ProductInput } from './product-types.js';
 
 interface ProductRow {
   id: number; sku: string | null; brand_id: number; brand_name: string;
@@ -8,6 +8,13 @@ interface ProductRow {
   model: string; product_category: string;
   reference_product_id: number | null; reference_product_model: string | null;
   status: 'active' | 'inactive';
+}
+
+interface HistoricalCandidateRow {
+  product_category: string;
+  sku: string;
+  model: string;
+  historical_drawing_count: number;
 }
 
 const selectProducts = `select product.id, product.brand_id, brand.name as brand_name,
@@ -89,5 +96,36 @@ export class ProductRepository {
     const row = this.db.prepare('select count(*) as count from drawing_numbers where product_id = ? or source_product_id = ?')
       .get(id, id) as { count: number };
     return row.count > 0;
+  }
+
+  listHistoricalCandidateRows(): Array<HistoricalProductCandidateIdentity & { historicalDrawingCount: number }> {
+    return (this.db.prepare(`select historical.detected_product_category as product_category,
+        historical.detected_sku as sku, historical.detected_model as model, count(*) as historical_drawing_count
+      from historical_drawing_numbers historical
+      where historical.product_id is null
+        and historical.detected_product_category is not null and length(trim(historical.detected_product_category)) > 0
+        and historical.detected_sku is not null and length(trim(historical.detected_sku)) > 0
+        and historical.detected_model is not null and length(trim(historical.detected_model)) > 0
+        and not exists (
+          select 1 from products product where product.sku = historical.detected_sku collate nocase
+        )
+      group by historical.detected_product_category, historical.detected_sku, historical.detected_model
+      order by historical.detected_product_category, historical.detected_sku, historical.detected_model`).all() as HistoricalCandidateRow[])
+      .map((row) => ({
+        productCategory: row.product_category,
+        sku: row.sku,
+        model: row.model,
+        historicalDrawingCount: row.historical_drawing_count,
+      }));
+  }
+
+  hasSku(sku: string): boolean {
+    return Boolean(this.db.prepare('select 1 from products where sku = ? collate nocase').get(sku));
+  }
+
+  linkHistoricalCandidate(identity: HistoricalProductCandidateIdentity, productId: number): number {
+    return this.db.prepare(`update historical_drawing_numbers set product_id = ?
+      where product_id is null and detected_product_category = ? and detected_sku = ? and detected_model = ?`)
+      .run(productId, identity.productCategory, identity.sku, identity.model).changes;
   }
 }
