@@ -19,6 +19,7 @@ function apiFixture() {
     listDictionaries: vi.fn((type: string) => Promise.resolve(type === 'color' ? colors : type === 'project_item' ? projects : [])),
     getCurrentBom: vi.fn().mockResolvedValue(null),
     listBomVersions: vi.fn().mockResolvedValue([]),
+    queryBomVersions: vi.fn().mockResolvedValue([]),
     listBomCandidates: vi.fn().mockResolvedValue([candidate]),
     getBomVersion: vi.fn(),
     saveBomVersion: vi.fn().mockResolvedValue({
@@ -81,6 +82,7 @@ describe('BomPage', () => {
     const current = (await api.saveBomVersion())!.version;
     api.getCurrentBom.mockResolvedValue(current);
     api.listBomVersions.mockResolvedValue([current]);
+    api.queryBomVersions.mockResolvedValue([current]);
     api.getBomVersion.mockResolvedValue(current);
     api.saveBomVersion.mockResolvedValue({ ...await api.saveBomVersion(), version: { ...current, id: 21, versionNumber: 2,
       previousVersionId: 20, items: [] }, diff: [{ type: 'removed', projectItemId: 7, projectItemName: 'LOGO',
@@ -91,9 +93,10 @@ describe('BomPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '删除 BOM 项目 1' }));
     expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeDisabled();
     expect(api.saveBomVersion).toHaveBeenCalledTimes(savesBeforeRemoval);
-    expect(screen.getByText('最近变更')).toBeVisible();
-    expect(screen.queryByText(/版本 1/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: '查看变更' })[0]);
+    expect(screen.queryByText('BOM 记录')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
+    expect(await screen.findByText('BOM 记录')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: `查看 BOM ${current.id}` }));
     expect(await screen.findByRole('region', { name: 'BOM 历史明细' })).toBeVisible();
     expect(screen.getByText(candidate.fullCode)).toBeVisible();
   });
@@ -138,10 +141,12 @@ describe('BomPage', () => {
     const notedVersion = { ...saved, items: [notedItem] };
     api.getCurrentBom.mockResolvedValue(notedVersion);
     api.listBomVersions.mockResolvedValue([notedVersion]);
+    api.queryBomVersions.mockResolvedValue([notedVersion]);
     api.getBomVersion.mockResolvedValue(notedVersion);
     render(<BomPage api={api as never} />); await selectGrayBom(false);
     expect(await screen.findByDisplayValue('贴纸位置以最新图纸为准')).toBeVisible();
-    fireEvent.click(screen.getAllByRole('button', { name: '查看变更' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
+    fireEvent.click(await screen.findByRole('button', { name: `查看 BOM ${notedVersion.id}` }));
     expect(await screen.findByRole('region', { name: 'BOM 历史明细' })).toBeVisible();
     expect(screen.getByText('贴纸位置以最新图纸为准')).toBeVisible();
   });
@@ -149,11 +154,38 @@ describe('BomPage', () => {
   it('labels createdAt as system save time rather than a business change date', async () => {
     const api = apiFixture(); const current = (await api.saveBomVersion())!.version;
     api.getCurrentBom.mockResolvedValue(current); api.listBomVersions.mockResolvedValue([current]);
+    api.queryBomVersions.mockResolvedValue([current]);
     render(<BomPage api={api as never} />); await selectGrayBom(false);
 
-    expect(await screen.findByRole('columnheader', { name: '保存时间' })).toBeVisible();
+    expect(await screen.findByText(/当前 BOM · 保存于/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
+    expect(await screen.findByRole('columnheader', { name: '系统保存时间' })).toBeVisible();
     expect(screen.queryByText('变更日期')).not.toBeInTheDocument();
-    expect(screen.getByText(/当前 BOM · 保存于/)).toBeVisible();
+  });
+
+  it('separates adding from queries and does not expose a quantity input', async () => {
+    const api = apiFixture(); render(<BomPage api={api as never} />); await selectGrayBom();
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+    expect(screen.queryByLabelText('第 1 行数量')).not.toBeInTheDocument();
+    expect(screen.queryByText('BOM 记录')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
+    expect(await screen.findByRole('region', { name: '查询 BOM' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: '保存当前 BOM' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('第 1 行项目')).not.toBeInTheDocument();
+  });
+
+  it('queries existing BOM records by model, project and drawing number', async () => {
+    const api = apiFixture(); render(<BomPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
+    fireEvent.change(screen.getByLabelText('查询 BOM 型号'), { target: { value: 'ZC100' } });
+    fireEvent.change(screen.getByLabelText('查询 BOM 项目'), { target: { value: '7' } });
+    fireEvent.change(screen.getByLabelText('查询 BOM 图号'), { target: { value: '0401001' } });
+    fireEvent.click(await screen.findByRole('button', { name: '查询' }));
+
+    await waitFor(() => expect(api.queryBomVersions).toHaveBeenLastCalledWith({
+      model: 'ZC100', projectItemId: 7, fullCode: '0401001',
+    }));
   });
 
   it('loads all eligible candidates for an existing row so its drawing can be replaced', async () => {

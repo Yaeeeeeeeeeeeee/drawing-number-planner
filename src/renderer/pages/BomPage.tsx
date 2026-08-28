@@ -3,13 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BomCandidateView, BomDiffView, BomItemView, BomVersionSummaryView, BomVersionView,
   DictionaryItemView, PlannerApi, ProductView } from '../data/client';
 import { ApiError } from '../data/client';
-
-type DraftCandidate = Omit<BomCandidateView, 'status'> & { status: BomItemView['status'] };
-
-interface DraftRow {
-  clientId: string; projectItemId: string; drawingId: string; quantity: string; notes: string;
-  usesWhiteMaterial: boolean; candidates: DraftCandidate[]; candidatesLoaded: boolean;
-}
+import { BomEditor, type DraftCandidate, type DraftRow } from './bom/BomEditor';
+import { BomQuery } from './bom/BomQuery';
 
 const blankRow = (id: number): DraftRow => ({ clientId: `bom-row-${id}`, projectItemId: '', drawingId: '',
   quantity: '1', notes: '', usesWhiteMaterial: false, candidates: [], candidatesLoaded: false });
@@ -28,25 +23,20 @@ const withCurrentVoidedReference = (row: DraftRow, eligible: BomCandidateView[])
     ? [current, ...eligible] : eligible;
 };
 
-const describeDiff = (item: BomDiffView): string => {
-  if (item.type === 'added') return `${item.projectItemName}：新增 ${item.fullCode}`;
-  if (item.type === 'removed') return `${item.projectItemName}：移除 ${item.previousFullCode}`;
-  if (item.type === 'replaced') return `${item.projectItemName}：${item.previousFullCode} → ${item.fullCode}`;
-  return `${item.projectItemName}：未变化`;
-};
-
 export function BomPage({ api }: { api: PlannerApi }) {
+  const [mode, setMode] = useState<'add' | 'query'>('add');
   const [products, setProducts] = useState<ProductView[]>([]);
   const [colors, setColors] = useState<DictionaryItemView[]>([]);
   const [projects, setProjects] = useState<DictionaryItemView[]>([]);
   const [productId, setProductId] = useState(''); const [colorId, setColorId] = useState('');
   const [base, setBase] = useState<BomVersionView | null>(null);
   const [historyDetail, setHistoryDetail] = useState<BomVersionView | null>(null);
-  const [history, setHistory] = useState<BomVersionSummaryView[]>([]);
   const [rows, setRows] = useState<DraftRow[]>([]); const [diff, setDiff] = useState<BomDiffView[]>([]);
   const [loaded, setLoaded] = useState(false); const [busy, setBusy] = useState(false);
   const [error, setError] = useState(''); const [savedMessage, setSavedMessage] = useState('');
   const [needsRefresh, setNeedsRefresh] = useState(false); const [reloadNonce, setReloadNonce] = useState(0);
+  const [queryModel, setQueryModel] = useState(''); const [queryProjectId, setQueryProjectId] = useState('');
+  const [queryFullCode, setQueryFullCode] = useState(''); const [queryResults, setQueryResults] = useState<BomVersionSummaryView[]>([]);
   const nextRow = useRef(1); const loadRequest = useRef(0); const historyRequest = useRef(0);
   const candidateRequests = useRef<Record<string, number>>({});
 
@@ -58,11 +48,10 @@ export function BomPage({ api }: { api: PlannerApi }) {
   useEffect(() => {
     const request = ++loadRequest.current; historyRequest.current += 1; setHistoryDetail(null);
     setDiff([]); setSavedMessage(''); setNeedsRefresh(false); setError('');
-    if (!productId || !colorId) { setBase(null); setHistory([]); setRows([]); setLoaded(false); return; }
+    if (!productId || !colorId) { setBase(null); setRows([]); setLoaded(false); return; }
     setBusy(true); setLoaded(false);
     void (async () => {
-      const [current, versions] = await Promise.all([api.getCurrentBom(Number(productId), Number(colorId)),
-        api.listBomVersions(Number(productId), Number(colorId))]);
+      const current = await api.getCurrentBom(Number(productId), Number(colorId));
       const draftRows = current?.items.map((item) => fromItem(item, `bom-row-${nextRow.current++}`)) ?? [];
       if (current) {
         const candidateLists = await Promise.all(current.items.map((item) => api.listBomCandidates({
@@ -75,7 +64,7 @@ export function BomPage({ api }: { api: PlannerApi }) {
         });
       }
       if (request !== loadRequest.current) return;
-      setBase(current); setHistory(versions); setRows(draftRows); setLoaded(true);
+      setBase(current); setRows(draftRows); setLoaded(true);
     })().catch((reason) => { if (request === loadRequest.current) setError(reason instanceof Error ? reason.message : 'BOM 加载失败'); })
       .finally(() => { if (request === loadRequest.current) setBusy(false); });
   }, [api, productId, colorId, reloadNonce]);
@@ -103,15 +92,14 @@ export function BomPage({ api }: { api: PlannerApi }) {
   };
   const complete = useMemo(() => Boolean(productId && colorId && rows.length > 0 && rows.every((row) => {
     const selected = row.candidates.find((item) => item.id === Number(row.drawingId));
-    return row.projectItemId && row.drawingId && selected?.status !== 'voided'
-      && Number.isInteger(Number(row.quantity)) && Number(row.quantity) > 0;
+    return row.projectItemId && row.drawingId && selected?.status !== 'voided';
   })), [productId, colorId, rows]);
 
   const save = async () => {
     if (!complete) return; setBusy(true); setError(''); setNeedsRefresh(false);
     const input = { productId: Number(productId), colorId: Number(colorId), expectedCurrentVersionId: base?.id ?? null,
       items: rows.map((row) => ({ projectItemId: Number(row.projectItemId), drawingId: Number(row.drawingId),
-        quantity: Number(row.quantity), ...(row.notes.trim() ? { notes: row.notes.trim() } : {}),
+        quantity: 1, ...(row.notes.trim() ? { notes: row.notes.trim() } : {}),
         usesWhiteMaterial: row.usesWhiteMaterial })) };
     try {
       const saved = await api.saveBomVersion(input); setBase(saved.version); setDiff(saved.diff);
@@ -124,7 +112,6 @@ export function BomPage({ api }: { api: PlannerApi }) {
         if (result.status === 'fulfilled') { savedRows[index].candidates = result.value; savedRows[index].candidatesLoaded = true; }
       });
       setRows(savedRows);
-      setHistory((current) => [saved.version, ...current.filter((item) => item.id !== saved.version.id)]);
       setSavedMessage('当前 BOM 已保存');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'BOM 保存失败');
@@ -136,60 +123,35 @@ export function BomPage({ api }: { api: PlannerApi }) {
     try { const version = await api.getBomVersion(id); if (request === historyRequest.current) setHistoryDetail(version); }
     catch (reason) { if (request === historyRequest.current) setError(reason instanceof Error ? reason.message : 'BOM 历史加载失败'); }
   };
+  const queryBoms = async () => {
+    setBusy(true); setError(''); setHistoryDetail(null);
+    try { setQueryResults(await api.queryBomVersions({ model: queryModel,
+      ...(queryProjectId ? { projectItemId: Number(queryProjectId) } : {}), fullCode: queryFullCode })); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'BOM 查询失败'); }
+    finally { setBusy(false); }
+  };
 
   return <section className="page-surface page-enter bom-page">
-    <header className="page-header"><div><p className="eyebrow">BILL OF MATERIALS</p><h1>BOM 管理</h1><p>维护某型号和颜色当前实际使用的图号；其他颜色可明确引用同型号白色图号。</p></div>
-      <span className="record-count">{base ? `当前 BOM · 保存于 ${new Date(base.createdAt).toLocaleDateString('zh-CN')}` : '尚无当前 BOM'}</span></header>
-    <div className="form-grid bom-basics">
+    <header className="page-header"><div><p className="eyebrow">BILL OF MATERIALS</p><h1>BOM 管理</h1><p>添加和查询分开操作；当前仍使用既有 BOM 数据结构。</p></div>
+      {mode === 'add' && <span className="record-count">{base ? `当前 BOM · 保存于 ${new Date(base.createdAt).toLocaleDateString('zh-CN')}` : '尚无当前 BOM'}</span>}</header>
+    <nav className="segmented-tabs" aria-label="BOM 管理方式"><button type="button" aria-selected={mode === 'add'} onClick={() => setMode('add')}>添加 BOM</button>
+      <button type="button" aria-selected={mode === 'query'} onClick={() => { setMode('query'); void queryBoms(); }}>查询 BOM</button></nav>
+    {mode === 'add' && <><div className="form-grid bom-basics">
       <label><span>产品型号</span><select aria-label="BOM 产品型号" disabled={busy} value={productId}
-        onChange={(event) => setProductId(event.target.value)}><option value="">请选择</option>
-        {products.map((item) => <option key={item.id} value={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
+        onChange={(event) => setProductId(event.target.value)}><option value="">请选择</option>{products.map((item) => <option key={item.id} value={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
       <label><span>BOM 颜色</span><select aria-label="BOM 颜色" disabled={busy} value={colorId}
-        onChange={(event) => setColorId(event.target.value)}><option value="">请选择</option>
-        {colors.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
-    </div>
+        onChange={(event) => setColorId(event.target.value)}><option value="">请选择</option>{colors.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
+    </div>{loaded && <BomEditor base={base} rows={rows} projects={projects} colors={colors} colorId={colorId} busy={busy}
+      complete={complete} needsRefresh={needsRefresh} savedMessage={savedMessage} diff={diff}
+      onAdd={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidateResult(); }}
+      onDelete={(clientId) => { setRows((current) => current.filter((item) => item.clientId !== clientId)); invalidateResult(); }}
+      onProject={changeProject} onWhite={changeWhite}
+      onDrawing={(row, value) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, drawingId: value } : item)); invalidateResult(); }}
+      onNotes={(row, value) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, notes: value } : item)); invalidateResult(); }}
+      onSave={save} onRefresh={() => setReloadNonce((value) => value + 1)} />}</>}
+    {mode === 'query' && <BomQuery model={queryModel} projectItemId={queryProjectId} fullCode={queryFullCode} projects={projects}
+      busy={busy} history={queryResults} detail={historyDetail} setModel={setQueryModel} setProjectItemId={setQueryProjectId}
+      setFullCode={setQueryFullCode} onSearch={queryBoms} onView={viewHistory} />}
     {error && <p className="error-banner">{error}</p>}
-    {loaded && <>
-      <div className="batch-toolbar"><div><h2>当前 BOM</h2><small>保存后自动记录本次变更</small></div>
-        <button className="secondary-button" type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidateResult(); }}>添加 BOM 项目</button></div>
-      {!base && rows.length === 0 && <div className="bom-empty"><strong>尚未建立 BOM</strong><span>添加项目后保存为当前 BOM。</span></div>}
-      <div className="planning-rows">{rows.map((row, index) => <article className="planning-row bom-row" key={row.clientId}>
-        <div className="planning-row-title"><strong>项目 {index + 1}</strong><button className="link-button" type="button"
-          disabled={busy} aria-label={`删除 BOM 项目 ${index + 1}`} onClick={() => { setRows((current) => current.filter((item) => item.clientId !== row.clientId)); invalidateResult(); }}>删除</button></div>
-        <div className="form-grid bom-row-fields">
-          <label><span>项目</span><select aria-label={`第 ${index + 1} 行项目`} disabled={busy} value={row.projectItemId}
-            onChange={(event) => changeProject(row, event.target.value)}><option value="">请选择</option>
-            {projects.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
-          <label className="bom-white-toggle"><span>颜色共用</span><span><input type="checkbox" aria-label={`第 ${index + 1} 行引用白色图号`}
-            disabled={busy || colors.find((item) => item.id === Number(colorId))?.code === '0'} checked={row.usesWhiteMaterial}
-            onChange={(event) => changeWhite(row, event.target.checked)} /> 引用白色图号</span>
-            {colors.find((item) => item.id === Number(colorId))?.code === '0' && <small>当前 BOM 已是白色，无需引用白色图号</small>}</label>
-          <label className="bom-drawing-field"><span>正式图号</span><select aria-label={`第 ${index + 1} 行图号`} disabled={busy || !row.projectItemId}
-            value={row.drawingId} onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, drawingId: event.target.value } : item)); invalidateResult(); }}>
-            <option value="">请选择</option>{row.candidates.map((item) => <option disabled={item.status === 'voided'} key={item.id} value={item.id}>{item.fullCode} · {item.displayName} · {item.status === 'reserved' ? '已占号' : item.status === 'active' ? '正式使用' : '作废，需替换'} · {item.colorName}</option>)}</select>
-            <small className="bom-candidate-rule">可引用已占号或正式使用的正式规划图号；文件完整性单独提示，已作废图号不会作为新候选。</small>
-            {row.candidates.some((item) => item.id === Number(row.drawingId) && item.status === 'voided') && <small className="bom-candidate-empty">当前引用图号已作废，请选择可用图号替换后再保存。</small>}
-            {row.projectItemId && row.candidatesLoaded && row.candidates.length === 0 && <small className="bom-candidate-empty">没有符合当前产品、项目和颜色规则的正式规划图号。历史已用图号不会自动进入候选；源文件或转曲后文件是否存在不影响候选资格。</small>}</label>
-          <label><span>数量</span><input aria-label={`第 ${index + 1} 行数量`} type="number" min="1" step="1" disabled={busy}
-            value={row.quantity} onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, quantity: event.target.value } : item)); invalidateResult(); }} /></label>
-          <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes}
-            onChange={(event) => { setRows((current) => current.map((item) => item.clientId === row.clientId ? { ...item, notes: event.target.value } : item)); invalidateResult(); }} /></label>
-        </div>
-      </article>)}</div>
-      <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete} onClick={() => void save()}>{busy ? '保存中…' : '保存当前 BOM'}</button>
-        {needsRefresh && <button className="secondary-button" type="button" disabled={busy} onClick={() => setReloadNonce((value) => value + 1)}>刷新当前 BOM</button>}</div>
-      {savedMessage && <p className="success-banner"><strong>{savedMessage}</strong></p>}
-      {diff.length > 0 && <section className="bom-diff"><p className="eyebrow">LATEST CHANGE</p><h2>本次变更</h2>
-        <div className="bom-diff-list">{diff.filter((item) => item.type !== 'unchanged').map((item) => <span className={`bom-diff-${item.type}`} key={item.projectItemId}>{describeDiff(item)}</span>)}</div></section>}
-      <section className="bom-history"><div className="batch-toolbar"><div><p className="eyebrow">CHANGE HISTORY</p><h2>最近变更</h2></div><span>{history.length} 条记录</span></div>
-        {history.length === 0 ? <p className="muted-text">保存后将在这里保留简单的变更记录。</p> : <table><thead><tr><th>保存时间</th><th>型号</th><th>颜色</th><th>查看</th></tr></thead>
-          <tbody>{history.map((item) => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td><td>{item.model}</td><td>{item.colorName}</td>
-            <td><button className="text-button" type="button" aria-label="查看变更" onClick={() => void viewHistory(item.id)}>查看变更</button></td></tr>)}</tbody></table>}
-        {historyDetail && <section className="bom-history-detail" aria-label="BOM 历史明细"><div className="batch-toolbar"><div><p className="eyebrow">HISTORY DETAIL</p><h3>历史 BOM 明细 · 保存于 {new Date(historyDetail.createdAt).toLocaleString('zh-CN')}</h3></div><span>{historyDetail.items.length} 个项目</span></div>
-          <table><thead><tr><th>项目</th><th>图号</th><th>颜色</th><th>数量</th><th>共用</th><th>备注</th></tr></thead><tbody>
-            {historyDetail.items.map((item) => <tr key={item.bomItemId}><td>{item.projectItemName}</td><td className="code-cell">{item.fullCode}</td><td>{item.colorName}</td><td>{item.quantity}</td><td>{item.usesWhiteMaterial ? '引用白色' : '本色'}</td><td>{item.notes || '—'}</td></tr>)}
-          </tbody></table></section>}
-      </section>
-    </>}
   </section>;
 }

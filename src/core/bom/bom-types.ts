@@ -54,6 +54,12 @@ export interface BomVersionSummary {
   createdAt: string;
 }
 
+export interface BomQueryFilters {
+  model?: string;
+  projectItemId?: number;
+  fullCode?: string;
+}
+
 export interface BomVersionDetail extends BomVersionSummary {
   items: BomItemRecord[];
 }

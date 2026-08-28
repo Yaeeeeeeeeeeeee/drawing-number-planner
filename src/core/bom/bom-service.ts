@@ -1,7 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { BomError } from './bom-errors.js';
 import { BomRepository } from './bom-repository.js';
-import type { BomCandidate, BomCandidateInput, BomDiffEntry, BomItemInput, BomVersionDetail,
+import type { BomCandidate, BomCandidateInput, BomDiffEntry, BomItemInput, BomQueryFilters, BomVersionDetail,
   BomVersionSummary, SaveBomInput, SavedBomVersion } from './bom-types.js';
 
 export const WHITE_COLOR_CODE = '0';
@@ -46,6 +46,10 @@ export class BomService {
 
   listVersions(productId: number, colorId: number): BomVersionSummary[] {
     return this.repository.listVersions(productId, colorId);
+  }
+
+  queryVersions(filters: BomQueryFilters): BomVersionSummary[] {
+    return this.repository.queryVersions(filters);
   }
 
   listCandidates(input: BomCandidateInput): BomCandidate[] {

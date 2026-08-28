@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { BomCandidate, BomCandidateInput, BomItemRecord, BomVersionDetail, BomVersionSummary } from './bom-types.js';
+import type { BomCandidate, BomCandidateInput, BomItemRecord, BomQueryFilters, BomVersionDetail, BomVersionSummary } from './bom-types.js';
 
 export interface BomContext {
   productId: number;
@@ -89,6 +89,21 @@ export class BomRepository {
     const rows = this.db.prepare(`${versionSelect} where version.product_id = ? and version.color_id = ?
       order by version.version_number desc`).all(productId, colorId) as VersionRow[];
     return rows.map(mapSummary);
+  }
+
+  queryVersions(filters: BomQueryFilters): BomVersionSummary[] {
+    const conditions: string[] = [];
+    const values: Array<string | number> = [];
+    if (filters.model?.trim()) { conditions.push('product.model like ?'); values.push(`%${filters.model.trim()}%`); }
+    if (filters.projectItemId !== undefined || filters.fullCode?.trim()) {
+      const itemConditions: string[] = [];
+      if (filters.projectItemId !== undefined) { itemConditions.push('item.project_item_id = ?'); values.push(filters.projectItemId); }
+      if (filters.fullCode?.trim()) { itemConditions.push('drawing.full_code like ?'); values.push(`%${filters.fullCode.trim()}%`); }
+      conditions.push(`exists (select 1 from bom_items item join drawing_numbers drawing on drawing.id = item.drawing_id
+        where item.bom_version_id = version.id and ${itemConditions.join(' and ')})`);
+    }
+    const where = conditions.length ? ` where ${conditions.join(' and ')}` : '';
+    return (this.db.prepare(`${versionSelect}${where} order by version.created_at desc, version.id desc`).all(...values) as VersionRow[]).map(mapSummary);
   }
 
   getDrawing(id: number): BomDrawing | undefined {

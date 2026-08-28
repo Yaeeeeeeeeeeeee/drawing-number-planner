@@ -63,6 +63,10 @@ describe('BOM API', () => {
     expect((await app.inject({ method: 'GET',
       url: `/api/boms/versions?productId=${refs.product.id}&colorId=${refs.gray.id}` })).json().items)
       .toEqual([expect.objectContaining({ id: versionId, versionNumber: 1 })]);
+
+    expect((await app.inject({ method: 'GET', url: `/api/boms/query?model=ZC100&projectItemId=${refs.logo.id}&fullCode=${encodeURIComponent(refs.drawing.fullCode)}` })).json())
+      .toEqual({ items: [expect.objectContaining({ id: versionId, model: 'ZC100' })] });
+    expect((await app.inject({ method: 'GET', url: '/api/boms/query?model=NOT-FOUND' })).json()).toEqual({ items: [] });
   });
 
   it('maps a stale draft to conflict without creating another version', async () => {

@@ -142,6 +142,7 @@ export interface PlannerApi {
     rows: Array<PlanningRowInputView & { expectedFullCode: string }> }): Promise<ReservedDrawingView[]>;
   getCurrentBom(productId: number, colorId: number): Promise<BomVersionView | null>;
   listBomVersions(productId: number, colorId: number): Promise<BomVersionSummaryView[]>;
+  queryBomVersions(filters?: { model?: string; projectItemId?: number; fullCode?: string }): Promise<BomVersionSummaryView[]>;
   getBomVersion(id: number): Promise<BomVersionView>;
   listBomCandidates(input: { productId: number; bomColorId: number; projectItemId: number;
     usesWhiteMaterial: boolean }): Promise<BomCandidateView[]>;
@@ -303,6 +304,8 @@ export const apiClient: PlannerApi = {
     `/api/boms/current${queryString({ productId, colorId })}`)).version,
   listBomVersions: async (productId, colorId) => (await request<{ items: BomVersionSummaryView[] }>(
     `/api/boms/versions${queryString({ productId, colorId })}`)).items,
+  queryBomVersions: async (filters = {}) => (await request<{ items: BomVersionSummaryView[] }>(
+    `/api/boms/query${queryString(filters)}`)).items,
   getBomVersion: (id) => request(`/api/boms/versions/${id}`),
   listBomCandidates: async (input) => (await request<{ items: BomCandidateView[] }>(
     `/api/boms/candidates${queryString(input)}`)).items,

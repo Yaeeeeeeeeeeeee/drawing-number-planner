@@ -15,6 +15,11 @@ const candidateQuery = z.object({
   projectItemId: z.coerce.number().int().positive(),
   usesWhiteMaterial: z.enum(['true', 'false']).transform((value) => value === 'true'),
 }).strict();
+const bomQuery = z.object({
+  model: z.string().trim().optional(),
+  projectItemId: z.coerce.number().int().positive().optional(),
+  fullCode: z.string().trim().optional(),
+}).strict();
 
 const itemSchema = z.object({
   projectItemId: z.number().int().positive(),
@@ -40,6 +45,11 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
+  app.get('/api/boms/query', async (request, reply) => {
+    const query = bomQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
+    return { items: service.queryVersions(query.data) };
+  });
   app.get('/api/boms/current', async (request, reply) => {
     const query = idsQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
