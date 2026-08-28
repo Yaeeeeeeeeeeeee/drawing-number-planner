@@ -27,6 +27,7 @@ export interface ProductInput {
 export interface ProductFilters {
   search?: string;
   brandId?: number;
+  productCategory?: string;
   status?: 'active' | 'inactive' | 'all';
 }
 

@@ -133,45 +133,52 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         { key: 'batchUsage', label: '资料使用', render: (item) => item.batchUsage
           ? <span>{usageLabel(item.batchUsage.state)} · 出现于 {item.batchUsage.occurrenceCount} 个资料批次</span> : '未建立批次关系' },
         { key: 'status', label: '状态', render: (item) => <span className={`status-text ${item.status}`}>{statusLabel(item.status)}</span> },
-      ]} />}
+      ]} renderExpandedRow={(item) => selected?.id === item.id ? <DrawingDetailPanel selected={selected} maintaining={maintaining}
+        pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
+        setSelectedPdfId={setSelectedPdfId} onClose={() => setSelected(null)} onStatus={changeStatus} onOpen={openLocation}
+        onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onError={setError} /> : null} />}
     </> : <BatchBrowser search={batchSearch} setSearch={setBatchSearch} loading={loading} batches={batches}
       selected={selectedBatch} files={batchFiles} onSearch={searchBatches} onSelect={openBatch} onOpen={openLocation} />}
-    {selected && <aside className="detail-panel drawing-maintenance panel-enter" aria-label="图号详情"><button className="panel-close" onClick={() => setSelected(null)} type="button">关闭</button>
-      <p className="eyebrow">DRAWING DETAIL</p><h2>{selected.fullCode}</h2><p className="detail-name">{selected.displayName}</p>
-      <dl><div><dt>产品身份</dt><dd>{selected.sku ?? '待补录'} · {selected.brandName} · {selected.model}</dd></div>
-        <div><dt>类别 / 项目</dt><dd>{selected.productCategory} · {selected.mainCategoryName} · {selected.projectItemName}</dd></div>
-        <div><dt>业务状态</dt><dd><span className={`status-text ${selected.status}`}>{statusLabel(selected.status)}</span></dd></div></dl>
-      {selected.readOnly ? <p className="historical-read-only">{selected.readOnlyMessage}</p> : <>
-        <div className="drawing-actions">{selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void changeStatus('active')} type="button">正式使用</button>}
-          {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void changeStatus('voided')} type="button">作废</button>}</div>
-      </>}
-      <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={openLocation} />
-      <FileSection title="转曲后文件" present={selected.hasOutlinedFile} files={selected.outlinedFiles ?? []} onOpen={openLocation} />
-      <section className="drawing-detail-section"><h3>资料批次</h3>
-        {!selected.batchUsage || selected.batchUsage.occurrences.length === 0
-          ? <p className="muted-text">尚未识别到资料批次</p>
-          : <ul>{selected.batchUsage.occurrences.map((occurrence) => <li key={occurrence.batchId}>
-            {occurrence.batchName}{occurrence.usageState === 'current' ? ' · 当前' : ''}
-            <small>{occurrence.productDirectory} · {occurrence.files.length} 个文件实例</small>
-          </li>)}</ul>}
-      </section>
-      <section className="drawing-detail-section"><h3>当前 BOM 使用</h3>{(selected.currentBomUsage ?? []).length === 0 ? <p className="muted-text">当前 BOM 未使用此图号</p>
-        : <ul>{selected.currentBomUsage.map((usage) => <li key={`${usage.bomVersionId}-${usage.projectItemId}`}>{usage.model} · {usage.colorName} · BOM v{usage.versionNumber}<small>{usage.projectItemName} · 数量 {usage.quantity}{usage.usesWhiteMaterial ? ' · 引用白色物料' : ''}</small></li>)}</ul>}</section>
-      {!selected.readOnly && <section className="drawing-detail-section pdf-association"><h3>关联现有 PDF 索引</h3>
-        <div className="pdf-search"><input aria-label="搜索现有 PDF" value={pdfKeyword} onChange={(event) => setPdfKeyword(event.target.value)} placeholder="文件名或相对路径" />
-          <button className="secondary-button" onClick={() => void loadPdfCandidates(pdfKeyword).catch((reason) => setError(reason instanceof Error ? reason.message : 'PDF 搜索失败'))} type="button">搜索 PDF</button></div>
-        <label><span>现有 PDF 索引</span><select aria-label="现有 PDF 索引" value={selectedPdfId} onChange={(event) => setSelectedPdfId(event.target.value)}><option value="">请选择当前存在的 PDF</option>
-          {pdfCandidates.map((file) => <option key={file.id} value={file.id}>{file.fileName} · {file.relativePath}</option>)}</select></label>
-        <div className="drawing-actions"><button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void associatePdf('source')} type="button">关联为源文件</button>
-          <button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void associatePdf('outlined')} type="button">关联为转曲后文件</button></div>
-        <p className="muted-text">仅更新当前资料库索引，不移动、复制、重命名或删除磁盘文件。</p></section>}
-    </aside>}
   </section>;
 }
 
 const statusLabel = (status: DrawingView['status']) => status === 'active' ? '正式使用' : status === 'reserved' ? '已占号' : status === 'historical' ? '历史已用' : '作废';
 const usageLabel = (status: 'current' | 'historical' | 'unbatched' | 'indeterminate') =>
   status === 'current' ? '当前使用' : status === 'historical' ? '历史使用' : status === 'indeterminate' ? '待确认' : '未归入批次';
+
+function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
+  setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onError }: {
+  selected: DrawingDetailView; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
+  pdfCandidates: PdfFileView[]; selectedPdfId: string; setSelectedPdfId(value: string): void; onClose(): void;
+  onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
+  onSearchPdf(keyword: string): Promise<void>; onAssociate(type: 'source' | 'outlined'): Promise<void>;
+  onError(message: string): void;
+}) {
+  return <aside className="drawing-maintenance inline-drawing-detail panel-enter" aria-label="图号详情"><button className="panel-close" onClick={onClose} type="button">关闭</button>
+    <p className="eyebrow">DRAWING DETAIL</p><h2>{selected.fullCode}</h2><p className="detail-name">{selected.displayName}</p>
+    <dl><div><dt>产品身份</dt><dd>{selected.sku ?? '待补录'} · {selected.brandName} · {selected.model}</dd></div>
+      <div><dt>类别 / 项目</dt><dd>{selected.productCategory} · {selected.mainCategoryName} · {selected.projectItemName}</dd></div>
+      <div><dt>业务状态</dt><dd><span className={`status-text ${selected.status}`}>{statusLabel(selected.status)}</span></dd></div></dl>
+    {selected.readOnly ? <p className="historical-read-only">{selected.readOnlyMessage}</p> : <div className="drawing-actions">
+      {selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">正式使用</button>}
+      {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}</div>}
+    <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={onOpen} />
+    <FileSection title="转曲后文件" present={selected.hasOutlinedFile} files={selected.outlinedFiles ?? []} onOpen={onOpen} />
+    <section className="drawing-detail-section"><h3>资料批次</h3>{!selected.batchUsage || selected.batchUsage.occurrences.length === 0
+      ? <p className="muted-text">尚未识别到资料批次</p>
+      : <ul>{selected.batchUsage.occurrences.map((occurrence) => <li key={occurrence.batchId}>{occurrence.batchName}{occurrence.usageState === 'current' ? ' · 当前' : ''}<small>{occurrence.productDirectory} · {occurrence.files.length} 个文件实例</small></li>)}</ul>}</section>
+    <section className="drawing-detail-section"><h3>当前 BOM 使用</h3>{(selected.currentBomUsage ?? []).length === 0 ? <p className="muted-text">当前 BOM 未使用此图号</p>
+      : <ul>{selected.currentBomUsage.map((usage) => <li key={`${usage.bomVersionId}-${usage.projectItemId}`}>{usage.model} · {usage.colorName} · BOM v{usage.versionNumber}<small>{usage.projectItemName} · 数量 {usage.quantity}{usage.usesWhiteMaterial ? ' · 引用白色物料' : ''}</small></li>)}</ul>}</section>
+    {!selected.readOnly && <section className="drawing-detail-section pdf-association"><h3>关联现有 PDF 索引</h3>
+      <div className="pdf-search"><input aria-label="搜索现有 PDF" value={pdfKeyword} onChange={(event) => setPdfKeyword(event.target.value)} placeholder="文件名或相对路径" />
+        <button className="secondary-button" onClick={() => void onSearchPdf(pdfKeyword).catch((reason) => onError(reason instanceof Error ? reason.message : 'PDF 搜索失败'))} type="button">搜索 PDF</button></div>
+      <label><span>现有 PDF 索引</span><select aria-label="现有 PDF 索引" value={selectedPdfId} onChange={(event) => setSelectedPdfId(event.target.value)}><option value="">请选择当前存在的 PDF</option>
+        {pdfCandidates.map((file) => <option key={file.id} value={file.id}>{file.fileName} · {file.relativePath}</option>)}</select></label>
+      <div className="drawing-actions"><button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void onAssociate('source')} type="button">关联为源文件</button>
+        <button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void onAssociate('outlined')} type="button">关联为转曲后文件</button></div>
+      <p className="muted-text">仅更新当前资料库索引，不移动、复制、重命名或删除磁盘文件。</p></section>}
+  </aside>;
+}
 
 function BatchBrowser({ search, setSearch, loading, batches, selected, files, onSearch, onSelect, onOpen }: {
   search: string;

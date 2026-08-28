@@ -54,6 +54,19 @@ describe('renderer API client', () => {
     }));
   });
 
+  it('accepts an empty 204 response when deleting an unused dictionary item', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'delete-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.deleteDictionary(7)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/dictionaries/items/7', expect.objectContaining({
+      method: 'DELETE', headers: expect.objectContaining({ 'x-planner-token': 'delete-token' }),
+    }));
+  });
+
   it('uses strict drawing lifecycle and PDF-association action payloads', async () => {
     const detail = { id: 7, status: 'active' };
     const fetchMock = vi.fn()

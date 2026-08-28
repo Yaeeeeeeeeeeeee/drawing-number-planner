@@ -100,6 +100,13 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .dictionary-hierarchy .inline-form { padding: 16px 0; }
 .dictionary-hierarchy .inline-form label { min-width: 0; flex: 1; }
 .dictionary-hierarchy .inline-form .primary-button { margin-left: 0; }
+.segmented-tabs.compact { padding-top: 0; margin-bottom: 16px; }
+.expanded-table-row > td { padding: 0 14px 14px; background: #f7f9fc; }
+.record-inline-panel { border-left: 3px solid #8ba7c7; }
+.record-inline-panel .editor-strip { margin: 0; }
+.inline-confirm { padding: 14px 16px; background: #fff8ee; }
+.inline-confirm p { margin: 0 0 10px; color: #74430b; }
+.inline-drawing-detail { position: relative; padding: 20px; border: 1px solid #cad7e6; background: #fff; }
 .dictionary-loading { margin: 20px 0; padding: 16px; color: #526074; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; }
 .form-grid { display: grid; grid-template-columns: repeat(5, minmax(140px, 1fr)); gap: 12px; } .form-actions { display: flex; justify-content: flex-end; gap: 16px; margin-top: 16px; }
 .file-picker span { display: inline-flex; height: 40px; align-items: center; padding: 0 16px; color: var(--blue); border: 1px solid #b7cbea; border-radius: 5px; background: #f6faff; }

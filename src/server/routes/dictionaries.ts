@@ -49,4 +49,11 @@ export function registerDictionaryRoutes(app: FastifyInstance, service: Dictiona
     try { return service.deactivate(params.data.id); }
     catch (error) { return sendDomainError(error, reply); }
   });
+
+  app.delete('/api/dictionaries/items/:id', async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '无效字典编号' } });
+    try { service.deleteUnused(params.data.id); return reply.code(204).send(); }
+    catch (error) { return sendDomainError(error, reply); }
+  });
 }

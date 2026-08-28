@@ -33,6 +33,7 @@ describe('DictionariesPage', () => {
     })),
     deactivateDictionary: vi.fn((id: number) => Promise.resolve({ id, type: 'project_item', code: '01', name: '新 LOGO', parentId: 10, status: 'inactive' })),
     updateDictionaryName: vi.fn((id: number, name: string) => Promise.resolve({ ...projects.find((item) => item.id === id)!, name })),
+    deleteDictionary: vi.fn().mockResolvedValue(undefined),
   });
 
   it('uses only root encoding dimensions as top-level tabs', async () => {
@@ -179,6 +180,8 @@ describe('DictionariesPage', () => {
     render(<DictionariesPage api={api as never} />);
     fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
 
+    await screen.findByText('印刷件类');
+    fireEvent.click(screen.getByRole('tab', { name: '层数' }));
     expect(await screen.findByRole('heading', { name: '层数' })).toBeVisible();
     expect(screen.getByText('三层')).toBeVisible();
     fireEvent.change(screen.getByLabelText('层数编码'), { target: { value: '5' } });
@@ -212,6 +215,8 @@ describe('DictionariesPage', () => {
     api.deactivateDictionary.mockResolvedValue({ id: 30, type: 'layer_count', code: '3', name: '三层加强', parentId: null, status: 'inactive' } as never);
     render(<DictionariesPage api={api as never} />);
     fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    await screen.findByText('印刷件类');
+    fireEvent.click(screen.getByRole('tab', { name: '层数' }));
     await screen.findByText('三层');
     fireEvent.click(screen.getByRole('button', { name: '修改 三层' }));
     fireEvent.change(screen.getByLabelText('修改名称'), { target: { value: '三层加强' } });
@@ -254,5 +259,24 @@ describe('DictionariesPage', () => {
 
     expect(await screen.findByText('SAMKYO 新名称')).toBeVisible();
     expect(api.updateDictionaryName).toHaveBeenCalledWith(3, 'SAMKYO 新名称');
+  });
+
+  it('confirms an unused deletion beside the selected row and removes it only after success', async () => {
+    const item = { id: 3, type: 'brand', code: '09', name: '临时品牌', parentId: null, status: 'active' as const };
+    const deleting = deferred<void>();
+    const api = {
+      listDictionaries: vi.fn().mockResolvedValue([item]), createDictionary: vi.fn(), deactivateDictionary: vi.fn(),
+      updateDictionaryName: vi.fn(), deleteDictionary: vi.fn().mockReturnValue(deleting.promise),
+    };
+    render(<DictionariesPage api={api as never} />);
+    await screen.findByText('临时品牌');
+
+    fireEvent.click(screen.getByRole('button', { name: '删除 临时品牌' }));
+    expect(screen.getByText(/09 临时品牌/).closest('.expanded-table-row')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
+    expect(screen.getByText('临时品牌')).toBeVisible();
+    await act(async () => deleting.resolve());
+    await waitFor(() => expect(screen.queryByText('临时品牌')).toBeNull());
+    expect(api.deleteDictionary).toHaveBeenCalledWith(3);
   });
 });

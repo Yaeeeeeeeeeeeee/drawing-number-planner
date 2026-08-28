@@ -63,6 +63,9 @@ export class ProductRepository {
     if (filters.brandId !== undefined) {
       conditions.push('product.brand_id = ?'); values.push(filters.brandId);
     }
+    if (filters.productCategory?.trim()) {
+      conditions.push('product.product_category = ?'); values.push(filters.productCategory.trim());
+    }
     if (filters.search?.trim()) {
       conditions.push('(product.sku like ? or product.model like ? or product.product_category like ?)');
       values.push(`%${filters.search.trim()}%`, `%${filters.search.trim()}%`, `%${filters.search.trim()}%`);

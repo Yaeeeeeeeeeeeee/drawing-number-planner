@@ -36,6 +36,7 @@ export function registerProductRoutes(app: FastifyInstance, service: ProductServ
     const query = z.object({
       search: z.string().optional(),
       brandId: z.coerce.number().int().positive().optional(),
+      productCategory: z.string().trim().min(1).optional(),
       status: z.enum(['active', 'inactive', 'all']).optional(),
     }).safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品筛选条件无效' } });

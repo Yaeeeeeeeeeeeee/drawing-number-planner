@@ -49,6 +49,18 @@ describe('product API', () => {
     await app.close();
   });
 
+  it('filters products by their existing product category', async () => {
+    const products = new ProductService(db);
+    products.create({ ...refs, sku: 'FREEZER-1', model: 'ZC220', productCategory: '冰柜' });
+    products.create({ ...refs, sku: 'DISHWASHER-1', model: 'T40', productCategory: '洗碗机' });
+    const app = Fastify(); registerProductRoutes(app, products);
+
+    const response = await app.inject({ method: 'GET', url: '/api/products?status=all&productCategory=' + encodeURIComponent('洗碗机') });
+
+    expect(response.json()).toEqual({ items: [expect.objectContaining({ sku: 'DISHWASHER-1', productCategory: '洗碗机' })] });
+    await app.close();
+  });
+
   it('updates and deactivates through explicit routes', async () => {
     const app = Fastify();
     registerProductRoutes(app, new ProductService(db));

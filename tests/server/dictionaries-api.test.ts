@@ -47,4 +47,15 @@ describe('dictionary API', () => {
     expect(deactivated.json()).toEqual(expect.objectContaining({ status: 'inactive' }));
     await app.close();
   });
+
+  it('deletes an unused item with an empty 204 response', async () => {
+    const app = Fastify(); registerDictionaryRoutes(app, new DictionaryService(db));
+    const created = await app.inject({ method: 'POST', url: '/api/dictionaries/layer_count', payload: { code: '9', name: '九层' } });
+
+    const deleted = await app.inject({ method: 'DELETE', url: `/api/dictionaries/items/${created.json().id}` });
+
+    expect(deleted.statusCode).toBe(204);
+    expect(deleted.body).toBe('');
+    await app.close();
+  });
 });
