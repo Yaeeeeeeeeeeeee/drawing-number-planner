@@ -202,4 +202,75 @@ describe('renderer API client', () => {
     expect(fetchMock.mock.calls.filter(([path]) => path === '/api/session')).toHaveLength(2);
     expect(fetchMock.mock.calls.filter(([path]) => path !== '/api/session')).toHaveLength(4);
   });
+
+  it('accepts a successful 204 response without trying to parse JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+
+    await expect(apiClient.searchDrawings()).resolves.toBeUndefined();
+  });
+
+  it('accepts a successful empty 200 response without trying to parse JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 200 })));
+
+    await expect(apiClient.searchDrawings()).resolves.toBeUndefined();
+  });
+
+  it('turns an empty proxy error response into a stable local-service error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', {
+      status: 502, headers: { 'content-type': 'text/plain' },
+    })));
+
+    await expect(apiClient.searchDrawings()).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE', message: '本地服务暂时不可用，请稍后重试',
+    } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
+
+  it('surfaces a non-JSON backend error without leaking JSON parser failures', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('服务正在重新启动', {
+      status: 503, headers: { 'content-type': 'text/plain' },
+    })));
+
+    await expect(apiClient.searchDrawings()).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE', message: '服务正在重新启动',
+    } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
+
+  it('rejects a non-JSON success response as an invalid service response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not-json', {
+      status: 200, headers: { 'content-type': 'text/plain' },
+    })));
+
+    await expect(apiClient.searchDrawings()).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE', message: '本地服务返回了无法识别的数据',
+    } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
+
+  it('wraps malformed JSON as an invalid service response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{broken', {
+      status: 200, headers: { 'content-type': 'application/json' },
+    })));
+
+    await expect(apiClient.searchDrawings()).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE', message: '本地服务返回了无法识别的数据',
+    } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
+
+  it('wraps network fetch failures instead of exposing Failed to fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    await expect(apiClient.searchDrawings()).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE', message: '无法连接本地服务，请确认桌面版正在运行',
+    } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
+
+  it('handles an empty session bootstrap response without a JSON parser error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', {
+      status: 502, headers: { 'content-type': 'text/plain' },
+    })));
+
+    await expect(apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' }))
+      .rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE', message: '本地服务暂时不可用，请稍后重试',
+      } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
 });

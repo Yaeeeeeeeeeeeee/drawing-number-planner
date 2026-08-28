@@ -134,6 +134,52 @@ export class ApiError extends Error {
   constructor(public readonly code: string, message: string) { super(message); }
 }
 
+type ResponseBody =
+  | { kind: 'empty' }
+  | { kind: 'json'; value: any }
+  | { kind: 'text'; value: string };
+
+async function fetchLocal(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(path, init);
+  } catch {
+    throw new ApiError('SERVICE_UNAVAILABLE', '无法连接本地服务，请确认桌面版正在运行');
+  }
+}
+
+async function readResponseBody(response: Response): Promise<ResponseBody> {
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw new ApiError('INVALID_RESPONSE', '本地服务返回了无法识别的数据');
+  }
+  if (!text.trim()) return { kind: 'empty' };
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  const trimmed = text.trim();
+  const isJson = contentType.includes('application/json') || contentType.includes('+json')
+    || trimmed.startsWith('{') || trimmed.startsWith('[');
+  if (!isJson) return { kind: 'text', value: trimmed };
+  try {
+    return { kind: 'json', value: JSON.parse(text) };
+  } catch {
+    throw new ApiError('INVALID_RESPONSE', '本地服务返回了无法识别的数据');
+  }
+}
+
+function responseError(response: Response, body: ResponseBody): ApiError {
+  const value = body.kind === 'json' ? body.value : undefined;
+  const backendError = value && typeof value === 'object' ? value.error : undefined;
+  if (backendError?.code || backendError?.message) {
+    return new ApiError(backendError.code ?? 'REQUEST_FAILED', backendError.message ?? '请求失败');
+  }
+  if ([502, 503, 504].includes(response.status)) {
+    return new ApiError('SERVICE_UNAVAILABLE', body.kind === 'text' ? body.value : '本地服务暂时不可用，请稍后重试');
+  }
+  return new ApiError('REQUEST_FAILED', body.kind === 'text' ? body.value : `请求失败（HTTP ${response.status}）`);
+}
+
 const queryString = (values: Record<string, unknown>) => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
@@ -146,35 +192,38 @@ const queryString = (values: Record<string, unknown>) => {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = init?.method?.toUpperCase() ?? 'GET';
   const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-  const send = async (token = ''): Promise<{ response: Response; body: any }> => {
+  const send = async (token = ''): Promise<{ response: Response; body: ResponseBody }> => {
     const headers = { ...(init?.headers as Record<string, string> | undefined), ...(write && token ? { 'x-planner-token': token } : {}) };
-    const response = await fetch(path, { ...init, headers });
-    return { response, body: await response.json() };
+    const response = await fetchLocal(path, { ...init, headers });
+    return { response, body: await readResponseBody(response) };
   };
   const tokenRequest = write ? sessionToken() : undefined;
   const first = await send(tokenRequest ? await tokenRequest : '');
-  if (!first.response.ok && write && first.response.status === 401 && first.body.error?.code === 'INVALID_TOKEN') {
+  const firstValue = first.body.kind === 'json' ? first.body.value : undefined;
+  if (!first.response.ok && write && first.response.status === 401 && firstValue?.error?.code === 'INVALID_TOKEN') {
     if (currentSessionToken === tokenRequest) currentSessionToken = undefined;
     const replay = await send(await sessionToken());
-    if (!replay.response.ok) {
-      throw new ApiError(replay.body.error?.code ?? 'REQUEST_FAILED', replay.body.error?.message ?? '请求失败');
-    }
-    return replay.body as T;
+    if (!replay.response.ok) throw responseError(replay.response, replay.body);
+    if (replay.body.kind === 'text') throw new ApiError('INVALID_RESPONSE', '本地服务返回了无法识别的数据');
+    return (replay.body.kind === 'json' ? replay.body.value : undefined) as T;
   }
-  if (!first.response.ok) {
-    throw new ApiError(first.body.error?.code ?? 'REQUEST_FAILED', first.body.error?.message ?? '请求失败');
-  }
-  return first.body as T;
+  if (!first.response.ok) throw responseError(first.response, first.body);
+  if (first.body.kind === 'text') throw new ApiError('INVALID_RESPONSE', '本地服务返回了无法识别的数据');
+  return (first.body.kind === 'json' ? first.body.value : undefined) as T;
 }
 
 let currentSessionToken: Promise<string> | undefined;
 function sessionToken(): Promise<string> {
   if (currentSessionToken) return currentSessionToken;
-  const pending = fetch('/api/session', { method: 'POST' })
+  const pending = fetchLocal('/api/session', { method: 'POST' })
     .then(async (response) => {
-      const body = await response.json();
-      if (!response.ok) throw new ApiError(body.error?.code ?? 'SESSION_FAILED', body.error?.message ?? '无法建立本机安全会话');
-      return String(body.token);
+      const body = await readResponseBody(response);
+      if (!response.ok) throw responseError(response, body);
+      const value = body.kind === 'json' ? body.value : undefined;
+      if (!value || typeof value !== 'object' || typeof value.token !== 'string' || !value.token) {
+        throw new ApiError('INVALID_RESPONSE', '本地服务返回了无法识别的数据');
+      }
+      return value.token;
     });
   currentSessionToken = pending;
   void pending.catch(() => {
