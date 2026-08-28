@@ -14,12 +14,12 @@ const navigation = [
   { label: '日常工作', items: [
     { key: 'planning', label: '图号规划 / 更新包材', icon: '规', enabled: true },
     { key: 'bom', label: 'BOM 管理', icon: 'B', enabled: true },
-    { key: 'files', label: 'PDF 文件中心', icon: 'P', enabled: true },
     { key: 'exports', label: '外发资料', icon: '外', enabled: false, phase: '未开放' },
   ] },
   { label: '基础资料', items: [
     { key: 'drawings', label: '图号库', icon: '图', enabled: true },
     { key: 'products', label: '产品档案', icon: '品', enabled: true },
+    { key: 'files', label: 'PDF 文件中心', icon: 'P', enabled: true },
     { key: 'dictionaries', label: '编码字典', icon: '码', enabled: true },
     { key: 'import', label: '迁移检查', icon: '迁', enabled: true },
   ] },

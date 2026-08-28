@@ -115,6 +115,7 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .planning-basics { margin-bottom: 18px; }
 .batch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 14px 0; }
 .batch-toolbar h2 { margin: 0; }
+.info-banner { margin: 14px 0; padding: 10px 12px; color: #344054; border-left: 3px solid #84adff; background: #f5f8ff; }
 .material-batch-browser { padding-top: 18px; }
 .batch-search { display: flex; align-items: end; gap: 12px; }
 .batch-search label { flex: 1; }

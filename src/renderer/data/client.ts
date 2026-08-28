@@ -112,6 +112,8 @@ export interface PdfFileView {
   colorName: string | null; matchStatus: 'matched' | 'pending' | 'unmatched' | 'conflict'; detectedCodes: string[];
   classificationWarning: string | null;
   conversionType: 'source' | 'outlined'; sizeBytes: number; modifiedAt: string; scannedAt: string; isPresent: boolean;
+  pathKey?: string; materialBatchId?: number | null; materialBatchName?: string | null;
+  materialBatchStatus?: 'recognized' | 'pending' | null;
 }
 
 export interface PlannerApi {

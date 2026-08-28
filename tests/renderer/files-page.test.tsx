@@ -35,6 +35,23 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('keeps legal cross-batch instances visible and explains that they are not scan duplicates', async () => {
+    const first = { ...file, id: 71, relativePath: 'T40\\00.首批大货\\same.pdf',
+      materialBatchId: 1, materialBatchName: '00.首批大货', materialBatchStatus: 'recognized' };
+    const current = { ...file, id: 72, relativePath: 'T40\\06.20260309\\same.pdf',
+      materialBatchId: 2, materialBatchName: '06.20260309', materialBatchStatus: 'recognized' };
+    const api = apiFixture(true);
+    api.searchPdfFiles.mockResolvedValue({ items: [first, current], total: 2, page: 1, pageSize: 50 });
+
+    render(<FilesPage api={api as never} />);
+
+    expect(await screen.findAllByText(file.fileName, { selector: '.file-primary' })).toHaveLength(2);
+    expect(screen.getByText('00.首批大货')).toBeVisible();
+    expect(screen.getByText('06.20260309')).toBeVisible();
+    expect(screen.getByText(/同一图号出现在不同资料批次属于正常历史快照/)).toBeVisible();
+    expect(screen.queryByText('扫描重复')).not.toBeInTheDocument();
+  });
+
   it('shows canonical product identity, uses product IDs to filter, and labels unlinked files', async () => {
     const api = apiFixture(true);
     render(<FilesPage api={api as never} />);

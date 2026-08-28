@@ -94,6 +94,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   return <section className="page-surface page-enter files-page">
     <header className="page-header"><div><p className="eyebrow">PDF WORKSPACE</p><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
       <span className="record-count">{total} 个索引文件</span></header>
+    <p className="info-banner">同一图号出现在不同资料批次属于正常历史快照；只有规范化后的同一相对路径重复建立索引才是扫描重复。</p>
     <section className="workspace-strip" aria-label="资料根目录设置">
       <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
         placeholder="请输入本机资料库目录" onChange={(event) => { setRootInput(event.target.value); setMessage(''); setError(''); }} /></label>
@@ -146,6 +147,9 @@ export function FilesPage({ api }: { api: PlannerApi }) {
           onChange={() => toggleSelection(item.id)} /> },
         { key: 'name', label: '文件名', render: (item) => <span className="file-primary">{item.fileName}</span> },
         { key: 'path', label: '相对路径', render: (item) => <span className="file-relative mono">{item.relativePath}</span> },
+        { key: 'batch', label: '资料批次', render: (item) => item.materialBatchName
+          ? <span>{item.materialBatchName}{item.materialBatchStatus === 'pending' ? ' · 待确认' : ''}</span>
+          : <span className="muted-text">未归入批次</span> },
         { key: 'product', label: '产品', render: (item) => item.productId ? <span className="file-product"><strong>{item.sku ?? '待补录'} · {item.model}</strong><small>{item.productCategory}</small></span> : <span className="muted-text">待关联</span> },
         { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="file-match matched">
           <span className="code-cell">{item.fullCode}</span>

@@ -14,10 +14,10 @@ describe('application shell', () => {
     const navGroups = Array.from(screen.getByRole('navigation').querySelectorAll<HTMLElement>('.nav-group'));
     expect(navGroups.map((group) => group.getAttribute('aria-label'))).toEqual(['日常工作', '基础资料']);
     expect(Array.from(navGroups[0].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
-      '规图号规划 / 更新包材', 'BBOM 管理', 'PPDF 文件中心', '外外发资料未开放',
+      '规图号规划 / 更新包材', 'BBOM 管理', '外外发资料未开放',
     ]);
     expect(Array.from(navGroups[1].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
-      '图图号库', '品产品档案', '码编码字典', '迁迁移检查',
+      '图图号库', '品产品档案', 'PPDF 文件中心', '码编码字典', '迁迁移检查',
     ]);
     expect(screen.getByRole('button', { name: /图号规划 \/ 更新包材/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /BOM 管理/ })).toBeEnabled();
