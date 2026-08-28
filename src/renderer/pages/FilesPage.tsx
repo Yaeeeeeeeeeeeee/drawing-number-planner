@@ -64,7 +64,11 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   };
   const scan = async () => {
     setScanning(true); setError(''); setMessage('');
-    try { const result = await api.scanPdfFiles(); setSummary(result); setMessage('资料库扫描完成'); await search(); }
+    try {
+      const result = await api.scanPdfFiles(); setSummary(result); setMessage('资料库扫描完成');
+      const [, batchItems] = await Promise.all([search(), api.listMaterialBatches({})]);
+      setBatches(batchItems);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : '资料库扫描失败'); }
     finally { setScanning(false); }
   };

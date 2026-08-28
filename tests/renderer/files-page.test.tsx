@@ -128,6 +128,20 @@ describe('FilesPage', () => {
     expect(screen.getByText('转曲后', { selector: '.conversion-label' })).toBeVisible();
   });
 
+  it('refreshes material-batch filter options after a successful scan', async () => {
+    const api = apiFixture(true);
+    api.listMaterialBatches.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      { id: 12, sku: 'SKDWT040JP', model: 'T40', name: '06.20260309' },
+    ]);
+    render(<FilesPage api={api as never} />);
+    await screen.findByDisplayValue('X:\\Library');
+
+    fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
+
+    expect(await screen.findByRole('option', { name: 'SKDWT040JP · T40 · 06.20260309' })).toBeVisible();
+    expect(api.listMaterialBatches).toHaveBeenCalledTimes(2);
+  });
+
   it('shows pending candidates and their reason without presenting them as occupied', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
 
