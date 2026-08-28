@@ -13,6 +13,7 @@ const cleanupSchema = z.object({
 const searchSchema = z.object({
   keyword: z.string().max(500).optional(),
   productId: z.coerce.number().int().positive().optional(),
+  materialBatchId: z.coerce.number().int().positive().optional(),
   matchStatus: z.enum(['matched', 'pending', 'unmatched', 'conflict']).optional(),
   conversionType: z.enum(['source', 'outlined']).optional(),
   presence: z.enum(['present', 'missing', 'all']).optional(),

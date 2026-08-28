@@ -72,6 +72,20 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getByText('batch/outlined.pdf')).toBeVisible();
   });
 
+  it('shows material-batch request failures in the batch view', async () => {
+    const api = {
+      searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]),
+      listMaterialBatches: vi.fn().mockRejectedValue(new Error('批次服务不可用')),
+    };
+    render(<DrawingLibraryPage api={api as never} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '按资料批次' }));
+    fireEvent.click(screen.getByRole('button', { name: '查询资料批次' }));
+
+    expect(await screen.findByText('批次服务不可用')).toBeVisible();
+  });
+
   it('offers a separate open-location action for each present source/outlined file and disables missing rows', async () => {
     const row = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
       model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',

@@ -36,6 +36,21 @@ function hasProductColumn(database: PlannerDatabase, name: string): boolean {
   return (database.pragma('table_info(products)') as Array<{ name: string }>).some((column) => column.name === name);
 }
 
+function hasBatchPathIndex(database: PlannerDatabase): boolean {
+  return Boolean(database.prepare(`select 1 from sqlite_master
+    where type = 'index' and name = 'material_batches_relative_path_nocase_unique'`).get());
+}
+
+function ensureBatchPathIndex(database: PlannerDatabase): void {
+  const duplicates = database.prepare(`select count(*) as count from (
+    select relative_path from material_batches
+    group by relative_path collate nocase having count(*) > 1
+  )`).get() as { count: number };
+  if (duplicates.count > 0) throw new Error('资料批次存在大小写路径冲突，数据库未升级');
+  database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS material_batches_relative_path_nocase_unique
+    ON material_batches(relative_path COLLATE NOCASE)`);
+}
+
 function validateExpandedDrawingRows(database: PlannerDatabase): void {
   const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
   if (foreignKeyErrors.length > 0) throw new Error('扩展版旧图号存在无效关联，数据库未升级');
@@ -86,7 +101,13 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
   if (from > 6) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 6`);
-  if (from >= 6) return { from, to: from };
+  if (from >= 6) {
+    if (!hasBatchPathIndex(database)) {
+      if (safety.databaseExists) safety.createBackup();
+      database.transaction(() => ensureBatchPathIndex(database))();
+    }
+    return { from, to: from };
+  }
   if (safety.databaseExists) safety.createBackup();
   database.transaction(() => {
     if (from < 1) database.exec(schemaVersionOne);
@@ -131,6 +152,7 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
         CREATE UNIQUE INDEX pdf_files_path_key_unique ON pdf_files(path_key);
         CREATE INDEX pdf_files_material_batch_idx ON pdf_files(material_batch_id);
       `);
+      ensureBatchPathIndex(database);
       const after = (database.prepare('select count(*) as count from pdf_files').get() as { count: number }).count;
       const missingKeys = (database.prepare('select count(*) as count from pdf_files where path_key is null').get() as { count: number }).count;
       if (before !== after || missingKeys > 0 || (database.pragma('foreign_key_check') as Array<unknown>).length > 0) {

@@ -106,6 +106,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
       <button type="button" aria-selected={view === 'drawing'} onClick={() => { setView('drawing'); setSelectedBatch(null); }}>按图号</button>
       <button type="button" aria-selected={view === 'batch'} onClick={() => { setView('batch'); setSelected(null); }}>按资料批次</button>
     </nav>
+    {error && <p className="error-banner">{error}</p>}
     {view === 'drawing' ? <>
     <form className="filter-bar filter-grid" onSubmit={submit}>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
@@ -121,7 +122,6 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         <label><span>转曲后文件</span><select aria-label="转曲后文件" value={filters.outlinedPresence} onChange={(event) => set('outlinedPresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label></>}
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
     </form>
-    {error && <p className="error-banner">{error}</p>}
     {!loading && items.length === 0 ? <EmptyState title="图号库尚无记录" description="Phase 2 完成正式占号后，记录会显示在这里。" /> :
       <DataTable items={items} onRowClick={(item) => void openDetail(item)} columns={[
         { key: 'code', label: '完整图号', render: (item) => <button className="link-button" type="button">{item.fullCode}</button> },

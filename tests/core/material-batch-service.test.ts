@@ -48,22 +48,24 @@ describe('MaterialBatchService', () => {
     const first = insertBatch(product, '00.首批大货', 0);
     const old = insertBatch(product, '01.20241210', 1);
     const latest = insertBatch(product, '06.20260309', 6);
-    insertBatch(product, '预案', null, 'pending');
+    const pending = insertBatch(product, '预案', null, 'pending');
     const drawing = insertHistorical('02.0209.010.0401001');
     insertFile(first, drawing, 'first');
     insertFile(old, drawing, 'old', '2099-01-01T00:00:00.000Z');
     insertFile(latest, drawing, 'latest', '2020-01-01T00:00:00.000Z');
+    insertFile(pending, drawing, 'plan');
 
     expect(service.getCurrentBatchSelection(product)).toEqual({ status: 'selected', batchId: latest });
     expect(service.getDrawingUsage('02.0209.010.0401001', 'historical')).toMatchObject({
       state: 'current',
-      occurrenceCount: 3,
+      occurrenceCount: 4,
       currentProductCount: 1,
       historicalProductCount: 0,
       occurrences: [
         expect.objectContaining({ batchId: latest, batchName: '06.20260309', usageState: 'current' }),
         expect.objectContaining({ batchId: old, usageState: 'historical' }),
         expect.objectContaining({ batchId: first, usageState: 'historical' }),
+        expect.objectContaining({ batchId: pending, usageState: 'indeterminate' }),
       ],
     });
   });

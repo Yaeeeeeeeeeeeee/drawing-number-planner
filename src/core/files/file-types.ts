@@ -30,6 +30,7 @@ export interface HistoricalDrawingScanRecord extends ParsedDrawingCode {
 export interface FileSearchFilters {
   keyword?: string;
   productId?: number;
+  materialBatchId?: number;
   matchStatus?: FileMatchStatus;
   conversionType?: ConversionType;
   presence?: FilePresence;

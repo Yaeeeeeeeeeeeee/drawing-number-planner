@@ -31,6 +31,7 @@ function apiFixture(configured = false) {
     cleanupPdfFiles: vi.fn().mockResolvedValue({ cleaned: 1 }),
     searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
     listProducts: vi.fn().mockResolvedValue([{ id: 9, sku: 'SKDZC100JP', model: 'ZC100', productCategory: '冰柜', status: 'active' }]),
+    listMaterialBatches: vi.fn().mockResolvedValue([{ id: 2, sku: 'SKDZC100JP', model: 'ZC100', name: '06.20260309' }]),
   };
 }
 
@@ -59,8 +60,9 @@ describe('FilesPage', () => {
     expect((await screen.findAllByText('SKDZC100JP · ZC100')).some((item) => item.tagName === 'STRONG')).toBe(true);
     expect(screen.getAllByText('待关联').length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText('产品档案'), { target: { value: '9' } });
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
-    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9 })));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9, materialBatchId: 2 })));
   });
   it('opens a present file by PDF index ID and disables missing file locations', async () => {
     const showFileInFolder = vi.fn().mockResolvedValue({ ok: true }); window.plannerDesktop = { showFileInFolder };

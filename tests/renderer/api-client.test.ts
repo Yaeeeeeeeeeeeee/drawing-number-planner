@@ -118,7 +118,7 @@ describe('renderer API client', () => {
     await apiClient.saveBomVersion({ productId: 1, colorId: 5, expectedCurrentVersionId: null, items: [] });
     await apiClient.updateWorkspaceSettings('X:\\Library');
     await apiClient.scanPdfFiles();
-    await apiClient.searchPdfFiles({ keyword: '转曲', matchStatus: 'unmatched', page: 1, pageSize: 20 });
+    await apiClient.searchPdfFiles({ keyword: '转曲', matchStatus: 'unmatched', materialBatchId: 7, page: 1, pageSize: 20 });
 
     expect(window.location.search).toBe('');
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/session', { method: 'POST' });
@@ -137,7 +137,7 @@ describe('renderer API client', () => {
       method: 'POST', headers: expect.objectContaining({ 'x-planner-token': 'fresh-launch-token' }),
     }));
     expect(fetchMock.mock.calls[4][1]?.headers).not.toHaveProperty('content-type');
-    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/files?keyword=%E8%BD%AC%E6%9B%B2&matchStatus=unmatched&page=1&pageSize=20', {
+    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/files?keyword=%E8%BD%AC%E6%9B%B2&matchStatus=unmatched&materialBatchId=7&page=1&pageSize=20', {
       headers: {},
     });
   });

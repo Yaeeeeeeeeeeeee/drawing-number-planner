@@ -20,7 +20,7 @@ export class MaterialBatchRepository {
        is_present, first_seen_at, last_seen_at)
       values (@relativePath, @productDirectory, @productId, @productCategory, @sku, @model,
        @name, @sequenceNumber, @businessDate, @recognitionStatus, @classificationWarning, 1, @scannedAt, @scannedAt)
-      on conflict(relative_path) do update set
+      on conflict do update set
         product_directory = excluded.product_directory,
         product_id = coalesce(excluded.product_id, material_batches.product_id),
         detected_product_category = excluded.detected_product_category,

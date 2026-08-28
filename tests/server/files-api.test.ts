@@ -53,6 +53,14 @@ describe('PDF file API', () => {
       matchStatus: 'pending', classificationWarning: expect.stringContaining('invalid-format'),
       detectedCodes: ['02.0404.010.0401000'],
     })] });
+
+    const batchRoot = join(workspace, '01.洗碗机', 'SKU-T40', '03.量产后的变更文件', '01.20241210');
+    mkdirSync(batchRoot, { recursive: true });
+    writeFileSync(join(batchRoot, 'batch.pdf'), '%PDF-1.4');
+    await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+    const batches = await (await fetch(`${server.url}/api/material-batches?search=T40`)).json() as { items: Array<{ id: number }> };
+    const byBatch = await (await fetch(`${server.url}/api/files?materialBatchId=${batches.items[0].id}`)).json();
+    expect(byBatch).toMatchObject({ total: 1, items: [expect.objectContaining({ fileName: 'batch.pdf' })] });
   });
 
   it('strictly rejects malformed input and maps workspace errors without changing settings', async () => {

@@ -40,6 +40,8 @@ describe('database migrations', () => {
     expect(batchColumns).toEqual(expect.arrayContaining([
       'relative_path', 'product_directory', 'sequence_number', 'recognition_status', 'is_present',
     ]));
+    expect(db.prepare("select name from sqlite_master where type = 'index' and name = 'material_batches_relative_path_nocase_unique'").get())
+      .toEqual({ name: 'material_batches_relative_path_nocase_unique' });
     expect(backup).not.toHaveBeenCalled();
   });
 
@@ -52,6 +54,19 @@ describe('database migrations', () => {
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
       .toEqual([{ name: 'bom_current' }, { name: 'bom_items' }, { name: 'bom_versions' }]);
+  });
+
+  it('backs up and repairs the case-insensitive batch path invariant on an early v6 database', () => {
+    const db = openDatabase(':memory:'); databases.push(db);
+    migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+    db.exec('drop index material_batches_relative_path_nocase_unique');
+    const backup = vi.fn();
+
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 6, to: 6 });
+
+    expect(backup).toHaveBeenCalledOnce();
+    expect(db.prepare("select name from sqlite_master where type = 'index' and name = 'material_batches_relative_path_nocase_unique'").get())
+      .toEqual({ name: 'material_batches_relative_path_nocase_unique' });
   });
 
   it('backs up an existing v3 database before adding the relative PDF index', () => {

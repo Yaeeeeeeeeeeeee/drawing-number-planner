@@ -153,6 +153,7 @@ export class FileRepository {
       parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
     }
     if (filters.productId != null) { where.push('coalesce(drawing.product_id, historical.product_id) = @productId'); parameters.productId = filters.productId; }
+    if (filters.materialBatchId != null) { where.push('file.material_batch_id = @materialBatchId'); parameters.materialBatchId = filters.materialBatchId; }
     if (filters.matchStatus) { where.push('file.match_status = @matchStatus'); parameters.matchStatus = filters.matchStatus; }
     if (filters.conversionType) { where.push('file.conversion_type = @conversionType'); parameters.conversionType = filters.conversionType; }
     const presence = filters.presence ?? 'present';

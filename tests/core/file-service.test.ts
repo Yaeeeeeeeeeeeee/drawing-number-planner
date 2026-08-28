@@ -81,6 +81,24 @@ describe('FileService', () => {
     expect(repository.search({ presence: 'present' }).items).toEqual([expect.objectContaining({ fileName: 'kept.pdf' })]);
   });
 
+  it('treats case-only batch path variants as the same Windows batch', () => {
+    const firstPath = '01.洗碗机\\SKU-T40\\03.量产后的变更文件\\01.20241210';
+    const secondPath = '01.洗碗机\\sku-t40\\03.量产后的变更文件\\01.20241210';
+    const record = (relativePath: string, batchPath: string) => ({
+      relativePath, fileName: 'same.pdf', drawingId: null, matchStatus: 'unmatched' as const,
+      detectedCodes: [], conversionType: 'outlined' as const, sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z',
+      materialBatch: { relativePath: batchPath, productDirectory: batchPath.split('\\03.')[0], directoryContext: null,
+        name: '01.20241210', sequenceNumber: 1, businessDate: '2024-12-10', recognitionStatus: 'recognized' as const,
+        classificationWarning: null },
+    });
+
+    repository.replaceScan([record(`${firstPath}\\same.pdf`, firstPath)], [], '2026-08-25T00:00:00.000Z');
+    repository.replaceScan([record(`${secondPath}\\same.pdf`, secondPath)], [], '2026-08-26T00:00:00.000Z');
+
+    expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 1 });
+    expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
+  });
+
   it('rejects a concurrent scan while the first scan is still running', async () => {
     const workspace = join(dataDir, 'library'); mkdirSync(workspace); settings.setWorkspaceRoot(workspace);
     let release!: (value: []) => void; const scanner = vi.fn(() => new Promise<[]>((resolve) => { release = resolve; }));

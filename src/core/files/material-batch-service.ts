@@ -125,7 +125,8 @@ export class MaterialBatchService {
         selection = this.getCurrentBatchSelection(row.product_directory);
         selectionByProduct.set(row.product_directory, selection);
       }
-      const usageState: BatchUsageState = selection.status === 'selected'
+      const usageState: BatchUsageState = row.recognition_status === 'pending' ? 'indeterminate'
+        : selection.status === 'selected'
         ? selection.batchId === row.batch_id ? 'current' : 'historical'
         : 'indeterminate';
       let occurrence = grouped.get(row.batch_id);
