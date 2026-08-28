@@ -55,7 +55,7 @@ describe('real application API', () => {
     const paths = resolveAppPaths(dataDir); mkdirSync(paths.baseDir, { recursive: true });
     const database = openDatabase(paths.database);
     database.exec(`create table schema_migrations (version integer primary key, applied_at text not null);
-      insert into schema_migrations values (6, '2026-08-24T00:00:00Z')`);
+      insert into schema_migrations values (7, '2026-08-24T00:00:00Z')`);
     database.close();
 
     await expect(startServer({ port: 0, dataDir })).rejects.toThrow('高于当前软件支持的版本');

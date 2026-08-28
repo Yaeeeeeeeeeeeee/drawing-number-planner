@@ -69,8 +69,9 @@ test('Phase 3 versions a gray BOM while sharing white drawings from the same mod
   await expect(page.getByText(`LOGO：${byClientId.get('gray-logo')} → ${byClientId.get('white-logo')}`)).toBeVisible();
   await expect(page.getByText(`说明书：移除 ${byClientId.get('white-manual')}`)).toBeVisible();
 
-  await page.getByRole('button', { name: '查看变更' }).last().click();
-  await expect(page.getByText(/使用明细/)).toBeVisible();
+  await page.getByRole('button', { name: '查询 BOM' }).click();
+  await page.getByRole('button', { name: /^查看 BOM / }).last().click();
+  await expect(page.getByRole('region', { name: 'BOM 历史明细' })).toBeVisible();
   await expect(page.getByRole('cell', { name: byClientId.get('gray-logo')!, exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: byClientId.get('white-manual')!, exact: true })).toBeVisible();
 

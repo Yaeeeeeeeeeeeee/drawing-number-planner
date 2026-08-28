@@ -5,6 +5,7 @@ const tokenHeaders = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'phas
 
 test('Phase 1 browser workflow uses the real local database', async ({ page, request }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: /图号库/ }).click();
   await expect(page.getByRole('heading', { name: '图号库', exact: true })).toBeVisible();
   await expect(page.getByText('图号库尚无记录')).toBeVisible();
 
@@ -26,7 +27,7 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
   await page.getByRole('button', { name: '新建产品' }).click();
   await page.getByRole('textbox', { name: 'SKU', exact: true }).fill('PHASE1-ZC220');
   await page.getByRole('textbox', { name: '型号', exact: true }).fill('ZC220');
-  await page.getByLabel('产品类别').fill('冰柜');
+  await page.getByRole('textbox', { name: '产品类别', exact: true }).fill('冰柜');
   await page.getByRole('combobox', { name: '品牌', exact: true }).selectOption({ label: 'SAMKYO' });
   await page.getByLabel('品类尺寸').selectOption({ label: 'ZC220冰柜' });
   await page.getByLabel('默认外观').selectOption({ label: '1号外观' });
