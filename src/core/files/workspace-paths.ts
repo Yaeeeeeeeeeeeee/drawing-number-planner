@@ -38,6 +38,17 @@ export function validateWorkspaceRelativePath(relativePath: string): string {
   return relativePath;
 }
 
+export function toWorkspacePathKey(relativePath: string): string {
+  const rawSegments = relativePath.split(/[\\/]+/);
+  if (!relativePath || relativePath.includes('\0') || win32.isAbsolute(relativePath)
+    || /^[a-z]:/i.test(relativePath) || rawSegments.some((segment) => segment === '..')) {
+    throw new FileError('PATH_OUTSIDE_WORKSPACE', '业务文件路径必须是资料根目录内的安全相对路径');
+  }
+  const normalized = win32.normalize(relativePath.replace(/\//g, '\\'));
+  validateWorkspaceRelativePath(normalized);
+  return normalized.toLocaleLowerCase('en-US');
+}
+
 function canonicalizeWithExistingAncestor(input: string): string {
   let probe = input; const missing: string[] = [];
   while (!existsSync(probe) && probe !== dirname(probe)) {

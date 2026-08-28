@@ -4,9 +4,21 @@ import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveWorkspacePath, toWorkspaceRelativePath, validateWorkspaceRoot } from '../../src/core/files/workspace-paths';
+import {
+  resolveWorkspacePath,
+  toWorkspacePathKey,
+  toWorkspaceRelativePath,
+  validateWorkspaceRoot,
+} from '../../src/core/files/workspace-paths';
 
 describe('workspace paths', () => {
+  it('creates one case-insensitive Windows key for equivalent safe relative paths', () => {
+    expect(toWorkspacePathKey('01.洗碗机/SKDWT040JP-T40/A.PDF'))
+      .toBe('01.洗碗机\\skdwt040jp-t40\\a.pdf');
+    expect(toWorkspacePathKey('01.洗碗机\\SKDWT040JP-T40\\.\\A.PDF'))
+      .toBe('01.洗碗机\\skdwt040jp-t40\\a.pdf');
+  });
+
   it('normalizes a real root and resolves a nested relative path inside it', () => {
     const root = mkdtempSync(join(tmpdir(), 'planner-root-')); mkdirSync(join(root, 'SAMKYO', 'ZC100'), { recursive: true });
 

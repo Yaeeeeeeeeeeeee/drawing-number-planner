@@ -263,3 +263,30 @@ export const schemaVersionFive = `
   INSERT INTO schema_migrations (version, applied_at)
   VALUES (5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 `;
+
+export const schemaVersionSix = `
+  CREATE TABLE material_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relative_path TEXT NOT NULL UNIQUE,
+    product_directory TEXT NOT NULL,
+    product_id INTEGER REFERENCES products(id),
+    detected_product_category TEXT,
+    detected_sku TEXT,
+    detected_model TEXT,
+    name TEXT NOT NULL,
+    sequence_number INTEGER,
+    business_date TEXT,
+    recognition_status TEXT NOT NULL CHECK (recognition_status IN ('recognized', 'pending')),
+    classification_warning TEXT,
+    is_present INTEGER NOT NULL DEFAULT 1 CHECK (is_present IN (0, 1)),
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL
+  );
+
+  CREATE INDEX material_batches_product_sequence_idx
+    ON material_batches(product_directory, sequence_number);
+  CREATE INDEX material_batches_product_id_idx ON material_batches(product_id);
+
+  ALTER TABLE pdf_files ADD COLUMN path_key TEXT;
+  ALTER TABLE pdf_files ADD COLUMN material_batch_id INTEGER REFERENCES material_batches(id);
+`;

@@ -1,5 +1,13 @@
 import type { PlannerDatabase } from './database.js';
-import { schemaVersionFive, schemaVersionFour, schemaVersionOne, schemaVersionThree, schemaVersionTwo } from './schema.sql.js';
+import { toWorkspacePathKey } from '../core/files/workspace-paths.js';
+import {
+  schemaVersionFive,
+  schemaVersionFour,
+  schemaVersionOne,
+  schemaVersionSix,
+  schemaVersionThree,
+  schemaVersionTwo,
+} from './schema.sql.js';
 
 export interface MigrationSafety {
   databaseExists: boolean;
@@ -77,8 +85,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 5) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 5`);
-  if (from >= 5) return { from, to: from };
+  if (from > 6) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 6`);
+  if (from >= 6) return { from, to: from };
   if (safety.databaseExists) safety.createBackup();
   database.transaction(() => {
     if (from < 1) database.exec(schemaVersionOne);
@@ -106,6 +114,30 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
         throw new Error('兼容性数据校验失败，数据库未升级');
       }
     }
+    if (from < 6) {
+      const before = (database.prepare('select count(*) as count from pdf_files').get() as { count: number }).count;
+      database.exec(schemaVersionSix);
+      const updatePathKey = database.prepare('update pdf_files set path_key = ? where id = ?');
+      const rows = database.prepare('select id, relative_path from pdf_files order by id').all() as Array<{
+        id: number;
+        relative_path: string;
+      }>;
+      for (const row of rows) updatePathKey.run(toWorkspacePathKey(row.relative_path), row.id);
+      const duplicatePathKeys = database.prepare(`select count(*) as count from (
+        select path_key from pdf_files group by path_key having count(*) > 1
+      )`).get() as { count: number };
+      if (duplicatePathKeys.count > 0) throw new Error('PDF 索引存在规范化路径冲突，数据库未升级');
+      database.exec(`
+        CREATE UNIQUE INDEX pdf_files_path_key_unique ON pdf_files(path_key);
+        CREATE INDEX pdf_files_material_batch_idx ON pdf_files(material_batch_id);
+      `);
+      const after = (database.prepare('select count(*) as count from pdf_files').get() as { count: number }).count;
+      const missingKeys = (database.prepare('select count(*) as count from pdf_files where path_key is null').get() as { count: number }).count;
+      if (before !== after || missingKeys > 0 || (database.pragma('foreign_key_check') as Array<unknown>).length > 0) {
+        throw new Error('资料批次数据校验失败，数据库未升级');
+      }
+      database.prepare('insert into schema_migrations (version, applied_at) values (6, ?)').run(new Date().toISOString());
+    }
   })();
-  return { from, to: 5 };
+  return { from, to: 6 };
 }
