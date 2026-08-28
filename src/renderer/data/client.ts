@@ -174,10 +174,13 @@ function responseError(response: Response, body: ResponseBody): ApiError {
   if (backendError?.code || backendError?.message) {
     return new ApiError(backendError.code ?? 'REQUEST_FAILED', backendError.message ?? '请求失败');
   }
+  const jsonMessage = value && typeof value === 'object' && typeof value.message === 'string'
+    ? value.message
+    : undefined;
   if ([502, 503, 504].includes(response.status)) {
-    return new ApiError('SERVICE_UNAVAILABLE', body.kind === 'text' ? body.value : '本地服务暂时不可用，请稍后重试');
+    return new ApiError('SERVICE_UNAVAILABLE', body.kind === 'text' ? body.value : jsonMessage ?? '本地服务暂时不可用，请稍后重试');
   }
-  return new ApiError('REQUEST_FAILED', body.kind === 'text' ? body.value : `请求失败（HTTP ${response.status}）`);
+  return new ApiError('REQUEST_FAILED', body.kind === 'text' ? body.value : jsonMessage ?? `请求失败（HTTP ${response.status}）`);
 }
 
 const queryString = (values: Record<string, unknown>) => {

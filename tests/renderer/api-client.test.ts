@@ -235,6 +235,18 @@ describe('renderer API client', () => {
     } satisfies Partial<InstanceType<typeof ApiError>>);
   });
 
+  it('surfaces the message from Fastify top-level JSON errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      statusCode: 404, error: 'Not Found', message: 'Route GET:/api/missing not found',
+    }), {
+      status: 404, headers: { 'content-type': 'application/json' },
+    })));
+
+    await expect(apiClient.searchDrawings()).rejects.toMatchObject({
+      code: 'REQUEST_FAILED', message: 'Route GET:/api/missing not found',
+    } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
+
   it('rejects a non-JSON success response as an invalid service response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not-json', {
       status: 200, headers: { 'content-type': 'text/plain' },
@@ -264,13 +276,28 @@ describe('renderer API client', () => {
   });
 
   it('handles an empty session bootstrap response without a JSON parser error', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', {
-      status: 502, headers: { 'content-type': 'text/plain' },
-    })));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('', {
+        status: 502, headers: { 'content-type': 'text/plain' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'recovered-token' }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 1, code: '02', name: 'SAMKYO', status: 'active' }), {
+        status: 201, headers: { 'content-type': 'application/json' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
 
     await expect(apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' }))
       .rejects.toMatchObject({
         code: 'SERVICE_UNAVAILABLE', message: '本地服务暂时不可用，请稍后重试',
       } satisfies Partial<InstanceType<typeof ApiError>>);
+    await expect(apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' }))
+      .resolves.toMatchObject({ id: 1, code: '02' });
+
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/session')).toHaveLength(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/dictionaries/brand', expect.objectContaining({
+      headers: expect.objectContaining({ 'x-planner-token': 'recovered-token' }),
+    }));
   });
 });
