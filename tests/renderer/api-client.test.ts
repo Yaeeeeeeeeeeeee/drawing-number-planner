@@ -14,6 +14,25 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('sends an empty JSON object for bodyless JSON write actions', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'write-token' }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 7, status: 'inactive' }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiClient.deactivateDictionary(7);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/dictionaries/items/7/deactivate', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ 'content-type': 'application/json', 'x-planner-token': 'write-token' }),
+      body: '{}',
+    }));
+  });
+
   it('uses strict drawing lifecycle and PDF-association action payloads', async () => {
     const detail = { id: 7, status: 'active' };
     const fetchMock = vi.fn()

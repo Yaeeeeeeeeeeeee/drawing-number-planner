@@ -238,7 +238,7 @@ function sessionToken(): Promise<string> {
 const json = (method: string, body?: unknown): RequestInit => ({
   method,
   headers: { 'content-type': 'application/json' },
-  ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  body: JSON.stringify(body ?? {}),
 });
 
 export const apiClient: PlannerApi = {
