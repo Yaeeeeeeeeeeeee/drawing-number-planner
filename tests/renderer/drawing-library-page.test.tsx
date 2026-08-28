@@ -4,6 +4,74 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
 describe('DrawingLibraryPage', () => {
+  it('aggregates one logical drawing and expands all of its material batch occurrences', async () => {
+    const occurrences = Array.from({ length: 7 }, (_, index) => ({
+      batchId: index + 1,
+      productDirectory: '01.洗碗机\\SKU-T40',
+      batchName: index === 6 ? '06.20260309' : `0${index}.20250${index + 1}01`,
+      sequenceNumber: index,
+      recognitionStatus: 'recognized',
+      usageState: index === 6 ? 'current' : 'historical',
+      files: [],
+    }));
+    const row = {
+      id: -1, fullCode: '02.0209.010.0501001', displayName: '大外箱', sku: 'SKU', model: 'T40',
+      brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '包装类', projectItemName: '大外箱',
+      status: 'historical', origin: 'historical', hasSourceFile: true, hasOutlinedFile: true,
+      dictionaryMappingStatus: 'mapped',
+      batchUsage: { state: 'current', occurrenceCount: 7, currentProductCount: 1, historicalProductCount: 0,
+        conflictWithBusinessStatus: false, occurrences },
+    } as const;
+    const api = {
+      searchDrawings: vi.fn().mockResolvedValue({ items: [row], total: 1, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]),
+      getDrawing: vi.fn().mockResolvedValue({ ...row, readOnly: true, readOnlyMessage: '永久占用的历史数据，不可修改',
+        sourceFiles: [], outlinedFiles: [], currentBomUsage: [] }),
+    };
+
+    render(<DrawingLibraryPage api={api as never} />);
+
+    expect(await screen.findAllByText(row.fullCode)).toHaveLength(1);
+    expect(screen.getByText('当前使用 · 出现于 7 个资料批次')).toBeVisible();
+    fireEvent.click(screen.getByText(row.fullCode));
+    expect(await screen.findByText('06.20260309 · 当前')).toBeVisible();
+    expect(screen.getByText('00.20250101')).toBeVisible();
+  });
+
+  it('browses a model by material batch and preserves every file instance', async () => {
+    const batches = [
+      { id: 6, productDirectory: '01.洗碗机\\SKU-T40', sku: 'SKU', model: 'T40', name: '06.20260309',
+        sequenceNumber: 6, recognitionStatus: 'recognized', currentState: 'current', fileCount: 2, isPresent: true },
+      { id: 7, productDirectory: '01.洗碗机\\SKU-T40', sku: 'SKU', model: 'T40', name: '预案',
+        sequenceNumber: null, recognitionStatus: 'pending', currentState: 'indeterminate', fileCount: 1, isPresent: true },
+    ];
+    const files = [
+      { pdfIndexId: 31, fileName: 'same.pdf', relativePath: 'batch/source.pdf', isPresent: true,
+        conversionType: 'source', fullCode: '02.0209.010.0501001', matchStatus: 'matched', classificationWarning: null },
+      { pdfIndexId: 32, fileName: 'same.pdf', relativePath: 'batch/outlined.pdf', isPresent: true,
+        conversionType: 'outlined', fullCode: '02.0209.010.0501001', matchStatus: 'matched', classificationWarning: null },
+    ];
+    const api = {
+      searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]),
+      listMaterialBatches: vi.fn().mockResolvedValue(batches),
+      getMaterialBatchFiles: vi.fn().mockResolvedValue(files),
+    };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '按资料批次' }));
+    fireEvent.change(screen.getByLabelText('搜索型号或批次'), { target: { value: 'T40' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询资料批次' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看批次 06.20260309' }));
+
+    expect(api.listMaterialBatches).toHaveBeenLastCalledWith({ search: 'T40' });
+    expect(await screen.findAllByText('same.pdf')).toHaveLength(2);
+    expect(screen.getByText('当前使用')).toBeVisible();
+    expect(screen.getByText('待确认')).toBeVisible();
+    expect(screen.getByText('batch/source.pdf')).toBeVisible();
+    expect(screen.getByText('batch/outlined.pdf')).toBeVisible();
+  });
+
   it('offers a separate open-location action for each present source/outlined file and disables missing rows', async () => {
     const row = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
       model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
