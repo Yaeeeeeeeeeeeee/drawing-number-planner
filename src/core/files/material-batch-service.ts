@@ -6,7 +6,9 @@ import type {
   CurrentBatchSelection,
   DrawingBatchOccurrence,
   DrawingBatchUsage,
+  MaterialBatchFileView,
   MaterialBatchRecognitionStatus,
+  MaterialBatchView,
 } from './material-batch-types.js';
 
 interface OccurrenceRow {
@@ -37,6 +39,70 @@ export class MaterialBatchService {
     return candidates.length === 1
       ? { status: 'selected', batchId: candidates[0].id }
       : { status: 'indeterminate', batchId: null };
+  }
+
+  list(filters: { search?: string; productId?: number } = {}): MaterialBatchView[] {
+    const where: string[] = [];
+    const params: Record<string, unknown> = {};
+    if (filters.search?.trim()) {
+      where.push(`(batch.product_directory like @search or batch.detected_sku like @search
+        or batch.detected_model like @search or batch.name like @search)`);
+      params.search = `%${filters.search.trim()}%`;
+    }
+    if (filters.productId !== undefined) {
+      where.push('batch.product_id = @productId');
+      params.productId = filters.productId;
+    }
+    const whereSql = where.length > 0 ? `where ${where.join(' and ')}` : '';
+    const rows = this.db.prepare(`select batch.id, batch.relative_path as relativePath,
+        batch.product_directory as productDirectory, batch.product_id as productId,
+        coalesce(product.product_category, batch.detected_product_category) as productCategory,
+        coalesce(product.sku, batch.detected_sku) as sku,
+        coalesce(product.model, batch.detected_model) as model,
+        batch.name, batch.sequence_number as sequenceNumber, batch.business_date as businessDate,
+        batch.recognition_status as recognitionStatus, batch.classification_warning as classificationWarning,
+        batch.is_present as isPresent, count(file.id) as fileCount
+      from material_batches batch
+      left join products product on product.id = batch.product_id
+      left join pdf_files file on file.material_batch_id = batch.id
+      ${whereSql}
+      group by batch.id`).all(params) as Array<Omit<MaterialBatchView, 'isPresent' | 'currentState'> & { isPresent: number }>;
+    const selections = new Map<string, CurrentBatchSelection>();
+    const items = rows.map((row): MaterialBatchView => {
+      let selection = selections.get(row.productDirectory);
+      if (!selection) {
+        selection = this.getCurrentBatchSelection(row.productDirectory);
+        selections.set(row.productDirectory, selection);
+      }
+      const currentState: BatchUsageState = row.recognitionStatus === 'pending'
+        || selection.status !== 'selected' ? 'indeterminate'
+        : selection.batchId === row.id ? 'current' : 'historical';
+      return { ...row, isPresent: row.isPresent === 1, currentState };
+    });
+    return items.sort((left, right) => {
+      const rank = (item: MaterialBatchView) => item.currentState === 'current' ? 0
+        : item.currentState === 'historical' ? 1 : 2;
+      return left.productDirectory.localeCompare(right.productDirectory, 'zh-CN')
+        || rank(left) - rank(right)
+        || (right.sequenceNumber ?? -1) - (left.sequenceNumber ?? -1)
+        || right.id - left.id;
+    });
+  }
+
+  getFiles(batchId: number): MaterialBatchFileView[] | null {
+    if (!this.db.prepare('select 1 from material_batches where id = ?').get(batchId)) return null;
+    const rows = this.db.prepare(`select file.id as pdfIndexId, file.file_name as fileName,
+        file.relative_path as relativePath, file.is_present as isPresent, file.conversion_type as conversionType,
+        coalesce(drawing.full_code, historical.full_code) as fullCode,
+        file.match_status as matchStatus, file.classification_warning as classificationWarning
+      from pdf_files file
+      left join drawing_numbers drawing on drawing.id = file.drawing_id
+      left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
+      where file.material_batch_id = ?
+      order by file.relative_path collate nocase, file.id`).all(batchId) as Array<
+        Omit<MaterialBatchFileView, 'isPresent'> & { isPresent: number }
+      >;
+    return rows.map((row) => ({ ...row, isPresent: row.isPresent === 1 }));
   }
 
   getDrawingUsage(fullCode: string, businessStatus: DrawingStatus): DrawingBatchUsage {

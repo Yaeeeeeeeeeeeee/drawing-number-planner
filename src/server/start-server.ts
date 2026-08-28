@@ -11,6 +11,7 @@ import { DictionaryService } from '../core/dictionaries/dictionary-service.js';
 import { DrawingQueryService } from '../core/drawings/drawing-query-service.js';
 import { FileRepository } from '../core/files/file-repository.js';
 import { FileService } from '../core/files/file-service.js';
+import { MaterialBatchService } from '../core/files/material-batch-service.js';
 import { IndexedPdfResolver } from '../core/files/indexed-pdf-resolver.js';
 import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
 import { PlanningService } from '../core/planning/planning-service.js';
@@ -23,6 +24,7 @@ import { registerBomRoutes } from './routes/boms.js';
 import { registerDrawingRoutes } from './routes/drawings.js';
 import { registerFileRoutes } from './routes/files.js';
 import { registerImportRoutes } from './routes/import.js';
+import { registerMaterialBatchRoutes } from './routes/material-batches.js';
 import { registerProductRoutes } from './routes/products.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 import { assertLoopbackHost, registerLocalAccess } from './security/local-access.js';
@@ -76,6 +78,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerProductRoutes(server, new ProductService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings));
+    registerMaterialBatchRoutes(server, new MaterialBatchService(database));
     registerPlanningRoutes(server, new PlanningService(database));
     registerBomRoutes(server, new BomService(database));
     await registerImportRoutes(server, database, () => {

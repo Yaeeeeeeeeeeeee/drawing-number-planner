@@ -14,6 +14,27 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('queries material batches and preserves every returned file instance', async () => {
+    const batches = [{ id: 6, name: '06.20260309' }];
+    const files = [
+      { pdfIndexId: 1, relativePath: 'batch/source.pdf' },
+      { pdfIndexId: 2, relativePath: 'batch/outlined.pdf' },
+    ];
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: batches }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: files }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.listMaterialBatches({ search: 'T40' })).resolves.toEqual(batches);
+    await expect(apiClient.getMaterialBatchFiles(6)).resolves.toEqual(files);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/material-batches?search=T40', { headers: {} });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/material-batches/6/files', { headers: {} });
+  });
+
   it('sends an empty JSON object for bodyless JSON write actions', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'write-token' }), {

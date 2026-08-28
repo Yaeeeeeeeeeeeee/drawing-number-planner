@@ -24,7 +24,7 @@ export interface DrawingView {
   productId: number | null; model: string; productCategory: string; brandName: string;
   colorName: string; mainCategoryName: string; projectItemName: string;
   status: 'reserved' | 'active' | 'voided' | 'historical'; hasSourceFile: boolean; hasOutlinedFile: boolean;
-  dictionaryMappingStatus: 'mapped' | 'unmapped'; [key: string]: unknown;
+  dictionaryMappingStatus: 'mapped' | 'unmapped'; batchUsage?: DrawingBatchUsageView; [key: string]: unknown;
 }
 export interface DrawingFileView {
   pdfIndexId: number; fileName: string; relativePath: string; isPresent: boolean; conversionType: 'source' | 'outlined';
@@ -36,6 +36,26 @@ export interface DrawingBomUsageView {
 export interface DrawingDetailView extends DrawingView {
   sourceFiles: DrawingFileView[]; outlinedFiles: DrawingFileView[]; currentBomUsage: DrawingBomUsageView[];
   readOnly: boolean; readOnlyMessage: string | null;
+}
+
+export type BatchUsageStateView = 'current' | 'historical' | 'unbatched' | 'indeterminate';
+export interface DrawingBatchUsageView {
+  state: BatchUsageStateView; occurrenceCount: number; currentProductCount: number; historicalProductCount: number;
+  conflictWithBusinessStatus: boolean;
+  occurrences: Array<{
+    batchId: number; productDirectory: string; batchName: string; sequenceNumber: number | null;
+    recognitionStatus: 'recognized' | 'pending'; usageState: BatchUsageStateView; files: DrawingFileView[];
+  }>;
+}
+export interface MaterialBatchView {
+  id: number; relativePath: string; productDirectory: string; productId: number | null;
+  productCategory: string | null; sku: string | null; model: string | null; name: string;
+  sequenceNumber: number | null; businessDate: string | null; recognitionStatus: 'recognized' | 'pending';
+  classificationWarning: string | null; isPresent: boolean; currentState: BatchUsageStateView; fileCount: number;
+}
+export interface MaterialBatchFileView extends DrawingFileView {
+  fullCode: string | null; matchStatus: 'matched' | 'pending' | 'unmatched' | 'conflict';
+  classificationWarning: string | null;
 }
 
 export interface ImportReportView {
@@ -100,6 +120,8 @@ export interface PlannerApi {
   activateDrawing(id: number): Promise<DrawingDetailView>;
   voidDrawing(id: number): Promise<DrawingDetailView>;
   associateDrawingPdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): Promise<DrawingDetailView>;
+  listMaterialBatches(filters?: { search?: string; productId?: number }): Promise<MaterialBatchView[]>;
+  getMaterialBatchFiles(id: number): Promise<MaterialBatchFileView[]>;
   listDictionaries(type: string, includeInactive?: boolean): Promise<DictionaryItemView[]>;
   createDictionary(type: string, input: { code: string; name: string; parentId?: number }): Promise<DictionaryItemView>;
   updateDictionaryName(id: number, name: string): Promise<DictionaryItemView>;
@@ -248,6 +270,10 @@ export const apiClient: PlannerApi = {
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
   associateDrawingPdf: (id, pdfIndexId, conversionType) => request(`/api/drawings/${id}/associate-pdf`,
     json('POST', { pdfIndexId, conversionType })),
+  listMaterialBatches: async (filters = {}) => (await request<{ items: MaterialBatchView[] }>(
+    `/api/material-batches${queryString(filters)}`)).items,
+  getMaterialBatchFiles: async (id) => (await request<{ items: MaterialBatchFileView[] }>(
+    `/api/material-batches/${id}/files`)).items,
   listDictionaries: async (type, includeInactive = true) => {
     const result = await request<{ items: DictionaryItemView[] }>(`/api/dictionaries/${type}?includeInactive=${includeInactive}`);
     return result.items;

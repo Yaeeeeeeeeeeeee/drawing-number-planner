@@ -44,3 +44,27 @@ export interface DrawingBatchUsage {
   conflictWithBusinessStatus: boolean;
   occurrences: DrawingBatchOccurrence[];
 }
+
+export interface MaterialBatchView {
+  id: number;
+  relativePath: string;
+  productDirectory: string;
+  productId: number | null;
+  productCategory: string | null;
+  sku: string | null;
+  model: string | null;
+  name: string;
+  sequenceNumber: number | null;
+  businessDate: string | null;
+  recognitionStatus: MaterialBatchRecognitionStatus;
+  classificationWarning: string | null;
+  isPresent: boolean;
+  currentState: BatchUsageState;
+  fileCount: number;
+}
+
+export interface MaterialBatchFileView extends BatchFileInstance {
+  fullCode: string | null;
+  matchStatus: 'matched' | 'pending' | 'unmatched' | 'conflict';
+  classificationWarning: string | null;
+}
