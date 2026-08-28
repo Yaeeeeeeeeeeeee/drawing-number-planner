@@ -5,6 +5,7 @@ import { DrawingQueryService } from '../../src/core/drawings/drawing-query-servi
 import { FileRepository } from '../../src/core/files/file-repository';
 import { FileError } from '../../src/core/files/file-errors';
 import type { FileScanRecord } from '../../src/core/files/file-types';
+import { parseMaterialBatch } from '../../src/core/files/material-batch-parser';
 import { parseDrawingCode } from '../../src/core/drawings/drawing-code';
 import { PlanningService } from '../../src/core/planning/planning-service';
 import { ProductService } from '../../src/core/products/product-service';
@@ -50,6 +51,62 @@ function records(drawingId: number): FileScanRecord[] {
 }
 
 describe('FileRepository', () => {
+  it('keeps legal cross-batch file instances while reusing one historical drawing', () => {
+    const historical = parseDrawingCode('02.0404.010.0501001')!;
+    const root = '03.量产后的变更文件（已量产的产品看最新日期）';
+    const makeRecord = (batch: string): FileScanRecord => {
+      const relativePath = `03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\${root}\\${batch}\\${historical.fullCode}-大外箱.pdf`;
+      return {
+        ...records(0)[1],
+        relativePath,
+        fileName: `${historical.fullCode}-大外箱.pdf`,
+        matchStatus: 'matched',
+        historicalFullCode: historical.fullCode,
+        detectedCodes: [historical.fullCode],
+        materialBatch: parseMaterialBatch(relativePath)!,
+      };
+    };
+    const scan = [makeRecord('00.首批大货'), makeRecord('01.20241210')];
+    const history = [{ ...historical, directoryContext: {
+      productCategory: '03.冰柜', sku: 'TEST-FILE-REPOSITORY', model: 'ZC100',
+    } }];
+
+    repository.replaceScan(scan, history, '2026-08-25T04:00:00.000Z');
+    repository.replaceScan(scan, history, '2026-08-26T04:00:00.000Z');
+
+    expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 2 });
+    expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 2 });
+    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
+    expect(db.prepare('select count(distinct material_batch_id) as count from pdf_files').get()).toEqual({ count: 2 });
+  });
+
+  it('uses the normalized path key to prevent duplicate indexes for the same actual path', () => {
+    const first = { ...records(0)[1], relativePath: '01.洗碗机\\SKU-T40\\A.PDF', fileName: 'A.PDF' };
+    const second = { ...first, relativePath: '01.洗碗机\\SKU-T40\\a.pdf', fileName: 'a.pdf', sizeBytes: 999 };
+
+    repository.replaceScan([first], [], '2026-08-25T04:00:00.000Z');
+    repository.replaceScan([second], [], '2026-08-26T04:00:00.000Z');
+
+    expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
+    expect(repository.search().items).toEqual([
+      expect.objectContaining({ relativePath: second.relativePath, fileName: 'a.pdf', sizeBytes: 999 }),
+    ]);
+  });
+
+  it('rolls file presence, batch rows, and history back together when batch persistence fails', () => {
+    const kept = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf' };
+    repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
+    db.exec(`create trigger reject_material_batch before insert on material_batches
+      begin select raise(abort, 'batch rejected'); end`);
+    const relativePath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件\\01.20241210\\x.pdf';
+    const failing = { ...records(0)[1], relativePath, materialBatch: parseMaterialBatch(relativePath)! };
+
+    expect(() => repository.replaceScan([failing], [], '2026-08-26T04:00:00.000Z')).toThrow('batch rejected');
+
+    expect(repository.search().items).toEqual([expect.objectContaining({ relativePath: 'kept.pdf', isPresent: true })]);
+    expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 0 });
+  });
+
   it('atomically registers only reliable historical codes and links their PDFs', () => {
     const drawing = drawingFixture();
     const historical = parseDrawingCode('02.0404.010.0401007')!;

@@ -1,10 +1,11 @@
 import { FileError } from './file-errors.js';
 import { FileRepository } from './file-repository.js';
 import { classifyHistoricalPdf } from './historical-file-classifier.js';
+import { parseMaterialBatch } from './material-batch-parser.js';
 import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
 import type { FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
 import { WorkspaceSettingsStore } from './workspace-settings.js';
-import { validateWorkspaceRoot } from './workspace-paths.js';
+import { toWorkspacePathKey, validateWorkspaceRoot } from './workspace-paths.js';
 
 export interface FileScanSummary {
   total: number; matched: number; pending: number; unmatched: number; conflict: number; historicalRegistered: number;
@@ -55,7 +56,9 @@ export class FileService {
         const classification = classifyHistoricalPdf({ ...file, drawings });
         if (classification.historicalCode) historicalCodes.push({ ...classification.historicalCode,
           directoryContext: classification.directoryContext });
-        return { ...file, drawingId: classification.drawingId,
+        return { ...file, pathKey: toWorkspacePathKey(file.relativePath),
+          materialBatch: parseMaterialBatch(file.relativePath),
+          drawingId: classification.drawingId,
           historicalFullCode: classification.historicalCode?.fullCode ?? null,
           matchStatus: classification.matchStatus, detectedCodes: classification.detectedCodes,
           conversionType: classification.conversionType, classificationWarning: classification.classificationWarning };

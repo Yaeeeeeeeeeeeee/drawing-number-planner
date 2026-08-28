@@ -1,7 +1,8 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import type { DrawingCodeReference, FileScanRecord, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
 import { FileError } from './file-errors.js';
-import { validateWorkspaceRelativePath } from './workspace-paths.js';
+import { MaterialBatchRepository } from './material-batch-repository.js';
+import { toWorkspacePathKey, validateWorkspaceRelativePath } from './workspace-paths.js';
 
 interface FileRow {
   id: number; relative_path: string; file_name: string; drawing_id: number | null; historical_drawing_id: number | null;
@@ -11,6 +12,8 @@ interface FileRow {
   sku: string | null; model: string | null; product_category: string | null;
   brand_name: string | null; project_item_name: string | null; color_name: string | null;
   historical_full_code: string | null; classification_warning: string | null;
+  path_key: string; material_batch_id: number | null; material_batch_name: string | null;
+  material_batch_status: PdfFileView['materialBatchStatus'];
 }
 
 function toView(row: FileRow): PdfFileView {
@@ -25,11 +28,14 @@ function toView(row: FileRow): PdfFileView {
     sizeBytes: row.size_bytes, modifiedAt: row.modified_at, scannedAt: row.scanned_at,
     isPresent: row.is_present === 1, fullCode: row.full_code, displayName: row.display_name,
     productId: row.product_id, sku: row.sku, model: row.model, productCategory: row.product_category,
-    brandName: row.brand_name, projectItemName: row.project_item_name, colorName: row.color_name };
+    brandName: row.brand_name, projectItemName: row.project_item_name, colorName: row.color_name,
+    pathKey: row.path_key, materialBatchId: row.material_batch_id, materialBatchName: row.material_batch_name,
+    materialBatchStatus: row.material_batch_status };
 }
 
 export class FileRepository {
-  constructor(private readonly db: PlannerDatabase) {}
+  private readonly batches: MaterialBatchRepository;
+  constructor(private readonly db: PlannerDatabase) { this.batches = new MaterialBatchRepository(db); }
 
   getIndexedFile(id: number): { relativePath: string; isPresent: boolean } | null {
     const row = this.db.prepare('select relative_path as relativePath, is_present as isPresent from pdf_files where id = ?')
@@ -44,9 +50,19 @@ export class FileRepository {
   replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string): {
     missing: number; historicalRegistered: number;
   } {
-    for (const record of records) validateWorkspaceRelativePath(record.relativePath);
+    for (const record of records) {
+      validateWorkspaceRelativePath(record.relativePath);
+      record.pathKey = record.pathKey ?? toWorkspacePathKey(record.relativePath);
+    }
     return this.db.transaction(() => {
       this.db.prepare('update pdf_files set is_present = 0').run();
+      this.batches.markAllMissing();
+      const batchIds = new Map<string, number>();
+      for (const record of records) {
+        if (record.materialBatch && !batchIds.has(record.materialBatch.relativePath)) {
+          batchIds.set(record.materialBatch.relativePath, this.batches.upsert(record.materialBatch, scannedAt));
+        }
+      }
       let historicalRegistered = 0;
       const upsertHistorical = this.db.prepare(`insert into historical_drawing_numbers
         (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
@@ -75,13 +91,17 @@ export class FileRepository {
         if (!existed) historicalRegistered += 1;
       }
       const upsert = this.db.prepare(`insert into pdf_files
-        (relative_path, file_name, drawing_id, historical_drawing_id, match_status, detected_codes_json, conversion_type,
-          classification_warning, size_bytes, modified_at, scanned_at, is_present)
-        values (@relativePath, @fileName, @drawingId,
+        (relative_path, path_key, material_batch_id, file_name, drawing_id, historical_drawing_id,
+          match_status, detected_codes_json, conversion_type, classification_warning,
+          size_bytes, modified_at, scanned_at, is_present)
+        values (@relativePath, @pathKey, @materialBatchId, @fileName, @drawingId,
           (select id from historical_drawing_numbers where full_code = @historicalFullCode),
           @matchStatus, @detectedCodesJson, @conversionType, @classificationWarning,
           @sizeBytes, @modifiedAt, @scannedAt, 1)
-        on conflict(relative_path) do update set
+        on conflict(path_key) do update set
+          relative_path = excluded.relative_path,
+          path_key = excluded.path_key,
+          material_batch_id = excluded.material_batch_id,
           file_name = excluded.file_name,
           drawing_id = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
             and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
@@ -99,7 +119,9 @@ export class FileRepository {
           classification_warning = excluded.classification_warning,
           size_bytes = excluded.size_bytes, modified_at = excluded.modified_at, scanned_at = excluded.scanned_at,
           is_present = 1`);
-      for (const record of records) upsert.run({ relativePath: record.relativePath, fileName: record.fileName,
+      for (const record of records) upsert.run({ relativePath: record.relativePath, pathKey: record.pathKey,
+        materialBatchId: record.materialBatch ? batchIds.get(record.materialBatch.relativePath) ?? null : null,
+        fileName: record.fileName,
         drawingId: record.drawingId, historicalFullCode: record.historicalFullCode ?? null,
         matchStatus: record.matchStatus, detectedCodesJson: JSON.stringify(record.detectedCodes),
         conversionType: record.conversionType, classificationWarning: record.classificationWarning ?? null,
@@ -142,12 +164,14 @@ export class FileRepository {
       left join products product on product.id = coalesce(drawing.product_id, historical.product_id)
       left join dictionary_items brand on brand.id = product.brand_id
       left join dictionary_items project on project.id = drawing.project_item_id
-      left join dictionary_items color on color.id = drawing.color_id`;
+      left join dictionary_items color on color.id = drawing.color_id
+      left join material_batches batch on batch.id = file.material_batch_id`;
     const total = (this.db.prepare(`select count(*) as total ${joins} ${whereSql}`).get(parameters) as { total: number }).total;
     const rows = this.db.prepare(`select file.*, coalesce(drawing.full_code, historical.full_code) as full_code,
         historical.full_code as historical_full_code, drawing.display_name, product.id as product_id, product.sku, product.model,
         product.product_category,
-        brand.name as brand_name, project.name as project_item_name, color.name as color_name
+        brand.name as brand_name, project.name as project_item_name, color.name as color_name,
+        batch.name as material_batch_name, batch.recognition_status as material_batch_status
       ${joins} ${whereSql} order by file.file_name collate nocase, file.id limit @limit offset @offset`)
       .all({ ...parameters, limit: pageSize, offset: (page - 1) * pageSize }) as FileRow[];
     return { items: rows.map(toView), total, page, pageSize };

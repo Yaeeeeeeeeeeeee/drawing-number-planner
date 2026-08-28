@@ -1,5 +1,6 @@
 import type { ParsedDrawingCode } from '../drawings/drawing-code.js';
 import type { DirectoryProductContext } from './directory-policy.js';
+import type { ParsedMaterialBatch } from './material-batch-types.js';
 
 export type FileMatchStatus = 'matched' | 'pending' | 'unmatched' | 'conflict';
 export type ConversionType = 'source' | 'outlined';
@@ -9,6 +10,7 @@ export interface DrawingCodeReference { id: number; fullCode: string }
 
 export interface FileScanRecord {
   relativePath: string;
+  pathKey?: string;
   fileName: string;
   drawingId: number | null;
   historicalFullCode?: string | null;
@@ -18,6 +20,7 @@ export interface FileScanRecord {
   classificationWarning?: string | null;
   sizeBytes: number;
   modifiedAt: string;
+  materialBatch?: ParsedMaterialBatch | null;
 }
 
 export interface HistoricalDrawingScanRecord extends ParsedDrawingCode {
@@ -50,6 +53,10 @@ export interface PdfFileView extends FileScanRecord {
   colorName: string | null;
   scannedAt: string;
   isPresent: boolean;
+  pathKey: string;
+  materialBatchId: number | null;
+  materialBatchName: string | null;
+  materialBatchStatus: 'recognized' | 'pending' | null;
 }
 
 export interface FileSearchResult {
