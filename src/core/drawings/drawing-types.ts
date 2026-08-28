@@ -1,3 +1,5 @@
+import type { DrawingBatchUsage } from '../files/material-batch-types.js';
+
 export type DrawingStatus = 'reserved' | 'active' | 'voided' | 'historical';
 export type DrawingOrigin = 'planned' | 'historical';
 export type FilePresenceFilter = 'present' | 'missing' | 'all';
@@ -41,6 +43,7 @@ export interface DrawingRecord {
   hasSourceFile: boolean;
   hasOutlinedFile: boolean;
   dictionaryMappingStatus: 'mapped' | 'unmapped';
+  batchUsage?: DrawingBatchUsage;
 }
 
 export interface DrawingFileRecord {
@@ -70,6 +73,7 @@ export interface DrawingDetailRecord extends DrawingRecord {
   currentBomUsage: DrawingBomUsage[];
   readOnly: boolean;
   readOnlyMessage: string | null;
+  batchUsage: DrawingBatchUsage;
 }
 
 export interface DrawingSearchFilters {

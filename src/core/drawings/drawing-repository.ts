@@ -149,7 +149,7 @@ export class DrawingRepository {
     return row ? mapRow(row) : undefined;
   }
 
-  getDetail(id: number): DrawingDetailRecord | undefined {
+  getDetail(id: number): Omit<DrawingDetailRecord, 'batchUsage'> | undefined {
     const drawing = this.get(id);
     if (!drawing) return undefined;
     const historicalId = drawing.origin === 'historical' ? -drawing.id : null;

@@ -1,4 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { MaterialBatchService } from '../files/material-batch-service.js';
 import { DrawingRepository } from './drawing-repository.js';
 import type { DrawingDetailRecord, DrawingSearchFilters, PagedDrawingResult } from './drawing-types.js';
 
@@ -8,19 +9,31 @@ export class DrawingQueryError extends Error {
 
 export class DrawingQueryService {
   private readonly repository: DrawingRepository;
-  constructor(database: PlannerDatabase) { this.repository = new DrawingRepository(database); }
+  private readonly batches: MaterialBatchService;
+  constructor(database: PlannerDatabase) {
+    this.repository = new DrawingRepository(database);
+    this.batches = new MaterialBatchService(database);
+  }
 
   search(filters: DrawingSearchFilters = {}): PagedDrawingResult {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 20;
     const result = this.repository.search(filters, page, pageSize);
-    return { ...result, page, pageSize };
+    return {
+      ...result,
+      items: result.items.map((item) => ({
+        ...item,
+        batchUsage: this.batches.getDrawingUsage(item.fullCode, item.status),
+      })),
+      page,
+      pageSize,
+    };
   }
 
   get(id: number): DrawingDetailRecord {
     const drawing = this.repository.getDetail(id);
     if (!drawing) throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
-    return drawing;
+    return { ...drawing, batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
   }
 
   transition(id: number, target: 'active' | 'voided'): DrawingDetailRecord {

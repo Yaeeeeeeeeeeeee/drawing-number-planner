@@ -75,6 +75,37 @@ describe('DrawingQueryService', () => {
     }));
   });
 
+  it('aggregates every batch file instance by canonical full code', () => {
+    const now = '2026-08-28T00:00:00.000Z';
+    const historicalId = Number(db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+       project_item_code, sequence, first_seen_at, last_seen_at)
+      values ('02.0209.010.0401001', '02', '0209', '01', '0', '04', '01', 1, ?, ?)`)
+      .run(now, now).lastInsertRowid);
+    const insertBatch = db.prepare(`insert into material_batches
+      (relative_path, product_directory, name, sequence_number, recognition_status, is_present, first_seen_at, last_seen_at)
+      values (?, '01.洗碗机\\TEST-DRAWING-QUERY-ZC220', ?, ?, 'recognized', 1, ?, ?)`);
+    const firstBatch = Number(insertBatch.run('01.洗碗机\\TEST-DRAWING-QUERY-ZC220\\03.量产\\00.首批大货',
+      '00.首批大货', 0, now, now).lastInsertRowid);
+    const currentBatch = Number(insertBatch.run('01.洗碗机\\TEST-DRAWING-QUERY-ZC220\\03.量产\\01.20241210',
+      '01.20241210', 1, now, now).lastInsertRowid);
+    const insertFile = db.prepare(`insert into pdf_files
+      (relative_path, path_key, material_batch_id, file_name, historical_drawing_id, match_status,
+       detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
+      values (?, ?, ?, ?, ?, 'matched', '[]', 'outlined', 1, ?, ?, 1)`);
+    insertFile.run('batch0\\same.pdf', 'batch0\\same.pdf', firstBatch, 'same.pdf', historicalId, now, now);
+    insertFile.run('batch1\\same.pdf', 'batch1\\same.pdf', currentBatch, 'same.pdf', historicalId, now, now);
+
+    expect(drawings.get(ids.first).batchUsage).toMatchObject({
+      occurrenceCount: 2,
+      state: 'current',
+      occurrences: [
+        expect.objectContaining({ batchId: currentBatch, usageState: 'current' }),
+        expect.objectContaining({ batchId: firstBatch, usageState: 'historical' }),
+      ],
+    });
+  });
+
   it('returns independent indexed PDF lists and only current BOM usage in planned detail', () => {
     const now = '2026-08-26T03:00:00.000Z';
     const sourceId = Number(db.prepare(`insert into pdf_files
