@@ -362,6 +362,36 @@ describe('database migrations', () => {
       .toEqual({ count: 0 });
   });
 
+  it('rolls v7 back when a same-named PDF index is unique but partial', () => {
+    const database = createV6Database();
+    seedV6Rows(database);
+    database.exec(`
+      drop index pdf_files_path_key_unique;
+      create unique index pdf_files_path_key_unique on pdf_files(path_key) where path_key is not null;
+    `);
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('扫描历史数据校验失败');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 6 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'file_scan_runs'").get())
+      .toEqual({ count: 0 });
+  });
+
+  it('rolls v7 back when a same-named batch index has binary instead of NOCASE collation', () => {
+    const database = createV6Database();
+    seedV6Rows(database);
+    database.exec(`
+      drop index material_batches_relative_path_nocase_unique;
+      create unique index material_batches_relative_path_nocase_unique on material_batches(relative_path collate binary);
+    `);
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('扫描历史数据校验失败');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 6 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'file_scan_changes'").get())
+      .toEqual({ count: 0 });
+  });
+
   it('rolls v7 back when pre-existing foreign keys are invalid', () => {
     const database = createV6Database();
     seedV6Rows(database);

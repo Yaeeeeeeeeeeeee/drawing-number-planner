@@ -58,8 +58,9 @@ function hasExpectedUniqueIndex(
   name: string,
   columns: Array<{ name: string; collation?: string }>,
 ): boolean {
-  const indexes = database.pragma(`index_list(${table})`) as Array<{ name: string; unique: number }>;
-  if (indexes.find((index) => index.name === name)?.unique !== 1) return false;
+  const indexes = database.pragma(`index_list(${table})`) as Array<{ name: string; unique: number; partial: number }>;
+  const index = indexes.find((candidate) => candidate.name === name);
+  if (index?.unique !== 1 || index.partial !== 0) return false;
   const keys = (database.pragma(`index_xinfo(${name})`) as Array<{
     seqno: number;
     name: string | null;
