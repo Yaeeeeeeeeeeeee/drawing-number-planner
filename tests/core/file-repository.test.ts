@@ -51,6 +51,12 @@ function records(drawingId: number): FileScanRecord[] {
 }
 
 describe('FileRepository', () => {
+  it('looks up current fingerprints in batches when a library exceeds SQLite variable limits', () => {
+    const pathKeys = Array.from({ length: 32_767 }, (_, index) => `library\\file-${index}.pdf`);
+
+    expect(repository.currentFingerprints(pathKeys)).toEqual(new Map());
+  });
+
   it('keeps legal cross-batch file instances while reusing one historical drawing', () => {
     const historical = parseDrawingCode('02.0404.010.0501001')!;
     const root = '03.量产后的变更文件（已量产的产品看最新日期）';

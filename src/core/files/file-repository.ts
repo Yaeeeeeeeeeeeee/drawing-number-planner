@@ -19,6 +19,8 @@ interface FileRow {
 
 interface StoredFileSnapshotRow extends Omit<IndexedFileSnapshot, 'isPresent'> { isPresent: number }
 
+const FINGERPRINT_LOOKUP_CHUNK_SIZE = 900;
+
 function toView(row: FileRow): PdfFileView {
   const detected = JSON.parse(row.detected_codes_json) as unknown;
   if (!Array.isArray(detected) || !detected.every((value) => typeof value === 'string')) {
@@ -52,10 +54,14 @@ export class FileRepository {
 
   currentFingerprints(pathKeys: string[]): Map<string, { pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }> {
     if (pathKeys.length === 0) return new Map();
-    const unique = [...new Set(pathKeys)]; const placeholders = unique.map(() => '?').join(', ');
-    const rows = this.db.prepare(`select path_key as pathKey, size_bytes as sizeBytes, modified_at as modifiedAt,
-      content_sha256 as contentSha256 from pdf_files where is_present = 1 and path_key in (${placeholders})`)
-      .all(...unique) as Array<{ pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }>;
+    const unique = [...new Set(pathKeys)]; const rows: Array<{ pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }> = [];
+    for (let offset = 0; offset < unique.length; offset += FINGERPRINT_LOOKUP_CHUNK_SIZE) {
+      const pathKeyChunk = unique.slice(offset, offset + FINGERPRINT_LOOKUP_CHUNK_SIZE);
+      const placeholders = pathKeyChunk.map(() => '?').join(', ');
+      rows.push(...this.db.prepare(`select path_key as pathKey, size_bytes as sizeBytes, modified_at as modifiedAt,
+        content_sha256 as contentSha256 from pdf_files where is_present = 1 and path_key in (${placeholders})`)
+        .all(...pathKeyChunk) as Array<{ pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }>);
+    }
     return new Map(rows.map((row) => [row.pathKey, row]));
   }
 

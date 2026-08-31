@@ -1,6 +1,8 @@
 import { createReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 
+export const FINGERPRINT_CONCURRENCY = 8;
+
 export interface ExistingFileFingerprint {
   pathKey: string;
   sizeBytes: number;
@@ -29,4 +31,18 @@ export async function resolveFileFingerprint(input: FileFingerprintInput): Promi
     return { contentSha256: existing.contentSha256, reused: true };
   }
   return { contentSha256: await fingerprintFile(input.absolutePath), reused: false };
+}
+
+export async function mapWithConcurrency<T, R>(items: T[], concurrency: number,
+  operation: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  if (!Number.isInteger(concurrency) || concurrency < 1) throw new Error('并发数必须为正整数');
+  const results = new Array<R>(items.length); let nextIndex = 0;
+  const worker = async (): Promise<void> => {
+    while (nextIndex < items.length) {
+      const index = nextIndex; nextIndex += 1;
+      results[index] = await operation(items[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
 }

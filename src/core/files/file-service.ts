@@ -1,5 +1,5 @@
 import { FileError } from './file-errors.js';
-import { resolveFileFingerprint } from './file-fingerprint.js';
+import { FINGERPRINT_CONCURRENCY, mapWithConcurrency, resolveFileFingerprint } from './file-fingerprint.js';
 import { FileRepository } from './file-repository.js';
 import { classifyHistoricalPdf } from './historical-file-classifier.js';
 import { parseMaterialBatch } from './material-batch-parser.js';
@@ -52,12 +52,12 @@ export class FileService {
     try {
       const files = await this.scanner(workspaceRoot); const drawings = this.repository.listDrawingCodes();
       const priorFingerprints = this.repository.currentFingerprints(files.map((file) => toWorkspacePathKey(file.relativePath)));
-      const fingerprints = await Promise.all(files.map(async (file) => {
+      const fingerprints = await mapWithConcurrency(files, FINGERPRINT_CONCURRENCY, async (file) => {
         const pathKey = toWorkspacePathKey(file.relativePath);
         if (!file.absolutePath) throw new Error('扫描器未返回可只读计算指纹的文件路径');
         return resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey, sizeBytes: file.sizeBytes,
           modifiedAt: file.modifiedAt, existing: priorFingerprints.get(pathKey) ?? null });
-      }));
+      });
       const historicalCodes: HistoricalDrawingScanRecord[] = [];
       const records = files.map((file, index): FileScanRecord => {
         if (!file.fileName.toLocaleLowerCase('en-US').endsWith('.pdf')) throw new Error('扫描器返回了非 PDF 文件');
