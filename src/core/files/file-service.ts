@@ -4,13 +4,14 @@ import { FileRepository } from './file-repository.js';
 import { classifyHistoricalPdf } from './historical-file-classifier.js';
 import { parseMaterialBatch } from './material-batch-parser.js';
 import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
-import type { FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
+import type { FileScanChangesView, FileScanComparison, FileScanRunView, FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
 import { WorkspaceSettingsStore } from './workspace-settings.js';
 import { toWorkspacePathKey, validateWorkspaceRoot } from './workspace-paths.js';
 
 export interface FileScanSummary {
   total: number; matched: number; pending: number; unmatched: number; conflict: number; historicalRegistered: number;
-  source: number; outlined: number; missing: number; scannedAt: string;
+  source: number; outlined: number; missing: number; scanId: number; currentTotal: number;
+  comparison: FileScanComparison; scannedAt: string;
 }
 
 export class FileService {
@@ -34,6 +35,10 @@ export class FileService {
   }
 
   search(filters: FileSearchFilters = {}): FileSearchResult { return this.repository.search(filters); }
+
+  latestScan(): FileScanRunView | null { return this.repository.latestScan(); }
+
+  scanChanges(id: number): FileScanChangesView | null { return this.repository.scanChanges(id); }
 
   cleanup(ids: unknown): { cleaned: number } {
     if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500
@@ -73,7 +78,7 @@ export class FileService {
           contentSha256: fingerprints[index].contentSha256 };
       });
       const scannedAt = new Date().toISOString();
-      const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt);
+      const { scanId, missing, historicalRegistered, comparison } = this.repository.replaceScan(records, historicalCodes, scannedAt);
       return { total: records.length,
         matched: records.filter((file) => file.matchStatus === 'matched').length,
         pending: records.filter((file) => file.matchStatus === 'pending').length,
@@ -81,7 +86,7 @@ export class FileService {
         conflict: records.filter((file) => file.matchStatus === 'conflict').length,
         source: records.filter((file) => file.conversionType === 'source').length,
         outlined: records.filter((file) => file.conversionType === 'outlined').length,
-        missing, historicalRegistered, scannedAt };
+        missing, historicalRegistered, scanId, currentTotal: records.length, comparison, scannedAt };
     } catch (error) {
       if (error instanceof FileError) throw error;
       throw new FileError('SCAN_FAILED', '资料库扫描失败，上次索引未更改', { cause: error });

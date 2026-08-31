@@ -20,6 +20,7 @@ const searchSchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 }).strict();
+const scanIdSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
 
 function sendFileError(reply: FastifyReply, error: unknown) {
   if (!(error instanceof FileError)) throw error;
@@ -52,6 +53,20 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService): 
     if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 索引清理请求无效' } });
     try { return service.cleanup(input.data.ids); }
     catch (error) { return sendFileError(reply, error); }
+  });
+
+  app.get('/api/files/scans/latest', async (_request, reply) => {
+    try { return service.latestScan(); }
+    catch (error) { return sendFileError(reply, error); }
+  });
+
+  app.get('/api/files/scans/:id/changes', async (request, reply) => {
+    const params = scanIdSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '扫描记录编号无效' } });
+    try {
+      const result = service.scanChanges(params.data.id);
+      return result ?? reply.code(404).send({ error: { code: 'SCAN_NOT_FOUND', message: '扫描记录不存在' } });
+    } catch (error) { return sendFileError(reply, error); }
   });
 
   app.get('/api/files', async (request, reply) => {

@@ -102,8 +102,15 @@ export interface WorkspaceSettingsView {
 }
 export interface PdfScanSummaryView {
   total: number; matched: number; pending: number; historicalRegistered: number; unmatched: number;
-  conflict: number; source: number; outlined: number; missing: number; scannedAt: string;
+  conflict: number; source: number; outlined: number; missing: number; scanId: number; currentTotal: number;
+  comparison: FileScanComparisonView; scannedAt: string;
 }
+export interface FileScanComparisonView { added: number; missing: number; moved: number; changed: number; unchanged: number }
+export interface FileScanRunView extends FileScanComparisonView { id: number; completedAt: string; currentTotal: number }
+export interface FileScanChangeView { id: number; type: 'added' | 'missing' | 'moved' | 'changed'; relativePath: string;
+  previousRelativePath: string | null; fileName: string; fullCode: string | null }
+export interface FileScanChangesView { scan: FileScanRunView;
+  changes: { added: FileScanChangeView[]; missing: FileScanChangeView[]; changed: FileScanChangeView[] } }
 export interface PdfFileView {
   id: number; relativePath: string; fileName: string; drawingId: number | null; historicalDrawingId: number | null;
   historicalFullCode: string | null; fullCode: string | null;
@@ -150,6 +157,8 @@ export interface PlannerApi {
   getWorkspaceSettings(): Promise<WorkspaceSettingsView>;
   updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
   scanPdfFiles(): Promise<PdfScanSummaryView>;
+  getLatestFileScan(): Promise<FileScanRunView | null>;
+  getFileScanChanges(id: number): Promise<FileScanChangesView>;
   cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
   searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
     items: PdfFileView[]; total: number; page: number; pageSize: number;
@@ -313,6 +322,8 @@ export const apiClient: PlannerApi = {
   getWorkspaceSettings: () => request('/api/files/settings'),
   updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
   scanPdfFiles: () => request('/api/files/scan', { method: 'POST' }),
+  getLatestFileScan: () => request('/api/files/scans/latest'),
+  getFileScanChanges: (id) => request(`/api/files/scans/${id}/changes`),
   cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),
   searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
 };

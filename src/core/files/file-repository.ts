@@ -1,8 +1,9 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingCodeReference, FileScanRecord, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
+import type { DrawingCodeReference, FileScanChangesView, FileScanComparison, FileScanRecord, FileScanRunView, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
 import { FileError } from './file-errors.js';
 import { diffFileScan, type IndexedFileSnapshot } from './file-scan-diff.js';
 import { MaterialBatchRepository } from './material-batch-repository.js';
+import { FileScanHistoryRepository } from './file-scan-history-repository.js';
 import { toWorkspacePathKey, validateWorkspaceRelativePath } from './workspace-paths.js';
 
 interface FileRow {
@@ -40,7 +41,8 @@ function toView(row: FileRow): PdfFileView {
 
 export class FileRepository {
   private readonly batches: MaterialBatchRepository;
-  constructor(private readonly db: PlannerDatabase) { this.batches = new MaterialBatchRepository(db); }
+  private readonly history: FileScanHistoryRepository;
+  constructor(private readonly db: PlannerDatabase) { this.batches = new MaterialBatchRepository(db); this.history = new FileScanHistoryRepository(db); }
 
   getIndexedFile(id: number): { relativePath: string; isPresent: boolean } | null {
     const row = this.db.prepare('select relative_path as relativePath, is_present as isPresent from pdf_files where id = ?')
@@ -65,8 +67,12 @@ export class FileRepository {
     return new Map(rows.map((row) => [row.pathKey, row]));
   }
 
+  latestScan(): FileScanRunView | null { return this.history.latest(); }
+
+  scanChanges(id: number): FileScanChangesView | null { return this.history.changes(id); }
+
   replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string): {
-    missing: number; historicalRegistered: number;
+    scanId: number; missing: number; historicalRegistered: number; comparison: FileScanComparison;
   } {
     for (const record of records) {
       validateWorkspaceRelativePath(record.relativePath);
@@ -183,7 +189,7 @@ export class FileRepository {
           fileName: snapshot.fileName, fullCode: snapshot.fullCode });
       }
       const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
-      return { missing, historicalRegistered };
+      return { scanId: scanRun.id, missing, historicalRegistered, comparison: counts };
     }).immediate();
   }
 

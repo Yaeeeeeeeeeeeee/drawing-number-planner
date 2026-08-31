@@ -14,6 +14,20 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('loads latest scan summaries and per-scan changes through the shared request layer', async () => {
+    const latest = { id: 9, currentTotal: 3, completedAt: '2026-08-31T00:00:00Z', added: 1, missing: 1, moved: 0, changed: 1, unchanged: 0 };
+    const changes = { scan: latest, changes: { added: [], missing: [], changed: [] } };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(latest), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(changes), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.getLatestFileScan()).resolves.toEqual(latest);
+    await expect(apiClient.getFileScanChanges(9)).resolves.toEqual(changes);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/files/scans/latest', { headers: {} });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/files/scans/9/changes', { headers: {} });
+  });
+
   it('queries material batches and preserves every returned file instance', async () => {
     const batches = [{ id: 6, name: '06.20260309' }];
     const files = [

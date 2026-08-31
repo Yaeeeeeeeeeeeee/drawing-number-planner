@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
-import type { MaterialBatchView, PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
+import type { FileScanChangesView, MaterialBatchView, PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
 import { openIndexedPdfLocation } from '../desktop-files';
 
 const initialFilters = { keyword: '', productId: '', materialBatchId: '', matchStatus: '', conversionType: '', presence: 'present' };
@@ -27,9 +27,11 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
   const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filters, setFilters] = useState(initialFilters);
   const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
+  const [scanChanges, setScanChanges] = useState<FileScanChangesView | null>(null);
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]); const [pendingCleanupIds, setPendingCleanupIds] = useState<number[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
+  const [loadingChanges, setLoadingChanges] = useState(false);
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const searchRequest = useRef(0);
 
   const search = async (values = filters, requestedPage = 1) => {
@@ -65,12 +67,18 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   const scan = async () => {
     setScanning(true); setError(''); setMessage('');
     try {
-      const result = await api.scanPdfFiles(); setSummary(result); setMessage('资料库扫描完成');
+      const result = await api.scanPdfFiles(); setSummary(result); setScanChanges(null); setMessage('资料库扫描完成');
       const [, batchItems] = await Promise.all([search(), api.listMaterialBatches({})]);
       setBatches(batchItems);
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : '资料库扫描失败'); }
     finally { setScanning(false); }
+  };
+  const viewChanges = async () => {
+    if (!summary) return; setLoadingChanges(true); setError('');
+    try { setScanChanges(await api.getFileScanChanges(summary.scanId)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '扫描变化加载失败'); }
+    finally { setLoadingChanges(false); }
   };
   const submit = (event: FormEvent) => { event.preventDefault(); setError(''); void search(filters, 1); };
   const setFilter = (key: keyof typeof filters, value: string) => setFilters((current) => ({ ...current, [key]: value }));
@@ -115,10 +123,22 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       </div>
     </section>
     {error && <p className="error-banner">{error}</p>}{message && <p className="success-banner"><strong>{message}</strong></p>}
-    {summary && <div className="scan-summary" aria-label="扫描统计"><strong>{summary.total} 个 PDF</strong><span>{summary.matched} 已匹配</span>
-      <span>{summary.pending} 待确认</span><span>{summary.historicalRegistered} 个历史图号已登记</span>
-      <span>{summary.unmatched} 未匹配</span><span>{summary.conflict} 冲突</span><span>{summary.source} 转曲前</span>
-      <span>{summary.outlined} 转曲后</span><span>{summary.missing} 已缺失</span></div>}
+    {summary && <>
+      <section className="scan-summary" aria-label="当前资料库状态"><strong>当前资料库状态</strong><span>{summary.currentTotal} 个 PDF</span>
+        <span>{summary.matched} 已匹配</span><span>{summary.pending} 待确认</span>
+        <span>{summary.historicalRegistered} 个历史图号已登记</span><span>{summary.unmatched} 未匹配</span>
+        <span>{summary.conflict} 冲突</span><span>{summary.source} 转曲前</span><span>{summary.outlined} 转曲后</span></section>
+      <section className="scan-comparison" aria-label="与上一次扫描相比"><div><strong>与上一次扫描相比</strong>
+        <span>{summary.comparison.added} 新增</span><span>{summary.comparison.missing} 删除/缺失</span>
+        <span>{summary.comparison.moved + summary.comparison.changed} 变化</span><span>{summary.comparison.unchanged} 无变化</span></div>
+        <button className="text-button" type="button" disabled={loadingChanges} onClick={() => void viewChanges()}>{loadingChanges ? '加载变化中…' : '查看本次变化'}</button></section>
+      {scanChanges && <section className="scan-change-details" aria-label="本次扫描变化详情">
+        {([['新增', scanChanges.changes.added], ['删除/缺失', scanChanges.changes.missing], ['变化', scanChanges.changes.changed]] as const)
+          .map(([label, items]) => <div className="scan-change-group" key={label}><strong>{label}</strong>
+            {items.length ? <ul>{items.map((item) => <li key={`${label}-${item.id}`}><span>{item.fileName}</span><small className="mono">{item.relativePath}{item.previousRelativePath ? ` ← ${item.previousRelativePath}` : ''}</small></li>)}</ul>
+              : <p className="muted-text">无</p>}</div>)}
+      </section>}
+    </>}
     <form className="filter-bar files-filter" onSubmit={submit}>
       <label><span>文件关键词</span><input aria-label="文件关键词" value={filters.keyword} onChange={(event) => setFilter('keyword', event.target.value)} /></label>
       <label><span>产品档案</span><select aria-label="产品档案" value={filters.productId} onChange={(event) => setFilter('productId', event.target.value)}><option value="">全部</option>{products.map((product) => <option value={product.id} key={product.id}>{product.sku ?? '待补录'} · {product.model}</option>)}</select></label>

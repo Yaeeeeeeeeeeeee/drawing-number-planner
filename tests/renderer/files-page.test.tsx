@@ -27,7 +27,13 @@ function apiFixture(configured = false) {
       : { workspaceRoot: null, configured: false, available: false }),
     updateWorkspaceSettings: vi.fn().mockResolvedValue({ workspaceRoot: 'X:\\Library', configured: true, available: true }),
     scanPdfFiles: vi.fn().mockResolvedValue({ total: 4, matched: 2, pending: 1, historicalRegistered: 1,
-      unmatched: 1, conflict: 0, source: 3, outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' }),
+      unmatched: 1, conflict: 0, source: 3, outlined: 1, missing: 0, scanId: 11, currentTotal: 4,
+      comparison: { added: 1, missing: 1, moved: 1, changed: 1, unchanged: 0 }, scannedAt: '2026-08-25T01:00:00Z' }),
+    getLatestFileScan: vi.fn().mockResolvedValue(null),
+    getFileScanChanges: vi.fn().mockResolvedValue({ scan: { id: 11, currentTotal: 4, completedAt: '2026-08-25T01:00:00Z', added: 1, missing: 1, moved: 1, changed: 1, unchanged: 0 },
+      changes: { added: [{ id: 1, type: 'added', relativePath: 'new.pdf', previousRelativePath: null, fileName: 'new.pdf', fullCode: null }],
+        missing: [{ id: 2, type: 'missing', relativePath: 'gone.pdf', previousRelativePath: null, fileName: 'gone.pdf', fullCode: null }],
+        changed: [{ id: 3, type: 'changed', relativePath: 'edited.pdf', previousRelativePath: null, fileName: 'edited.pdf', fullCode: null }] } }),
     cleanupPdfFiles: vi.fn().mockResolvedValue({ cleaned: 1 }),
     searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
     listProducts: vi.fn().mockResolvedValue([{ id: 9, sku: 'SKDZC100JP', model: 'ZC100', productCategory: '冰柜', status: 'active' }]),
@@ -114,7 +120,8 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
     expect(screen.getByRole('button', { name: '扫描中…' })).toBeDisabled();
     release({ total: 4, matched: 2, pending: 1, historicalRegistered: 1, unmatched: 1, conflict: 0,
-      source: 3, outlined: 1, missing: 0, scannedAt: '2026-08-25T01:00:00Z' });
+      source: 3, outlined: 1, missing: 0, scanId: 11, currentTotal: 4,
+      comparison: { added: 1, missing: 1, moved: 0, changed: 0, unchanged: 2 }, scannedAt: '2026-08-25T01:00:00Z' });
 
     expect(await screen.findByText('4 个 PDF')).toBeVisible();
     expect(screen.getByText('2 已匹配')).toBeVisible();
@@ -126,6 +133,26 @@ describe('FilesPage', () => {
     expect(screen.getByText(outlined.fileName)).toBeVisible();
     expect(screen.getAllByText('转曲前', { selector: '.conversion-label' })).toHaveLength(3);
     expect(screen.getByText('转曲后', { selector: '.conversion-label' })).toBeVisible();
+  });
+
+  it('separates current library state from this scan changes and expands grouped details in place', async () => {
+    const api = apiFixture(true); render(<FilesPage api={api as never} />);
+    await screen.findByDisplayValue('X:\\Library');
+    fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
+
+    expect(await screen.findByText('当前资料库状态')).toBeVisible();
+    expect(screen.getByText('与上一次扫描相比')).toBeVisible();
+    expect(screen.getByText('1 新增')).toBeVisible();
+    expect(screen.getByText('1 删除/缺失')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '查看本次变化' }));
+
+    expect(await screen.findByText('新增')).toBeVisible();
+    expect(screen.getByText('删除/缺失')).toBeVisible();
+    expect(screen.getByText('变化')).toBeVisible();
+    expect(screen.getByText('new.pdf', { selector: '.scan-change-group span' })).toBeVisible();
+    expect(screen.getByText('gone.pdf', { selector: '.scan-change-group span' })).toBeVisible();
+    expect(screen.getByText('edited.pdf', { selector: '.scan-change-group span' })).toBeVisible();
+    expect(api.getFileScanChanges).toHaveBeenCalledWith(11);
   });
 
   it('refreshes material-batch filter options after a successful scan', async () => {

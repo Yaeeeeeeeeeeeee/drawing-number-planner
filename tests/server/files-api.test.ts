@@ -21,6 +21,51 @@ const writeHeaders = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'file
 const actionHeaders = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'files-token' };
 
 describe('PDF file API', () => {
+  it('returns current scan counts and grouped changes without treating old missing rows as newly deleted', async () => {
+    const { server, workspace } = await serverFixture();
+    const retained = join(workspace, 'retained.pdf');
+    const removed = join(workspace, 'removed.pdf');
+    const changed = join(workspace, 'changed.pdf');
+    await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
+      body: JSON.stringify({ workspaceRoot: workspace }) });
+    writeFileSync(retained, '%PDF-1.4 retained'); writeFileSync(removed, '%PDF-1.4 removed');
+    writeFileSync(changed, '%PDF-1.4 first');
+    await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+
+    unlinkSync(removed); writeFileSync(changed, '%PDF-1.4 second version');
+    writeFileSync(join(workspace, 'added.pdf'), '%PDF-1.4 added');
+    const secondScan = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+    expect(await secondScan.json()).toMatchObject({
+      total: 3, currentTotal: 3,
+      comparison: { added: 1, missing: 1, moved: 0, changed: 1, unchanged: 1 },
+    });
+
+    const latest = await (await fetch(`${server.url}/api/files/scans/latest`)).json() as { id: number; currentTotal: number };
+    expect(latest.currentTotal).toBe(3);
+    const onePage = await (await fetch(`${server.url}/api/files?page=1&pageSize=1`)).json();
+    expect(onePage).toMatchObject({ total: 3, items: [expect.any(Object)] });
+    expect(onePage.items).toHaveLength(1);
+    expect(latest.currentTotal).toBe(3);
+    const changes = await (await fetch(`${server.url}/api/files/scans/${latest.id}/changes`)).json();
+    expect(changes).toMatchObject({
+      scan: { id: latest.id, currentTotal: 3 },
+      changes: {
+        added: [expect.objectContaining({ relativePath: 'added.pdf' })],
+        missing: [expect.objectContaining({ relativePath: 'removed.pdf' })],
+        changed: [expect.objectContaining({ relativePath: 'changed.pdf' })],
+      },
+    });
+    expect(changes.changes.added[0].relativePath).not.toContain(workspace);
+
+    unlinkSync(retained); unlinkSync(changed); unlinkSync(join(workspace, 'added.pdf'));
+    await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+    const newest = await (await fetch(`${server.url}/api/files/scans/latest`)).json() as { id: number; currentTotal: number };
+    const newestChanges = await (await fetch(`${server.url}/api/files/scans/${newest.id}/changes`)).json();
+    expect(newest.currentTotal).toBe(0);
+    expect(newestChanges.changes.missing).toHaveLength(3);
+    expect(newestChanges.changes.missing.map((item: { relativePath: string }) => item.relativePath)).not.toContain('removed.pdf');
+  });
+
   it('protects and persists workspace settings, scans real PDFs, and filters indexed results', async () => {
     const { server, workspace } = await serverFixture();
     expect(await (await fetch(`${server.url}/api/files/settings`)).json()).toEqual({
