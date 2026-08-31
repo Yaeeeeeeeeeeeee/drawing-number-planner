@@ -347,6 +347,21 @@ describe('database migrations', () => {
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 2 });
   });
 
+  it('rolls v7 back when a same-named PDF index is unique but uses the wrong column', () => {
+    const database = createV6Database();
+    seedV6Rows(database);
+    database.exec(`
+      drop index pdf_files_path_key_unique;
+      create unique index pdf_files_path_key_unique on pdf_files(relative_path);
+    `);
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('扫描历史数据校验失败');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 6 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'file_scan_runs'").get())
+      .toEqual({ count: 0 });
+  });
+
   it('rolls v7 back when pre-existing foreign keys are invalid', () => {
     const database = createV6Database();
     seedV6Rows(database);

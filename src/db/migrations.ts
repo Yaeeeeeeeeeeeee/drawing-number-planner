@@ -52,9 +52,26 @@ function ensureBatchPathIndex(database: PlannerDatabase): void {
     ON material_batches(relative_path COLLATE NOCASE)`);
 }
 
-function hasUniqueIndex(database: PlannerDatabase, name: string): boolean {
-  const index = database.prepare(`select sql from sqlite_master where type = 'index' and name = ?`).get(name) as { sql: string | null } | undefined;
-  return Boolean(index?.sql?.toUpperCase().includes('CREATE UNIQUE INDEX'));
+function hasExpectedUniqueIndex(
+  database: PlannerDatabase,
+  table: string,
+  name: string,
+  columns: Array<{ name: string; collation?: string }>,
+): boolean {
+  const indexes = database.pragma(`index_list(${table})`) as Array<{ name: string; unique: number }>;
+  if (indexes.find((index) => index.name === name)?.unique !== 1) return false;
+  const keys = (database.pragma(`index_xinfo(${name})`) as Array<{
+    seqno: number;
+    name: string | null;
+    coll: string;
+    key: number;
+  }>)
+    .filter((column) => column.key === 1)
+    .sort((left, right) => left.seqno - right.seqno);
+  return keys.length === columns.length && keys.every((column, index) => (
+    column.name === columns[index].name
+    && (!columns[index].collation || column.coll.toUpperCase() === columns[index].collation)
+  ));
 }
 
 function validateScanHistoryMigration(database: PlannerDatabase, before: { pdf: number; batches: number; historical: number }): void {
@@ -68,8 +85,10 @@ function validateScanHistoryMigration(database: PlannerDatabase, before: { pdf: 
   const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
   if (before.pdf !== after.pdf || before.batches !== after.batches || before.historical !== after.historical
     || historicalDefaults > 0 || foreignKeyErrors.length > 0
-    || !hasUniqueIndex(database, 'pdf_files_path_key_unique')
-    || !hasUniqueIndex(database, 'material_batches_relative_path_nocase_unique')) {
+    || !hasExpectedUniqueIndex(database, 'pdf_files', 'pdf_files_path_key_unique', [{ name: 'path_key' }])
+    || !hasExpectedUniqueIndex(database, 'material_batches', 'material_batches_relative_path_nocase_unique', [
+      { name: 'relative_path', collation: 'NOCASE' },
+    ])) {
     throw new Error('扫描历史数据校验失败，数据库未升级');
   }
 }
