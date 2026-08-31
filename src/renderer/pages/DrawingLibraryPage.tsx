@@ -75,6 +75,20 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : '业务状态更新失败'); }
     finally { setMaintaining(false); }
   };
+  const changeHistoricalStatus = async (target: 'active' | 'inactive') => {
+    if (!selected) return;
+    const confirmed = window.confirm(target === 'active'
+      ? '确认启用该历史图号？启用不会改变文件完整性，也不会释放或重新占用号码。'
+      : '确认停用该历史图号？停用不释放号码，也不会改变文件完整性。');
+    if (!confirmed) return;
+    setMaintaining(true); setError('');
+    try {
+      if (target === 'active') await api.activateHistoricalDrawing(selected.id);
+      else await api.deactivateHistoricalDrawing(selected.id);
+      await refreshDetail(selected.id);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '历史图号状态更新失败'); }
+    finally { setMaintaining(false); }
+  };
   const associatePdf = async (conversionType: 'source' | 'outlined') => {
     if (!selected || !selectedPdfId) return;
     setMaintaining(true); setError('');
@@ -113,7 +127,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}
-      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">已生效</option><option value="voided">已作废</option><option value="historical">历史已用</option></select></label>
+      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
       <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
       {moreFilters && <><label><span>SKU</span><input aria-label="SKU" value={filters.sku} onChange={(event) => set('sku', event.target.value)} /></label>
@@ -132,34 +146,42 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         { key: 'files', label: '文件完整性', render: (item) => <span>{item.hasSourceFile ? '源文件已有' : '源文件缺失'} · {item.hasOutlinedFile ? '转曲后已有' : '转曲后缺失'}</span> },
         { key: 'batchUsage', label: '资料使用', render: (item) => item.batchUsage
           ? <span>{usageLabel(item.batchUsage.state)} · 出现于 {item.batchUsage.occurrenceCount} 个资料批次</span> : '未建立批次关系' },
-        { key: 'status', label: '状态', render: (item) => <span className={`status-text ${item.status}`}>{statusLabel(item.status)}</span> },
+        { key: 'status', label: '状态', render: (item) => <span className={`status-text ${item.status}`}>{statusLabel(item.origin, item.status)}</span> },
       ]} renderExpandedRow={(item) => selected?.id === item.id ? <DrawingDetailPanel selected={selected} maintaining={maintaining}
         pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
         setSelectedPdfId={setSelectedPdfId} onClose={() => setSelected(null)} onStatus={changeStatus} onOpen={openLocation}
-        onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onError={setError} /> : null} />}
+        onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus} onError={setError} /> : null} />}
     </> : <BatchBrowser search={batchSearch} setSearch={setBatchSearch} loading={loading} batches={batches}
       selected={selectedBatch} files={batchFiles} onSearch={searchBatches} onSelect={openBatch} onOpen={openLocation} />}
   </section>;
 }
 
-const statusLabel = (status: DrawingView['status']) => status === 'active' ? '正式使用' : status === 'reserved' ? '已占号' : status === 'historical' ? '历史已用' : '作废';
+const statusLabel = (origin: DrawingView['origin'], status: DrawingView['status']) => {
+  if (origin === 'historical') return status === 'inactive' ? '已停用' : '使用中';
+  return status === 'active' ? '正式使用' : status === 'reserved' ? '已占号' : '作废';
+};
 const usageLabel = (status: 'current' | 'historical' | 'unbatched' | 'indeterminate') =>
   status === 'current' ? '当前使用' : status === 'historical' ? '历史使用' : status === 'indeterminate' ? '待确认' : '未归入批次';
 
 function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
-  setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onError }: {
+  setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus, onError }: {
   selected: DrawingDetailView; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
   pdfCandidates: PdfFileView[]; selectedPdfId: string; setSelectedPdfId(value: string): void; onClose(): void;
   onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
   onSearchPdf(keyword: string): Promise<void>; onAssociate(type: 'source' | 'outlined'): Promise<void>;
+  onHistoricalStatus(target: 'active' | 'inactive'): Promise<void>;
   onError(message: string): void;
 }) {
   return <aside className="drawing-maintenance inline-drawing-detail panel-enter" aria-label="图号详情"><button className="panel-close" onClick={onClose} type="button">关闭</button>
     <p className="eyebrow">DRAWING DETAIL</p><h2>{selected.fullCode}</h2><p className="detail-name">{selected.displayName}</p>
     <dl><div><dt>产品身份</dt><dd>{selected.sku ?? '待补录'} · {selected.brandName} · {selected.model}</dd></div>
       <div><dt>类别 / 项目</dt><dd>{selected.productCategory} · {selected.mainCategoryName} · {selected.projectItemName}</dd></div>
-      <div><dt>业务状态</dt><dd><span className={`status-text ${selected.status}`}>{statusLabel(selected.status)}</span></dd></div></dl>
-    {selected.readOnly ? <p className="historical-read-only">{selected.readOnlyMessage}</p> : <div className="drawing-actions">
+      <div><dt>业务状态</dt><dd><span className={`status-text ${selected.status}`}>{statusLabel(selected.origin, selected.status)}</span></dd></div></dl>
+    {selected.origin === 'historical' ? <><p className="historical-read-only">{selected.readOnlyMessage}</p><div className="drawing-actions">
+      {selected.status === 'active'
+        ? <button className="text-button danger" disabled={maintaining} onClick={() => void onHistoricalStatus('inactive')} type="button">停用</button>
+        : <button className="primary-button" disabled={maintaining} onClick={() => void onHistoricalStatus('active')} type="button">启用</button>}
+    </div><p className="muted-text">停用不释放号码</p></> : <div className="drawing-actions">
       {selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">正式使用</button>}
       {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}</div>}
     <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={onOpen} />

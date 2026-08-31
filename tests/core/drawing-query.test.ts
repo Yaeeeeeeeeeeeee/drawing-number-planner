@@ -175,7 +175,7 @@ describe('DrawingQueryService', () => {
     expect(new OccupiedNumberRepository(db).hasFullCode(before.fullCode)).toBe(true);
   });
 
-  it('associates a present indexed PDF transactionally and rejects absent or historical targets', () => {
+  it('associates a present indexed PDF transactionally and rejects historical association changes', () => {
     const now = '2026-08-26T03:00:00.000Z';
     const historyId = Number(db.prepare(`insert into historical_drawing_numbers
       (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
@@ -208,7 +208,7 @@ describe('DrawingQueryService', () => {
     expect(() => drawings.transition(-historyId, 'voided'))
       .toThrowError(expect.objectContaining({ code: 'HISTORICAL_READ_ONLY' }));
     expect(drawings.get(-historyId)).toEqual(expect.objectContaining({ readOnly: true,
-      readOnlyMessage: '永久占用的历史数据，不可修改' }));
+      readOnlyMessage: '历史图号的编码和文件关联不可修改；停用不释放号码。' }));
   });
 
   it('lists historical codes with planned records and prefers planned on duplicate full codes', () => {
@@ -226,7 +226,36 @@ describe('DrawingQueryService', () => {
     expect(result.items.filter((item) => item.fullCode === '02.0209.010.0401001'))
       .toEqual([expect.objectContaining({ origin: 'planned' })]);
     expect(result.items).toContainEqual(expect.objectContaining({ fullCode: '02.0209.010.0401007',
-      origin: 'historical', sku: 'TEST-DRAWING-QUERY', status: 'historical', dictionaryMappingStatus: 'mapped' }));
+      origin: 'historical', sku: 'TEST-DRAWING-QUERY', status: 'active', dictionaryMappingStatus: 'mapped' }));
+  });
+
+  it('toggles historical business status without changing file completeness or permanent occupancy', () => {
+    const now = '2026-08-31T00:00:00.000Z';
+    const historicalId = Number(db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+       project_item_code, sequence, first_seen_at, last_seen_at)
+      values ('02.0209.010.0401007', '02', '0209', '01', '0', '04', '01', 7, ?, ?)`)
+      .run(now, now).lastInsertRowid);
+    db.prepare(`insert into pdf_files
+      (relative_path, file_name, historical_drawing_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('history/source.pdf', 'source.pdf', ?, 'matched', '[]', 'source', 1, ?, ?, 1)`)
+      .run(historicalId, now, now);
+    db.prepare(`insert into pdf_files
+      (relative_path, file_name, historical_drawing_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('history/outlined.pdf', 'outlined.pdf', ?, 'matched', '[]', 'outlined', 1, ?, ?, 0)`)
+      .run(historicalId, now, now);
+
+    expect(drawings.get(-historicalId)).toEqual(expect.objectContaining({
+      origin: 'historical', status: 'active', hasSourceFile: true, hasOutlinedFile: false,
+    }));
+    expect(drawings.updateHistoricalStatus(historicalId, 'inactive')).toEqual(expect.objectContaining({
+      id: -historicalId, origin: 'historical', status: 'inactive', hasSourceFile: true, hasOutlinedFile: false,
+    }));
+    expect(new OccupiedNumberRepository(db).hasFullCode('02.0209.010.0401007')).toBe(true);
+    expect(new OccupiedNumberRepository(db).findMaxSequence('02.0209.010.0401')).toBe(7);
+    expect(drawings.updateHistoricalStatus(historicalId, 'active')).toEqual(expect.objectContaining({ status: 'active' }));
   });
 
   it('computes source and outlined completeness independently and combines new filters', () => {

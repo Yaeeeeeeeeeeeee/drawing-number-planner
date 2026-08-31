@@ -35,4 +35,12 @@ describe('OccupiedNumberRepository', () => {
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 0 });
     expect(repository.findMaxSequence('02.0404.010.0401')).toBe(7);
   });
+
+  it('keeps an inactive historical number occupied for duplicate checks and sequence selection', () => {
+    insertHistorical(8);
+    database.prepare("update historical_drawing_numbers set status = 'inactive' where sequence = 8").run();
+
+    expect(repository.hasFullCode('02.0404.010.0401008')).toBe(true);
+    expect(repository.findMaxSequence('02.0404.010.0401')).toBe(8);
+  });
 });

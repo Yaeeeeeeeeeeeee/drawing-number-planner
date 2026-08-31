@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingSearchFilters } from './drawing-types.js';
+import type { DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
 
 interface DrawingRow {
   id: number; origin: DrawingRecord['origin']; sku: string | null; full_code: string; display_name: string;
@@ -62,7 +62,7 @@ const unifiedCte = `with drawing_records as (
     main_category.id as main_category_id, coalesce(main_category.name, historical.main_category_code) as main_category_name,
     project_item.id as project_item_id, coalesce(project_item.name, historical.project_item_code) as project_item_name,
     historical.brand_code, historical.product_size_code, historical.appearance_code, historical.color_code,
-    historical.main_category_code, historical.project_item_code, historical.sequence, 'historical' as status,
+    historical.main_category_code, historical.project_item_code, historical.sequence, historical.status,
     null as previous_drawing_id, null as previous_full_code, null as change_reason,
     null as source_product_id, null as source_product_model, null as source_drawing_id,
     null as source_drawing_full_code, null as notes, historical.first_seen_at as created_at,
@@ -182,11 +182,15 @@ export class DrawingRepository {
       sourceFiles: files.filter((file) => file.conversionType === 'source'),
       outlinedFiles: files.filter((file) => file.conversionType === 'outlined'),
       currentBomUsage, readOnly: drawing.origin === 'historical',
-      readOnlyMessage: drawing.origin === 'historical' ? '永久占用的历史数据，不可修改' : null };
+      readOnlyMessage: drawing.origin === 'historical' ? '历史图号的编码和文件关联不可修改；停用不释放号码。' : null };
   }
 
   updateStatus(id: number, status: 'active' | 'voided'): void {
     this.db.prepare('update drawing_numbers set status = ? where id = ?').run(status, id);
+  }
+
+  updateHistoricalStatus(id: number, status: HistoricalDrawingStatus): void {
+    this.db.prepare('update historical_drawing_numbers set status = ? where id = ?').run(status, id);
   }
 
   associatePdf(drawingId: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): boolean {

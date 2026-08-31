@@ -23,7 +23,7 @@ export interface DrawingView {
   id: number; origin: 'planned' | 'historical'; sku: string | null; fullCode: string; displayName: string;
   productId: number | null; model: string; productCategory: string; brandName: string;
   colorName: string; mainCategoryName: string; projectItemName: string;
-  status: 'reserved' | 'active' | 'voided' | 'historical'; hasSourceFile: boolean; hasOutlinedFile: boolean;
+  status: 'reserved' | 'active' | 'voided' | 'inactive'; hasSourceFile: boolean; hasOutlinedFile: boolean;
   dictionaryMappingStatus: 'mapped' | 'unmapped'; batchUsage?: DrawingBatchUsageView; [key: string]: unknown;
 }
 export interface DrawingFileView {
@@ -130,6 +130,8 @@ export interface PlannerApi {
   getDrawing(id: number): Promise<DrawingDetailView>;
   activateDrawing(id: number): Promise<DrawingDetailView>;
   voidDrawing(id: number): Promise<DrawingDetailView>;
+  activateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
+  deactivateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
   associateDrawingPdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): Promise<DrawingDetailView>;
   listMaterialBatches(filters?: { search?: string; productId?: number }): Promise<MaterialBatchView[]>;
   getMaterialBatchFiles(id: number): Promise<MaterialBatchFileView[]>;
@@ -285,6 +287,8 @@ export const apiClient: PlannerApi = {
   getDrawing: (id) => request(`/api/drawings/${id}`),
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
+  activateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/activate`, json('POST', { confirmed: true })),
+  deactivateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/deactivate`, json('POST', { confirmed: true })),
   associateDrawingPdf: (id, pdfIndexId, conversionType) => request(`/api/drawings/${id}/associate-pdf`,
     json('POST', { pdfIndexId, conversionType })),
   listMaterialBatches: async (filters = {}) => (await request<{ items: MaterialBatchView[] }>(

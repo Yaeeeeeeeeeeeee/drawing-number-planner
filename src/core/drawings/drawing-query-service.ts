@@ -1,7 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
 import { DrawingRepository } from './drawing-repository.js';
-import type { DrawingDetailRecord, DrawingSearchFilters, PagedDrawingResult } from './drawing-types.js';
+import type { DrawingDetailRecord, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
 
 export class DrawingQueryError extends Error {
   constructor(public readonly code: 'NOT_FOUND' | 'INVALID_TRANSITION' | 'HISTORICAL_READ_ONLY' | 'PDF_NOT_AVAILABLE', message: string) { super(message); }
@@ -38,7 +38,7 @@ export class DrawingQueryService {
 
   transition(id: number, target: 'active' | 'voided'): DrawingDetailRecord {
     const drawing = this.get(id);
-    if (drawing.readOnly) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '永久占用的历史数据，不可修改');
+    if (drawing.readOnly) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '历史图号的编码和文件关联不可修改；停用不释放号码。');
     const allowed = (drawing.status === 'reserved' && (target === 'active' || target === 'voided'))
       || (drawing.status === 'active' && target === 'voided');
     if (!allowed) {
@@ -49,9 +49,16 @@ export class DrawingQueryService {
     return this.get(id);
   }
 
+  updateHistoricalStatus(historicalId: number, status: HistoricalDrawingStatus): DrawingDetailRecord {
+    const drawing = this.get(-historicalId);
+    if (drawing.origin !== 'historical') throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
+    this.repository.updateHistoricalStatus(historicalId, status);
+    return this.get(-historicalId);
+  }
+
   associatePdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): DrawingDetailRecord {
     const drawing = this.get(id);
-    if (drawing.readOnly) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '永久占用的历史数据，不可修改');
+    if (drawing.readOnly) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '历史图号的编码和文件关联不可修改；停用不释放号码。');
     if (!this.repository.associatePdf(id, pdfIndexId, conversionType)) {
       throw new DrawingQueryError('PDF_NOT_AVAILABLE', 'PDF 索引不存在或文件当前缺失');
     }

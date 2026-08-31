@@ -17,7 +17,7 @@ describe('DrawingLibraryPage', () => {
     const row = {
       id: -1, fullCode: '02.0209.010.0501001', displayName: '大外箱', sku: 'SKU', model: 'T40',
       brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '包装类', projectItemName: '大外箱',
-      status: 'historical', origin: 'historical', hasSourceFile: true, hasOutlinedFile: true,
+      status: 'active', origin: 'historical', hasSourceFile: true, hasOutlinedFile: true,
       dictionaryMappingStatus: 'mapped',
       batchUsage: { state: 'current', occurrenceCount: 7, currentProductCount: 1, historicalProductCount: 0,
         conflictWithBusinessStatus: false, occurrences },
@@ -162,7 +162,7 @@ describe('DrawingLibraryPage', () => {
   it('marks historical codes whose dictionary segments are not mapped', async () => {
     const historical = { id: -1, fullCode: '99.9999.999.9999001', displayName: '99.9999.999.9999001',
       sku: null, model: '待识别', brandName: '99', colorName: '9', mainCategoryName: '99', projectItemName: '99',
-      status: 'historical', origin: 'historical', hasSourceFile: false, hasOutlinedFile: true,
+      status: 'active', origin: 'historical', hasSourceFile: false, hasOutlinedFile: true,
       dictionaryMappingStatus: 'unmapped' };
     const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [historical], total: 1, page: 1, pageSize: 20 }),
       listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(historical) };
@@ -292,19 +292,28 @@ describe('DrawingLibraryPage', () => {
     expect(api.associateDrawingPdf).toHaveBeenCalledTimes(1);
   });
 
-  it('shows historical detail as permanently occupied read-only data without maintenance controls', async () => {
+  it('toggles historical business status while keeping file completeness and permanent occupancy visible', async () => {
     const historical = { id: -4, fullCode: '02.0209.010.0401004', displayName: '02.0209.010.0401004', sku: 'OLD',
       productId: null, model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色',
-      mainCategoryName: '印刷件类', projectItemName: 'LOGO', status: 'historical', origin: 'historical',
+      mainCategoryName: '印刷件类', projectItemName: 'LOGO', status: 'active', origin: 'historical',
       hasSourceFile: false, hasOutlinedFile: true, dictionaryMappingStatus: 'mapped', readOnly: true,
-      readOnlyMessage: '永久占用的历史数据，不可修改', sourceFiles: [], outlinedFiles: [], currentBomUsage: [] } as const;
+      readOnlyMessage: '历史图号的编码和文件关联不可修改；停用不释放号码。', sourceFiles: [], outlinedFiles: [], currentBomUsage: [] } as const;
+    const inactive = { ...historical, status: 'inactive' as const };
     const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [historical], total: 1, page: 1, pageSize: 20 }),
-      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(historical) };
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValueOnce(historical).mockResolvedValueOnce(inactive),
+      deactivateHistoricalDrawing: vi.fn().mockResolvedValue(inactive), activateHistoricalDrawing: vi.fn().mockResolvedValue(historical) };
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<DrawingLibraryPage api={api as never} />);
     fireEvent.click(await screen.findByText(historical.fullCode));
+    fireEvent.click(await screen.findByRole('button', { name: '停用' }));
 
-    expect(await screen.findByText('永久占用的历史数据，不可修改')).toBeVisible();
+    await waitFor(() => expect(api.deactivateHistoricalDrawing).toHaveBeenCalledWith(-4));
+    expect(confirm).toHaveBeenCalledWith('确认停用该历史图号？停用不释放号码，也不会改变文件完整性。');
+    expect(await screen.findByText('历史图号的编码和文件关联不可修改；停用不释放号码。')).toBeVisible();
+    expect(screen.getAllByText('已停用').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/源文件缺失.*转曲后已有/)).toBeVisible();
+    expect(screen.getByText('停用不释放号码')).toBeVisible();
     expect(screen.queryByRole('button', { name: '正式使用' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('搜索现有 PDF')).not.toBeInTheDocument();
   });

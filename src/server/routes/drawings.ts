@@ -13,7 +13,7 @@ const querySchema = z.object({
   mainCategoryId: z.coerce.number().int().positive().optional(),
   projectItemId: z.coerce.number().int().positive().optional(),
   colorId: z.coerce.number().int().positive().optional(),
-  status: z.enum(['reserved', 'active', 'voided', 'historical']).optional(),
+  status: z.enum(['reserved', 'active', 'voided', 'inactive', 'historical']).optional(),
   sourcePresence: z.enum(['present', 'missing', 'all']).optional(),
   outlinedPresence: z.enum(['present', 'missing', 'all']).optional(),
   keyword: z.string().optional(),
@@ -61,6 +61,17 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   };
   app.post('/api/drawings/:id/activate', transition('active', '正式使用确认请求无效'));
   app.post('/api/drawings/:id/void', transition('voided', '作废确认请求无效'));
+
+  const historicalTransition = (target: 'active' | 'inactive', invalidMessage: string) => async (request: any, reply: FastifyReply) => {
+    const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: invalidMessage } });
+    }
+    try { return service.updateHistoricalStatus(params.data.id, target); }
+    catch (error) { return sendDrawingError(reply, error); }
+  };
+  app.post('/api/historical-drawings/:id/activate', historicalTransition('active', '历史图号启用确认请求无效'));
+  app.post('/api/historical-drawings/:id/deactivate', historicalTransition('inactive', '历史图号停用确认请求无效'));
 
   app.post('/api/drawings/:id/associate-pdf', async (request, reply) => {
     const params = paramsSchema.safeParse(request.params); const input = associationSchema.safeParse(request.body);

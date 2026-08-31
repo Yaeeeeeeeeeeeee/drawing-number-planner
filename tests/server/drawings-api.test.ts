@@ -32,6 +32,15 @@ function seedPlannedDrawing(database: PlannerDatabase, status: 'reserved' | 'act
   return { id, fullCode: '02.0209.010.0401001' };
 }
 
+function seedHistoricalDrawing(database: PlannerDatabase) {
+  const now = '2026-08-31T00:00:00.000Z';
+  return Number(database.prepare(`insert into historical_drawing_numbers
+    (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+     project_item_code, sequence, first_seen_at, last_seen_at)
+    values ('02.0209.010.0401007', '02', '0209', '01', '0', '04', '01', 7, ?, ?)`)
+    .run(now, now).lastInsertRowid);
+}
+
 beforeEach(() => {
   db = openDatabase(':memory:');
   migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
@@ -102,6 +111,22 @@ describe('drawing library API', () => {
     expect((await app.inject({ method: 'POST', url: `/api/drawings/${planned.id}/associate-pdf`,
       payload: { pdfIndexId: 999999, conversionType: 'source' } })).json())
       .toEqual({ error: { code: 'PDF_NOT_AVAILABLE', message: 'PDF 索引不存在或文件当前缺失' } });
+    await app.close();
+  });
+
+  it('toggles historical business status without exposing removal of its permanent occupancy', async () => {
+    const historicalId = seedHistoricalDrawing(db);
+    const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+
+    const deactivated = await app.inject({ method: 'POST', url: `/api/historical-drawings/${historicalId}/deactivate`,
+      payload: { confirmed: true } });
+    expect(deactivated.statusCode).toBe(200);
+    expect(deactivated.json()).toEqual(expect.objectContaining({
+      id: -historicalId, origin: 'historical', status: 'inactive', hasSourceFile: false, hasOutlinedFile: false,
+    }));
+    expect((await app.inject({ method: 'POST', url: `/api/historical-drawings/${historicalId}/activate`,
+      payload: { confirmed: true } })).json()).toEqual(expect.objectContaining({ status: 'active' }));
+    expect((await app.inject({ method: 'DELETE', url: `/api/historical-drawings/${historicalId}` })).statusCode).toBe(404);
     await app.close();
   });
 });

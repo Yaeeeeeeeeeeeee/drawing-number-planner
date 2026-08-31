@@ -1,6 +1,8 @@
 import type { DrawingBatchUsage } from '../files/material-batch-types.js';
 
-export type DrawingStatus = 'reserved' | 'active' | 'voided' | 'historical';
+export type PlannedDrawingStatus = 'reserved' | 'active' | 'voided';
+export type HistoricalDrawingStatus = 'active' | 'inactive';
+export type DrawingStatus = PlannedDrawingStatus | HistoricalDrawingStatus | 'historical';
 export type DrawingOrigin = 'planned' | 'historical';
 export type FilePresenceFilter = 'present' | 'missing' | 'all';
 
