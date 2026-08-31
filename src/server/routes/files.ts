@@ -20,6 +20,7 @@ const searchSchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 }).strict();
+const clearIndexSchema = z.object({ confirmation: z.string() }).strict();
 const scanIdSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
 
 function sendFileError(reply: FastifyReply, error: unknown) {
@@ -52,6 +53,18 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService): 
     const input = cleanupSchema.safeParse(request.body);
     if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 索引清理请求无效' } });
     try { return service.cleanup(input.data.ids); }
+    catch (error) { return sendFileError(reply, error); }
+  });
+
+  app.get('/api/files/index/clear-preview', async (_request, reply) => {
+    try { return service.clearIndexPreview(); }
+    catch (error) { return sendFileError(reply, error); }
+  });
+
+  app.post('/api/files/index/clear', async (request, reply) => {
+    const input = clearIndexSchema.safeParse(request.body);
+    if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '清空资料库索引请求无效' } });
+    try { return service.clearIndex(input.data.confirmation); }
     catch (error) { return sendFileError(reply, error); }
   });
 

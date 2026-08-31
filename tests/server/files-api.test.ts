@@ -156,4 +156,32 @@ describe('PDF file API', () => {
     expect(await cleaned.json()).toEqual({ cleaned: 1 });
     expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(0);
   });
+
+  it('previews and clears scan indexes only after the exact confirmation phrase', async () => {
+    const { server, workspace } = await serverFixture();
+    const filePath = join(workspace, '02.0404.010.0401002-history.pdf');
+    await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
+      body: JSON.stringify({ workspaceRoot: workspace }) });
+    writeFileSync(filePath, '%PDF-1.4 unchanged');
+    await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+
+    const preview = await fetch(`${server.url}/api/files/index/clear-preview`);
+    expect(await preview.json()).toMatchObject({ workspaceRoot: realpathSync.native(workspace),
+      counts: { pdfFiles: 1, materialBatches: 0, scanChanges: 1, scanRuns: 1 } });
+    const wrongConfirmation = await fetch(`${server.url}/api/files/index/clear`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ confirmation: '清空资料库' }) });
+    expect(wrongConfirmation.status).toBe(422);
+    expect((await wrongConfirmation.json()).error.code).toBe('INVALID_CLEAR_INDEX_CONFIRMATION');
+
+    const cleared = await fetch(`${server.url}/api/files/index/clear`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ confirmation: '清空资料库索引' }) });
+    expect(cleared.status).toBe(200);
+    expect(await cleared.json()).toEqual({ pdfFiles: 1, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
+    expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(0);
+    expect(await (await fetch(`${server.url}/api/files/settings`)).json()).toMatchObject({ workspaceRoot: realpathSync.native(workspace) });
+    expect(await (await import('node:fs')).promises.readFile(filePath, 'utf8')).toBe('%PDF-1.4 unchanged');
+
+    const rescan = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+    expect(await rescan.json()).toMatchObject({ historicalRegistered: 0, total: 1 });
+  });
 });

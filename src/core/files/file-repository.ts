@@ -20,6 +20,13 @@ interface FileRow {
 
 interface StoredFileSnapshotRow extends Omit<IndexedFileSnapshot, 'isPresent'> { isPresent: number }
 
+export interface FileIndexClearResult {
+  pdfFiles: number;
+  materialBatches: number;
+  scanChanges: number;
+  scanRuns: number;
+}
+
 const FINGERPRINT_LOOKUP_CHUNK_SIZE = 900;
 
 function toView(row: FileRow): PdfFileView {
@@ -204,6 +211,29 @@ export class FileRepository {
       const result = this.db.prepare(`delete from pdf_files where id in (${placeholders}) and is_present = 0`).run(...ids);
       return { cleaned: result.changes };
     }).immediate();
+  }
+
+  clearIndex(): FileIndexClearResult {
+    return this.db.transaction(() => {
+      const result = this.indexCounts();
+      this.db.prepare('delete from pdf_files').run();
+      this.db.prepare('delete from material_batches').run();
+      this.db.prepare('delete from file_scan_changes').run();
+      this.db.prepare('delete from file_scan_runs').run();
+      const foreignKeyErrors = this.db.prepare('pragma foreign_key_check').all();
+      if (foreignKeyErrors.length > 0) throw new Error('清空资料库索引后外键校验失败');
+      return result;
+    }).immediate();
+  }
+
+  indexCounts(): FileIndexClearResult {
+    const count = (table: 'pdf_files' | 'material_batches' | 'file_scan_changes' | 'file_scan_runs') => (
+      this.db.prepare(`select count(*) as count from ${table}`).get() as { count: number }
+    ).count;
+    return {
+      pdfFiles: count('pdf_files'), materialBatches: count('material_batches'),
+      scanChanges: count('file_scan_changes'), scanRuns: count('file_scan_runs'),
+    };
   }
 
   search(filters: FileSearchFilters = {}): FileSearchResult {

@@ -342,6 +342,61 @@ describe('FileRepository', () => {
     expect(db.prepare('select full_code from historical_drawing_numbers').all()).toEqual([{ full_code: historical.fullCode }]);
   });
 
+  it('clears only scan index tables and retains permanent business records', () => {
+    const drawing = drawingFixture();
+    const historical = parseDrawingCode('02.0404.010.0401002')!;
+    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
+    const indexed = { ...records(0)[1], relativePath: `${batchPath}\\${historical.fullCode}-LOGO.pdf`,
+      fileName: `${historical.fullCode}-LOGO.pdf`, matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
+      detectedCodes: [historical.fullCode], materialBatch: parseMaterialBatch(`${batchPath}\\${historical.fullCode}-LOGO.pdf`)! };
+    repository.replaceScan([indexed], [{ ...historical, directoryContext: {
+      productCategory: '03.冰柜', sku: 'TEST-FILE-REPOSITORY', model: 'ZC100',
+    } }], '2026-08-25T04:00:00.000Z');
+    const drawingReferences = db.prepare('select product_id as productId, color_id as colorId from drawing_numbers where id = ?')
+      .get(drawing.id) as { productId: number; colorId: number };
+    const bom = db.prepare(`insert into bom_versions (product_id, color_id, version_number, created_at)
+      values (?, ?, 1, '2026-08-25T04:00:00.000Z') returning id`).get(drawingReferences.productId, drawingReferences.colorId) as { id: number };
+    db.prepare('insert into bom_current (product_id, color_id, version_id, updated_at) values (?, ?, ?, ?)')
+      .run(drawingReferences.productId, drawingReferences.colorId, bom.id, '2026-08-25T04:00:00.000Z');
+    const preserved = {
+      dictionaries: db.prepare('select count(*) as count from dictionary_items').get(),
+      products: db.prepare('select count(*) as count from products').get(),
+      drawings: db.prepare('select count(*) as count from drawing_numbers').get(),
+      historical: db.prepare('select count(*) as count from historical_drawing_numbers').get(),
+      boms: db.prepare('select count(*) as count from bom_versions').get(),
+    };
+
+    expect(repository.clearIndex()).toEqual({ pdfFiles: 1, materialBatches: 1, scanChanges: 1, scanRuns: 1 });
+
+    expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 0 });
+    expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 0 });
+    expect(db.prepare('select count(*) as count from file_scan_changes').get()).toEqual({ count: 0 });
+    expect(db.prepare('select count(*) as count from file_scan_runs').get()).toEqual({ count: 0 });
+    expect({
+      dictionaries: db.prepare('select count(*) as count from dictionary_items').get(),
+      products: db.prepare('select count(*) as count from products').get(),
+      drawings: db.prepare('select count(*) as count from drawing_numbers').get(),
+      historical: db.prepare('select count(*) as count from historical_drawing_numbers').get(),
+      boms: db.prepare('select count(*) as count from bom_versions').get(),
+    }).toEqual(preserved);
+    expect(db.prepare('pragma foreign_key_check').all()).toEqual([]);
+  });
+
+  it('rolls index clearing back completely if a dependent batch cannot be removed', () => {
+    const batchPath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件\\01.20241210';
+    const path = `${batchPath}\\kept.pdf`;
+    const indexed = { ...records(0)[1], relativePath: path, fileName: 'kept.pdf', materialBatch: parseMaterialBatch(path)! };
+    repository.replaceScan([indexed], [], '2026-08-25T04:00:00.000Z');
+    const before = repository.indexCounts();
+    db.exec(`create trigger reject_batch_clear before delete on material_batches
+      begin select raise(abort, 'batch clear rejected'); end`);
+
+    expect(() => repository.clearIndex()).toThrow('batch clear rejected');
+
+    expect(repository.indexCounts()).toEqual(before);
+    expect(db.prepare('pragma foreign_key_check').all()).toEqual([]);
+  });
+
   it('supports combined filters, stable pagination, and drawing-code listing', () => {
     const drawing = drawingFixture(); repository.replaceScan(records(drawing.id), [], '2026-08-25T04:00:00.000Z');
 

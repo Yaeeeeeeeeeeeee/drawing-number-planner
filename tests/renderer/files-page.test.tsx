@@ -35,6 +35,9 @@ function apiFixture(configured = false) {
         missing: [{ id: 2, type: 'missing', relativePath: 'gone.pdf', previousRelativePath: null, fileName: 'gone.pdf', fullCode: null }],
         changed: [{ id: 3, type: 'changed', relativePath: 'edited.pdf', previousRelativePath: null, fileName: 'edited.pdf', fullCode: null }] } }),
     cleanupPdfFiles: vi.fn().mockResolvedValue({ cleaned: 1 }),
+    getFileIndexClearPreview: vi.fn().mockResolvedValue({ workspaceRoot: 'X:\\Library',
+      counts: { pdfFiles: 4, materialBatches: 1, scanChanges: 4, scanRuns: 2 } }),
+    clearFileIndex: vi.fn().mockResolvedValue({ pdfFiles: 4, materialBatches: 1, scanChanges: 4, scanRuns: 2 }),
     searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
     listProducts: vi.fn().mockResolvedValue([{ id: 9, sku: 'SKDZC100JP', model: 'ZC100', productCategory: '冰柜', status: 'active' }]),
     listMaterialBatches: vi.fn().mockResolvedValue([{ id: 2, sku: 'SKDZC100JP', model: 'ZC100', name: '06.20260309' }]),
@@ -252,5 +255,26 @@ describe('FilesPage', () => {
 
     await waitFor(() => expect(api.cleanupPdfFiles).toHaveBeenCalledWith([missing.id]));
     expect(screen.getByRole('button', { name: '清理已选索引记录 (0)' })).toBeDisabled();
+  });
+
+  it('uses a configured-root two-step phrase confirmation before clearing the library index', async () => {
+    const api = apiFixture(true);
+    render(<FilesPage api={api as never} />);
+    await screen.findByText(file.fileName, { selector: '.file-primary' });
+
+    fireEvent.click(screen.getByRole('button', { name: '清空资料库索引' }));
+    expect(await screen.findByText('资料根目录：X:\\Library')).toBeVisible();
+    expect(screen.getByText('不会删除 X:\\Library 中的任何实际文件。')).toBeVisible();
+    expect(screen.getByText('PDF 索引：4')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '继续' }));
+
+    const confirmation = screen.getByLabelText('确认短语');
+    fireEvent.change(confirmation, { target: { value: '清空资料库' } });
+    expect(screen.getByRole('button', { name: '确认清空资料库索引' })).toBeDisabled();
+    fireEvent.change(confirmation, { target: { value: '清空资料库索引' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认清空资料库索引' }));
+
+    await waitFor(() => expect(api.clearFileIndex).toHaveBeenCalledWith('清空资料库索引'));
+    expect(await screen.findByText('已清空 4 条 PDF 索引、1 个资料批次、4 条扫描变化和 2 次扫描记录')).toBeVisible();
   });
 });

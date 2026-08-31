@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
-import type { FileScanChangesView, MaterialBatchView, PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
+import type { FileIndexClearPreviewView, FileScanChangesView, MaterialBatchView, PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
 import { openIndexedPdfLocation } from '../desktop-files';
 
 const initialFilters = { keyword: '', productId: '', materialBatchId: '', matchStatus: '', conversionType: '', presence: 'present' };
@@ -32,6 +32,9 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]); const [pendingCleanupIds, setPendingCleanupIds] = useState<number[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
+  const [indexClearPreview, setIndexClearPreview] = useState<FileIndexClearPreviewView | null>(null);
+  const [indexClearConfirming, setIndexClearConfirming] = useState(false); const [indexClearPhrase, setIndexClearPhrase] = useState('');
+  const [clearingIndex, setClearingIndex] = useState(false);
   const [loadingChanges, setLoadingChanges] = useState(false);
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const searchRequest = useRef(0);
 
@@ -104,6 +107,26 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'PDF 索引清理失败'); }
     finally { setCleaning(false); }
   };
+  const requestIndexClear = async () => {
+    setError(''); setMessage(''); setClearingIndex(true);
+    try { setIndexClearPreview(await api.getFileIndexClearPreview()); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引信息加载失败'); }
+    finally { setClearingIndex(false); }
+  };
+  const cancelIndexClear = () => { if (!clearingIndex) { setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); } };
+  const confirmIndexClear = async () => {
+    if (indexClearPhrase !== '清空资料库索引') return;
+    setClearingIndex(true); setError('');
+    try {
+      const result = await api.clearFileIndex(indexClearPhrase);
+      setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); setSelectedIds([]);
+      setSummary(null); setScanChanges(null); setShowChanges(false);
+      setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
+      const [, batchItems] = await Promise.all([search(filters, 1), api.listMaterialBatches({})]);
+      setBatches(batchItems);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引失败'); }
+    finally { setClearingIndex(false); }
+  };
   const openLocation = async (id: number) => {
     setError(''); setMessage('');
     const result = await openIndexedPdfLocation(id);
@@ -124,6 +147,11 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         <strong>{settings.configured ? settings.available ? '目录可用' : '目录不可用' : '尚未设置资料根目录'}</strong>
         <span>{settings.configured ? '保存后请手动扫描以更新索引' : '输入资源管理器中的完整目录路径'}</span>
       </div>
+    </section>
+    <section className="file-cleanup-toolbar" aria-label="资料库索引清空">
+      <span>仅清空扫描生成的数据库索引，不会释放任何已占用图号。</span>
+      <button className="text-button danger" type="button" disabled={scanning || clearingIndex || !settings.configured}
+        onClick={() => void requestIndexClear()}>清空资料库索引</button>
     </section>
     {error && <p className="error-banner">{error}</p>}{message && <p className="success-banner"><strong>{message}</strong></p>}
     {summary && <>
@@ -172,6 +200,24 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       <p>此操作只清理数据库索引记录，不会删除磁盘文件，也不会释放历史图号。</p>
       <div><button className="secondary-button" type="button" disabled={cleaning} onClick={() => setPendingCleanupIds(null)}>取消</button>
         <button className="primary-button" type="button" disabled={cleaning} onClick={() => void confirmCleanup()}>{cleaning ? '清理中…' : '确认清理索引记录'}</button></div>
+    </section>}
+    {indexClearPreview && !indexClearConfirming && <section className="file-cleanup-confirmation" role="dialog" aria-label="确认清空资料库索引">
+      <strong>清空资料库索引</strong>
+      <p>资料根目录：{indexClearPreview.workspaceRoot ?? '未配置'}</p>
+      <ul><li>PDF 索引：{indexClearPreview.counts.pdfFiles}</li><li>资料批次：{indexClearPreview.counts.materialBatches}</li>
+        <li>扫描变化：{indexClearPreview.counts.scanChanges}</li><li>扫描记录：{indexClearPreview.counts.scanRuns}</li></ul>
+      <p>不会删除 {indexClearPreview.workspaceRoot ?? '当前资料根目录'} 中的任何实际文件。</p>
+      <div><button className="secondary-button" type="button" disabled={clearingIndex} onClick={cancelIndexClear}>取消</button>
+        <button className="primary-button" type="button" disabled={clearingIndex} onClick={() => setIndexClearConfirming(true)}>继续</button></div>
+    </section>}
+    {indexClearPreview && indexClearConfirming && <section className="file-cleanup-confirmation" role="dialog" aria-label="最终确认清空资料库索引">
+      <strong>请输入“清空资料库索引”以继续</strong>
+      <p>不会删除 {indexClearPreview.workspaceRoot ?? '当前资料根目录'} 中的任何实际文件，也不会释放历史图号。</p>
+      <label><span>确认短语</span><input aria-label="确认短语" value={indexClearPhrase} disabled={clearingIndex}
+        onChange={(event) => setIndexClearPhrase(event.target.value)} /></label>
+      <div><button className="secondary-button" type="button" disabled={clearingIndex} onClick={cancelIndexClear}>取消</button>
+        <button className="primary-button" type="button" disabled={clearingIndex || indexClearPhrase !== '清空资料库索引'}
+          onClick={() => void confirmIndexClear()}>{clearingIndex ? '清空中…' : '确认清空资料库索引'}</button></div>
     </section>}
     {!loading && files.length === 0 ? <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
       description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} /> :

@@ -111,6 +111,8 @@ export interface FileScanChangeView { id: number; type: 'added' | 'missing' | 'm
   previousRelativePath: string | null; fileName: string; fullCode: string | null }
 export interface FileScanChangesView { scan: FileScanRunView;
   changes: { added: FileScanChangeView[]; missing: FileScanChangeView[]; changed: FileScanChangeView[] } }
+export interface FileIndexClearResultView { pdfFiles: number; materialBatches: number; scanChanges: number; scanRuns: number }
+export interface FileIndexClearPreviewView { workspaceRoot: string | null; counts: FileIndexClearResultView }
 export interface PdfFileView {
   id: number; relativePath: string; fileName: string; drawingId: number | null; historicalDrawingId: number | null;
   historicalFullCode: string | null; fullCode: string | null;
@@ -160,6 +162,8 @@ export interface PlannerApi {
   getLatestFileScan(): Promise<FileScanRunView | null>;
   getFileScanChanges(id: number): Promise<FileScanChangesView>;
   cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
+  getFileIndexClearPreview(): Promise<FileIndexClearPreviewView>;
+  clearFileIndex(confirmation: string): Promise<FileIndexClearResultView>;
   searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
     items: PdfFileView[]; total: number; page: number; pageSize: number;
   }>;
@@ -325,5 +329,7 @@ export const apiClient: PlannerApi = {
   getLatestFileScan: () => request('/api/files/scans/latest'),
   getFileScanChanges: (id) => request(`/api/files/scans/${id}/changes`),
   cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),
+  getFileIndexClearPreview: () => request('/api/files/index/clear-preview'),
+  clearFileIndex: (confirmation) => request('/api/files/index/clear', json('POST', { confirmation })),
   searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
 };

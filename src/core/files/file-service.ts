@@ -1,6 +1,6 @@
 import { FileError } from './file-errors.js';
 import { FINGERPRINT_CONCURRENCY, mapWithConcurrency, resolveFileFingerprint } from './file-fingerprint.js';
-import { FileRepository } from './file-repository.js';
+import { FileRepository, type FileIndexClearResult } from './file-repository.js';
 import { classifyHistoricalPdf } from './historical-file-classifier.js';
 import { parseMaterialBatch } from './material-batch-parser.js';
 import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
@@ -12,6 +12,13 @@ export interface FileScanSummary {
   total: number; matched: number; pending: number; unmatched: number; conflict: number; historicalRegistered: number;
   source: number; outlined: number; missing: number; scanId: number; currentTotal: number;
   comparison: FileScanComparison; scannedAt: string;
+}
+
+export const FILE_INDEX_CLEAR_CONFIRMATION = '清空资料库索引';
+
+export interface FileIndexClearPreview {
+  workspaceRoot: string | null;
+  counts: FileIndexClearResult;
 }
 
 export class FileService {
@@ -47,6 +54,18 @@ export class FileService {
       throw new FileError('INVALID_CLEANUP_IDS', '请选择不超过 500 条不重复的 PDF 索引记录');
     }
     return this.repository.cleanupMissing(ids);
+  }
+
+  clearIndex(confirmation: unknown): FileIndexClearResult {
+    if (confirmation !== FILE_INDEX_CLEAR_CONFIRMATION) {
+      throw new FileError('INVALID_CLEAR_INDEX_CONFIRMATION', '请准确输入“清空资料库索引”后再执行');
+    }
+    if (this.scanning) throw new FileError('SCAN_IN_PROGRESS', '资料库正在扫描，扫描完成后才能清空索引');
+    return this.repository.clearIndex();
+  }
+
+  clearIndexPreview(): FileIndexClearPreview {
+    return { workspaceRoot: this.settings.get().workspaceRoot, counts: this.repository.indexCounts() };
   }
 
   async scan(): Promise<FileScanSummary> {

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -151,5 +151,46 @@ describe('FileService', () => {
       expect(() => service.cleanup(ids)).toThrowError(expect.objectContaining({ code: 'INVALID_CLEANUP_IDS' }));
     }
     expect(service.cleanup([id])).toEqual({ cleaned: 1 });
+  });
+
+  it('requires the exact confirmation phrase before clearing scan indexes', () => {
+    const service = new FileService(repository, settings);
+
+    expect(() => service.clearIndex('清空资料库')).toThrowError(expect.objectContaining({
+      code: 'INVALID_CLEAR_INDEX_CONFIRMATION',
+    }));
+  });
+
+  it('rejects an index clear while a scan is active', async () => {
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); settings.setWorkspaceRoot(workspace);
+    let release!: (value: []) => void; const scanner = vi.fn(() => new Promise<[]>((resolve) => { release = resolve; }));
+    const service = new FileService(repository, settings, scanner); const activeScan = service.scan();
+
+    expect(() => service.clearIndex('清空资料库索引')).toThrowError(expect.objectContaining({ code: 'SCAN_IN_PROGRESS' }));
+
+    release([]); await activeScan;
+  });
+
+  it('rebuilds an empty index without duplicating historical occupancy or changing library files', async () => {
+    const drawing = createDrawing(); const workspace = join(dataDir, 'library'); mkdirSync(workspace);
+    const historyPath = join(workspace, '02.0404.010.0401002-history.pdf'); writeFileSync(historyPath, '%PDF unchanged');
+    const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
+    expect(await service.scan()).toMatchObject({ historicalRegistered: 1, total: 1 });
+    const refs = db.prepare(`select product_id as productId, color_id as colorId, main_category_id as mainCategoryId,
+      project_item_id as projectItemId from drawing_numbers where id = ?`).get(drawing.id) as {
+        productId: number; colorId: number; mainCategoryId: number; projectItemId: number;
+      };
+    const planning = new PlanningService(db);
+    const nextBefore = planning.preview({ productId: refs.productId, rows: [{ clientId: 'next', colorId: refs.colorId,
+      mainCategoryId: refs.mainCategoryId, projectItemId: refs.projectItemId }] }).rows[0].sequence;
+    const contentBefore = readFileSync(historyPath, 'utf8'); const metadataBefore = statSync(historyPath);
+
+    expect(service.clearIndex('清空资料库索引')).toEqual({ pdfFiles: 1, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
+    expect(readFileSync(historyPath, 'utf8')).toBe(contentBefore);
+    expect(statSync(historyPath).mtimeMs).toBe(metadataBefore.mtimeMs);
+    expect(await service.scan()).toMatchObject({ historicalRegistered: 0, total: 1 });
+    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
+    expect(planning.preview({ productId: refs.productId, rows: [{ clientId: 'next', colorId: refs.colorId,
+      mainCategoryId: refs.mainCategoryId, projectItemId: refs.projectItemId }] }).rows[0].sequence).toBe(nextBefore);
   });
 });
