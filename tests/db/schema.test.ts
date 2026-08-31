@@ -47,13 +47,13 @@ function seedProduct(database: ReturnType<typeof openDatabase>) {
   return { product, drawing };
 }
 
-describe('schema version five', () => {
+describe('schema migrations', () => {
   it('backs up and preserves v4 records while adding compatibility fields', () => {
     const database = v4Database();
     const seeded = seedProduct(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 6 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 7 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select id, sku from products').get()).toEqual({ id: seeded.product, sku: null });

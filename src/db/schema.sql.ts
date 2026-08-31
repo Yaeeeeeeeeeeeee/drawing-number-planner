@@ -290,3 +290,42 @@ export const schemaVersionSix = `
   ALTER TABLE pdf_files ADD COLUMN path_key TEXT;
   ALTER TABLE pdf_files ADD COLUMN material_batch_id INTEGER REFERENCES material_batches(id);
 `;
+
+export const schemaVersionSeven = `
+  CREATE TABLE file_scan_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    completed_at TEXT NOT NULL,
+    total_current INTEGER NOT NULL DEFAULT 0 CHECK (total_current >= 0),
+    added_count INTEGER NOT NULL DEFAULT 0 CHECK (added_count >= 0),
+    missing_count INTEGER NOT NULL DEFAULT 0 CHECK (missing_count >= 0),
+    moved_count INTEGER NOT NULL DEFAULT 0 CHECK (moved_count >= 0),
+    changed_count INTEGER NOT NULL DEFAULT 0 CHECK (changed_count >= 0),
+    unchanged_count INTEGER NOT NULL DEFAULT 0 CHECK (unchanged_count >= 0)
+  );
+
+  CREATE TABLE file_scan_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_run_id INTEGER NOT NULL REFERENCES file_scan_runs(id) ON DELETE CASCADE,
+    change_type TEXT NOT NULL CHECK (change_type IN ('added', 'missing', 'moved', 'changed', 'unchanged')),
+    index_kind TEXT NOT NULL CHECK (index_kind IN ('pdf', 'qr')),
+    file_index_id INTEGER NOT NULL,
+    relative_path TEXT NOT NULL,
+    previous_relative_path TEXT,
+    file_name TEXT NOT NULL,
+    full_code TEXT
+  );
+
+  CREATE INDEX file_scan_changes_scan_run_idx ON file_scan_changes(scan_run_id);
+  CREATE INDEX file_scan_changes_index_kind_idx ON file_scan_changes(index_kind, file_index_id);
+
+  ALTER TABLE pdf_files ADD COLUMN content_sha256 TEXT;
+  ALTER TABLE pdf_files ADD COLUMN last_seen_scan_run_id INTEGER REFERENCES file_scan_runs(id);
+  CREATE INDEX pdf_files_last_seen_scan_run_idx ON pdf_files(last_seen_scan_run_id);
+
+  ALTER TABLE material_batches ADD COLUMN last_seen_scan_run_id INTEGER REFERENCES file_scan_runs(id);
+  CREATE INDEX material_batches_last_seen_scan_run_idx ON material_batches(last_seen_scan_run_id);
+
+  ALTER TABLE historical_drawing_numbers ADD COLUMN status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'inactive'));
+`;

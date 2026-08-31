@@ -5,6 +5,7 @@ import {
   schemaVersionFour,
   schemaVersionOne,
   schemaVersionSix,
+  schemaVersionSeven,
   schemaVersionThree,
   schemaVersionTwo,
 } from './schema.sql.js';
@@ -49,6 +50,28 @@ function ensureBatchPathIndex(database: PlannerDatabase): void {
   if (duplicates.count > 0) throw new Error('资料批次存在大小写路径冲突，数据库未升级');
   database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS material_batches_relative_path_nocase_unique
     ON material_batches(relative_path COLLATE NOCASE)`);
+}
+
+function hasUniqueIndex(database: PlannerDatabase, name: string): boolean {
+  const index = database.prepare(`select sql from sqlite_master where type = 'index' and name = ?`).get(name) as { sql: string | null } | undefined;
+  return Boolean(index?.sql?.toUpperCase().includes('CREATE UNIQUE INDEX'));
+}
+
+function validateScanHistoryMigration(database: PlannerDatabase, before: { pdf: number; batches: number; historical: number }): void {
+  const after = {
+    pdf: (database.prepare('select count(*) as count from pdf_files').get() as { count: number }).count,
+    batches: (database.prepare('select count(*) as count from material_batches').get() as { count: number }).count,
+    historical: (database.prepare('select count(*) as count from historical_drawing_numbers').get() as { count: number }).count,
+  };
+  const historicalDefaults = (database.prepare(`select count(*) as count from historical_drawing_numbers
+    where status <> 'active'`).get() as { count: number }).count;
+  const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
+  if (before.pdf !== after.pdf || before.batches !== after.batches || before.historical !== after.historical
+    || historicalDefaults > 0 || foreignKeyErrors.length > 0
+    || !hasUniqueIndex(database, 'pdf_files_path_key_unique')
+    || !hasUniqueIndex(database, 'material_batches_relative_path_nocase_unique')) {
+    throw new Error('扫描历史数据校验失败，数据库未升级');
+  }
 }
 
 function validateExpandedDrawingRows(database: PlannerDatabase): void {
@@ -100,8 +123,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 6) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 6`);
-  if (from >= 6) {
+  if (from > 7) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 7`);
+  if (from >= 7) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -160,6 +183,16 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       }
       database.prepare('insert into schema_migrations (version, applied_at) values (6, ?)').run(new Date().toISOString());
     }
+    if (from < 7) {
+      const before = {
+        pdf: (database.prepare('select count(*) as count from pdf_files').get() as { count: number }).count,
+        batches: (database.prepare('select count(*) as count from material_batches').get() as { count: number }).count,
+        historical: (database.prepare('select count(*) as count from historical_drawing_numbers').get() as { count: number }).count,
+      };
+      database.exec(schemaVersionSeven);
+      database.prepare('insert into schema_migrations (version, applied_at) values (7, ?)').run(new Date().toISOString());
+      validateScanHistoryMigration(database, before);
+    }
   })();
-  return { from, to: 6 };
+  return { from, to: 7 };
 }
