@@ -70,7 +70,7 @@ export interface MaterialBatchFileView extends BatchFileInstance {
 }
 
 export interface MaterialBatchLogicalMaterialView {
-  fullCode: string;
+  fullCode: string | null;
   outlinedFiles: MaterialBatchFileView[];
   sourceFiles: MaterialBatchFileView[];
 }

@@ -106,7 +106,7 @@ export interface PdfScanSummaryView {
   comparison: FileScanComparisonView; scannedAt: string;
 }
 export interface MaterialBatchLogicalMaterialView {
-  fullCode: string; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
+  fullCode: string | null; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
 }
 export interface FileScanComparisonView { added: number; missing: number; moved: number; changed: number; unchanged: number }
 export interface FileScanRunView extends FileScanComparisonView { id: number; completedAt: string; currentTotal: number }

@@ -47,8 +47,8 @@ describe('DrawingLibraryPage', () => {
     ];
     const materials = [{ fullCode: '02.0209.010.0501001',
       outlinedFiles: [
-        { pdfIndexId: 32, fileName: 'outlined.pdf', relativePath: 'batch/outlined.pdf', isPresent: true, conversionType: 'outlined' },
         { pdfIndexId: 33, fileName: 'outlined-old.pdf', relativePath: 'batch/outlined-old.pdf', isPresent: false, conversionType: 'outlined' },
+        { pdfIndexId: 32, fileName: 'outlined.pdf', relativePath: 'batch/outlined.pdf', isPresent: true, conversionType: 'outlined' },
       ],
       sourceFiles: [
         { pdfIndexId: 31, fileName: 'source.pdf', relativePath: 'product/source.pdf', isPresent: true, conversionType: 'source' },
@@ -79,6 +79,23 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getByText('product/source.pdf')).toBeVisible();
     expect(screen.getByText('product/source-old.pdf')).toBeVisible();
     expect(screen.getAllByText('已缺失')).toHaveLength(2);
+  });
+
+  it('shows an unrecognized outlined file as a pending standalone batch row', async () => {
+    const api = {
+      searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]),
+      listMaterialBatches: vi.fn().mockResolvedValue([{ id: 6, productDirectory: '01.洗碗机\\SKU-T40', sku: 'SKU', model: 'T40', name: '06.20260309', sequenceNumber: 6, recognitionStatus: 'recognized', currentState: 'current', fileCount: 1, isPresent: true }]),
+      getMaterialBatchMaterials: vi.fn().mockResolvedValue([{ fullCode: null, outlinedFiles: [{ pdfIndexId: 32, fileName: 'unrecognized.pdf', relativePath: 'batch/unrecognized.pdf', isPresent: true, conversionType: 'outlined', matchStatus: 'pending' }], sourceFiles: [] }]),
+    };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '按资料批次' }));
+    fireEvent.click(screen.getByRole('button', { name: '查询资料批次' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看批次 06.20260309' }));
+
+    expect(await screen.findByRole('button', { name: 'unrecognized.pdf' })).toBeVisible();
+    expect(screen.getByText(/未可靠识别 · 待确认/)).toBeVisible();
   });
 
   it('explains that opening a file location needs the Windows desktop app in browser preview', async () => {

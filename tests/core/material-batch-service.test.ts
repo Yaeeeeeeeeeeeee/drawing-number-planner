@@ -43,6 +43,15 @@ function insertFile(batchId: number, historicalId: number, suffix: string, modif
     .run(relativePath, relativePath, batchId, `${suffix}.pdf`, historicalId, conversionType, modifiedAt, now, isPresent ? 1 : 0);
 }
 
+function insertUnbatchedSource(productDirectory: string, historicalId: number, suffix: string): void {
+  const relativePath = `${productDirectory}\\02.未转曲源文件\\${suffix}.pdf`;
+  db.prepare(`insert into pdf_files
+    (relative_path, path_key, material_batch_id, file_name, historical_drawing_id, match_status,
+     detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
+    values (?, lower(?), null, ?, ?, 'matched', '[]', 'source', 1, ?, ?, 1)`)
+    .run(relativePath, relativePath, `${suffix}.pdf`, historicalId, now, now);
+}
+
 describe('MaterialBatchService', () => {
   it('selects the unique highest recognized sequence and never uses PDF modification time', () => {
     const product = '01.洗碗机\\\\SKU-T40';
@@ -99,16 +108,17 @@ describe('MaterialBatchService', () => {
     ]));
   });
 
-  it('aggregates a batch material by full code while retaining every outlined instance and only same-product sources', () => {
+  it('pairs a batch material with same-product source instances even when they have no material batch', () => {
     const code = '02.0209.010.0401001';
     const drawing = insertHistorical(code);
     const productDirectory = '01.洗碗机\\SKU-T40';
     const selected = insertBatch(productDirectory, '06.20260309', 6);
     const earlier = insertBatch(productDirectory, '05.20251216', 5);
     const anotherProduct = insertBatch('01.洗碗机\\SKU-T60', '06.20260309', 6);
-    insertFile(selected, drawing, 'outlined-current-a');
-    insertFile(selected, drawing, 'outlined-current-b', now, 'outlined', false);
+    insertFile(selected, drawing, '00-outlined-missing', now, 'outlined', false);
+    insertFile(selected, drawing, '99-outlined-present');
     insertFile(earlier, drawing, 'source-same-product', now, 'source');
+    insertUnbatchedSource(productDirectory, drawing, 'source-unbatched');
     insertFile(anotherProduct, drawing, 'source-other-product', now, 'source');
 
     const logicalMaterials = (service as typeof service & { getLogicalMaterials(batchId: number): unknown }).getLogicalMaterials(selected);
@@ -117,11 +127,31 @@ describe('MaterialBatchService', () => {
       expect.objectContaining({
         fullCode: code,
         outlinedFiles: [
-          expect.objectContaining({ relativePath: expect.stringContaining('outlined-current-a.pdf'), isPresent: true }),
-          expect.objectContaining({ relativePath: expect.stringContaining('outlined-current-b.pdf'), isPresent: false }),
+          expect.objectContaining({ relativePath: expect.stringContaining('99-outlined-present.pdf'), isPresent: true }),
+          expect.objectContaining({ relativePath: expect.stringContaining('00-outlined-missing.pdf'), isPresent: false }),
         ],
-        sourceFiles: [expect.objectContaining({ relativePath: expect.stringContaining('source-same-product.pdf') })],
+        sourceFiles: expect.arrayContaining([
+          expect.objectContaining({ relativePath: expect.stringContaining('source-same-product.pdf') }),
+          expect.objectContaining({ relativePath: expect.stringContaining('source-unbatched.pdf') }),
+        ]),
       }),
     ]);
+  });
+
+  it('keeps an unrecognized outlined batch file as its own unpaired material row', () => {
+    const selected = insertBatch('01.洗碗机\\SKU-T40', '06.20260309', 6);
+    db.prepare(`insert into pdf_files
+      (relative_path, path_key, material_batch_id, file_name, match_status, detected_codes_json,
+       conversion_type, size_bytes, modified_at, scanned_at, is_present)
+      values (?, lower(?), ?, ?, 'pending', '["02.0209.010.0401001"]', 'outlined', 1, ?, ?, 1)`)
+      .run('01.洗碗机\\SKU-T40\\03.量产后的变更文件\\06.20260309\\unrecognized.pdf',
+        '01.洗碗机\\SKU-T40\\03.量产后的变更文件\\06.20260309\\unrecognized.pdf', selected,
+        'unrecognized.pdf', now, now);
+
+    expect(service.getLogicalMaterials(selected)).toEqual([expect.objectContaining({
+      fullCode: null,
+      outlinedFiles: [expect.objectContaining({ fileName: 'unrecognized.pdf', matchStatus: 'pending' })],
+      sourceFiles: [],
+    })]);
   });
 });

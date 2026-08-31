@@ -233,11 +233,12 @@ function BatchBrowser({ search, setSearch, loading, batches, selected, materials
           <h2>{selected.productDirectory}</h2><p>{selected.name} · {usageLabel(selected.currentState)}</p>
           {!desktopAvailable && <p className="info-banner">浏览器预览不支持打开文件位置，请在 Windows 桌面版操作。</p>}
           {materials.length === 0 ? <p className="muted-text">该批次暂无可靠识别的转曲后文件</p> : <ul className="batch-material-list">{materials.map((material) => {
-            const primary = material.outlinedFiles[0];
-            const expanded = expandedCode === material.fullCode;
-            return <li key={material.fullCode} className="batch-material-row"><div className="batch-material-summary">
-              <span><button className="text-button" type="button" onClick={() => setExpandedCode(expanded ? null : material.fullCode)}>{primary.fileName}</button>
-                <small>{material.fullCode} · {material.outlinedFiles.length} 个转曲后实例</small></span>
+            const primary = material.outlinedFiles.find((file) => file.isPresent) ?? material.outlinedFiles[0];
+            const materialKey = material.fullCode ?? `unpaired-${primary.pdfIndexId}`;
+            const expanded = expandedCode === materialKey;
+            return <li key={materialKey} className="batch-material-row"><div className="batch-material-summary">
+              <span><button className="text-button" type="button" onClick={() => setExpandedCode(expanded ? null : materialKey)}>{primary.fileName}</button>
+                <small>{material.fullCode ? `${material.fullCode} · ` : '未可靠识别 · 待确认 · '}{material.outlinedFiles.length} 个转曲后实例</small></span>
               <button className="text-button" type="button" disabled={!primary.isPresent}
                 aria-label={`打开转曲后文件 ${primary.fileName} 的位置`} onClick={() => void onOpen(primary.pdfIndexId)}>{primary.isPresent ? '打开位置' : '已缺失'}</button>
             </div>{expanded && <div className="batch-material-details">
