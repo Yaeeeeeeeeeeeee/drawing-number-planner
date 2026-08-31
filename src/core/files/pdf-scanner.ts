@@ -4,6 +4,7 @@ import { basename, join } from 'node:path';
 import { toWorkspaceRelativePath, validateWorkspaceRoot } from './workspace-paths.js';
 
 export interface ScannedPdfFile {
+  absolutePath: string;
   relativePath: string;
   fileName: string;
   sizeBytes: number;
@@ -25,7 +26,7 @@ export async function scanPdfWorkspace(rootInput: string): Promise<ScannedPdfFil
       if (!entry.isFile() || !entry.name.toLocaleLowerCase('en-US').endsWith('.pdf')) continue;
       const resolved = await realpath(absolutePath); toWorkspaceRelativePath(root, resolved);
       const stats = await lstat(absolutePath);
-      files.push({ relativePath: toWorkspaceRelativePath(root, absolutePath), fileName: basename(absolutePath),
+      files.push({ absolutePath, relativePath: toWorkspaceRelativePath(root, absolutePath), fileName: basename(absolutePath),
         sizeBytes: stats.size, modifiedAt: stats.mtime.toISOString() });
     }
   };

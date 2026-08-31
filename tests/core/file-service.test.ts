@@ -63,6 +63,7 @@ describe('FileService', () => {
     const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
 
     expect(await service.scan()).toMatchObject({ total: 2, matched: 2, unmatched: 0, conflict: 0, source: 1, outlined: 1, missing: 0 });
+    expect(db.prepare('select count(content_sha256) as count from pdf_files where is_present = 1').get()).toEqual({ count: 2 });
     unlinkSync(join(workspace, `${drawing.fullCode}-LOGO.pdf`));
     expect(await service.scan()).toMatchObject({ total: 1, matched: 1, missing: 1 });
     expect(service.search({ presence: 'missing' }).items).toEqual([

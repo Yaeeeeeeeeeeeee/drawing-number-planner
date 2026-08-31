@@ -1,6 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import type { DrawingCodeReference, FileScanRecord, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
 import { FileError } from './file-errors.js';
+import { diffFileScan, type IndexedFileSnapshot } from './file-scan-diff.js';
 import { MaterialBatchRepository } from './material-batch-repository.js';
 import { toWorkspacePathKey, validateWorkspaceRelativePath } from './workspace-paths.js';
 
@@ -15,6 +16,8 @@ interface FileRow {
   path_key: string; material_batch_id: number | null; material_batch_name: string | null;
   material_batch_status: PdfFileView['materialBatchStatus'];
 }
+
+interface StoredFileSnapshotRow extends Omit<IndexedFileSnapshot, 'isPresent'> { isPresent: number }
 
 function toView(row: FileRow): PdfFileView {
   const detected = JSON.parse(row.detected_codes_json) as unknown;
@@ -47,20 +50,48 @@ export class FileRepository {
     return this.db.prepare('select id, full_code as fullCode from drawing_numbers order by id').all() as DrawingCodeReference[];
   }
 
+  currentFingerprints(pathKeys: string[]): Map<string, { pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }> {
+    if (pathKeys.length === 0) return new Map();
+    const unique = [...new Set(pathKeys)]; const placeholders = unique.map(() => '?').join(', ');
+    const rows = this.db.prepare(`select path_key as pathKey, size_bytes as sizeBytes, modified_at as modifiedAt,
+      content_sha256 as contentSha256 from pdf_files where is_present = 1 and path_key in (${placeholders})`)
+      .all(...unique) as Array<{ pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }>;
+    return new Map(rows.map((row) => [row.pathKey, row]));
+  }
+
   replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string): {
     missing: number; historicalRegistered: number;
   } {
     for (const record of records) {
       validateWorkspaceRelativePath(record.relativePath);
-      record.pathKey = record.pathKey ?? toWorkspacePathKey(record.relativePath);
+      record.pathKey = toWorkspacePathKey(record.relativePath);
+    }
+    if (new Set(records.map((record) => record.pathKey)).size !== records.length) {
+      throw new Error('扫描结果包含重复的实际相对路径');
     }
     return this.db.transaction(() => {
+      const previous = this.db.prepare(`select id, relative_path as relativePath, path_key as pathKey, file_name as fileName,
+        size_bytes as sizeBytes, modified_at as modifiedAt, content_sha256 as contentSha256, is_present as isPresent
+        from pdf_files where is_present = 1`).all() as StoredFileSnapshotRow[];
+      const current = records.map((record) => ({ relativePath: record.relativePath, pathKey: record.pathKey!, fileName: record.fileName,
+        sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, contentSha256: record.contentSha256 ?? null }));
+      const differences = diffFileScan(previous.map((file) => ({ ...file, isPresent: file.isPresent === 1 })), current);
+      const counts = { added: differences.filter((change) => change.type === 'added').length,
+        missing: differences.filter((change) => change.type === 'missing').length,
+        moved: differences.filter((change) => change.type === 'moved').length,
+        changed: differences.filter((change) => change.type === 'changed').length,
+        unchanged: differences.filter((change) => change.type === 'unchanged').length };
+      const scanRun = this.db.prepare(`insert into file_scan_runs
+        (started_at, completed_at, total_current, added_count, missing_count, moved_count, changed_count, unchanged_count)
+        values (@scannedAt, @scannedAt, @totalCurrent, @added, @missing, @moved, @changed, @unchanged) returning id`).get({
+        scannedAt, totalCurrent: records.length, ...counts,
+      }) as { id: number };
       this.db.prepare('update pdf_files set is_present = 0').run();
       this.batches.markAllMissing();
       const batchIds = new Map<string, number>();
       for (const record of records) {
         if (record.materialBatch && !batchIds.has(record.materialBatch.relativePath)) {
-          batchIds.set(record.materialBatch.relativePath, this.batches.upsert(record.materialBatch, scannedAt));
+          batchIds.set(record.materialBatch.relativePath, this.batches.upsert(record.materialBatch, scannedAt, scanRun.id));
         }
       }
       let historicalRegistered = 0;
@@ -93,11 +124,11 @@ export class FileRepository {
       const upsert = this.db.prepare(`insert into pdf_files
         (relative_path, path_key, material_batch_id, file_name, drawing_id, historical_drawing_id,
           match_status, detected_codes_json, conversion_type, classification_warning,
-          size_bytes, modified_at, scanned_at, is_present)
+          size_bytes, modified_at, scanned_at, is_present, content_sha256, last_seen_scan_run_id)
         values (@relativePath, @pathKey, @materialBatchId, @fileName, @drawingId,
           (select id from historical_drawing_numbers where full_code = @historicalFullCode),
           @matchStatus, @detectedCodesJson, @conversionType, @classificationWarning,
-          @sizeBytes, @modifiedAt, @scannedAt, 1)
+          @sizeBytes, @modifiedAt, @scannedAt, 1, @contentSha256, @scanRunId)
         on conflict(path_key) do update set
           relative_path = excluded.relative_path,
           path_key = excluded.path_key,
@@ -118,14 +149,33 @@ export class FileRepository {
             then pdf_files.conversion_type else excluded.conversion_type end,
           classification_warning = excluded.classification_warning,
           size_bytes = excluded.size_bytes, modified_at = excluded.modified_at, scanned_at = excluded.scanned_at,
-          is_present = 1`);
+          is_present = 1, content_sha256 = coalesce(excluded.content_sha256, pdf_files.content_sha256),
+          last_seen_scan_run_id = excluded.last_seen_scan_run_id`);
       for (const record of records) upsert.run({ relativePath: record.relativePath, pathKey: record.pathKey,
         materialBatchId: record.materialBatch ? batchIds.get(record.materialBatch.relativePath) ?? null : null,
         fileName: record.fileName,
         drawingId: record.drawingId, historicalFullCode: record.historicalFullCode ?? null,
         matchStatus: record.matchStatus, detectedCodesJson: JSON.stringify(record.detectedCodes),
         conversionType: record.conversionType, classificationWarning: record.classificationWarning ?? null,
-        sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, scannedAt });
+        sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, scannedAt,
+        contentSha256: record.contentSha256 ?? null, scanRunId: scanRun.id });
+      const idRows = this.db.prepare('select id, path_key as pathKey from pdf_files where last_seen_scan_run_id = ?').all(scanRun.id) as Array<{ id: number; pathKey: string }>;
+      const idsByPath = new Map(idRows.map((row) => [row.pathKey, row.id]));
+      const insertChange = this.db.prepare(`insert into file_scan_changes
+        (scan_run_id, change_type, index_kind, file_index_id, relative_path, previous_relative_path, file_name, full_code)
+        values (@scanRunId, @changeType, 'pdf', @fileIndexId, @relativePath, @previousRelativePath, @fileName, @fullCode)`);
+      const fileSnapshot = this.db.prepare(`select file_name as fileName, coalesce(drawing.full_code, historical.full_code) as fullCode
+        from pdf_files file left join drawing_numbers drawing on drawing.id = file.drawing_id
+        left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id where file.id = ?`);
+      for (const difference of differences) {
+        const fileIndexId = difference.type === 'missing' ? difference.previousFileId! : idsByPath.get(toWorkspacePathKey(difference.relativePath));
+        if (fileIndexId == null) throw new Error('扫描差异找不到对应的文件索引');
+        const snapshot = fileSnapshot.get(fileIndexId) as { fileName: string; fullCode: string | null } | undefined;
+        if (!snapshot) throw new Error('扫描差异找不到文件快照');
+        insertChange.run({ scanRunId: scanRun.id, changeType: difference.type, fileIndexId,
+          relativePath: difference.relativePath, previousRelativePath: difference.previousRelativePath,
+          fileName: snapshot.fileName, fullCode: snapshot.fullCode });
+      }
       const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
       return { missing, historicalRegistered };
     }).immediate();

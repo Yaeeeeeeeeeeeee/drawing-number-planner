@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,6 +16,7 @@ describe('PDF workspace scanner', () => {
 
     expect(result.map((file) => file.relativePath)).toEqual(['B.PDF', join('SAMKYO', 'ZC100', 'a.pdf')]);
     expect(result[0]).toMatchObject({ fileName: 'B.PDF', sizeBytes: 13 });
+    expect(result[0].absolutePath).toBe(realpathSync.native(join(root, 'B.PDF')));
     expect(new Date(result[0].modifiedAt).toISOString()).toBe(result[0].modifiedAt);
   });
 

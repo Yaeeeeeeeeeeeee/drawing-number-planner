@@ -78,6 +78,9 @@ describe('FileRepository', () => {
     expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 2 });
     expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
     expect(db.prepare('select count(distinct material_batch_id) as count from pdf_files').get()).toEqual({ count: 2 });
+    expect(db.prepare('select unchanged_count from file_scan_runs order by id desc limit 1').get()).toEqual({ unchanged_count: 2 });
+    expect(db.prepare("select index_kind, change_type, count(*) as count from file_scan_changes where scan_run_id = 2 group by index_kind, change_type").all())
+      .toEqual([{ index_kind: 'pdf', change_type: 'unchanged', count: 2 }]);
   });
 
   it('uses the normalized path key to prevent duplicate indexes for the same actual path', () => {
@@ -91,6 +94,11 @@ describe('FileRepository', () => {
     expect(repository.search().items).toEqual([
       expect.objectContaining({ relativePath: second.relativePath, fileName: 'a.pdf', sizeBytes: 999 }),
     ]);
+    expect(db.prepare("select change_type from file_scan_changes where scan_run_id = 2").all())
+      .toEqual([{ change_type: 'changed' }]);
+    repository.replaceScan([second], [], '2026-08-27T04:00:00.000Z');
+    expect(db.prepare("select change_type from file_scan_changes where scan_run_id = 3").all())
+      .toEqual([{ change_type: 'unchanged' }]);
   });
 
   it('rolls file presence, batch rows, and history back together when batch persistence fails', () => {
@@ -166,6 +174,23 @@ describe('FileRepository', () => {
     }));
     expect(db.prepare('select relative_path from pdf_files where drawing_id = ?').get(drawing.id))
       .toEqual({ relative_path: 'SAMKYO\\ZC100\\logo.pdf' });
+    expect(db.prepare('select total_current, added_count, missing_count, moved_count, changed_count, unchanged_count from file_scan_runs').get())
+      .toEqual({ total_current: 3, added_count: 3, missing_count: 0, moved_count: 0, changed_count: 0, unchanged_count: 0 });
+    expect(db.prepare("select index_kind, change_type, file_index_id from file_scan_changes order by id").all()).toHaveLength(3);
+    expect(db.prepare('select count(*) as count from pdf_files where last_seen_scan_run_id is not null').get()).toEqual({ count: 3 });
+  });
+
+  it('records a uniquely hash-matched move against the current file index identity', () => {
+    const before = { ...records(0)[1], relativePath: 'before.pdf', fileName: 'before.pdf', contentSha256: 'same-content' };
+    const after = { ...before, relativePath: 'after.pdf', fileName: 'after.pdf' };
+    repository.replaceScan([before], [], '2026-08-25T04:00:00.000Z');
+    repository.replaceScan([after], [], '2026-08-26T04:00:00.000Z');
+
+    const currentId = (db.prepare("select id from pdf_files where path_key = 'after.pdf'").get() as { id: number }).id;
+    expect(db.prepare('select moved_count, added_count, missing_count from file_scan_runs where id = 2').get())
+      .toEqual({ moved_count: 1, added_count: 0, missing_count: 0 });
+    expect(db.prepare('select index_kind, file_index_id, relative_path, previous_relative_path from file_scan_changes where scan_run_id = 2').get())
+      .toEqual({ index_kind: 'pdf', file_index_id: currentId, relative_path: 'after.pdf', previous_relative_path: 'before.pdf' });
   });
 
   it('refreshes seen metadata and marks unseen records missing without deleting them', () => {
@@ -181,6 +206,42 @@ describe('FileRepository', () => {
       .toEqual(expect.arrayContaining([expect.objectContaining({ matchStatus: 'unmatched', isPresent: false }),
         expect.objectContaining({ matchStatus: 'conflict', isPresent: false })]));
     expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 3 });
+    expect(db.prepare("select change_type from file_scan_changes where scan_run_id = 2 order by id").all())
+      .toEqual([{ change_type: 'changed' }, { change_type: 'missing' }, { change_type: 'missing' }]);
+  });
+
+  it('uses only previously present v7 baseline rows when recording the first scan differences', () => {
+    db.prepare(`insert into pdf_files
+      (relative_path, path_key, file_name, drawing_id, match_status, detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
+      values ('current.pdf', 'current.pdf', 'current.pdf', null, 'unmatched', '[]', 'source', 1, '2026-08-25T00:00:00.000Z', '2026-08-25T00:00:00.000Z', 1),
+        ('old-missing.pdf', 'old-missing.pdf', 'old-missing.pdf', null, 'unmatched', '[]', 'source', 1, '2026-08-25T00:00:00.000Z', '2026-08-25T00:00:00.000Z', 0)`).run();
+
+    repository.replaceScan([{ ...records(0)[1], relativePath: 'current.pdf', fileName: 'current.pdf',
+      sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z', contentSha256: 'hash-current' }], [], '2026-08-26T00:00:00.000Z');
+
+    expect(db.prepare('select missing_count, unchanged_count from file_scan_runs').get()).toEqual({ missing_count: 0, unchanged_count: 1 });
+    expect(db.prepare("select relative_path, change_type from file_scan_changes").all())
+      .toEqual([{ relative_path: 'current.pdf', change_type: 'unchanged' }]);
+  });
+
+  it('preserves index rows, scan history, and historical occupancy when change persistence fails', () => {
+    const kept = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf', contentSha256: 'hash-kept' };
+    repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
+    const historical = parseDrawingCode('02.0404.010.0401007')!;
+    const before = {
+      files: repository.search({ presence: 'all' }),
+      runs: db.prepare('select count(*) as count from file_scan_runs').get(),
+      historical: db.prepare('select count(*) as count from historical_drawing_numbers').get(),
+    };
+    db.exec(`create trigger reject_scan_change before insert on file_scan_changes
+      begin select raise(abort, 'scan change rejected'); end`);
+
+    expect(() => repository.replaceScan([{ ...kept, relativePath: 'replacement.pdf', fileName: 'replacement.pdf', contentSha256: 'hash-next' }],
+      [{ ...historical, directoryContext: null }], '2026-08-26T04:00:00.000Z')).toThrow('scan change rejected');
+
+    expect(repository.search({ presence: 'all' })).toEqual(before.files);
+    expect(db.prepare('select count(*) as count from file_scan_runs').get()).toEqual(before.runs);
+    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual(before.historical);
   });
 
   it('exposes canonical product identity for planned and historical PDFs and filters by product ID', () => {

@@ -20,6 +20,7 @@ export interface FileScanRecord {
   classificationWarning?: string | null;
   sizeBytes: number;
   modifiedAt: string;
+  contentSha256?: string | null;
   materialBatch?: ParsedMaterialBatch | null;
 }
 

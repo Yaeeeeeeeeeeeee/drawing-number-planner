@@ -1,4 +1,5 @@
 import { FileError } from './file-errors.js';
+import { resolveFileFingerprint } from './file-fingerprint.js';
 import { FileRepository } from './file-repository.js';
 import { classifyHistoricalPdf } from './historical-file-classifier.js';
 import { parseMaterialBatch } from './material-batch-parser.js';
@@ -50,8 +51,15 @@ export class FileService {
     this.scanning = true;
     try {
       const files = await this.scanner(workspaceRoot); const drawings = this.repository.listDrawingCodes();
+      const priorFingerprints = this.repository.currentFingerprints(files.map((file) => toWorkspacePathKey(file.relativePath)));
+      const fingerprints = await Promise.all(files.map(async (file) => {
+        const pathKey = toWorkspacePathKey(file.relativePath);
+        if (!file.absolutePath) throw new Error('扫描器未返回可只读计算指纹的文件路径');
+        return resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey, sizeBytes: file.sizeBytes,
+          modifiedAt: file.modifiedAt, existing: priorFingerprints.get(pathKey) ?? null });
+      }));
       const historicalCodes: HistoricalDrawingScanRecord[] = [];
-      const records = files.map((file): FileScanRecord => {
+      const records = files.map((file, index): FileScanRecord => {
         if (!file.fileName.toLocaleLowerCase('en-US').endsWith('.pdf')) throw new Error('扫描器返回了非 PDF 文件');
         const classification = classifyHistoricalPdf({ ...file, drawings });
         if (classification.historicalCode) historicalCodes.push({ ...classification.historicalCode,
@@ -61,7 +69,8 @@ export class FileService {
           drawingId: classification.drawingId,
           historicalFullCode: classification.historicalCode?.fullCode ?? null,
           matchStatus: classification.matchStatus, detectedCodes: classification.detectedCodes,
-          conversionType: classification.conversionType, classificationWarning: classification.classificationWarning };
+          conversionType: classification.conversionType, classificationWarning: classification.classificationWarning,
+          contentSha256: fingerprints[index].contentSha256 };
       });
       const scannedAt = new Date().toISOString();
       const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt);
