@@ -6,6 +6,7 @@ import { dictionaryTypes } from '../../core/dictionaries/dictionary-types.js';
 
 const typeSchema = z.enum(dictionaryTypes);
 const createSchema = z.object({ code: z.string().trim().min(1), name: z.string().trim().min(1), parentId: z.number().int().positive().optional() });
+const updateNameSchema = z.object({ name: z.string().trim().min(1) }).strict();
 
 export function registerDictionaryRoutes(app: FastifyInstance, service: DictionaryService): void {
   const sendDomainError = (error: unknown, reply: FastifyReply) => {
@@ -37,7 +38,7 @@ export function registerDictionaryRoutes(app: FastifyInstance, service: Dictiona
 
   app.patch('/api/dictionaries/items/:id', async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
-    const body = z.object({ name: z.string().trim().min(1) }).safeParse(request.body);
+    const body = updateNameSchema.safeParse(request.body);
     if (!params.success || !body.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '字典数据不完整' } });
     try { return service.updateName(params.data.id, body.data.name); }
     catch (error) { return sendDomainError(error, reply); }
@@ -47,6 +48,13 @@ export function registerDictionaryRoutes(app: FastifyInstance, service: Dictiona
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '无效字典编号' } });
     try { return service.deactivate(params.data.id); }
+    catch (error) { return sendDomainError(error, reply); }
+  });
+
+  app.post('/api/dictionaries/items/:id/activate', async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '无效字典编号' } });
+    try { return service.activate(params.data.id); }
     catch (error) { return sendDomainError(error, reply); }
   });
 

@@ -35,9 +35,6 @@ export class DictionaryService {
 
   updateName(id: number, name: string): DictionaryItem {
     if (!this.repository.get(id)) throw new DictionaryError('NOT_FOUND', '字典项不存在');
-    if (this.repository.isReferenced(id)) {
-      throw new DictionaryError('DICTIONARY_ITEM_REFERENCED', '已被业务记录引用的字典值不能修改');
-    }
     return this.repository.updateName(id, name.trim());
   }
 
@@ -46,10 +43,15 @@ export class DictionaryService {
     return this.repository.deactivate(id);
   }
 
+  activate(id: number): DictionaryItem {
+    if (!this.repository.get(id)) throw new DictionaryError('NOT_FOUND', '字典项不存在');
+    return this.repository.activate(id);
+  }
+
   deleteUnused(id: number): void {
     if (!this.repository.get(id)) throw new DictionaryError('NOT_FOUND', '字典项不存在');
     if (!this.repository.deleteUnused(id)) {
-      throw new DictionaryError('DICTIONARY_ITEM_REFERENCED', '该编码已经被历史数据使用，无法删除。可以选择停用。');
+      throw new DictionaryError('DICTIONARY_ITEM_REFERENCED', '该编码已被产品、正式图号、历史图号、BOM 或字典层级引用，无法删除。可以选择停用。');
     }
   }
 }

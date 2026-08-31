@@ -48,6 +48,35 @@ describe('dictionary API', () => {
     await app.close();
   });
 
+  it('rejects a code mutation while allowing the name-only update contract', async () => {
+    const app = Fastify();
+    registerDictionaryRoutes(app, new DictionaryService(db));
+    const created = await app.inject({ method: 'POST', url: '/api/dictionaries/color', payload: { code: '0', name: '白' } });
+    const id = created.json().id as number;
+
+    const mutated = await app.inject({ method: 'PATCH', url: `/api/dictionaries/items/${id}`, payload: { code: '9', name: '白色' } });
+
+    expect(mutated.statusCode).toBe(400);
+    expect(mutated.json()).toEqual({ error: { code: 'INVALID_REQUEST', message: '字典数据不完整' } });
+    const listed = await app.inject({ method: 'GET', url: '/api/dictionaries/color?includeInactive=true' });
+    expect(listed.json()).toEqual({ items: [expect.objectContaining({ id, code: '0', name: '白' })] });
+    await app.close();
+  });
+
+  it('reactivates an inactive item through an explicit action', async () => {
+    const app = Fastify();
+    registerDictionaryRoutes(app, new DictionaryService(db));
+    const created = await app.inject({ method: 'POST', url: '/api/dictionaries/color', payload: { code: '0', name: '白' } });
+    const id = created.json().id as number;
+    await app.inject({ method: 'POST', url: `/api/dictionaries/items/${id}/deactivate` });
+
+    const activated = await app.inject({ method: 'POST', url: `/api/dictionaries/items/${id}/activate` });
+
+    expect(activated.statusCode).toBe(200);
+    expect(activated.json()).toEqual(expect.objectContaining({ id, status: 'active', code: '0', name: '白' }));
+    await app.close();
+  });
+
   it('deletes an unused item with an empty 204 response', async () => {
     const app = Fastify(); registerDictionaryRoutes(app, new DictionaryService(db));
     const created = await app.inject({ method: 'POST', url: '/api/dictionaries/layer_count', payload: { code: '9', name: '九层' } });

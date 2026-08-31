@@ -175,20 +175,14 @@ describe('DictionariesPage', () => {
     expect(api.createDictionary).toHaveBeenCalledWith('project_item', { code: '09', name: '售后卡', parentId: 10 });
   });
 
-  it('keeps layer count accessible as an auxiliary main-category dictionary', async () => {
+  it('does not load or show the layer-count management entry in the dictionaries page', async () => {
     const api = hierarchyApi();
     render(<DictionariesPage api={api as never} />);
     fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
 
     await screen.findByText('印刷件类');
-    fireEvent.click(screen.getByRole('tab', { name: '层数' }));
-    expect(await screen.findByRole('heading', { name: '层数' })).toBeVisible();
-    expect(screen.getByText('三层')).toBeVisible();
-    fireEvent.change(screen.getByLabelText('层数编码'), { target: { value: '5' } });
-    fireEvent.change(screen.getByLabelText('层数名称'), { target: { value: '五层' } });
-    fireEvent.click(screen.getByRole('button', { name: '新增层数' }));
-
-    expect(api.createDictionary).toHaveBeenCalledWith('layer_count', { code: '5', name: '五层' });
+    expect(screen.queryByRole('tab', { name: '层数' })).toBeNull();
+    expect(api.listDictionaries).not.toHaveBeenCalledWith('layer_count', true);
   });
 
   it('renames and deactivates project items inside their selected main category', async () => {
@@ -207,25 +201,6 @@ describe('DictionariesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '停用 新 LOGO' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: '停用 新 LOGO' })).toBeNull());
     expect(api.deactivateDictionary).toHaveBeenCalledWith(20);
-  });
-
-  it('renames and deactivates layer counts through the same shared actions', async () => {
-    const api = hierarchyApi();
-    api.updateDictionaryName.mockResolvedValue({ id: 30, type: 'layer_count', code: '3', name: '三层加强', parentId: null, status: 'active' } as never);
-    api.deactivateDictionary.mockResolvedValue({ id: 30, type: 'layer_count', code: '3', name: '三层加强', parentId: null, status: 'inactive' } as never);
-    render(<DictionariesPage api={api as never} />);
-    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
-    await screen.findByText('印刷件类');
-    fireEvent.click(screen.getByRole('tab', { name: '层数' }));
-    await screen.findByText('三层');
-    fireEvent.click(screen.getByRole('button', { name: '修改 三层' }));
-    fireEvent.change(screen.getByLabelText('修改名称'), { target: { value: '三层加强' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存名称' }));
-    expect(await screen.findByText('三层加强')).toBeVisible();
-    expect(api.updateDictionaryName).toHaveBeenCalledWith(30, '三层加强');
-    fireEvent.click(screen.getByRole('button', { name: '停用 三层加强' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: '停用 三层加强' })).toBeNull());
-    expect(api.deactivateDictionary).toHaveBeenCalledWith(30);
   });
 
   it('deactivates a dictionary item through the API', async () => {
@@ -254,11 +229,27 @@ describe('DictionariesPage', () => {
     await screen.findByText('SAMKYO');
 
     fireEvent.click(screen.getByRole('button', { name: '修改 SAMKYO' }));
+    expect(screen.getByText('编码锁定：02')).toBeVisible();
     fireEvent.change(screen.getByLabelText('修改名称'), { target: { value: 'SAMKYO 新名称' } });
     fireEvent.click(screen.getByRole('button', { name: '保存名称' }));
 
     expect(await screen.findByText('SAMKYO 新名称')).toBeVisible();
     expect(api.updateDictionaryName).toHaveBeenCalledWith(3, 'SAMKYO 新名称');
+  });
+
+  it('reactivates an inactive item in the selected row', async () => {
+    const item = { id: 3, type: 'brand', code: '02', name: 'SAMKYO', parentId: null, status: 'inactive' as const };
+    const api = {
+      listDictionaries: vi.fn().mockResolvedValue([item]), createDictionary: vi.fn(), deactivateDictionary: vi.fn(),
+      activateDictionary: vi.fn().mockResolvedValue({ ...item, status: 'active' }), updateDictionaryName: vi.fn(),
+    };
+    render(<DictionariesPage api={api as never} />);
+    await screen.findByText('SAMKYO');
+
+    fireEvent.click(screen.getByRole('button', { name: '启用 SAMKYO' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: '启用 SAMKYO' })).toBeNull());
+    expect(api.activateDictionary).toHaveBeenCalledWith(3);
   });
 
   it('confirms an unused deletion beside the selected row and removes it only after success', async () => {

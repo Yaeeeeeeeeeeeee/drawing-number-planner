@@ -139,6 +139,7 @@ export interface PlannerApi {
   createDictionary(type: string, input: { code: string; name: string; parentId?: number }): Promise<DictionaryItemView>;
   updateDictionaryName(id: number, name: string): Promise<DictionaryItemView>;
   deactivateDictionary(id: number): Promise<DictionaryItemView>;
+  activateDictionary(id: number): Promise<DictionaryItemView>;
   deleteDictionary(id: number): Promise<void>;
   listProducts(filters?: Record<string, string | number | undefined>): Promise<ProductView[]>;
   createProduct(input: Record<string, unknown>): Promise<ProductView>;
@@ -302,6 +303,7 @@ export const apiClient: PlannerApi = {
   createDictionary: (type, input) => request(`/api/dictionaries/${type}`, json('POST', input)),
   updateDictionaryName: (id, name) => request(`/api/dictionaries/items/${id}`, json('PATCH', { name })),
   deactivateDictionary: (id) => request(`/api/dictionaries/items/${id}/deactivate`, json('POST')),
+  activateDictionary: (id) => request(`/api/dictionaries/items/${id}/activate`, json('POST')),
   deleteDictionary: (id) => request(`/api/dictionaries/items/${id}`, { method: 'DELETE' }),
   listProducts: async (filters = {}) => (await request<{ items: ProductView[] }>(`/api/products${queryString(filters)}`)).items,
   createProduct: (input) => request('/api/products', json('POST', input)),

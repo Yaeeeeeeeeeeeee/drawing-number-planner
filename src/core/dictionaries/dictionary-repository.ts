@@ -43,6 +43,11 @@ export class DictionaryRepository {
     return this.get(id)!;
   }
 
+  activate(id: number): DictionaryItem {
+    this.db.prepare("update dictionary_items set status = 'active', deactivated_at = null where id = ?").run(id);
+    return this.get(id)!;
+  }
+
   isReferenced(id: number): boolean {
     const item = this.get(id);
     if (!item) return false;
