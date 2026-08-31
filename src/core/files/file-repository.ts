@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingCodeReference, FileScanChangesView, FileScanComparison, FileScanRecord, FileScanRunView, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
+import type { DrawingCodeReference, FileScanChangesView, FileScanRecord, FileScanRunView, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
 import { FileError } from './file-errors.js';
 import { diffFileScan, type IndexedFileSnapshot } from './file-scan-diff.js';
 import { MaterialBatchRepository } from './material-batch-repository.js';
@@ -72,7 +72,7 @@ export class FileRepository {
   scanChanges(id: number): FileScanChangesView | null { return this.history.changes(id); }
 
   replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string): {
-    scanId: number; missing: number; historicalRegistered: number; comparison: FileScanComparison;
+    missing: number; historicalRegistered: number;
   } {
     for (const record of records) {
       validateWorkspaceRelativePath(record.relativePath);
@@ -189,7 +189,7 @@ export class FileRepository {
           fileName: snapshot.fileName, fullCode: snapshot.fullCode });
       }
       const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
-      return { scanId: scanRun.id, missing, historicalRegistered, comparison: counts };
+      return { missing, historicalRegistered };
     }).immediate();
   }
 

@@ -78,7 +78,9 @@ export class FileService {
           contentSha256: fingerprints[index].contentSha256 };
       });
       const scannedAt = new Date().toISOString();
-      const { scanId, missing, historicalRegistered, comparison } = this.repository.replaceScan(records, historicalCodes, scannedAt);
+      const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt);
+      const completedScan = this.repository.latestScan();
+      if (!completedScan) throw new Error('扫描完成后未找到扫描记录');
       return { total: records.length,
         matched: records.filter((file) => file.matchStatus === 'matched').length,
         pending: records.filter((file) => file.matchStatus === 'pending').length,
@@ -86,7 +88,8 @@ export class FileService {
         conflict: records.filter((file) => file.matchStatus === 'conflict').length,
         source: records.filter((file) => file.conversionType === 'source').length,
         outlined: records.filter((file) => file.conversionType === 'outlined').length,
-        missing, historicalRegistered, scanId, currentTotal: records.length, comparison, scannedAt };
+        missing, historicalRegistered, scanId: completedScan.id, currentTotal: completedScan.currentTotal,
+        comparison: completedScan, scannedAt };
     } catch (error) {
       if (error instanceof FileError) throw error;
       throw new FileError('SCAN_FAILED', '资料库扫描失败，上次索引未更改', { cause: error });

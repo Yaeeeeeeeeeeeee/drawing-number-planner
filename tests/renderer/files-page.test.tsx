@@ -144,7 +144,12 @@ describe('FilesPage', () => {
     expect(screen.getByText('与上一次扫描相比')).toBeVisible();
     expect(screen.getByText('1 新增')).toBeVisible();
     expect(screen.getByText('1 删除/缺失')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '查看本次变化' }));
+    expect(screen.getByText('1 路径变化')).toBeVisible();
+    expect(screen.getByText('1 内容变化')).toBeVisible();
+    const viewChanges = screen.getByRole('button', { name: '查看本次变化' });
+    expect(viewChanges).toHaveAttribute('aria-expanded', 'false');
+    expect(viewChanges).toHaveAttribute('aria-controls', 'scan-change-details');
+    fireEvent.click(viewChanges);
 
     expect(await screen.findByText('新增')).toBeVisible();
     expect(screen.getByText('删除/缺失')).toBeVisible();
@@ -153,6 +158,11 @@ describe('FilesPage', () => {
     expect(screen.getByText('gone.pdf', { selector: '.scan-change-group span' })).toBeVisible();
     expect(screen.getByText('edited.pdf', { selector: '.scan-change-group span' })).toBeVisible();
     expect(api.getFileScanChanges).toHaveBeenCalledWith(11);
+    const collapseChanges = screen.getByRole('button', { name: '收起本次变化' });
+    expect(collapseChanges).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(collapseChanges);
+    expect(screen.queryByLabelText('本次扫描变化详情')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看本次变化' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('refreshes material-batch filter options after a successful scan', async () => {
