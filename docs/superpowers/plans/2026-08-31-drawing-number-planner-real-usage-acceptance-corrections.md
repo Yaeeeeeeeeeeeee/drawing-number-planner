@@ -10,7 +10,7 @@
 
 ---
 
-## 0. 执行前基线与保护
+## Task 0: 执行前基线与保护
 
 **Files:**
 
@@ -43,7 +43,7 @@ Expected: PASS。若失败，先按系统化调试流程查清既有故障，不
 
 ---
 
-## 1. Schema v7：扫描运行、差异与历史状态
+## Task 1: Schema v7：扫描运行、差异与历史状态
 
 **Files:**
 
@@ -84,7 +84,7 @@ git commit -m "feat: add scan history schema"
 
 ---
 
-## 2. 扫描差异算法与当前状态同步
+## Task 2: 扫描差异算法与当前状态同步
 
 **Files:**
 
@@ -136,7 +136,7 @@ git commit -m "feat: track scan differences"
 
 ---
 
-## 3. 扫描历史 API 与“本次变化”UI
+## Task 3: 扫描历史 API 与“本次变化”UI
 
 **Files:**
 
@@ -176,7 +176,7 @@ git commit -m "feat: show per-scan file changes"
 
 ---
 
-## 4. 安全清空资料库索引
+## Task 4: 安全清空资料库索引
 
 **Files:**
 
@@ -217,7 +217,7 @@ git commit -m "feat: clear file indexes safely"
 
 ---
 
-## 5. 历史图号状态与占号边界
+## Task 5: 历史图号状态与占号边界
 
 **Files:**
 
@@ -255,7 +255,7 @@ git commit -m "feat: manage historical drawing status"
 
 ---
 
-## 6. 字典名称、重新启用与层数 UI
+## Task 6: 字典名称、重新启用与层数 UI
 
 **Files:**
 
@@ -303,7 +303,7 @@ git commit -m "fix: align dictionary editing lifecycle"
 
 ---
 
-## 7. 图号库批次文件聚合与紧凑筛选
+## Task 7: 图号库批次文件聚合与紧凑筛选
 
 **Files:**
 
@@ -345,7 +345,7 @@ git commit -m "feat: simplify batch material browsing"
 
 ---
 
-## 8. Schema v8：二维码数据模型
+## Task 8: Schema v8：二维码数据模型
 
 > **边界：** 二维码独立于图号和 BOM。不得把二维码用途加入编码字典，不得复用 `drawing_numbers` 或 `historical_drawing_numbers`。
 
@@ -383,7 +383,7 @@ git commit -m "feat: add qr management schema"
 
 ---
 
-## 9. 二维码用途、扫描关联与业务服务
+## Task 9: 二维码用途、扫描关联与业务服务
 
 **Files:**
 
@@ -435,7 +435,7 @@ git commit -m "feat: manage product qr records"
 
 ---
 
-## 10. 二维码管理与产品档案 UI
+## Task 10: 二维码管理与产品档案 UI
 
 **Files:**
 
@@ -479,7 +479,7 @@ git commit -m "feat: add qr management workflow"
 
 ---
 
-## 11. Schema v9：产品级 BOM 与正式字段
+## Task 11: Schema v9：产品级 BOM 与正式字段
 
 > **风险门禁：** v7/v8 全部验证通过后再开始。实施前重新统计同一产品是否存在多个颜色当前 BOM；若存在，停止 v9 并向用户报告，不自动选择或合并。
 
@@ -513,7 +513,7 @@ git commit -m "feat: add formal bom schema"
 
 ---
 
-## 12. BOM 领域服务、图片沿用与 API
+## Task 12: BOM 领域服务、图片沿用与 API
 
 **Files:**
 
@@ -558,7 +558,7 @@ git commit -m "feat: support formal bom records"
 
 ---
 
-## 13. BOM 添加/查询 UI
+## Task 13: BOM 添加/查询 UI
 
 **Files:**
 
@@ -593,7 +593,7 @@ git commit -m "feat: complete bom maintenance workflow"
 
 ---
 
-## 14. 真实数据库升级与资料库扫描回归
+## Task 14: 真实数据库升级与资料库扫描回归
 
 **Files:**
 
@@ -621,7 +621,7 @@ git commit -m "feat: complete bom maintenance workflow"
 
 ---
 
-## 15. 浏览器、Windows 桌面与最终质量门禁
+## Task 15: 浏览器、Windows 桌面与最终质量门禁
 
 **Files:**
 
@@ -669,7 +669,7 @@ Expected: 工作区干净。向用户报告最终提交号、分支、Schema 版
 
 ---
 
-## 16. 强制停止条件
+## Task 16: 强制停止条件
 
 执行中遇到以下任一情况必须停止对应部分并向用户说明：
 
