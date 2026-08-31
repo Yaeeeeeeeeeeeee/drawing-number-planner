@@ -38,24 +38,28 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getByText('00.20250101')).toBeVisible();
   });
 
-  it('browses a model by material batch and preserves every file instance', async () => {
+  it('browses logical batch materials without hiding physical file instances', async () => {
     const batches = [
       { id: 6, productDirectory: '01.洗碗机\\SKU-T40', sku: 'SKU', model: 'T40', name: '06.20260309',
         sequenceNumber: 6, recognitionStatus: 'recognized', currentState: 'current', fileCount: 2, isPresent: true },
       { id: 7, productDirectory: '01.洗碗机\\SKU-T40', sku: 'SKU', model: 'T40', name: '预案',
         sequenceNumber: null, recognitionStatus: 'pending', currentState: 'indeterminate', fileCount: 1, isPresent: true },
     ];
-    const files = [
-      { pdfIndexId: 31, fileName: 'same.pdf', relativePath: 'batch/source.pdf', isPresent: true,
-        conversionType: 'source', fullCode: '02.0209.010.0501001', matchStatus: 'matched', classificationWarning: null },
-      { pdfIndexId: 32, fileName: 'same.pdf', relativePath: 'batch/outlined.pdf', isPresent: true,
-        conversionType: 'outlined', fullCode: '02.0209.010.0501001', matchStatus: 'matched', classificationWarning: null },
-    ];
+    const materials = [{ fullCode: '02.0209.010.0501001',
+      outlinedFiles: [
+        { pdfIndexId: 32, fileName: 'outlined.pdf', relativePath: 'batch/outlined.pdf', isPresent: true, conversionType: 'outlined' },
+        { pdfIndexId: 33, fileName: 'outlined-old.pdf', relativePath: 'batch/outlined-old.pdf', isPresent: false, conversionType: 'outlined' },
+      ],
+      sourceFiles: [
+        { pdfIndexId: 31, fileName: 'source.pdf', relativePath: 'product/source.pdf', isPresent: true, conversionType: 'source' },
+        { pdfIndexId: 34, fileName: 'source-old.pdf', relativePath: 'product/source-old.pdf', isPresent: false, conversionType: 'source' },
+      ],
+    }];
     const api = {
       searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
       listDictionaries: vi.fn().mockResolvedValue([]),
       listMaterialBatches: vi.fn().mockResolvedValue(batches),
-      getMaterialBatchFiles: vi.fn().mockResolvedValue(files),
+      getMaterialBatchMaterials: vi.fn().mockResolvedValue(materials),
     };
 
     render(<DrawingLibraryPage api={api as never} />);
@@ -65,11 +69,36 @@ describe('DrawingLibraryPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '查看批次 06.20260309' }));
 
     expect(api.listMaterialBatches).toHaveBeenLastCalledWith({ search: 'T40' });
-    expect(await screen.findAllByText('same.pdf')).toHaveLength(2);
+    expect(await screen.findByText('outlined.pdf')).toBeVisible();
     expect(screen.getByText('当前使用')).toBeVisible();
     expect(screen.getByText('待确认')).toBeVisible();
-    expect(screen.getByText('batch/source.pdf')).toBeVisible();
-    expect(screen.getByText('batch/outlined.pdf')).toBeVisible();
+    expect(screen.queryByText('batch/outlined.pdf')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('outlined.pdf'));
+    expect(await screen.findByText('batch/outlined.pdf')).toBeVisible();
+    expect(screen.getByText('batch/outlined-old.pdf')).toBeVisible();
+    expect(screen.getByText('product/source.pdf')).toBeVisible();
+    expect(screen.getByText('product/source-old.pdf')).toBeVisible();
+    expect(screen.getAllByText('已缺失')).toHaveLength(2);
+  });
+
+  it('explains that opening a file location needs the Windows desktop app in browser preview', async () => {
+    delete window.plannerDesktop;
+    const api = {
+      searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]),
+      listMaterialBatches: vi.fn().mockResolvedValue([{ id: 6, productDirectory: '01.洗碗机\\SKU-T40', sku: 'SKU', model: 'T40', name: '06.20260309', sequenceNumber: 6, recognitionStatus: 'recognized', currentState: 'current', fileCount: 1, isPresent: true }]),
+      getMaterialBatchMaterials: vi.fn().mockResolvedValue([{ fullCode: '02.0209.010.0501001', outlinedFiles: [{ pdfIndexId: 32, fileName: 'outlined.pdf', relativePath: 'batch/outlined.pdf', isPresent: true, conversionType: 'outlined' }], sourceFiles: [] }]),
+    };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '按资料批次' }));
+    fireEvent.click(screen.getByRole('button', { name: '查询资料批次' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看批次 06.20260309' }));
+
+    expect(await screen.findByText('浏览器预览不支持打开文件位置，请在 Windows 桌面版操作。')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '打开转曲后文件 outlined.pdf 的位置' }));
+    expect(await screen.findByText('请在 Windows 桌面版打开文件位置')).toBeVisible();
+    expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
   });
 
   it('shows material-batch request failures in the batch view', async () => {
@@ -134,9 +163,9 @@ describe('DrawingLibraryPage', () => {
     fireEvent.change(screen.getByLabelText('关键词'), { target: { value: 'LOGO' } });
     fireEvent.change(screen.getByLabelText('状态'), { target: { value: 'active' } });
     fireEvent.click(screen.getByLabelText('精确图号'));
+    fireEvent.change(screen.getByLabelText('产品类别'), { target: { value: '冰柜' } });
     fireEvent.click(screen.getByRole('button', { name: '更多筛选' }));
     fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 'SKDZC220JP' } });
-    fireEvent.change(screen.getByLabelText('产品类别'), { target: { value: '冰柜' } });
     fireEvent.change(screen.getByLabelText('源文件'), { target: { value: 'present' } });
     fireEvent.change(screen.getByLabelText('转曲后文件'), { target: { value: 'missing' } });
     fireEvent.click(screen.getByRole('button', { name: '检索' }));

@@ -32,14 +32,15 @@ function insertHistorical(fullCode: string): number {
     values (?, '02', '0209', '01', '0', '04', '01', 1, ?, ?)`).run(fullCode, now, now).lastInsertRowid);
 }
 
-function insertFile(batchId: number, historicalId: number, suffix: string, modifiedAt = now): void {
+function insertFile(batchId: number, historicalId: number, suffix: string, modifiedAt = now,
+  conversionType: 'source' | 'outlined' = 'outlined', isPresent = true): void {
   const batch = db.prepare('select relative_path as path from material_batches where id = ?').get(batchId) as { path: string };
   const relativePath = `${batch.path}\\${suffix}.pdf`;
   db.prepare(`insert into pdf_files
     (relative_path, path_key, material_batch_id, file_name, historical_drawing_id, match_status,
      detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
-    values (?, lower(?), ?, ?, ?, 'matched', '[]', 'outlined', 1, ?, ?, 1)`)
-    .run(relativePath, relativePath, batchId, `${suffix}.pdf`, historicalId, modifiedAt, now);
+    values (?, lower(?), ?, ?, ?, 'matched', '[]', ?, 1, ?, ?, ?)`)
+    .run(relativePath, relativePath, batchId, `${suffix}.pdf`, historicalId, conversionType, modifiedAt, now, isPresent ? 1 : 0);
 }
 
 describe('MaterialBatchService', () => {
@@ -96,5 +97,31 @@ describe('MaterialBatchService', () => {
       expect.objectContaining({ productDirectory: '01.洗碗机\\\\SKU-T40', usageState: 'current' }),
       expect.objectContaining({ productDirectory: '01.洗碗机\\\\SKU-T60', usageState: 'historical' }),
     ]));
+  });
+
+  it('aggregates a batch material by full code while retaining every outlined instance and only same-product sources', () => {
+    const code = '02.0209.010.0401001';
+    const drawing = insertHistorical(code);
+    const productDirectory = '01.洗碗机\\SKU-T40';
+    const selected = insertBatch(productDirectory, '06.20260309', 6);
+    const earlier = insertBatch(productDirectory, '05.20251216', 5);
+    const anotherProduct = insertBatch('01.洗碗机\\SKU-T60', '06.20260309', 6);
+    insertFile(selected, drawing, 'outlined-current-a');
+    insertFile(selected, drawing, 'outlined-current-b', now, 'outlined', false);
+    insertFile(earlier, drawing, 'source-same-product', now, 'source');
+    insertFile(anotherProduct, drawing, 'source-other-product', now, 'source');
+
+    const logicalMaterials = (service as typeof service & { getLogicalMaterials(batchId: number): unknown }).getLogicalMaterials(selected);
+
+    expect(logicalMaterials).toEqual([
+      expect.objectContaining({
+        fullCode: code,
+        outlinedFiles: [
+          expect.objectContaining({ relativePath: expect.stringContaining('outlined-current-a.pdf'), isPresent: true }),
+          expect.objectContaining({ relativePath: expect.stringContaining('outlined-current-b.pdf'), isPresent: false }),
+        ],
+        sourceFiles: [expect.objectContaining({ relativePath: expect.stringContaining('source-same-product.pdf') })],
+      }),
+    ]);
   });
 });

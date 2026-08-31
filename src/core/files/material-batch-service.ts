@@ -7,6 +7,7 @@ import type {
   DrawingBatchOccurrence,
   DrawingBatchUsage,
   MaterialBatchFileView,
+  MaterialBatchLogicalMaterialView,
   MaterialBatchRecognitionStatus,
   MaterialBatchView,
 } from './material-batch-types.js';
@@ -103,6 +104,56 @@ export class MaterialBatchService {
         Omit<MaterialBatchFileView, 'isPresent'> & { isPresent: number }
       >;
     return rows.map((row) => ({ ...row, isPresent: row.isPresent === 1 }));
+  }
+
+  getLogicalMaterials(batchId: number): MaterialBatchLogicalMaterialView[] | null {
+    const batch = this.db.prepare('select product_directory as productDirectory from material_batches where id = ?')
+      .get(batchId) as { productDirectory: string } | undefined;
+    if (!batch) return null;
+
+    const outlinedRows = this.db.prepare(`select file.id as pdfIndexId, file.file_name as fileName,
+        file.relative_path as relativePath, file.is_present as isPresent, file.conversion_type as conversionType,
+        coalesce(drawing.full_code, historical.full_code) as fullCode,
+        file.match_status as matchStatus, file.classification_warning as classificationWarning
+      from pdf_files file
+      left join drawing_numbers drawing on drawing.id = file.drawing_id
+      left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
+      where file.material_batch_id = ? and file.conversion_type = 'outlined'
+        and coalesce(drawing.full_code, historical.full_code) is not null
+      order by coalesce(drawing.full_code, historical.full_code), file.relative_path collate nocase, file.id`)
+      .all(batchId) as Array<Omit<MaterialBatchFileView, 'isPresent' | 'fullCode'> & { isPresent: number; fullCode: string }>;
+    if (outlinedRows.length === 0) return [];
+
+    const materials = new Map<string, MaterialBatchLogicalMaterialView>();
+    for (const row of outlinedRows) {
+      let material = materials.get(row.fullCode);
+      if (!material) {
+        material = { fullCode: row.fullCode, outlinedFiles: [], sourceFiles: [] };
+        materials.set(row.fullCode, material);
+      }
+      material.outlinedFiles.push({ ...row, isPresent: row.isPresent === 1 });
+    }
+
+    const fullCodes = [...materials.keys()];
+    const placeholders = fullCodes.map(() => '?').join(', ');
+    const sourceRows = this.db.prepare(`select file.id as pdfIndexId, file.file_name as fileName,
+        file.relative_path as relativePath, file.is_present as isPresent, file.conversion_type as conversionType,
+        coalesce(drawing.full_code, historical.full_code) as fullCode,
+        file.match_status as matchStatus, file.classification_warning as classificationWarning
+      from pdf_files file
+      join material_batches source_batch on source_batch.id = file.material_batch_id
+      left join drawing_numbers drawing on drawing.id = file.drawing_id
+      left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
+      where source_batch.product_directory = ? and file.conversion_type = 'source'
+        and coalesce(drawing.full_code, historical.full_code) in (${placeholders})
+      order by coalesce(drawing.full_code, historical.full_code), file.relative_path collate nocase, file.id`)
+      .all(batch.productDirectory, ...fullCodes) as Array<
+        Omit<MaterialBatchFileView, 'isPresent' | 'fullCode'> & { isPresent: number; fullCode: string }
+      >;
+    for (const row of sourceRows) {
+      materials.get(row.fullCode)?.sourceFiles.push({ ...row, isPresent: row.isPresent === 1 });
+    }
+    return [...materials.values()];
   }
 
   getDrawingUsage(fullCode: string, businessStatus: DrawingStatus): DrawingBatchUsage {

@@ -105,6 +105,9 @@ export interface PdfScanSummaryView {
   conflict: number; source: number; outlined: number; missing: number; scanId: number; currentTotal: number;
   comparison: FileScanComparisonView; scannedAt: string;
 }
+export interface MaterialBatchLogicalMaterialView {
+  fullCode: string; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
+}
 export interface FileScanComparisonView { added: number; missing: number; moved: number; changed: number; unchanged: number }
 export interface FileScanRunView extends FileScanComparisonView { id: number; completedAt: string; currentTotal: number }
 export interface FileScanChangeView { id: number; type: 'added' | 'missing' | 'moved' | 'changed'; relativePath: string;
@@ -135,6 +138,7 @@ export interface PlannerApi {
   associateDrawingPdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): Promise<DrawingDetailView>;
   listMaterialBatches(filters?: { search?: string; productId?: number }): Promise<MaterialBatchView[]>;
   getMaterialBatchFiles(id: number): Promise<MaterialBatchFileView[]>;
+  getMaterialBatchMaterials(id: number): Promise<MaterialBatchLogicalMaterialView[]>;
   listDictionaries(type: string, includeInactive?: boolean): Promise<DictionaryItemView[]>;
   createDictionary(type: string, input: { code: string; name: string; parentId?: number }): Promise<DictionaryItemView>;
   updateDictionaryName(id: number, name: string): Promise<DictionaryItemView>;
@@ -296,6 +300,8 @@ export const apiClient: PlannerApi = {
     `/api/material-batches${queryString(filters)}`)).items,
   getMaterialBatchFiles: async (id) => (await request<{ items: MaterialBatchFileView[] }>(
     `/api/material-batches/${id}/files`)).items,
+  getMaterialBatchMaterials: async (id) => (await request<{ items: MaterialBatchLogicalMaterialView[] }>(
+    `/api/material-batches/${id}/materials`)).items,
   listDictionaries: async (type, includeInactive = true) => {
     const result = await request<{ items: DictionaryItemView[] }>(`/api/dictionaries/${type}?includeInactive=${includeInactive}`);
     return result.items;

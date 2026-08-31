@@ -5,7 +5,7 @@ import type {
   DrawingDetailView,
   DrawingFileView,
   DrawingView,
-  MaterialBatchFileView,
+  MaterialBatchLogicalMaterialView,
   MaterialBatchView,
   PdfFileView,
   PlannerApi,
@@ -28,7 +28,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [batchSearch, setBatchSearch] = useState('');
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<MaterialBatchView | null>(null);
-  const [batchFiles, setBatchFiles] = useState<MaterialBatchFileView[]>([]);
+  const [batchMaterials, setBatchMaterials] = useState<MaterialBatchLogicalMaterialView[]>([]);
   const search = async (values: Record<string, string | number | boolean> = {}) => {
     setLoading(true); setError('');
     try { const result = await api.searchDrawings(values); setItems(result.items); setTotal(result.total); }
@@ -108,7 +108,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   };
   const openBatch = async (batch: MaterialBatchView) => {
     setError('');
-    try { setSelectedBatch(batch); setBatchFiles(await api.getMaterialBatchFiles(batch.id)); }
+    try { setSelectedBatch(batch); setBatchMaterials(await api.getMaterialBatchMaterials(batch.id)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '批次文件加载失败'); }
   };
   const dictionarySelect = (label: string, key: 'brandId' | 'mainCategoryId' | 'projectItemId' | 'colorId', type: string) =>
@@ -125,13 +125,13 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     <form className="filter-bar filter-grid" onSubmit={submit}>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
+      <label><span>产品类别</span><input aria-label="产品类别" value={filters.productCategory} onChange={(event) => set('productCategory', event.target.value)} /></label>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
-      {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}
       <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
       <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
       {moreFilters && <><label><span>SKU</span><input aria-label="SKU" value={filters.sku} onChange={(event) => set('sku', event.target.value)} /></label>
-        <label><span>产品类别</span><input aria-label="产品类别" value={filters.productCategory} onChange={(event) => set('productCategory', event.target.value)} /></label>
+        {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}
         <label><span>源文件</span><select aria-label="源文件" value={filters.sourcePresence} onChange={(event) => set('sourcePresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label>
         <label><span>转曲后文件</span><select aria-label="转曲后文件" value={filters.outlinedPresence} onChange={(event) => set('outlinedPresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label></>}
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
@@ -151,8 +151,8 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
         setSelectedPdfId={setSelectedPdfId} onClose={() => setSelected(null)} onStatus={changeStatus} onOpen={openLocation}
         onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus} onError={setError} /> : null} />}
-    </> : <BatchBrowser search={batchSearch} setSearch={setBatchSearch} loading={loading} batches={batches}
-      selected={selectedBatch} files={batchFiles} onSearch={searchBatches} onSelect={openBatch} onOpen={openLocation} />}
+    </> : <BatchBrowser key={selectedBatch?.id ?? 'none'} search={batchSearch} setSearch={setBatchSearch} loading={loading} batches={batches}
+      selected={selectedBatch} materials={batchMaterials} onSearch={searchBatches} onSelect={openBatch} onOpen={openLocation} />}
   </section>;
 }
 
@@ -202,17 +202,19 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
   </aside>;
 }
 
-function BatchBrowser({ search, setSearch, loading, batches, selected, files, onSearch, onSelect, onOpen }: {
+function BatchBrowser({ search, setSearch, loading, batches, selected, materials, onSearch, onSelect, onOpen }: {
   search: string;
   setSearch(value: string): void;
   loading: boolean;
   batches: MaterialBatchView[];
   selected: MaterialBatchView | null;
-  files: MaterialBatchFileView[];
+  materials: MaterialBatchLogicalMaterialView[];
   onSearch(): Promise<void>;
   onSelect(batch: MaterialBatchView): Promise<void>;
   onOpen(id: number): Promise<void>;
 }) {
+  const [expandedCode, setExpandedCode] = useState<string | null>(null);
+  const desktopAvailable = typeof window !== 'undefined' && Boolean(window.plannerDesktop);
   return <section className="material-batch-browser">
     <form className="filter-bar batch-search" onSubmit={(event) => { event.preventDefault(); void onSearch(); }}>
       <label><span>型号 / SKU / 批次</span><input aria-label="搜索型号或批次" value={search}
@@ -229,15 +231,30 @@ function BatchBrowser({ search, setSearch, loading, batches, selected, files, on
         </article>)}</div>
         {selected && <section className="batch-file-panel" aria-label="资料批次文件">
           <h2>{selected.productDirectory}</h2><p>{selected.name} · {usageLabel(selected.currentState)}</p>
-          {files.length === 0 ? <p className="muted-text">该批次暂无 PDF 索引</p> : <ul>{files.map((file) =>
-            <li key={file.pdfIndexId} className="drawing-file-row"><span><strong>{file.fileName}</strong>
-              <small>{file.fullCode ?? '未可靠识别图号'} · {file.conversionType === 'source' ? '源文件' : '转曲后'}</small>
-              <small>{file.relativePath}</small></span>
-              <button className="text-button" type="button" disabled={!file.isPresent}
-                onClick={() => void onOpen(file.pdfIndexId)}>{file.isPresent ? '打开位置' : '文件缺失'}</button></li>)}</ul>}
+          {!desktopAvailable && <p className="info-banner">浏览器预览不支持打开文件位置，请在 Windows 桌面版操作。</p>}
+          {materials.length === 0 ? <p className="muted-text">该批次暂无可靠识别的转曲后文件</p> : <ul className="batch-material-list">{materials.map((material) => {
+            const primary = material.outlinedFiles[0];
+            const expanded = expandedCode === material.fullCode;
+            return <li key={material.fullCode} className="batch-material-row"><div className="batch-material-summary">
+              <span><button className="text-button" type="button" onClick={() => setExpandedCode(expanded ? null : material.fullCode)}>{primary.fileName}</button>
+                <small>{material.fullCode} · {material.outlinedFiles.length} 个转曲后实例</small></span>
+              <button className="text-button" type="button" disabled={!primary.isPresent}
+                aria-label={`打开转曲后文件 ${primary.fileName} 的位置`} onClick={() => void onOpen(primary.pdfIndexId)}>{primary.isPresent ? '打开位置' : '已缺失'}</button>
+            </div>{expanded && <div className="batch-material-details">
+              <BatchFileInstances title="转曲后文件" files={material.outlinedFiles} onOpen={onOpen} />
+              <BatchFileInstances title="源文件" files={material.sourceFiles} onOpen={onOpen} />
+            </div>}</li>;
+          })}</ul>}
         </section>}
       </div>}
   </section>;
+}
+
+function BatchFileInstances({ title, files, onOpen }: { title: string; files: MaterialBatchLogicalMaterialView['outlinedFiles']; onOpen(id: number): Promise<void> }) {
+  return <section className="batch-instance-list"><h3>{title}</h3>{files.length === 0 ? <p className="muted-text">无可靠配对实例</p>
+    : <ul>{files.map((file) => <li key={file.pdfIndexId} className="drawing-file-row"><span><strong>{file.fileName}</strong><small>{file.relativePath}</small></span>
+      <button className="text-button" type="button" disabled={!file.isPresent}
+        aria-label={`打开${title} ${file.fileName} 的位置`} onClick={() => void onOpen(file.pdfIndexId)}>{file.isPresent ? '打开位置' : '已缺失'}</button></li>)}</ul>}</section>;
 }
 
 function FileSection({ title, present, files, onOpen }: { title: string; present: boolean; files: DrawingFileView[]; onOpen(id: number): Promise<void> }) {

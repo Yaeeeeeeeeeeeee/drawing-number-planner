@@ -71,6 +71,32 @@ describe('material batch API', () => {
     await app.close();
   });
 
+  it('returns logical batch materials separately from the raw file-instance endpoint', async () => {
+    const batchId = batch('06.20260309', 6);
+    const historicalId = Number(db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+       project_item_code, sequence, first_seen_at, last_seen_at)
+      values ('02.0209.010.0501001', '02', '0209', '01', '0', '05', '01', 1, ?, ?)`)
+      .run(now, now).lastInsertRowid);
+    db.prepare(`insert into pdf_files
+      (relative_path, path_key, material_batch_id, file_name, historical_drawing_id, match_status,
+       detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
+      values (?, ?, ?, ?, ?, 'matched', '[]', 'outlined', 1, ?, ?, 1)`)
+      .run('batch\\outlined.pdf', 'batch\\outlined.pdf', batchId, 'outlined.pdf', historicalId, now, now);
+    const app = Fastify();
+    registerMaterialBatchRoutes(app, new MaterialBatchService(db));
+
+    const response = await app.inject({ method: 'GET', url: `/api/material-batches/${batchId}/materials` });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().items).toEqual([expect.objectContaining({
+      fullCode: '02.0209.010.0501001',
+      outlinedFiles: [expect.objectContaining({ fileName: 'outlined.pdf' })],
+      sourceFiles: [],
+    })]);
+    await app.close();
+  });
+
   it('rejects invalid filters and missing batches', async () => {
     const app = Fastify();
     registerMaterialBatchRoutes(app, new MaterialBatchService(db));

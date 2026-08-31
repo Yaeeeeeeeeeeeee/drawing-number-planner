@@ -136,6 +136,14 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .usage-badge.indeterminate { color: #b54708; }
 .batch-file-panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #f8fafc; }
 .batch-file-panel h2 { margin-top: 0; }
+.batch-material-list, .batch-instance-list ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.batch-material-row { padding: 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+.batch-material-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.batch-material-summary > span { display: grid; min-width: 0; gap: 4px; }
+.batch-material-summary small { color: var(--muted); overflow-wrap: anywhere; }
+.batch-material-details { display: grid; gap: 14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.batch-instance-list h3 { margin: 0 0 7px; font-size: 12px; }
+.batch-instance-list li { padding: 8px; background: #f7f9fc; }
 @media (max-width: 900px) { .material-batch-layout { grid-template-columns: 1fr; } }
 .planning-rows { display: grid; gap: 12px; }
 .planning-row { padding: 14px; border: 1px solid #dce4ef; border-radius: 7px; background: #fff; }

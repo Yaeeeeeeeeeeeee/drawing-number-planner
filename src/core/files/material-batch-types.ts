@@ -68,3 +68,9 @@ export interface MaterialBatchFileView extends BatchFileInstance {
   matchStatus: 'matched' | 'pending' | 'unmatched' | 'conflict';
   classificationWarning: string | null;
 }
+
+export interface MaterialBatchLogicalMaterialView {
+  fullCode: string;
+  outlinedFiles: MaterialBatchFileView[];
+  sourceFiles: MaterialBatchFileView[];
+}

@@ -29,4 +29,16 @@ export function registerMaterialBatchRoutes(app: FastifyInstance, service: Mater
     }
     return { items };
   });
+
+  app.get('/api/material-batches/:id/materials', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '资料批次编号无效' } });
+    }
+    const items = service.getLogicalMaterials(params.data.id);
+    if (items === null) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '资料批次不存在' } });
+    }
+    return { items };
+  });
 }
