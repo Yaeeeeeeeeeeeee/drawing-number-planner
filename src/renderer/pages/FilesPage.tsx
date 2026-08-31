@@ -137,6 +137,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       const nextFilters = { ...filters, materialBatchId: '' };
       setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); setSelectedIds([]); setPendingCleanupIds(null);
       setFilters(nextFilters);
+      setFiles([]); setTotal(0); setBatches([]); setPage(1);
       setSummary(null); setScanChanges(null); setShowChanges(false);
       setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
       await refreshAfterIndexClear(nextFilters);

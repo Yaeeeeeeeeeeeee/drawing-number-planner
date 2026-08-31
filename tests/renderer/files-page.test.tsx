@@ -334,5 +334,7 @@ describe('FilesPage', () => {
     expect(await screen.findByText('已清空 4 条 PDF 索引、1 个资料批次、4 条扫描变化和 2 次扫描记录')).toBeVisible();
     expect(await screen.findByText('索引已清空，但列表刷新失败：列表刷新失败')).toBeVisible();
     expect(screen.queryByText('清空资料库索引失败')).not.toBeInTheDocument();
+    expect(screen.queryByText(file.fileName, { selector: '.file-primary' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'SKDZC100JP · ZC100 · 06.20260309' })).not.toBeInTheDocument();
   });
 });
