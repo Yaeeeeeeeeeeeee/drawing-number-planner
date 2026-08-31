@@ -277,4 +277,62 @@ describe('FilesPage', () => {
     await waitFor(() => expect(api.clearFileIndex).toHaveBeenCalledWith('清空资料库索引'));
     expect(await screen.findByText('已清空 4 条 PDF 索引、1 个资料批次、4 条扫描变化和 2 次扫描记录')).toBeVisible();
   });
+
+  it('clears a selected deleted batch filter so the next scan shows rebuilt batches and files', async () => {
+    const rebuilt = { ...file, id: 12, fileName: 'rebuilt.pdf', relativePath: 'rebuilt.pdf' };
+    const api = apiFixture(true);
+    api.searchPdfFiles.mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 50 })
+      .mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 50 })
+      .mockResolvedValueOnce({ items: [rebuilt], total: 1, page: 1, pageSize: 50 });
+    api.listMaterialBatches.mockResolvedValueOnce([{ id: 2, sku: 'SKDZC100JP', model: 'ZC100', name: '旧批次' }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 12, sku: 'SKDWT040JP', model: 'T40', name: '重扫批次' }]);
+    render(<FilesPage api={api as never} />);
+    await screen.findByText(file.fileName, { selector: '.file-primary' });
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '2' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '清空资料库索引' }));
+    fireEvent.click(await screen.findByRole('button', { name: '继续' }));
+    fireEvent.change(screen.getByLabelText('确认短语'), { target: { value: '清空资料库索引' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认清空资料库索引' }));
+
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenNthCalledWith(2, expect.not.objectContaining({ materialBatchId: 2 })));
+    expect(screen.getByLabelText('资料批次')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
+    expect(await screen.findByRole('option', { name: 'SKDWT040JP · T40 · 重扫批次' })).toBeVisible();
+    expect(screen.getByText('rebuilt.pdf', { selector: '.file-primary' })).toBeVisible();
+  });
+
+  it('closes a pending missing-index cleanup confirmation after a full index clear', async () => {
+    const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [missing], total: 1, page: 1, pageSize: 50 });
+    render(<FilesPage api={api as never} />);
+    await screen.findByText(missing.fileName, { selector: '.file-primary' });
+    fireEvent.click(screen.getByRole('button', { name: `清理 ${missing.fileName} 的索引记录` }));
+    expect(await screen.findByRole('dialog', { name: '确认清理 PDF 索引记录' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '清空资料库索引' }));
+    fireEvent.click(await screen.findByRole('button', { name: '继续' }));
+    fireEvent.change(screen.getByLabelText('确认短语'), { target: { value: '清空资料库索引' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认清空资料库索引' }));
+
+    await waitFor(() => expect(api.clearFileIndex).toHaveBeenCalledWith('清空资料库索引'));
+    expect(screen.queryByRole('dialog', { name: '确认清理 PDF 索引记录' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a completed index clear successful when the post-clear refresh fails', async () => {
+    const api = apiFixture(true);
+    api.searchPdfFiles.mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 50 })
+      .mockRejectedValueOnce(new Error('列表刷新失败'));
+    render(<FilesPage api={api as never} />);
+    await screen.findByText(file.fileName, { selector: '.file-primary' });
+
+    fireEvent.click(screen.getByRole('button', { name: '清空资料库索引' }));
+    fireEvent.click(await screen.findByRole('button', { name: '继续' }));
+    fireEvent.change(screen.getByLabelText('确认短语'), { target: { value: '清空资料库索引' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认清空资料库索引' }));
+
+    expect(await screen.findByText('已清空 4 条 PDF 索引、1 个资料批次、4 条扫描变化和 2 次扫描记录')).toBeVisible();
+    expect(await screen.findByText('索引已清空，但列表刷新失败：列表刷新失败')).toBeVisible();
+    expect(screen.queryByText('清空资料库索引失败')).not.toBeInTheDocument();
+  });
 });

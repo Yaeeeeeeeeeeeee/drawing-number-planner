@@ -114,16 +114,32 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     finally { setClearingIndex(false); }
   };
   const cancelIndexClear = () => { if (!clearingIndex) { setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); } };
+  const refreshAfterIndexClear = async (nextFilters: typeof filters) => {
+    const request = ++searchRequest.current; setLoading(true);
+    try {
+      const [result, batchItems] = await Promise.all([
+        api.searchPdfFiles(searchInput(nextFilters, 1)), api.listMaterialBatches({}),
+      ]);
+      if (request !== searchRequest.current) return;
+      setFiles(result.items); setTotal(result.total); setPage(result.page); setBatches(batchItems);
+    } catch (reason) {
+      if (request === searchRequest.current) {
+        const detail = reason instanceof Error ? reason.message : '请重新加载列表';
+        setError(`索引已清空，但列表刷新失败：${detail}`);
+      }
+    } finally { if (request === searchRequest.current) setLoading(false); }
+  };
   const confirmIndexClear = async () => {
     if (indexClearPhrase !== '清空资料库索引') return;
     setClearingIndex(true); setError('');
     try {
       const result = await api.clearFileIndex(indexClearPhrase);
-      setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); setSelectedIds([]);
+      const nextFilters = { ...filters, materialBatchId: '' };
+      setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); setSelectedIds([]); setPendingCleanupIds(null);
+      setFilters(nextFilters);
       setSummary(null); setScanChanges(null); setShowChanges(false);
       setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
-      const [, batchItems] = await Promise.all([search(filters, 1), api.listMaterialBatches({})]);
-      setBatches(batchItems);
+      await refreshAfterIndexClear(nextFilters);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引失败'); }
     finally { setClearingIndex(false); }
   };
