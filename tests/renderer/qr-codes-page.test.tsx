@@ -25,14 +25,43 @@ describe('QrCodesPage', () => {
     expect(screen.getByLabelText('业务状态')).toBeVisible();
     expect(screen.getByLabelText('文件状态')).toBeVisible();
 
+    fireEvent.click(await screen.findByRole('button', { name: '展开 Q100 的二维码用途' }));
     fireEvent.click(screen.getByRole('button', { name: '查看 Q100 使用说明' }));
-    expect(await screen.findByText('业务状态')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Q100 使用说明' })).toBeVisible();
+    expect(screen.getByText('业务状态')).toBeVisible();
     expect(screen.getByText('启用中')).toBeVisible();
     expect(screen.getByText('文件状态')).toBeVisible();
     expect(screen.getAllByText('文件可用').length).toBeGreaterThan(0);
     expect(screen.getByText('创建时间')).toBeVisible();
     expect(screen.getByText('更新时间')).toBeVisible();
     expect(screen.getByText('待人工确认')).toBeVisible();
+  });
+
+  it('groups QR purposes under one product row and keeps filter choices after narrowing results', async () => {
+    const warranty = { ...manual, id: 12, purposeId: 2, key: 'warranty', displayName: '售后二维码', name: 'Q100 售后服务' };
+    const fryer = { ...manual, id: 21, productId: 4, sku: 'SKU-A1', model: 'A100', productCategory: '空气炸锅', purposeId: 3, key: 'recipe', displayName: '菜谱二维码', name: 'A100 菜谱' };
+    const api = {
+      listQrCodes: vi.fn().mockResolvedValueOnce({ items: [manual, warranty, fryer] }).mockResolvedValueOnce({ items: [manual] }),
+      getQrCode: vi.fn().mockResolvedValue(manual), updateQrCode: vi.fn(), activateQrCode: vi.fn(), deactivateQrCode: vi.fn(), associateQrFile: vi.fn(),
+    };
+    const { container } = render(<QrCodesPage api={api as never} />);
+
+    await screen.findByRole('button', { name: '展开 Q100 的二维码用途' });
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '展开 Q100 的二维码用途' }));
+    expect(screen.getByRole('button', { name: '查看 Q100 使用说明' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '查看 Q100 售后服务' })).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText('产品类别'), { target: { value: '冰柜' } });
+    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+    await waitFor(() => expect(api.listQrCodes).toHaveBeenLastCalledWith(expect.objectContaining({ productCategory: '冰柜' })));
+    expect(Array.from((screen.getByLabelText('产品类别') as HTMLSelectElement).options)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: '空气炸锅' }),
+    ]));
+    expect(Array.from((screen.getByLabelText('用途') as HTMLSelectElement).options)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ text: '售后' }),
+      expect.objectContaining({ text: '菜谱' }),
+    ]));
   });
 
   it('saves metadata and manually associates a pending file without changing the business status', async () => {

@@ -35,6 +35,11 @@ interface QrFileDependencies {
   readFile(path: string): Buffer;
 }
 const imageMimeTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const qrApplicationErrorCode = (error: unknown): string | null => {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
+  const code = String(error.code);
+  return /^(QR_|WORKSPACE_|PATH_)/.test(code) ? code : null;
+};
 
 export function createQrFileActionHandler(dependencies: QrFileDependencies) {
   return async (_event: unknown, relativePath: unknown, action: unknown): Promise<QrDesktopFileResult> => {
@@ -52,8 +57,10 @@ export function createQrFileActionHandler(dependencies: QrFileDependencies) {
       if (openError) return { ok: false, error: { code: 'OPEN_QR_FILE_FAILED', message: openError } };
       return { ok: true };
     } catch (error) {
+      const code = qrApplicationErrorCode(error);
+      if (!code) return { ok: false, error: { code: 'QR_FILE_UNAVAILABLE', message: '二维码文件当前不可用，请重新扫描资料库' } };
       return { ok: false, error: {
-        code: typeof error === 'object' && error && 'code' in error ? String(error.code) : 'OPEN_QR_FILE_FAILED',
+        code,
         message: error instanceof Error ? error.message : '二维码文件操作失败',
       } };
     }

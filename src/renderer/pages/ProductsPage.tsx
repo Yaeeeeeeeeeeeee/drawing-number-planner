@@ -37,6 +37,12 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
     try { setItems(await api.listProducts(filters)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '产品档案加载失败'); }
   };
+  const refreshProductQrCodes = async (productId: number) => {
+    const listQrCodes = (api as Partial<PlannerApi>).listQrCodes;
+    if (!listQrCodes) return;
+    const result = await listQrCodes({ productId });
+    setQrCodes((current) => [...current.filter((item) => item.productId !== productId), ...result.items]);
+  };
 
   useEffect(() => {
     void Promise.all([
@@ -71,6 +77,10 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
         ? current.map((item) => item.id === editingId ? product : item)
         : [...current, product];
       setItems(replace); setAllProducts(replace); setEditorOpen(false);
+      if (!editingId) {
+        try { await refreshProductQrCodes(product.id); }
+        catch { setError('产品已保存，但二维码摘要暂时未能更新。'); }
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : '产品保存失败'); }
   };
   const deactivate = async (item: ProductView) => {
@@ -101,6 +111,8 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
       });
       setItems((current) => [...current, result.product]);
       setAllProducts((current) => [...current, result.product]);
+      try { await refreshProductQrCodes(result.product.id); }
+      catch { setError('产品已建立，但二维码摘要暂时未能更新。'); }
       setHistoricalCandidates((current) => current.filter((candidate) => !sameCandidate(candidate, selectedCandidate)));
       setHistoricalMessage(`已建立 ${result.product.model}，并关联 ${result.linkedHistoricalCount} 个历史图号。`);
       setSelectedCandidate(null); setHistoricalForm(blankHistorical);

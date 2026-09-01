@@ -36,8 +36,10 @@ describe('ProductsPage', () => {
     const created = { id: 9, brandId: 1, brandName: 'SAMKYO', productSizeId: 2,
       productSizeName: 'ZC220冰柜', defaultAppearanceId: 3, defaultAppearanceName: '1号外观',
       sku: 'SKDZC220JP', model: 'ZC220', productCategory: '冰柜', referenceProductId: null, referenceProductModel: null, status: 'active' };
+    const inactiveManual = { id: 71, productId: 9, key: 'user_manual', displayName: '说明书二维码', status: 'inactive' };
     const api = {
       listProducts: vi.fn().mockResolvedValue([]),
+      listQrCodes: vi.fn().mockResolvedValueOnce({ items: [] }).mockResolvedValueOnce({ items: [inactiveManual] }),
       listHistoricalProductCandidates: vi.fn().mockResolvedValue([]),
       listDictionaries: vi.fn((type: keyof typeof dictionaries) => Promise.resolve(dictionaries[type])),
       createProduct: vi.fn().mockResolvedValue(created),
@@ -58,6 +60,8 @@ describe('ProductsPage', () => {
 
     expect(await screen.findByText('ZC220')).toBeVisible();
     expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ sku: 'SKDZC220JP', model: 'ZC220', brandId: 1 }));
+    expect(await screen.findByRole('button', { name: '说明书 · 已停用' })).toBeVisible();
+    expect(api.listQrCodes).toHaveBeenLastCalledWith({ productId: created.id });
   });
 
   it('searches, edits, deactivates and stores a reference product', async () => {
@@ -107,8 +111,10 @@ describe('ProductsPage', () => {
     const created = { id: 12, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
       defaultAppearanceId: 3, defaultAppearanceName: '1号外观', sku: candidate.sku, model: candidate.model,
       productCategory: candidate.productCategory, referenceProductId: null, referenceProductModel: null, status: 'active' };
+    const inactiveManual = { id: 72, productId: 12, key: 'user_manual', displayName: '说明书二维码', status: 'inactive' };
     const api = {
       listProducts: vi.fn().mockResolvedValue([]),
+      listQrCodes: vi.fn().mockResolvedValueOnce({ items: [] }).mockResolvedValueOnce({ items: [inactiveManual] }),
       listHistoricalProductCandidates: vi.fn().mockResolvedValue([candidate]),
       confirmHistoricalProductCandidate: vi.fn().mockResolvedValue({ product: created, linkedHistoricalCount: 4 }),
       listDictionaries: vi.fn((type: keyof typeof dictionaries) => Promise.resolve(dictionaries[type])),
@@ -134,6 +140,8 @@ describe('ProductsPage', () => {
     }));
     expect(await screen.findByText('已建立 ZU70SD，并关联 4 个历史图号。')).toBeVisible();
     expect(screen.getByText('ZU70SD')).toBeVisible();
+    expect(await screen.findByRole('button', { name: '说明书 · 已停用' })).toBeVisible();
+    expect(api.listQrCodes).toHaveBeenLastCalledWith({ productId: created.id });
   });
 
   it('labels ambiguous historical candidates and does not offer confirmation', async () => {

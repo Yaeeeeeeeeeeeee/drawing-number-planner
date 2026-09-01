@@ -23,4 +23,18 @@ describe('desktop QR file actions', () => {
     expect(resolveQrFilePath).not.toHaveBeenCalled();
     expect(openPath).not.toHaveBeenCalled();
   });
+
+  it('normalizes filesystem errors from the file resolver while preserving application errors', async () => {
+    const filesystemError = Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+    const resolver = vi.fn().mockImplementation(() => { throw filesystemError; });
+    const handler = createQrFileActionHandler({ resolveQrFilePath: resolver, openPath: vi.fn(), showItemInFolder: vi.fn(), readFile: vi.fn() });
+
+    await expect(handler({}, '冰柜/SKU-Q1-Q100/二维码.png', 'open')).resolves.toMatchObject({
+      ok: false, error: { code: 'QR_FILE_UNAVAILABLE', message: '二维码文件当前不可用，请重新扫描资料库' },
+    });
+
+    const applicationError = Object.assign(new Error('二维码文件已缺失，请重新扫描资料库'), { code: 'QR_FILE_MISSING' });
+    const appHandler = createQrFileActionHandler({ resolveQrFilePath: () => { throw applicationError; }, openPath: vi.fn(), showItemInFolder: vi.fn(), readFile: vi.fn() });
+    await expect(appHandler({}, '冰柜/SKU-Q1-Q100/二维码.png', 'open')).resolves.toMatchObject({ ok: false, error: { code: 'QR_FILE_MISSING' } });
+  });
 });

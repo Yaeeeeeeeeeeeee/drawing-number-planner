@@ -50,9 +50,10 @@ export interface RunningServer {
   close(): Promise<void>;
 }
 
-function qrFileError(code: string, message: string): Error & { code: string } {
-  return Object.assign(new Error(message), { code });
+class QrFileResolverError extends Error {
+  constructor(readonly code: string, message: string) { super(message); }
 }
+function qrFileError(code: string, message: string): QrFileResolverError { return new QrFileResolverError(code, message); }
 
 export async function startServer(options: ServerOptions = {}): Promise<RunningServer> {
   const host = options.host ?? '127.0.0.1';
@@ -115,8 +116,8 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
           if (!statSync(canonical).isFile()) throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
           return { path: canonical, mimeType: indexed.mimeType };
         } catch (error) {
-          if (typeof error === 'object' && error && 'code' in error) throw error;
-          throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件已不存在，请重新扫描资料库');
+          if (error instanceof QrFileResolverError) throw error;
+          throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
         }
       },
       close: async () => {

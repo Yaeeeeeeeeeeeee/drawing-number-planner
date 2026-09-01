@@ -10,11 +10,24 @@ const businessLabel = (status: 'active' | 'inactive') => status === 'active' ? '
 const fileLabel = (files: QrFileView[]) => files.length === 0 ? '未关联文件'
   : files.some((file) => file.isPresent) ? '文件可用' : '文件已缺失';
 const formatTime = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
+interface QrProductGroup { id: number; sku: string | null; model: string; productCategory: string; codes: ProductQrCodeView[] }
+
+const groupByProduct = (items: ProductQrCodeView[]): QrProductGroup[] => {
+  const groups = new Map<number, QrProductGroup>();
+  for (const item of items) {
+    const group = groups.get(item.productId);
+    if (group) group.codes.push(item);
+    else groups.set(item.productId, { id: item.productId, sku: item.sku, model: item.model, productCategory: item.productCategory, codes: [item] });
+  }
+  return [...groups.values()];
+};
 
 export function QrCodesPage({ api, initialQrCodeId, onOpened }: {
   api: PlannerApi; initialQrCodeId?: number | null; onOpened?: () => void;
 }) {
   const [items, setItems] = useState<ProductQrCodeView[]>([]);
+  const [vocabulary, setVocabulary] = useState<ProductQrCodeView[]>([]);
+  const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const [selected, setSelected] = useState<ProductQrCodeView | null>(null);
   const [search, setSearch] = useState(''); const [category, setCategory] = useState('');
   const [purposeId, setPurposeId] = useState(''); const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
@@ -22,14 +35,15 @@ export function QrCodesPage({ api, initialQrCodeId, onOpened }: {
   const [name, setName] = useState(''); const [targetUrl, setTargetUrl] = useState('');
   const [message, setMessage] = useState(''); const [error, setError] = useState(''); const [preview, setPreview] = useState<string | null>(null);
 
-  const categories = useMemo(() => [...new Set(items.map((item) => item.productCategory))], [items]);
-  const purposes = useMemo(() => [...new Map(items.map((item) => [item.purposeId, item])).values()], [items]);
+  const categories = useMemo(() => [...new Set(vocabulary.map((item) => item.productCategory))], [vocabulary]);
+  const purposes = useMemo(() => [...new Map(vocabulary.map((item) => [item.purposeId, item])).values()], [vocabulary]);
+  const groups = useMemo(() => groupByProduct(items), [items]);
   const replace = (updated: ProductQrCodeView) => {
     setSelected(updated); setName(updated.name); setTargetUrl(updated.targetUrl ?? '');
     setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
   };
-  const load = async (filters: ProductQrCodeFilters = {}) => {
-    try { setError(''); const result = await api.listQrCodes(filters); setItems(result.items); }
+  const load = async (filters: ProductQrCodeFilters = {}, setFilterVocabulary = false) => {
+    try { setError(''); const result = await api.listQrCodes(filters); setItems(result.items); if (setFilterVocabulary) setVocabulary(result.items); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '二维码记录加载失败'); }
   };
   const open = async (id: number) => {
@@ -37,11 +51,11 @@ export function QrCodesPage({ api, initialQrCodeId, onOpened }: {
     catch (reason) { setError(reason instanceof Error ? reason.message : '二维码详情加载失败'); }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load({}, true); }, []);
   useEffect(() => { if (initialQrCodeId != null) void open(initialQrCodeId); }, [initialQrCodeId]);
 
   const submitFilters = (event: FormEvent) => {
-    event.preventDefault(); setSelected(null); setPreview(null);
+    event.preventDefault(); setSelected(null); setPreview(null); setExpandedProductId(null);
     void load({ ...(search.trim() ? { search: search.trim() } : {}), ...(category ? { productCategory: category } : {}),
       ...(purposeId ? { purposeId: Number(purposeId) } : {}), status, fileStatus });
   };
@@ -80,6 +94,6 @@ export function QrCodesPage({ api, initialQrCodeId, onOpened }: {
 
   return <section className="page-surface page-enter"><header className="page-header"><div><p className="eyebrow">QR MANAGEMENT</p><h1>二维码管理</h1><p>集中维护产品二维码用途、网址、业务状态与资料文件状态。</p></div></header>{error && <p className="error-banner">{error}</p>}
     <form className="filter-bar qr-filter" onSubmit={submitFilters}><label><span>SKU / 型号</span><input aria-label="SKU / 型号" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label><span>产品类别</span><select aria-label="产品类别" value={category} onChange={(event) => setCategory(event.target.value)}><option value="">全部</option>{categories.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label><span>用途</span><select aria-label="用途" value={purposeId} onChange={(event) => setPurposeId(event.target.value)}><option value="">全部</option>{purposes.map((purpose) => <option key={purpose.purposeId} value={purpose.purposeId}>{purposeLabels[purpose.key] ?? purpose.displayName}</option>)}</select></label><label><span>业务状态</span><select aria-label="业务状态" value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">全部</option><option value="active">启用中</option><option value="inactive">已停用</option></select></label><label><span>文件状态</span><select aria-label="文件状态" value={fileStatus} onChange={(event) => setFileStatus(event.target.value as typeof fileStatus)}><option value="all">全部</option><option value="present">文件可用</option><option value="missing">文件已缺失</option><option value="none">未关联文件</option></select></label><button className="primary-button" type="submit">筛选</button></form>
-    {items.length === 0 ? <EmptyState title="还没有二维码记录" description="建立产品档案后，适用的二维码用途会显示在这里。" symbol="二" /> : <DataTable items={items} columns={[{ key: 'model', label: 'SKU / 型号', render: (item) => <div className="file-product"><strong>{item.sku ?? '待补录'}</strong><small>{item.model}</small></div> }, { key: 'category', label: '产品类别', render: (item) => item.productCategory }, { key: 'purpose', label: '用途', render: (item) => purposeLabels[item.key] ?? item.displayName }, { key: 'name', label: '二维码名称', render: (item) => item.name }, { key: 'business', label: '业务状态', render: (item) => businessLabel(item.status) }, { key: 'file', label: '文件状态', render: (item) => fileLabel(item.files) }, { key: 'actions', label: '操作', render: (item) => <button className="text-button" type="button" aria-label={`查看 ${item.name}`} onClick={() => void open(item.id)}>查看</button> }]} />}
+    {groups.length === 0 ? <EmptyState title="还没有二维码记录" description="建立产品档案后，适用的二维码用途会显示在这里。" symbol="二" /> : <DataTable items={groups} columns={[{ key: 'model', label: 'SKU / 型号', render: (item) => <div className="file-product"><strong>{item.sku ?? '待补录'}</strong><small>{item.model}</small></div> }, { key: 'category', label: '产品类别', render: (item) => item.productCategory }, { key: 'count', label: '二维码用途', render: (item) => `${item.codes.length} 项` }, { key: 'actions', label: '操作', render: (item) => <button className="text-button" type="button" aria-label={`${expandedProductId === item.id ? '收起' : '展开'} ${item.model} 的二维码用途`} onClick={() => setExpandedProductId((current) => current === item.id ? null : item.id)}>{expandedProductId === item.id ? '收起用途' : '查看用途'}</button> }]} renderExpandedRow={(group) => expandedProductId !== group.id ? null : <div className="qr-purpose-list">{group.codes.map((item) => <div className="qr-purpose-row" key={item.id}><div><strong>{purposeLabels[item.key] ?? item.displayName}</strong><small>{item.name}</small></div><span>{businessLabel(item.status)}</span><span>{fileLabel(item.files)}</span><button className="text-button" type="button" aria-label={`查看 ${item.name}`} onClick={() => void open(item.id)}>查看</button></div>)}</div>} />}
   </section>;
 }
