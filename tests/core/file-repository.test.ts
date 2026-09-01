@@ -366,7 +366,7 @@ describe('FileRepository', () => {
       boms: db.prepare('select count(*) as count from bom_versions').get(),
     };
 
-    expect(repository.clearIndex()).toEqual({ pdfFiles: 1, materialBatches: 1, scanChanges: 1, scanRuns: 1 });
+    expect(repository.clearIndex()).toEqual({ pdfFiles: 1, qrCodeFiles: 0, materialBatches: 1, scanChanges: 1, scanRuns: 1 });
 
     expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 0 });
     expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 0 });

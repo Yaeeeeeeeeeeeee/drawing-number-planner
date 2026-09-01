@@ -1,4 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { QrRepository } from '../qr/qr-repository.js';
 import { ProductRepository } from './product-repository.js';
 import type { ConfirmHistoricalProductCandidateInput, HistoricalProductCandidate, Product, ProductFilters, ProductInput } from './product-types.js';
 
@@ -25,8 +26,13 @@ export class ProductService {
 
   create(input: ProductInput): Product {
     const normalized = this.validateAndNormalize(input);
-    try { return this.repository.create(normalized); }
-    catch (error) { return this.mapDatabaseError(error); }
+    return this.database.transaction(() => {
+      try {
+        const product = this.repository.create(normalized);
+        new QrRepository(this.database).ensureForProduct(product.id);
+        return product;
+      } catch (error) { return this.mapDatabaseError(error); }
+    })();
   }
 
   update(id: number, input: ProductInput): Product {

@@ -167,7 +167,7 @@ describe('PDF file API', () => {
 
     const preview = await fetch(`${server.url}/api/files/index/clear-preview`);
     expect(await preview.json()).toMatchObject({ workspaceRoot: realpathSync.native(workspace),
-      counts: { pdfFiles: 1, materialBatches: 0, scanChanges: 1, scanRuns: 1 } });
+      counts: { pdfFiles: 1, qrCodeFiles: 0, materialBatches: 0, scanChanges: 1, scanRuns: 1 } });
     const wrongConfirmation = await fetch(`${server.url}/api/files/index/clear`, { method: 'POST', headers: writeHeaders,
       body: JSON.stringify({ confirmation: '清空资料库' }) });
     expect(wrongConfirmation.status).toBe(422);
@@ -176,7 +176,7 @@ describe('PDF file API', () => {
     const cleared = await fetch(`${server.url}/api/files/index/clear`, { method: 'POST', headers: writeHeaders,
       body: JSON.stringify({ confirmation: '清空资料库索引' }) });
     expect(cleared.status).toBe(200);
-    expect(await cleared.json()).toEqual({ pdfFiles: 1, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
+    expect(await cleared.json()).toEqual({ pdfFiles: 1, qrCodeFiles: 0, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
     expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(0);
     expect(await (await fetch(`${server.url}/api/files/settings`)).json()).toMatchObject({ workspaceRoot: realpathSync.native(workspace) });
     expect(await (await import('node:fs')).promises.readFile(filePath, 'utf8')).toBe('%PDF-1.4 unchanged');

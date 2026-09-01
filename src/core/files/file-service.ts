@@ -7,6 +7,9 @@ import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
 import type { FileScanChangesView, FileScanComparison, FileScanRunView, FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
 import { WorkspaceSettingsStore } from './workspace-settings.js';
 import { toWorkspacePathKey, validateWorkspaceRoot } from './workspace-paths.js';
+import { scanQrWorkspace } from '../qr/qr-file-scanner.js';
+import { classifyQrFile } from '../qr/qr-file-classifier.js';
+import type { QrFileScanRecord } from '../qr/qr-types.js';
 
 export interface FileScanSummary {
   total: number; matched: number; pending: number; unmatched: number; conflict: number; historicalRegistered: number;
@@ -74,13 +77,30 @@ export class FileService {
     if (!workspaceRoot) throw new FileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
     this.scanning = true;
     try {
-      const files = await this.scanner(workspaceRoot); const drawings = this.repository.listDrawingCodes();
+      const pdfScan = this.scanner(workspaceRoot);
+      const qrScan = scanQrWorkspace(workspaceRoot);
+      const [scannedPdfFiles, qrFiles] = await Promise.all([pdfScan, qrScan]);
+      const qrPathKeys = new Set(qrFiles.map((file) => toWorkspacePathKey(file.relativePath)));
+      const files = scannedPdfFiles.filter((file) => !qrPathKeys.has(toWorkspacePathKey(file.relativePath)));
+      const drawings = this.repository.listDrawingCodes();
       const priorFingerprints = this.repository.currentFingerprints(files.map((file) => toWorkspacePathKey(file.relativePath)));
       const fingerprints = await mapWithConcurrency(files, FINGERPRINT_CONCURRENCY, async (file) => {
         const pathKey = toWorkspacePathKey(file.relativePath);
         if (!file.absolutePath) throw new Error('扫描器未返回可只读计算指纹的文件路径');
         return resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey, sizeBytes: file.sizeBytes,
           modifiedAt: file.modifiedAt, existing: priorFingerprints.get(pathKey) ?? null });
+      });
+      const qrFingerprints = await mapWithConcurrency(qrFiles, FINGERPRINT_CONCURRENCY, async (file) => (
+        resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey: toWorkspacePathKey(file.relativePath),
+          sizeBytes: file.sizeBytes, modifiedAt: file.modifiedAt, existing: null })
+      ));
+      const qrProducts = this.repository.listQrClassifierProducts();
+      const qrPurposes = this.repository.listQrClassifierPurposes();
+      const qrRecords: QrFileScanRecord[] = qrFiles.map((file, index) => {
+        const classification = classifyQrFile({ ...file, products: qrProducts, purposes: qrPurposes });
+        return { ...file, pathKey: toWorkspacePathKey(file.relativePath), contentSha256: qrFingerprints[index].contentSha256,
+          productId: classification.productId, purposeId: classification.purposeId, qrCodeId: null,
+          matchStatus: classification.matchStatus, classificationWarning: classification.classificationWarning };
       });
       const historicalCodes: HistoricalDrawingScanRecord[] = [];
       const records = files.map((file, index): FileScanRecord => {
@@ -97,7 +117,7 @@ export class FileService {
           contentSha256: fingerprints[index].contentSha256 };
       });
       const scannedAt = new Date().toISOString();
-      const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt);
+      const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt, qrRecords);
       const completedScan = this.repository.latestScan();
       if (!completedScan) throw new Error('扫描完成后未找到扫描记录');
       return { total: records.length,

@@ -1,0 +1,59 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
+import { ProductService } from '../../src/core/products/product-service';
+import { QrService } from '../../src/core/qr/qr-service';
+import { openDatabase, type PlannerDatabase } from '../../src/db/database';
+import { migrateDatabase } from '../../src/db/migrations';
+
+let db: PlannerDatabase;
+let dictionaries: DictionaryService;
+let products: ProductService;
+
+beforeEach(() => {
+  db = openDatabase(':memory:');
+  migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+  dictionaries = new DictionaryService(db); products = new ProductService(db);
+});
+afterEach(() => db.close());
+
+function productInput(productCategory: string, sku: string, model: string) {
+  const brand = dictionaries.create({ type: 'brand', code: sku.slice(-2), name: `Brand ${sku}` });
+  const size = dictionaries.create({ type: 'product_size', code: `S${sku.slice(-3)}`, name: `Size ${sku}` });
+  const appearance = dictionaries.create({ type: 'appearance', code: `A${sku.slice(-2)}`, name: `Appearance ${sku}` });
+  return { sku, model, productCategory, brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id };
+}
+
+describe('QrService', () => {
+  it('backfills applicable inactive QR records when products are created without coupling them to drawings or BOM', () => {
+    const ordinary = products.create(productInput('冰柜', 'SKUZC', 'ZC100'));
+    const airFryer = products.create(productInput('空气炸锅', 'SKUAF', 'AF30'));
+    const service = new QrService(db);
+
+    expect(service.list({ productId: ordinary.id }).items.map((item) => [item.englishName, item.status]))
+      .toEqual([['User Manual', 'inactive'], ['Warranty', 'inactive']]);
+    expect(service.list({ productId: airFryer.id }).items.map((item) => item.englishName))
+      .toEqual(['Recipe', 'User Manual', 'Warranty']);
+    expect(db.prepare('select count(*) as count from drawing_numbers').get()).toEqual({ count: 0 });
+    expect(db.prepare('select count(*) as count from bom_versions').get()).toEqual({ count: 0 });
+  });
+
+  it('keeps URL and file association when a QR record is deactivated and rejects non-http URLs', () => {
+    const product = products.create(productInput('冰柜', 'SKUZC', 'ZC100'));
+    const service = new QrService(db);
+    const code = service.list({ productId: product.id }).items[0];
+    db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, qr_code_id, match_status, first_seen_at, last_seen_at)
+      values ('冰柜/SKUZC-ZC100/ZC100-User Manual（网址编码）.png', '冰柜\\skuzc-zc100\\zc100-user manual（网址编码）.png',
+        'ZC100-User Manual（网址编码）.png', 'image/png', 1, '2026-09-01', ?, 'matched', '2026-09-01', '2026-09-01')`).run(code.id);
+
+    expect(() => service.update(code.id, { name: '新版说明书', targetUrl: 'ftp://invalid.example' }))
+      .toThrowError(expect.objectContaining({ code: 'INVALID_TARGET_URL' }));
+    const updated = service.update(code.id, { name: '新版说明书', targetUrl: 'https://example.test/manual' });
+    const inactive = service.deactivate(code.id);
+
+    expect(updated.targetUrl).toBe('https://example.test/manual');
+    expect(inactive).toMatchObject({ status: 'inactive', targetUrl: 'https://example.test/manual' });
+    expect(db.prepare('select qr_code_id as qrCodeId from qr_code_files').get()).toEqual({ qrCodeId: code.id });
+  });
+});

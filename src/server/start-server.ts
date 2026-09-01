@@ -16,6 +16,7 @@ import { IndexedPdfResolver } from '../core/files/indexed-pdf-resolver.js';
 import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
 import { PlanningService } from '../core/planning/planning-service.js';
 import { ProductService } from '../core/products/product-service.js';
+import { QrService } from '../core/qr/qr-service.js';
 import { createDatabaseBackup } from '../db/backup.js';
 import { openDatabase } from '../db/database.js';
 import { migrateDatabase } from '../db/migrations.js';
@@ -27,6 +28,7 @@ import { registerImportRoutes } from './routes/import.js';
 import { registerMaterialBatchRoutes } from './routes/material-batches.js';
 import { registerProductRoutes } from './routes/products.js';
 import { registerPlanningRoutes } from './routes/planning.js';
+import { registerQrCodeRoutes } from './routes/qr-codes.js';
 import { assertLoopbackHost, registerLocalAccess } from './security/local-access.js';
 
 export interface ServerOptions {
@@ -76,6 +78,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     const indexedPdfResolver = new IndexedPdfResolver(fileRepository, workspaceSettings);
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database));
+    registerQrCodeRoutes(server, new QrService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings));
     registerMaterialBatchRoutes(server, new MaterialBatchService(database));

@@ -5,6 +5,8 @@ import { diffFileScan, type IndexedFileSnapshot } from './file-scan-diff.js';
 import { MaterialBatchRepository } from './material-batch-repository.js';
 import { FileScanHistoryRepository } from './file-scan-history-repository.js';
 import { toWorkspacePathKey, validateWorkspaceRelativePath } from './workspace-paths.js';
+import type { QrFileScanRecord } from '../qr/qr-types.js';
+import { QrRepository } from '../qr/qr-repository.js';
 
 interface FileRow {
   id: number; relative_path: string; file_name: string; drawing_id: number | null; historical_drawing_id: number | null;
@@ -22,6 +24,7 @@ interface StoredFileSnapshotRow extends Omit<IndexedFileSnapshot, 'isPresent'> {
 
 export interface FileIndexClearResult {
   pdfFiles: number;
+  qrCodeFiles: number;
   materialBatches: number;
   scanChanges: number;
   scanRuns: number;
@@ -61,6 +64,14 @@ export class FileRepository {
     return this.db.prepare('select id, full_code as fullCode from drawing_numbers order by id').all() as DrawingCodeReference[];
   }
 
+  listQrClassifierProducts(): Array<{ id: number; sku: string | null; model: string; productCategory: string }> {
+    return new QrRepository(this.db).listClassifierProducts();
+  }
+
+  listQrClassifierPurposes(): Array<{ id: number; englishName: string }> {
+    return new QrRepository(this.db).listClassifierPurposes();
+  }
+
   currentFingerprints(pathKeys: string[]): Map<string, { pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }> {
     if (pathKeys.length === 0) return new Map();
     const unique = [...new Set(pathKeys)]; const rows: Array<{ pathKey: string; sizeBytes: number; modifiedAt: string; contentSha256: string | null }> = [];
@@ -78,15 +89,23 @@ export class FileRepository {
 
   scanChanges(id: number): FileScanChangesView | null { return this.history.changes(id); }
 
-  replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string): {
+  replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string,
+    qrRecords: QrFileScanRecord[] = []): {
     missing: number; historicalRegistered: number;
   } {
     for (const record of records) {
       validateWorkspaceRelativePath(record.relativePath);
       record.pathKey = toWorkspacePathKey(record.relativePath);
     }
+    for (const record of qrRecords) {
+      validateWorkspaceRelativePath(record.relativePath);
+      record.pathKey = toWorkspacePathKey(record.relativePath);
+    }
     if (new Set(records.map((record) => record.pathKey)).size !== records.length) {
       throw new Error('扫描结果包含重复的实际相对路径');
+    }
+    if (new Set(qrRecords.map((record) => record.pathKey)).size !== qrRecords.length) {
+      throw new Error('扫描结果包含重复的二维码相对路径');
     }
     return this.db.transaction(() => {
       const previous = this.db.prepare(`select id, relative_path as relativePath, path_key as pathKey, file_name as fileName,
@@ -95,17 +114,37 @@ export class FileRepository {
       const current = records.map((record) => ({ relativePath: record.relativePath, pathKey: record.pathKey!, fileName: record.fileName,
         sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, contentSha256: record.contentSha256 ?? null }));
       const differences = diffFileScan(previous.map((file) => ({ ...file, isPresent: file.isPresent === 1 })), current);
-      const counts = { added: differences.filter((change) => change.type === 'added').length,
-        missing: differences.filter((change) => change.type === 'missing').length,
-        moved: differences.filter((change) => change.type === 'moved').length,
-        changed: differences.filter((change) => change.type === 'changed').length,
-        unchanged: differences.filter((change) => change.type === 'unchanged').length };
+      const previousQr = this.db.prepare(`select id, relative_path as relativePath, path_key as pathKey, file_name as fileName,
+        size_bytes as sizeBytes, modified_at as modifiedAt, content_sha256 as contentSha256, is_present as isPresent
+        from qr_code_files where is_present = 1`).all() as StoredFileSnapshotRow[];
+      const currentQr = qrRecords.map((record) => ({ relativePath: record.relativePath, pathKey: record.pathKey!, fileName: record.fileName,
+        sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, contentSha256: record.contentSha256 ?? null }));
+      const qrDifferences = diffFileScan(previousQr.map((file) => ({ ...file, isPresent: file.isPresent === 1 })), currentQr);
+      const allDifferences = [...differences, ...qrDifferences];
+      const counts = { added: allDifferences.filter((change) => change.type === 'added').length,
+        missing: allDifferences.filter((change) => change.type === 'missing').length,
+        moved: allDifferences.filter((change) => change.type === 'moved').length,
+        changed: allDifferences.filter((change) => change.type === 'changed').length,
+        unchanged: allDifferences.filter((change) => change.type === 'unchanged').length };
       const scanRun = this.db.prepare(`insert into file_scan_runs
         (started_at, completed_at, total_current, added_count, missing_count, moved_count, changed_count, unchanged_count)
         values (@scannedAt, @scannedAt, @totalCurrent, @added, @missing, @moved, @changed, @unchanged) returning id`).get({
-        scannedAt, totalCurrent: records.length, ...counts,
+        scannedAt, totalCurrent: records.length + qrRecords.length, ...counts,
       }) as { id: number };
       this.db.prepare('update pdf_files set is_present = 0').run();
+      this.db.prepare('update qr_code_files set is_present = 0').run();
+      const qrRepository = new QrRepository(this.db);
+      for (const record of qrRecords) {
+        if (record.productId != null && record.purposeId != null) {
+          qrRepository.ensureForProduct(record.productId);
+          const code = qrRepository.findByProductPurpose(record.productId, record.purposeId);
+          if (code) record.qrCodeId = code.id;
+          else {
+            record.qrCodeId = null; record.matchStatus = 'pending';
+            record.classificationWarning = 'qr-purpose-not-applicable';
+          }
+        }
+      }
       this.batches.markAllMissing();
       const batchIds = new Map<string, number>();
       for (const record of records) {
@@ -178,6 +217,20 @@ export class FileRepository {
         conversionType: record.conversionType, classificationWarning: record.classificationWarning ?? null,
         sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, scannedAt,
         contentSha256: record.contentSha256 ?? null, scanRunId: scanRun.id });
+      const upsertQr = this.db.prepare(`insert into qr_code_files
+        (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, content_sha256, qr_code_id,
+          match_status, classification_warning, is_present, last_seen_scan_run_id, first_seen_at, last_seen_at)
+        values (@relativePath, @pathKey, @fileName, @mimeType, @sizeBytes, @modifiedAt, @contentSha256, @qrCodeId,
+          @matchStatus, @classificationWarning, 1, @scanRunId, @scannedAt, @scannedAt)
+        on conflict(path_key) do update set relative_path = excluded.relative_path, file_name = excluded.file_name,
+          mime_type = excluded.mime_type, size_bytes = excluded.size_bytes, modified_at = excluded.modified_at,
+          content_sha256 = coalesce(excluded.content_sha256, qr_code_files.content_sha256), qr_code_id = excluded.qr_code_id,
+          match_status = excluded.match_status, classification_warning = excluded.classification_warning, is_present = 1,
+          last_seen_scan_run_id = excluded.last_seen_scan_run_id, last_seen_at = excluded.last_seen_at`);
+      for (const record of qrRecords) upsertQr.run({ relativePath: record.relativePath, pathKey: record.pathKey,
+        fileName: record.fileName, mimeType: record.mimeType, sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt,
+        contentSha256: record.contentSha256 ?? null, qrCodeId: record.qrCodeId, matchStatus: record.matchStatus,
+        classificationWarning: record.classificationWarning, scanRunId: scanRun.id, scannedAt });
       const idRows = this.db.prepare('select id, path_key as pathKey from pdf_files where last_seen_scan_run_id = ?').all(scanRun.id) as Array<{ id: number; pathKey: string }>;
       const idsByPath = new Map(idRows.map((row) => [row.pathKey, row.id]));
       const insertChange = this.db.prepare(`insert into file_scan_changes
@@ -194,6 +247,20 @@ export class FileRepository {
         insertChange.run({ scanRunId: scanRun.id, changeType: difference.type, fileIndexId,
           relativePath: difference.relativePath, previousRelativePath: difference.previousRelativePath,
           fileName: snapshot.fileName, fullCode: snapshot.fullCode });
+      }
+      const qrIdRows = this.db.prepare('select id, path_key as pathKey from qr_code_files where last_seen_scan_run_id = ?').all(scanRun.id) as Array<{ id: number; pathKey: string }>;
+      const qrIdsByPath = new Map(qrIdRows.map((row) => [row.pathKey, row.id]));
+      const insertQrChange = this.db.prepare(`insert into file_scan_changes
+        (scan_run_id, change_type, index_kind, file_index_id, relative_path, previous_relative_path, file_name, full_code)
+        values (@scanRunId, @changeType, 'qr', @fileIndexId, @relativePath, @previousRelativePath, @fileName, null)`);
+      const qrSnapshot = this.db.prepare('select file_name as fileName from qr_code_files where id = ?');
+      for (const difference of qrDifferences) {
+        const fileIndexId = difference.type === 'missing' ? difference.previousFileId! : qrIdsByPath.get(toWorkspacePathKey(difference.relativePath));
+        if (fileIndexId == null) throw new Error('扫描差异找不到二维码文件索引');
+        const snapshot = qrSnapshot.get(fileIndexId) as { fileName: string } | undefined;
+        if (!snapshot) throw new Error('扫描差异找不到二维码文件快照');
+        insertQrChange.run({ scanRunId: scanRun.id, changeType: difference.type, fileIndexId,
+          relativePath: difference.relativePath, previousRelativePath: difference.previousRelativePath, fileName: snapshot.fileName });
       }
       const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
       return { missing, historicalRegistered };
@@ -217,6 +284,7 @@ export class FileRepository {
     return this.db.transaction(() => {
       const result = this.indexCounts();
       this.db.prepare('delete from pdf_files').run();
+      this.db.prepare('delete from qr_code_files').run();
       this.db.prepare('delete from material_batches').run();
       this.db.prepare('delete from file_scan_changes').run();
       this.db.prepare('delete from file_scan_runs').run();
@@ -227,11 +295,11 @@ export class FileRepository {
   }
 
   indexCounts(): FileIndexClearResult {
-    const count = (table: 'pdf_files' | 'material_batches' | 'file_scan_changes' | 'file_scan_runs') => (
+    const count = (table: 'pdf_files' | 'qr_code_files' | 'material_batches' | 'file_scan_changes' | 'file_scan_runs') => (
       this.db.prepare(`select count(*) as count from ${table}`).get() as { count: number }
     ).count;
     return {
-      pdfFiles: count('pdf_files'), materialBatches: count('material_batches'),
+      pdfFiles: count('pdf_files'), qrCodeFiles: count('qr_code_files'), materialBatches: count('material_batches'),
       scanChanges: count('file_scan_changes'), scanRuns: count('file_scan_runs'),
     };
   }

@@ -185,12 +185,41 @@ describe('FileService', () => {
       mainCategoryId: refs.mainCategoryId, projectItemId: refs.projectItemId }] }).rows[0].sequence;
     const contentBefore = readFileSync(historyPath, 'utf8'); const metadataBefore = statSync(historyPath);
 
-    expect(service.clearIndex('清空资料库索引')).toEqual({ pdfFiles: 1, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
+    expect(service.clearIndex('清空资料库索引')).toEqual({ pdfFiles: 1, qrCodeFiles: 0, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
     expect(readFileSync(historyPath, 'utf8')).toBe(contentBefore);
     expect(statSync(historyPath).mtimeMs).toBe(metadataBefore.mtimeMs);
     expect(await service.scan()).toMatchObject({ historicalRegistered: 0, total: 1 });
     expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
     expect(planning.preview({ productId: refs.productId, rows: [{ clientId: 'next', colorId: refs.colorId,
       mainCategoryId: refs.mainCategoryId, projectItemId: refs.projectItemId }] }).rows[0].sequence).toBe(nextBefore);
+  });
+
+  it('routes QR candidates before historical parsing, tracks their presence, and clears only their index rows', async () => {
+    const dictionaries = new DictionaryService(db); const products = new ProductService(db);
+    const brand = dictionaries.create({ type: 'brand', code: '03', name: 'QR brand' });
+    const size = dictionaries.create({ type: 'product_size', code: '0405', name: 'QR size' });
+    const appearance = dictionaries.create({ type: 'appearance', code: '02', name: 'QR appearance' });
+    const product = products.create({ sku: 'SKUQR', model: 'QR100', productCategory: '冰柜',
+      brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id });
+    const workspace = join(dataDir, 'library'); const directory = join(workspace, '冰柜', 'SKUQR-QR100', '二维码');
+    mkdirSync(directory, { recursive: true });
+    const manual = join(directory, 'QR100-User Manual（二维码的网址编码）.png');
+    const warranty = join(directory, 'QR100-Warranty（网址编码）.pdf');
+    const history = join(workspace, '02.0404.010.0401007-history.pdf');
+    writeFileSync(manual, 'png'); writeFileSync(warranty, '%PDF warranty'); writeFileSync(history, '%PDF history');
+    const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
+
+    expect(await service.scan()).toMatchObject({ total: 1, historicalRegistered: 1 });
+    expect(db.prepare('select count(*) as count from qr_code_files where match_status = ?').get('matched')).toEqual({ count: 2 });
+    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
+    const firstCodes = db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id);
+    unlinkSync(manual); await service.scan();
+    expect(db.prepare(`select is_present as isPresent from qr_code_files where file_name like 'QR100-User Manual%'`).get())
+      .toEqual({ isPresent: 0 });
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
+
+    expect(service.clearIndex('清空资料库索引')).toMatchObject({ qrCodeFiles: 2 });
+    expect(db.prepare('select count(*) as count from qr_code_files').get()).toEqual({ count: 0 });
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
   });
 });
