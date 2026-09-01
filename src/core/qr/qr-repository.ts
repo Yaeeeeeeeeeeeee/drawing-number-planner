@@ -61,12 +61,12 @@ export class QrRepository {
   }
 
   listClassifierProducts(): Array<{ id: number; sku: string | null; model: string; productCategory: string }> {
-    return this.db.prepare(`select id, sku, model, product_category as productCategory from products`).all() as Array<{
+    return this.db.prepare(`select id, sku, model, product_category as productCategory from products where status = 'active'`).all() as Array<{
       id: number; sku: string | null; model: string; productCategory: string;
     }>;
   }
 
   listClassifierPurposes(): Array<{ id: number; englishName: string }> {
-    return this.db.prepare('select id, english_name as englishName from qr_purposes').all() as Array<{ id: number; englishName: string }>;
+    return this.db.prepare("select id, english_name as englishName from qr_purposes where status = 'active'").all() as Array<{ id: number; englishName: string }>;
   }
 }

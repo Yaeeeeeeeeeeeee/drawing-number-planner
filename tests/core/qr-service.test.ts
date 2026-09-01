@@ -56,4 +56,27 @@ describe('QrService', () => {
     expect(inactive).toMatchObject({ status: 'inactive', targetUrl: 'https://example.test/manual' });
     expect(db.prepare('select qr_code_id as qrCodeId from qr_code_files').get()).toEqual({ qrCodeId: code.id });
   });
+
+  it('uses active purpose data for normal and historically confirmed product defaults without deleting disabled-purpose records', () => {
+    db.prepare(`insert into qr_purposes (key, english_name, display_name, default_for_all, status, created_at, updated_at)
+      values ('quick_start', 'Quick Start', '快速入门二维码', 1, 'active', '2026-09-01', '2026-09-01')`).run();
+    const existing = products.create(productInput('冰柜', 'SKUDATA', 'DATA100'));
+    db.prepare("update qr_purposes set status = 'inactive' where key = 'quick_start'").run();
+    const service = new QrService(db);
+    expect(service.list({ productId: existing.id }).items.map((item) => item.englishName)).toContain('Quick Start');
+
+    const refs = productInput('冰柜', 'SKUHIST', 'HIST100');
+    db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, detected_sku, detected_model, detected_product_category, first_seen_at, last_seen_at)
+      values ('02.0404.010.0401007', '02', '0404', '01', '0', '04', '01', 7,
+        'SKUHIST', 'HIST100', '冰柜', '2026-09-01', '2026-09-01')`).run();
+    const confirmed = products.confirmHistoricalCandidate({ productCategory: '冰柜', sku: 'SKUHIST', model: 'HIST100',
+      brandId: refs.brandId, productSizeId: refs.productSizeId, defaultAppearanceId: refs.defaultAppearanceId });
+
+    expect(service.list({ productId: confirmed.product.id }).items.map((item) => item.englishName))
+      .toEqual(['User Manual', 'Warranty']);
+    expect(service.list({ productId: existing.id }).items.find((item) => item.englishName === 'Quick Start'))
+      .toMatchObject({ purposeStatus: 'inactive' });
+  });
 });

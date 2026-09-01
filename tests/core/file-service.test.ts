@@ -201,7 +201,7 @@ describe('FileService', () => {
     const appearance = dictionaries.create({ type: 'appearance', code: '02', name: 'QR appearance' });
     const product = products.create({ sku: 'SKUQR', model: 'QR100', productCategory: '冰柜',
       brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id });
-    const workspace = join(dataDir, 'library'); const directory = join(workspace, '冰柜', 'SKUQR-QR100', '二维码');
+    const workspace = join(dataDir, 'library'); const directory = join(workspace, '冰柜', 'SKUQR-QR100');
     mkdirSync(directory, { recursive: true });
     const manual = join(directory, 'QR100-User Manual（二维码的网址编码）.png');
     const warranty = join(directory, 'QR100-Warranty（网址编码）.pdf');
@@ -213,6 +213,11 @@ describe('FileService', () => {
     expect(db.prepare('select count(*) as count from qr_code_files where match_status = ?').get('matched')).toEqual({ count: 2 });
     expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
     const firstCodes = db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id);
+    db.prepare("update qr_purposes set status = 'inactive' where english_name = 'Warranty'").run();
+    await service.scan();
+    expect(db.prepare(`select match_status as matchStatus, qr_code_id as qrCodeId from qr_code_files
+      where file_name like 'QR100-Warranty%'`).get()).toEqual({ matchStatus: 'pending', qrCodeId: null });
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
     unlinkSync(manual); await service.scan();
     expect(db.prepare(`select is_present as isPresent from qr_code_files where file_name like 'QR100-User Manual%'`).get())
       .toEqual({ isPresent: 0 });
