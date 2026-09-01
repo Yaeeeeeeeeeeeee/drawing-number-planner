@@ -29,6 +29,15 @@ export class QrRepository {
       on conflict(product_id, purpose_id) do nothing`).run({ productId, now: new Date().toISOString() });
   }
 
+  ensurePurposeForProduct(productId: number, purposeId: number): void {
+    this.db.prepare(`insert into product_qr_codes (product_id, purpose_id, name, status, created_at, updated_at)
+      select product.id, purpose.id, purpose.display_name, 'inactive', @now, @now
+      from products product join qr_purposes purpose
+      where product.id = @productId and purpose.id = @purposeId
+        and product.status = 'active' and purpose.status = 'active'
+      on conflict(product_id, purpose_id) do nothing`).run({ productId, purposeId, now: new Date().toISOString() });
+  }
+
   findByProductPurpose(productId: number, purposeId: number): ProductQrCode | null {
     const row = this.db.prepare(`${selectQrCodes} where code.product_id = ? and code.purpose_id = ?`).get(productId, purposeId) as QrRow | undefined;
     return row ? toCode(row) : null;

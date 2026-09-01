@@ -205,12 +205,18 @@ describe('FileService', () => {
     mkdirSync(directory, { recursive: true });
     const manual = join(directory, 'QR100-User Manual（二维码的网址编码）.png');
     const warranty = join(directory, 'QR100-Warranty（网址编码）.pdf');
+    const custom = join(directory, 'QR100-Custom Guide（网址编码）.png');
     const history = join(workspace, '02.0404.010.0401007-history.pdf');
-    writeFileSync(manual, 'png'); writeFileSync(warranty, '%PDF warranty'); writeFileSync(history, '%PDF history');
+    db.prepare(`insert into qr_purposes (key, english_name, display_name, default_for_all, status, created_at, updated_at)
+      values ('custom_guide', 'Custom Guide', '自定义指南二维码', 0, 'active', '2026-09-01', '2026-09-01')`).run();
+    writeFileSync(manual, 'png'); writeFileSync(warranty, '%PDF warranty'); writeFileSync(custom, 'custom png'); writeFileSync(history, '%PDF history');
     const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
 
     expect(await service.scan()).toMatchObject({ total: 1, historicalRegistered: 1 });
-    expect(db.prepare('select count(*) as count from qr_code_files where match_status = ?').get('matched')).toEqual({ count: 2 });
+    expect(db.prepare('select count(*) as count from qr_code_files where match_status = ?').get('matched')).toEqual({ count: 3 });
+    expect(db.prepare(`select code.status, code.target_url as targetUrl from product_qr_codes code
+      join qr_purposes purpose on purpose.id = code.purpose_id where code.product_id = ? and purpose.key = 'custom_guide'`).get(product.id))
+      .toEqual({ status: 'inactive', targetUrl: null });
     expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
     const firstCodes = db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id);
     db.prepare("update qr_purposes set status = 'inactive' where english_name = 'Warranty'").run();
@@ -223,7 +229,7 @@ describe('FileService', () => {
       .toEqual({ isPresent: 0 });
     expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
 
-    expect(service.clearIndex('清空资料库索引')).toMatchObject({ qrCodeFiles: 2 });
+    expect(service.clearIndex('清空资料库索引')).toMatchObject({ qrCodeFiles: 3 });
     expect(db.prepare('select count(*) as count from qr_code_files').get()).toEqual({ count: 0 });
     expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
   });

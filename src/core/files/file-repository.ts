@@ -136,7 +136,7 @@ export class FileRepository {
       const qrRepository = new QrRepository(this.db);
       for (const record of qrRecords) {
         if (record.productId != null && record.purposeId != null) {
-          qrRepository.ensureForProduct(record.productId);
+          qrRepository.ensurePurposeForProduct(record.productId, record.purposeId);
           const code = qrRepository.findByProductPurpose(record.productId, record.purposeId);
           if (code) record.qrCodeId = code.id;
           else {
