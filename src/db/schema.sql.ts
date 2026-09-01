@@ -329,3 +329,99 @@ export const schemaVersionSeven = `
   ALTER TABLE historical_drawing_numbers ADD COLUMN status TEXT NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'inactive'));
 `;
+
+export const schemaVersionEight = `
+  CREATE TABLE qr_purposes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    english_name TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    default_for_all INTEGER NOT NULL DEFAULT 0 CHECK (default_for_all IN (0, 1)),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE qr_purpose_product_categories (
+    purpose_id INTEGER NOT NULL REFERENCES qr_purposes(id) ON DELETE CASCADE,
+    product_category TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (purpose_id, product_category)
+  );
+
+  CREATE TABLE product_qr_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    purpose_id INTEGER NOT NULL REFERENCES qr_purposes(id),
+    name TEXT NOT NULL,
+    target_url TEXT,
+    status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('active', 'inactive')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (product_id, purpose_id)
+  );
+
+  CREATE INDEX product_qr_codes_product_idx ON product_qr_codes(product_id);
+  CREATE INDEX product_qr_codes_purpose_idx ON product_qr_codes(purpose_id);
+
+  CREATE TABLE qr_code_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relative_path TEXT NOT NULL UNIQUE CHECK (
+      length(relative_path) > 0
+      AND substr(relative_path, 1, 1) NOT IN ('/', '\\')
+      AND relative_path NOT GLOB '[A-Za-z]:*'
+      AND relative_path NOT IN ('.', '..')
+      AND relative_path NOT LIKE '../%'
+      AND relative_path NOT LIKE '..\\%'
+      AND relative_path NOT LIKE '%/../%'
+      AND relative_path NOT LIKE '%\\..\\%'
+      AND relative_path NOT LIKE '%/..'
+      AND relative_path NOT LIKE '%\\..'
+    ),
+    path_key TEXT NOT NULL UNIQUE,
+    file_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+    modified_at TEXT NOT NULL,
+    content_sha256 TEXT,
+    qr_code_id INTEGER REFERENCES product_qr_codes(id) ON DELETE SET NULL,
+    match_status TEXT NOT NULL CHECK (match_status IN ('matched', 'pending', 'unmatched')),
+    classification_warning TEXT,
+    is_present INTEGER NOT NULL DEFAULT 1 CHECK (is_present IN (0, 1)),
+    last_seen_scan_run_id INTEGER REFERENCES file_scan_runs(id),
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    CHECK (
+      (match_status = 'matched' AND qr_code_id IS NOT NULL)
+      OR (match_status <> 'matched' AND qr_code_id IS NULL)
+    )
+  );
+
+  CREATE INDEX qr_code_files_qr_code_idx ON qr_code_files(qr_code_id);
+  CREATE INDEX qr_code_files_last_seen_scan_run_idx ON qr_code_files(last_seen_scan_run_id);
+
+  INSERT INTO qr_purposes (
+    key, english_name, display_name, default_for_all, status, created_at, updated_at
+  ) VALUES
+    ('user_manual', 'User Manual', '说明书二维码', 1, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    ('warranty', 'Warranty', '售后二维码', 1, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    ('recipe', 'Recipe', '菜谱二维码', 0, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+
+  INSERT INTO qr_purpose_product_categories (purpose_id, product_category, created_at)
+  SELECT id, '空气炸锅', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  FROM qr_purposes
+  WHERE key = 'recipe';
+
+  INSERT INTO product_qr_codes (
+    product_id, purpose_id, name, target_url, status, created_at, updated_at
+  )
+  SELECT product.id, purpose.id, purpose.english_name, NULL, 'inactive',
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  FROM products product
+  JOIN qr_purposes purpose ON purpose.default_for_all = 1
+    OR EXISTS (
+      SELECT 1 FROM qr_purpose_product_categories mapping
+      WHERE mapping.purpose_id = purpose.id
+        AND mapping.product_category = product.product_category
+    );
+`;

@@ -6,6 +6,7 @@ import {
   schemaVersionOne,
   schemaVersionSix,
   schemaVersionSeven,
+  schemaVersionEight,
   schemaVersionThree,
   schemaVersionTwo,
 } from './schema.sql.js';
@@ -94,6 +95,72 @@ function validateScanHistoryMigration(database: PlannerDatabase, before: { pdf: 
   }
 }
 
+type V7RowCounts = Record<
+  'dictionaryItems' | 'products' | 'drawings' | 'historicalDrawings' | 'pdfFiles' | 'materialBatches'
+  | 'scanRuns' | 'scanChanges' | 'bomVersions' | 'bomItems' | 'bomCurrent',
+  number
+>;
+
+function v7RowCounts(database: PlannerDatabase): V7RowCounts {
+  const count = (table: string): number => (database.prepare(`select count(*) as count from ${table}`).get() as { count: number }).count;
+  return {
+    dictionaryItems: count('dictionary_items'),
+    products: count('products'),
+    drawings: count('drawing_numbers'),
+    historicalDrawings: count('historical_drawing_numbers'),
+    pdfFiles: count('pdf_files'),
+    materialBatches: count('material_batches'),
+    scanRuns: count('file_scan_runs'),
+    scanChanges: count('file_scan_changes'),
+    bomVersions: count('bom_versions'),
+    bomItems: count('bom_items'),
+    bomCurrent: count('bom_current'),
+  };
+}
+
+function validateQrMigration(database: PlannerDatabase, before: V7RowCounts): void {
+  const after = v7RowCounts(database);
+  const expectedQrCodes = (database.prepare(`select count(*) as count
+    from products product
+    join qr_purposes purpose on purpose.default_for_all = 1
+      or exists (
+        select 1 from qr_purpose_product_categories mapping
+        where mapping.purpose_id = purpose.id
+          and mapping.product_category = product.product_category
+      )`).get() as { count: number }).count;
+  const actualQrCodes = (database.prepare('select count(*) as count from product_qr_codes').get() as { count: number }).count;
+  const invalidQrCodes = (database.prepare(`select count(*) as count
+    from product_qr_codes code
+    left join qr_purposes purpose on purpose.id = code.purpose_id
+    left join products product on product.id = code.product_id
+    where purpose.id is null or product.id is null
+      or code.name <> purpose.english_name
+      or code.target_url is not null
+      or code.status <> 'inactive'
+      or code.created_at is null or code.updated_at is null
+      or not (
+        purpose.default_for_all = 1 or exists (
+          select 1 from qr_purpose_product_categories mapping
+          where mapping.purpose_id = purpose.id
+            and mapping.product_category = product.product_category
+        )
+      )`).get() as { count: number }).count;
+  const canonicalPurposes = (database.prepare(`select count(*) as count from qr_purposes
+    where (key = 'user_manual' and english_name = 'User Manual' and default_for_all = 1 and status = 'active')
+       or (key = 'warranty' and english_name = 'Warranty' and default_for_all = 1 and status = 'active')
+       or (key = 'recipe' and english_name = 'Recipe' and default_for_all = 0 and status = 'active')`).get() as { count: number }).count;
+  const recipeMappings = (database.prepare(`select count(*) as count
+    from qr_purpose_product_categories mapping
+    join qr_purposes purpose on purpose.id = mapping.purpose_id
+    where purpose.key = 'recipe' and mapping.product_category = '空气炸锅'`).get() as { count: number }).count;
+  const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
+  if (Object.keys(before).some((key) => before[key as keyof V7RowCounts] !== after[key as keyof V7RowCounts])
+    || canonicalPurposes !== 3 || recipeMappings !== 1 || expectedQrCodes !== actualQrCodes
+    || invalidQrCodes > 0 || foreignKeyErrors.length > 0) {
+    throw new Error('二维码数据校验失败，数据库未升级');
+  }
+}
+
 function validateExpandedDrawingRows(database: PlannerDatabase): void {
   const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
   if (foreignKeyErrors.length > 0) throw new Error('扩展版旧图号存在无效关联，数据库未升级');
@@ -143,8 +210,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 7) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 7`);
-  if (from >= 7) {
+  if (from > 8) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 8`);
+  if (from >= 8) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -213,6 +280,13 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (7, ?)').run(new Date().toISOString());
       validateScanHistoryMigration(database, before);
     }
+    if (from === 7 && !hasBatchPathIndex(database)) ensureBatchPathIndex(database);
+    if (from < 8) {
+      const before = v7RowCounts(database);
+      database.exec(schemaVersionEight);
+      database.prepare('insert into schema_migrations (version, applied_at) values (8, ?)').run(new Date().toISOString());
+      validateQrMigration(database, before);
+    }
   })();
-  return { from, to: 7 };
+  return { from, to: 8 };
 }

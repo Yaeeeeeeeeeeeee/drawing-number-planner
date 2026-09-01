@@ -45,28 +45,21 @@ describe('createDatabaseBackup', () => {
     expect([migration, daily, secondDaily].every(existsSync)).toBe(true);
   });
 
-  it('preserves committed schema v7 scan history in a SQLite backup', () => {
+  it('preserves committed schema v8 QR metadata in a readable SQLite backup', () => {
     const dir = mkdtempSync(join(tmpdir(), 'drawing-planner-v7-backup-'));
     const source = join(dir, 'planner.db');
     const database = openDatabase(source); opened.push(database);
-    migrateDatabase(database, { databaseExists: false, createBackup: () => undefined });
-    const scanRun = Number(database.prepare(`insert into file_scan_runs
-      (started_at, completed_at, total_current, added_count)
-      values ('2026-08-31T00:00:00.000Z', '2026-08-31T00:01:00.000Z', 1, 1)`).run().lastInsertRowid);
-    database.prepare(`insert into file_scan_changes
-      (scan_run_id, change_type, index_kind, file_index_id, relative_path, file_name, full_code)
-      values (?, 'added', 'pdf', 42, 'incoming\\drawing.pdf', 'drawing.pdf', '02.0404.010.0401001')`)
-      .run(scanRun);
+    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 0, to: 8 });
 
     const result = createDatabaseBackup(database, source, join(dir, 'backups'), 'migration', new Date('2026-08-31T08:30:00.123Z'));
 
     const backup = new Database(result, { readonly: true }); opened.push(backup);
-    expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 7 });
-    expect(backup.prepare('select started_at, completed_at, total_current, added_count from file_scan_runs').get()).toEqual({
-      started_at: '2026-08-31T00:00:00.000Z', completed_at: '2026-08-31T00:01:00.000Z', total_current: 1, added_count: 1,
-    });
-    expect(backup.prepare('select change_type, index_kind, file_index_id, relative_path, full_code from file_scan_changes').get()).toEqual({
-      change_type: 'added', index_kind: 'pdf', file_index_id: 42, relative_path: 'incoming\\drawing.pdf', full_code: '02.0404.010.0401001',
-    });
+    expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 8 });
+    expect(backup.prepare('select key, english_name, default_for_all, status from qr_purposes order by id').all()).toEqual([
+      { key: 'user_manual', english_name: 'User Manual', default_for_all: 1, status: 'active' },
+      { key: 'warranty', english_name: 'Warranty', default_for_all: 1, status: 'active' },
+      { key: 'recipe', english_name: 'Recipe', default_for_all: 0, status: 'active' },
+    ]);
+    expect(backup.pragma('integrity_check', { simple: true })).toBe('ok');
   });
 });

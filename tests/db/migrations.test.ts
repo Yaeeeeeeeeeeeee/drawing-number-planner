@@ -11,6 +11,7 @@ import {
   schemaVersionFour,
   schemaVersionOne,
   schemaVersionSix,
+  schemaVersionSeven,
   schemaVersionThree,
   schemaVersionTwo,
 } from '../../src/db/schema.sql';
@@ -58,17 +59,168 @@ function seedV6Rows(database: ReturnType<typeof openDatabase>) {
   return { historical, batch, pdf };
 }
 
+function createV7Database() {
+  const database = createV6Database();
+  database.exec(schemaVersionSeven);
+  database.prepare('insert into schema_migrations (version, applied_at) values (7, ?)').run('2026-08-31T00:00:00.000Z');
+  return database;
+}
+
+function seedV7Products(database: ReturnType<typeof openDatabase>) {
+  const now = '2026-09-01T00:00:00.000Z';
+  const insertDictionary = database.prepare(`insert into dictionary_items
+    (type, code, name, parent_id, created_at) values (?, ?, ?, ?, ?)`);
+  const brand = Number(insertDictionary.run('brand', '02', 'SAMKYO', null, now).lastInsertRowid);
+  const size = Number(insertDictionary.run('product_size', '0404', '产品尺寸', null, now).lastInsertRowid);
+  const appearance = Number(insertDictionary.run('appearance', '01', '1号外观', null, now).lastInsertRowid);
+  const insertProduct = database.prepare(`insert into products
+    (brand_id, product_size_id, default_appearance_id, model, product_category, created_at)
+    values (?, ?, ?, ?, ?, ?)`);
+  const refrigerator = Number(insertProduct.run(brand, size, appearance, 'ZC200', '冰柜', now).lastInsertRowid);
+  const airFryer = Number(insertProduct.run(brand, size, appearance, 'AF100', '空气炸锅', now).lastInsertRowid);
+  return { refrigerator, airFryer };
+}
+
 describe('database migrations', () => {
+  it('backs up v7 rows and creates independent inactive QR records from extensible purposes', () => {
+    const database = createV7Database();
+    const legacy = seedV6Rows(database);
+    const products = seedV7Products(database);
+    const backup = vi.fn();
+
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 7, to: 8 });
+
+    expect(backup).toHaveBeenCalledOnce();
+    expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
+    expect(database.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 1 });
+    expect(database.prepare('select id, full_code from historical_drawing_numbers').get()).toEqual({
+      id: legacy.historical, full_code: '02.0404.010.0401007',
+    });
+    expect(database.prepare(`select key, english_name, default_for_all, status from qr_purposes order by id`).all()).toEqual([
+      { key: 'user_manual', english_name: 'User Manual', default_for_all: 1, status: 'active' },
+      { key: 'warranty', english_name: 'Warranty', default_for_all: 1, status: 'active' },
+      { key: 'recipe', english_name: 'Recipe', default_for_all: 0, status: 'active' },
+    ]);
+    expect(database.prepare(`select purpose.key, mapping.product_category
+      from qr_purpose_product_categories mapping
+      join qr_purposes purpose on purpose.id = mapping.purpose_id`).all())
+      .toEqual([{ key: 'recipe', product_category: '空气炸锅' }]);
+    expect(database.prepare(`select code.product_id, purpose.key, code.name, code.target_url, code.status
+      from product_qr_codes code
+      join qr_purposes purpose on purpose.id = code.purpose_id
+      order by product_id, purpose.id`).all()).toEqual([
+      { product_id: products.refrigerator, key: 'user_manual', name: 'User Manual', target_url: null, status: 'inactive' },
+      { product_id: products.refrigerator, key: 'warranty', name: 'Warranty', target_url: null, status: 'inactive' },
+      { product_id: products.airFryer, key: 'user_manual', name: 'User Manual', target_url: null, status: 'inactive' },
+      { product_id: products.airFryer, key: 'warranty', name: 'Warranty', target_url: null, status: 'inactive' },
+      { product_id: products.airFryer, key: 'recipe', name: 'Recipe', target_url: null, status: 'inactive' },
+    ]);
+    const userManual = (database.prepare("select id from qr_purposes where key = 'user_manual'").get() as { id: number }).id;
+    expect(() => database.prepare(`insert into product_qr_codes
+      (product_id, purpose_id, name, target_url, status, created_at, updated_at)
+      values (?, ?, 'Duplicate', null, 'inactive', ?, ?)`)
+      .run(products.refrigerator, userManual, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'))
+      .toThrow(/UNIQUE constraint/);
+    const userManualCode = (database.prepare(`select code.id from product_qr_codes code
+      join qr_purposes purpose on purpose.id = code.purpose_id
+      where code.product_id = ? and purpose.key = 'user_manual'`).get(products.refrigerator) as { id: number }).id;
+    database.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, content_sha256,
+       qr_code_id, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜\\SKU-ZC200\\ZC200-User Manual.png', '冰柜\\sku-zc200\\zc200-user manual.png',
+        'ZC200-User Manual.png', 'image/png', 42, ?, 'abc123', ?, 'matched', 1, ?, ?)`)
+      .run('2026-09-01T00:00:00.000Z', userManualCode, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z');
+    expect(() => database.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜\\SKU-ZC200\\duplicate.png', '冰柜\\sku-zc200\\zc200-user manual.png',
+        'duplicate.png', 'image/png', 1, ?, 'unmatched', 1, ?, ?)`)
+      .run('2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'))
+      .toThrow(/UNIQUE constraint/);
+    expect(() => database.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜\\SKU-ZC200\\unlinked.png', '冰柜\\sku-zc200\\unlinked.png',
+        'unlinked.png', 'image/png', 1, ?, 'matched', 1, ?, ?)`)
+      .run('2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'))
+      .toThrow(/CHECK constraint/);
+    expect(database.prepare(`select name from sqlite_master where type = 'table' and name in
+      ('qr_purposes', 'qr_purpose_product_categories', 'product_qr_codes', 'qr_code_files') order by name`).all())
+      .toEqual([
+        { name: 'product_qr_codes' },
+        { name: 'qr_code_files' },
+        { name: 'qr_purpose_product_categories' },
+        { name: 'qr_purposes' },
+      ]);
+    expect((database.pragma('table_info(qr_code_files)') as Array<{ name: string }>).map((column) => column.name))
+      .not.toEqual(expect.arrayContaining(['drawing_id', 'historical_drawing_id', 'full_code']));
+    expect(database.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  it('does not start a v8 migration when its safety backup fails', () => {
+    const database = createV7Database();
+
+    expect(() => migrateDatabase(database, {
+      databaseExists: true,
+      createBackup: () => { throw new Error('backup unavailable'); },
+    })).toThrow('backup unavailable');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 7 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'qr_purposes'").get())
+      .toEqual({ count: 0 });
+  });
+
+  it('rolls v8 back when a legacy foreign-key violation is detected', () => {
+    const database = createV7Database();
+    seedV6Rows(database);
+    database.pragma('foreign_keys = OFF');
+    database.prepare('update pdf_files set material_batch_id = 9999').run();
+    database.pragma('foreign_keys = ON');
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('二维码数据校验失败，数据库未升级');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 7 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'qr_code_files'").get())
+      .toEqual({ count: 0 });
+  });
+
+  it('rolls v8 back when a migration-time uniqueness conflict occurs', () => {
+    const database = createV7Database();
+    seedV7Products(database);
+    database.exec(`create trigger conflicting_product_after_v8 after insert on schema_migrations
+      when new.version = 8 begin
+        insert into products (brand_id, product_size_id, default_appearance_id, model, product_category, created_at)
+        select brand_id, product_size_id, default_appearance_id, model, product_category, created_at from products limit 1;
+      end;`);
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow(/UNIQUE constraint/);
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 7 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'qr_purposes'").get())
+      .toEqual({ count: 0 });
+  });
+
+  it('rolls v8 back when a migration-time side effect changes legacy row counts', () => {
+    const database = createV7Database();
+    seedV6Rows(database);
+    database.exec(`create trigger discard_pdf_after_v8 after insert on schema_migrations
+      when new.version = 8 begin delete from pdf_files; end;`);
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('二维码数据校验失败，数据库未升级');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 7 });
+    expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'product_qr_codes'").get())
+      .toEqual({ count: 0 });
+  });
+
   it('creates schema version one and is idempotent', () => {
     const db = openDatabase(':memory:');
     databases.push(db);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 7 });
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 7, to: 7 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 8 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 8, to: 8 });
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.prepare('select version from schema_migrations order by version').all()).toEqual([
-      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 },
+      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
     ]);
     const drawingColumns = (db.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).map((column) => column.name);
     expect(drawingColumns).toEqual(expect.arrayContaining([
@@ -96,7 +248,7 @@ describe('database migrations', () => {
     const db = openDatabase(':memory:'); databases.push(db); db.exec(schemaVersionOne); db.exec(schemaVersionTwo);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 7 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 8 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
@@ -109,7 +261,7 @@ describe('database migrations', () => {
     db.exec('drop index material_batches_relative_path_nocase_unique');
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 7, to: 7 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 8, to: 8 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'index' and name = 'material_batches_relative_path_nocase_unique'").get())
@@ -121,7 +273,7 @@ describe('database migrations', () => {
     db.exec(schemaVersionOne); db.exec(schemaVersionTwo); db.exec(schemaVersionThree);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 3, to: 7 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 3, to: 8 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name = 'pdf_files'").get())
@@ -158,7 +310,7 @@ describe('database migrations', () => {
       .run(product, color, main, item, now);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 7 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 8 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare(`select appearance_id, brand_code, product_size_code, appearance_code,
@@ -213,11 +365,11 @@ describe('database migrations', () => {
        brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
       sequence, status, notes, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', '不得丢失', ?)`)
       .run('02.0209.20.0401001', product, drawingAppearance, color, main, item, now);
-    db.exec('drop table file_scan_changes; drop table file_scan_runs; drop table pdf_files; drop table material_batches; drop table historical_drawing_numbers; drop table bom_current; drop table bom_items; drop table bom_versions;');
+    db.exec('drop table qr_code_files; drop table product_qr_codes; drop table qr_purpose_product_categories; drop table qr_purposes; drop table file_scan_changes; drop table file_scan_runs; drop table pdf_files; drop table material_batches; drop table historical_drawing_numbers; drop table bom_current; drop table bom_items; drop table bom_versions;');
     db.prepare('delete from schema_migrations where version >= 2').run();
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 7 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 8 });
 
     expect(db.prepare('select appearance_id, appearance_code, notes from drawing_numbers').get()).toEqual({
       appearance_id: drawingAppearance, appearance_code: '2', notes: '不得丢失',
@@ -245,7 +397,7 @@ describe('database migrations', () => {
       sequence, status, created_at) values (?, '图号', ?, ?, ?, ?, ?, '02', '0209', '2', '0', '04', '01', 1, 'active', ?)`)
       .run('02.0209.20.0401001', product, appearanceTwo, color, main, item, now);
     db.prepare('update drawing_numbers set appearance_id = ?').run(appearanceOne);
-    db.exec('drop table pdf_files; drop table historical_drawing_numbers; drop table bom_current; drop table bom_items; drop table bom_versions;');
+    db.exec('drop table qr_code_files; drop table product_qr_codes; drop table qr_purpose_product_categories; drop table qr_purposes; drop table pdf_files; drop table historical_drawing_numbers; drop table bom_current; drop table bom_items; drop table bom_versions;');
     db.prepare('delete from schema_migrations where version >= 2').run();
 
     expect(() => migrateDatabase(db, { databaseExists: true, createBackup: vi.fn() }))
@@ -296,7 +448,7 @@ describe('database migrations', () => {
     const seeded = seedV6Rows(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 6, to: 7 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 6, to: 8 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
@@ -431,11 +583,11 @@ describe('database migrations', () => {
       .toEqual({ count: 0 });
   });
 
-  it('rejects databases above schema version seven', () => {
+  it('rejects databases above schema version eight', () => {
     const database = createV6Database();
-    database.prepare('insert into schema_migrations (version, applied_at) values (8, ?)').run('2026-08-31T00:00:00.000Z');
+    database.prepare('insert into schema_migrations (version, applied_at) values (9, ?)').run('2026-09-01T00:00:00.000Z');
 
     expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
-      .toThrow('数据库版本 8 高于当前软件支持的版本 7');
+      .toThrow('数据库版本 9 高于当前软件支持的版本 8');
   });
 });
