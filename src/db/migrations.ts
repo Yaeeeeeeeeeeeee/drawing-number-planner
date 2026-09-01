@@ -129,6 +129,9 @@ function validateQrMigration(database: PlannerDatabase, before: V7RowCounts): vo
           and mapping.product_category = product.product_category
       )`).get() as { count: number }).count;
   const actualQrCodes = (database.prepare('select count(*) as count from product_qr_codes').get() as { count: number }).count;
+  const purposeTotal = (database.prepare('select count(*) as count from qr_purposes').get() as { count: number }).count;
+  const purposeCategoryTotal = (database.prepare('select count(*) as count from qr_purpose_product_categories').get() as { count: number }).count;
+  const qrFileTotal = (database.prepare('select count(*) as count from qr_code_files').get() as { count: number }).count;
   const invalidQrCodes = (database.prepare(`select count(*) as count
     from product_qr_codes code
     left join qr_purposes purpose on purpose.id = code.purpose_id
@@ -155,7 +158,8 @@ function validateQrMigration(database: PlannerDatabase, before: V7RowCounts): vo
     where purpose.key = 'recipe' and mapping.product_category = '空气炸锅'`).get() as { count: number }).count;
   const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
   if (Object.keys(before).some((key) => before[key as keyof V7RowCounts] !== after[key as keyof V7RowCounts])
-    || canonicalPurposes !== 3 || recipeMappings !== 1 || expectedQrCodes !== actualQrCodes
+    || purposeTotal !== 3 || canonicalPurposes !== 3 || purposeCategoryTotal !== 1 || recipeMappings !== 1
+    || expectedQrCodes !== actualQrCodes || qrFileTotal !== 0
     || invalidQrCodes > 0 || foreignKeyErrors.length > 0) {
     throw new Error('二维码数据校验失败，数据库未升级');
   }

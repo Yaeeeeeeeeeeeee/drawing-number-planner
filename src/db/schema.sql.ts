@@ -384,7 +384,7 @@ export const schemaVersionEight = `
     size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
     modified_at TEXT NOT NULL,
     content_sha256 TEXT,
-    qr_code_id INTEGER REFERENCES product_qr_codes(id) ON DELETE SET NULL,
+    qr_code_id INTEGER REFERENCES product_qr_codes(id) ON DELETE RESTRICT,
     match_status TEXT NOT NULL CHECK (match_status IN ('matched', 'pending', 'unmatched')),
     classification_warning TEXT,
     is_present INTEGER NOT NULL DEFAULT 1 CHECK (is_present IN (0, 1)),

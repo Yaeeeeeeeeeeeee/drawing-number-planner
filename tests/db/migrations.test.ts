@@ -167,6 +167,51 @@ describe('database migrations', () => {
       .toEqual({ count: 0 });
   });
 
+  it('rejects deletion of a QR business record while a matched QR file still references it', () => {
+    const database = createV7Database();
+    const products = seedV7Products(database);
+    migrateDatabase(database, { databaseExists: false, createBackup: () => undefined });
+    const qrCode = (database.prepare(`select code.id from product_qr_codes code
+      join qr_purposes purpose on purpose.id = code.purpose_id
+      where code.product_id = ? and purpose.key = 'user_manual'`).get(products.refrigerator) as { id: number }).id;
+    database.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at,
+       qr_code_id, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜\\SKU-ZC200\\manual.png', '冰柜\\sku-zc200\\manual.png', 'manual.png', 'image/png', 1, ?,
+        ?, 'matched', 1, ?, ?)`)
+      .run('2026-09-01T00:00:00.000Z', qrCode, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z');
+
+    expect(() => database.prepare('delete from product_qr_codes where id = ?').run(qrCode))
+      .toThrow(/FOREIGN KEY constraint failed/);
+    expect(database.prepare('select qr_code_id, match_status from qr_code_files').get())
+      .toEqual({ qr_code_id: qrCode, match_status: 'matched' });
+  });
+
+  it('rolls v8 back when a trigger injects extra QR seed or file-index rows', () => {
+    const database = createV7Database();
+    seedV6Rows(database);
+    database.exec(`create trigger inject_qr_rows_after_v8 after insert on schema_migrations
+      when new.version = 8 begin
+        insert into qr_purposes
+          (key, english_name, display_name, default_for_all, status, created_at, updated_at)
+          values ('extra', 'Extra', '额外二维码', 0, 'active', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z');
+        insert into qr_purpose_product_categories (purpose_id, product_category, created_at)
+          select id, '测试产品' , '2026-09-01T00:00:00.000Z' from qr_purposes where key = 'user_manual';
+        insert into qr_code_files
+          (relative_path, path_key, file_name, mime_type, size_bytes, modified_at,
+           match_status, is_present, first_seen_at, last_seen_at)
+          values ('测试\\extra.png', '测试\\extra.png', 'extra.png', 'image/png', 1, '2026-09-01T00:00:00.000Z',
+            'unmatched', 1, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z');
+      end;`);
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('二维码数据校验失败，数据库未升级');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 7 });
+    expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
+    expect(database.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'qr_purposes'").get())
+      .toEqual({ count: 0 });
+  });
+
   it('rolls v8 back when a legacy foreign-key violation is detected', () => {
     const database = createV7Database();
     seedV6Rows(database);
