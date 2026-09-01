@@ -4,6 +4,29 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProductsPage } from '../../src/renderer/pages/ProductsPage';
 
 describe('ProductsPage', () => {
+  it('summarizes only existing applicable QR records and opens the selected QR detail', async () => {
+    const normal = { id: 1, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
+      defaultAppearanceId: 3, defaultAppearanceName: '外观', sku: 'SKU-N', model: 'N100', productCategory: '冰柜', referenceProductId: null, referenceProductModel: null, status: 'active' };
+    const fryer = { ...normal, id: 2, sku: 'SKU-A', model: 'A100', productCategory: '空气炸锅' };
+    const qrCodes = [
+      { id: 11, productId: 1, key: 'user_manual', displayName: '说明书二维码', status: 'active' },
+      { id: 12, productId: 1, key: 'warranty', displayName: '售后二维码', status: 'inactive' },
+      { id: 21, productId: 2, key: 'recipe', displayName: '菜谱二维码', status: 'inactive' },
+    ];
+    const api = { listProducts: vi.fn().mockResolvedValue([normal, fryer]), listQrCodes: vi.fn().mockResolvedValue({ items: qrCodes }),
+      listHistoricalProductCandidates: vi.fn().mockResolvedValue([]), listDictionaries: vi.fn().mockResolvedValue([]),
+      createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn() };
+    const onOpenQr = vi.fn();
+    render(<ProductsPage api={api as never} onOpenQr={onOpenQr} />);
+
+    expect(await screen.findByRole('button', { name: '说明书 · 启用中' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '售后 · 已停用' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '菜谱 · 已停用' })).toBeVisible();
+    expect(screen.queryByText('Quick Start')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '菜谱 · 已停用' }));
+    expect(onOpenQr).toHaveBeenCalledWith(21);
+  });
+
   it('creates a product archive record with active dictionary selections', async () => {
     const dictionaries = {
       brand: [{ id: 1, code: '02', name: 'SAMKYO', status: 'active' }],

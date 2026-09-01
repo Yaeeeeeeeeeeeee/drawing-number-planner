@@ -32,4 +32,21 @@ export class QrService {
   }
   activate(id: number): ProductQrCode { this.get(id); return this.repository.setStatus(id, 'active'); }
   deactivate(id: number): ProductQrCode { this.get(id); return this.repository.setStatus(id, 'inactive'); }
+  associateFile(qrCodeId: number, qrFileId: number): ProductQrCode {
+    this.get(qrCodeId);
+    try {
+      const code = this.repository.associatePendingFile(qrCodeId, qrFileId);
+      if (!code) throw new QrError('QR_FILE_NOT_FOUND', '待关联二维码文件不存在');
+      return code;
+    } catch (error) {
+      if (error instanceof QrError) throw error;
+      const code = error instanceof Error ? error.message : '';
+      const messages = {
+        QR_FILE_ALREADY_LINKED: '二维码文件已关联到其他记录', QR_FILE_NOT_PENDING: '只有待确认二维码文件可以人工关联',
+        QR_FILE_MISSING: '二维码文件已缺失，请重新扫描资料库', QR_FILE_INCOMPATIBLE: '该文件与当前产品型号或用途不匹配',
+      } as const;
+      if (code in messages) throw new QrError(code as keyof typeof messages, messages[code as keyof typeof messages]);
+      throw error;
+    }
+  }
 }

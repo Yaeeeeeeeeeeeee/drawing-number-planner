@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import Fastify from 'fastify';
@@ -13,10 +13,12 @@ import { FileRepository } from '../core/files/file-repository.js';
 import { FileService } from '../core/files/file-service.js';
 import { MaterialBatchService } from '../core/files/material-batch-service.js';
 import { IndexedPdfResolver } from '../core/files/indexed-pdf-resolver.js';
+import { resolveWorkspacePath } from '../core/files/workspace-paths.js';
 import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
 import { PlanningService } from '../core/planning/planning-service.js';
 import { ProductService } from '../core/products/product-service.js';
 import { QrService } from '../core/qr/qr-service.js';
+import { QrRepository } from '../core/qr/qr-repository.js';
 import { createDatabaseBackup } from '../db/backup.js';
 import { openDatabase } from '../db/database.js';
 import { migrateDatabase } from '../db/migrations.js';
@@ -44,7 +46,12 @@ export interface RunningServer {
   url: string;
   token: string;
   resolvePdfFilePath(id: unknown): string;
+  resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
   close(): Promise<void>;
+}
+
+function qrFileError(code: string, message: string): Error & { code: string } {
+  return Object.assign(new Error(message), { code });
 }
 
 export async function startServer(options: ServerOptions = {}): Promise<RunningServer> {
@@ -76,6 +83,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     const fileRepository = new FileRepository(database);
     const workspaceSettings = new WorkspaceSettingsStore(paths.settings);
     const indexedPdfResolver = new IndexedPdfResolver(fileRepository, workspaceSettings);
+    const qrRepository = new QrRepository(database);
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database));
     registerQrCodeRoutes(server, new QrService(database));
@@ -95,6 +103,22 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       url: address,
       token,
       resolvePdfFilePath: (id) => indexedPdfResolver.resolve(id),
+      resolveQrFilePath: (relativePath) => {
+        const indexed = qrRepository.getIndexedQrFile(relativePath);
+        if (!indexed) throw qrFileError('QR_FILE_NOT_FOUND', '未找到已关联的二维码文件');
+        if (!indexed.isPresent) throw qrFileError('QR_FILE_MISSING', '二维码文件已缺失，请重新扫描资料库');
+        const workspaceRoot = workspaceSettings.get().workspaceRoot;
+        if (!workspaceRoot) throw qrFileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
+        const resolved = resolveWorkspacePath(workspaceRoot, indexed.relativePath, { requireExistingParent: true });
+        try {
+          const canonical = realpathSync.native(resolved);
+          if (!statSync(canonical).isFile()) throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
+          return { path: canonical, mimeType: indexed.mimeType };
+        } catch (error) {
+          if (typeof error === 'object' && error && 'code' in error) throw error;
+          throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件已不存在，请重新扫描资料库');
+        }
+      },
       close: async () => {
         server!.server.closeAllConnections();
         await server!.close();

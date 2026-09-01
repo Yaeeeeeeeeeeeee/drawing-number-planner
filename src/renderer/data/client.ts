@@ -105,6 +105,22 @@ export interface PdfScanSummaryView {
   conflict: number; source: number; outlined: number; missing: number; scanId: number; currentTotal: number;
   comparison: FileScanComparisonView; scannedAt: string;
 }
+export type QrBusinessStatus = 'active' | 'inactive';
+export type QrFileStatus = 'present' | 'missing' | 'none' | 'all';
+export interface QrFileView {
+  id: number; relativePath: string; fileName: string; mimeType: string; isPresent: boolean;
+  matchStatus: 'matched' | 'pending' | 'unmatched';
+}
+export interface ProductQrCodeView {
+  id: number; productId: number; sku: string | null; model: string; productCategory: string;
+  purposeId: number; key: string; englishName: string; displayName: string; purposeStatus: QrBusinessStatus;
+  name: string; targetUrl: string | null; status: QrBusinessStatus; createdAt: string; updatedAt: string;
+  files: QrFileView[]; pendingFiles: QrFileView[];
+}
+export interface ProductQrCodeFilters {
+  productId?: number; purposeId?: number; status?: QrBusinessStatus | 'all'; search?: string;
+  productCategory?: string; fileStatus?: QrFileStatus;
+}
 export interface MaterialBatchLogicalMaterialView {
   fullCode: string | null; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
 }
@@ -149,6 +165,12 @@ export interface PlannerApi {
   createProduct(input: Record<string, unknown>): Promise<ProductView>;
   updateProduct(id: number, input: Record<string, unknown>): Promise<ProductView>;
   deactivateProduct(id: number): Promise<ProductView>;
+  listQrCodes(filters?: ProductQrCodeFilters): Promise<{ items: ProductQrCodeView[] }>;
+  getQrCode(id: number): Promise<ProductQrCodeView>;
+  updateQrCode(id: number, input: { name: string; targetUrl: string | null }): Promise<ProductQrCodeView>;
+  activateQrCode(id: number): Promise<ProductQrCodeView>;
+  deactivateQrCode(id: number): Promise<ProductQrCodeView>;
+  associateQrFile(id: number, qrFileId: number): Promise<ProductQrCodeView>;
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
   confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
@@ -229,7 +251,7 @@ function responseError(response: Response, body: ResponseBody): ApiError {
   return new ApiError('REQUEST_FAILED', body.kind === 'text' ? body.value : jsonMessage ?? `请求失败（HTTP ${response.status}）`);
 }
 
-const queryString = (values: Record<string, unknown>) => {
+const queryString = (values: object) => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
     if (value !== undefined && value !== '') query.set(key, String(value));
@@ -315,6 +337,12 @@ export const apiClient: PlannerApi = {
   createProduct: (input) => request('/api/products', json('POST', input)),
   updateProduct: (id, input) => request(`/api/products/${id}`, json('PUT', input)),
   deactivateProduct: (id) => request(`/api/products/${id}/deactivate`, json('POST')),
+  listQrCodes: (filters = {}) => request(`/api/qr-codes${queryString(filters)}`),
+  getQrCode: (id) => request(`/api/qr-codes/${id}`),
+  updateQrCode: (id, input) => request(`/api/qr-codes/${id}`, json('PUT', input)),
+  activateQrCode: (id) => request(`/api/qr-codes/${id}/activate`, json('POST')),
+  deactivateQrCode: (id) => request(`/api/qr-codes/${id}/deactivate`, json('POST')),
+  associateQrFile: (id, qrFileId) => request(`/api/qr-codes/${id}/associate-file`, json('POST', { qrFileId })),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(
     '/api/products/historical-candidates')).items,
   confirmHistoricalProductCandidate: (input) => request('/api/products/historical-candidates/confirm', json('POST', input)),

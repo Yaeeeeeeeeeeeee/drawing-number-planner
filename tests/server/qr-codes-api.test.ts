@@ -46,4 +46,40 @@ describe('QR code API', () => {
     expect(response.json()).toMatchObject({ error: { code: 'INVALID_TARGET_URL' } });
     await app.close();
   });
+
+  it('returns product and file context, then resolves a compatible pending QR file without changing business status', async () => {
+    const { app, product } = await appWithProduct();
+    const listed = await app.inject({ method: 'GET', url: `/api/qr-codes?productId=${product.id}` });
+    const code = listed.json().items.find((item: { key: string }) => item.key === 'user_manual') as { id: number; purposeId: number };
+    const pending = db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜/SKUAPI-API100/待确认/API100-User Manual（网址编码）.png', '冰柜\\skuapi-api100\\待确认\\api100-user manual（网址编码）.png',
+        'API100-User Manual（网址编码）.png', 'image/png', 1, '2026-09-01', 'pending', 1, '2026-09-01', '2026-09-01')`).run();
+
+    const detail = await app.inject({ method: 'GET', url: `/api/qr-codes/${code.id}` });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toMatchObject({ sku: 'SKUAPI', model: 'API100', productCategory: '冰柜',
+      pendingFiles: [{ id: Number(pending.lastInsertRowid), isPresent: true }] });
+
+    const associated = await app.inject({ method: 'POST', url: `/api/qr-codes/${code.id}/associate-file`,
+      payload: { qrFileId: Number(pending.lastInsertRowid) } });
+    expect(associated.statusCode).toBe(200);
+    expect(associated.json()).toMatchObject({ id: code.id, status: 'inactive',
+      files: [{ id: Number(pending.lastInsertRowid), isPresent: true }] });
+
+    const repeated = await app.inject({ method: 'POST', url: `/api/qr-codes/${code.id}/associate-file`,
+      payload: { qrFileId: Number(pending.lastInsertRowid) } });
+    expect(repeated.statusCode).toBe(400);
+    expect(repeated.json()).toMatchObject({ error: { code: 'QR_FILE_ALREADY_LINKED' } });
+
+    const incompatible = db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜/OTHER-OTHER/待确认/OTHER-Warranty（网址编码）.png', '冰柜\\other-other\\待确认\\other-warranty（网址编码）.png',
+        'OTHER-Warranty（网址编码）.png', 'image/png', 1, '2026-09-01', 'pending', 1, '2026-09-01', '2026-09-01')`).run();
+    const rejected = await app.inject({ method: 'POST', url: `/api/qr-codes/${code.id}/associate-file`,
+      payload: { qrFileId: Number(incompatible.lastInsertRowid) } });
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.json()).toMatchObject({ error: { code: 'QR_FILE_INCOMPATIBLE' } });
+    await app.close();
+  });
 });

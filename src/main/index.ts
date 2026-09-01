@@ -1,9 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { startServer, type RunningServer } from '../server/start-server.js';
-import { createShowFileInFolderHandler } from './open-file-location.js';
+import { createQrFileActionHandler, createShowFileInFolderHandler } from './open-file-location.js';
 
 let runningServer: RunningServer | undefined;
 let mainWindow: BrowserWindow | undefined;
@@ -44,6 +45,15 @@ app.whenReady().then(() => {
       return runningServer.resolvePdfFilePath(id);
     },
     showItemInFolder: (path) => shell.showItemInFolder(path),
+  }));
+  ipcMain.handle('planner:qr-file-action', createQrFileActionHandler({
+    resolveQrFilePath: (relativePath) => {
+      if (!runningServer) throw new Error('本机文件服务尚未启动');
+      return runningServer.resolveQrFilePath(relativePath);
+    },
+    openPath: (path) => shell.openPath(path),
+    showItemInFolder: (path) => shell.showItemInFolder(path),
+    readFile: (path) => readFileSync(path),
   }));
   return createWindow();
 }).catch((error) => {

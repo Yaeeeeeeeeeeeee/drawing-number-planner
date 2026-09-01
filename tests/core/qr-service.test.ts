@@ -79,4 +79,46 @@ describe('QrService', () => {
     expect(service.list({ productId: existing.id }).items.find((item) => item.englishName === 'Quick Start'))
       .toMatchObject({ purposeStatus: 'inactive' });
   });
+
+  it('exposes product context with associated and eligible pending file references for QR management', () => {
+    const product = products.create(productInput('冰柜', 'SKUIQ', 'IQ100'));
+    const service = new QrService(db);
+    const code = service.list({ productId: product.id }).items.find((item) => item.key === 'user_manual')!;
+    db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, qr_code_id, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜/SKUIQ-IQ100/IQ100-User Manual（网址编码）.png', '冰柜\\skuiq-iq100\\iq100-user manual（网址编码）.png',
+        'IQ100-User Manual（网址编码）.png', 'image/png', 1, '2026-09-01', ?, 'matched', 1, '2026-09-01', '2026-09-01'),
+        ('冰柜\\SKUIQ-IQ100\\待确认\\IQ100-User Manual（网址编码）.png', '冰柜\\skuiq-iq100\\待确认\\iq100-user manual（网址编码）.png',
+        'IQ100-User Manual（网址编码）.png', 'image/png', 1, '2026-09-01', null, 'pending', 0, '2026-09-01', '2026-09-01')`)
+      .run(code.id);
+
+    const detail = service.get(code.id) as unknown as {
+      sku: string | null; model: string; productCategory: string;
+      files: Array<{ relativePath: string; isPresent: boolean }>;
+      pendingFiles: Array<{ relativePath: string; isPresent: boolean }>;
+    };
+
+    expect(detail).toMatchObject({ sku: 'SKUIQ', model: 'IQ100', productCategory: '冰柜' });
+    expect(detail.files).toMatchObject([{ relativePath: '冰柜/SKUIQ-IQ100/IQ100-User Manual（网址编码）.png', isPresent: true }]);
+    expect(detail.pendingFiles).toMatchObject([{ relativePath: '冰柜\\SKUIQ-IQ100\\待确认\\IQ100-User Manual（网址编码）.png', isPresent: false }]);
+  });
+
+  it('manually resolves only a compatible pending QR file without changing the QR business status', () => {
+    const product = products.create(productInput('冰柜', 'SKUMAN', 'MAN100'));
+    const service = new QrService(db);
+    const code = service.list({ productId: product.id }).items.find((item) => item.key === 'user_manual')!;
+    const pending = db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜/SKUMAN-MAN100/待确认/MAN100-User Manual（网址编码）.png', '冰柜\\skuman-man100\\待确认\\man100-user manual（网址编码）.png',
+        'MAN100-User Manual（网址编码）.png', 'image/png', 1, '2026-09-01', 'pending', 1, '2026-09-01', '2026-09-01')`).run();
+
+    const resolved = (service as unknown as { associateFile(qrCodeId: number, qrFileId: number): unknown })
+      .associateFile(code.id, Number(pending.lastInsertRowid));
+
+    expect(resolved).toMatchObject({ id: code.id, status: 'inactive' });
+    expect(db.prepare('select qr_code_id as qrCodeId, match_status as matchStatus from qr_code_files where id = ?')
+      .get(pending.lastInsertRowid)).toEqual({ qrCodeId: code.id, matchStatus: 'matched' });
+    expect(() => (service as unknown as { associateFile(qrCodeId: number, qrFileId: number): unknown })
+      .associateFile(code.id, Number(pending.lastInsertRowid))).toThrowError(expect.objectContaining({ code: 'QR_FILE_ALREADY_LINKED' }));
+  });
 });

@@ -4,8 +4,11 @@ export interface DesktopFileResult {
 }
 
 declare global {
+  interface PlannerDesktop {
+    showFileInFolder(pdfFileId: number): Promise<DesktopFileResult>;
+  }
   interface Window {
-    plannerDesktop?: { showFileInFolder(pdfFileId: number): Promise<DesktopFileResult> };
+    plannerDesktop?: PlannerDesktop;
   }
 }
 

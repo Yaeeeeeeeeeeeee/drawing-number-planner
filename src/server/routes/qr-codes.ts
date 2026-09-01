@@ -9,8 +9,12 @@ const filtersSchema = z.object({
   productId: z.coerce.number().int().positive().optional(),
   purposeId: z.coerce.number().int().positive().optional(),
   status: z.enum(['active', 'inactive', 'all']).optional(),
+  search: z.string().trim().max(500).optional(),
+  productCategory: z.string().trim().max(200).optional(),
+  fileStatus: z.enum(['present', 'missing', 'none', 'all']).optional(),
 }).strict();
 const updateSchema = z.object({ name: z.string().trim().min(1).max(500), targetUrl: z.string().trim().max(2000).nullable() }).strict();
+const associateFileSchema = z.object({ qrFileId: z.coerce.number().int().positive() }).strict();
 
 function sendQrError(reply: FastifyReply, error: unknown) {
   if (!(error instanceof QrError)) throw error;
@@ -32,6 +36,11 @@ export function registerQrCodeRoutes(app: FastifyInstance, service: QrService): 
     const params = idSchema.safeParse(request.params); const input = updateSchema.safeParse(request.body);
     if (!params.success || !input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '二维码数据无效' } });
     try { return service.update(params.data.id, input.data); } catch (error) { return sendQrError(reply, error); }
+  });
+  app.post('/api/qr-codes/:id/associate-file', async (request, reply) => {
+    const params = idSchema.safeParse(request.params); const input = associateFileSchema.safeParse(request.body);
+    if (!params.success || !input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '二维码文件关联数据无效' } });
+    try { return service.associateFile(params.data.id, input.data.qrFileId); } catch (error) { return sendQrError(reply, error); }
   });
   for (const status of ['active', 'inactive'] as const) {
     app.post(`/api/qr-codes/:id/${status === 'active' ? 'activate' : 'deactivate'}`, async (request, reply) => {

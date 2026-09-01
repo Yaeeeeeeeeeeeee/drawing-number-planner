@@ -14,6 +14,27 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('uses the shared request layer for QR filters, updates, state changes, and manual file association', async () => {
+    const code = { id: 11, name: '说明书' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [code] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'qr-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(code), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(code), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(code), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiClient.listQrCodes({ search: 'Q100', productCategory: '空气炸锅', purposeId: 3, status: 'active', fileStatus: 'present' });
+    await apiClient.updateQrCode(11, { name: '说明书', targetUrl: 'https://example.test/manual' });
+    await apiClient.deactivateQrCode(11);
+    await apiClient.associateQrFile(11, 82);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/qr-codes?search=Q100&productCategory=%E7%A9%BA%E6%B0%94%E7%82%B8%E9%94%85&purposeId=3&status=active&fileStatus=present', { headers: {} });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/qr-codes/11', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: '说明书', targetUrl: 'https://example.test/manual' }) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/qr-codes/11/deactivate', expect.objectContaining({ method: 'POST', body: '{}' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/qr-codes/11/associate-file', expect.objectContaining({ method: 'POST', body: JSON.stringify({ qrFileId: 82 }) }));
+  });
+
   it('loads latest scan summaries and per-scan changes through the shared request layer', async () => {
     const latest = { id: 9, currentTotal: 3, completedAt: '2026-08-31T00:00:00Z', added: 1, missing: 1, moved: 0, changed: 1, unchanged: 0 };
     const changes = { scan: latest, changes: { added: [], missing: [], changed: [] } };

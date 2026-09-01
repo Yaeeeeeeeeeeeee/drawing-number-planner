@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
-import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductView } from '../data/client';
+import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductQrCodeView, ProductView } from '../data/client';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 
@@ -9,7 +9,9 @@ const blankHistorical = { brandId: '', productSizeId: '', defaultAppearanceId: '
 const sameCandidate = (left: HistoricalProductCandidateView, right: HistoricalProductCandidateView) =>
   left.productCategory === right.productCategory && left.sku === right.sku && left.model === right.model;
 
-export function ProductsPage({ api }: { api: PlannerApi }) {
+const qrLabel = (item: ProductQrCodeView) => ({ user_manual: '说明书', warranty: '售后', recipe: '菜谱' }[item.key] ?? item.displayName);
+
+export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id: number) => void }) {
   const [items, setItems] = useState<ProductView[]>([]);
   const [allProducts, setAllProducts] = useState<ProductView[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -29,6 +31,7 @@ export function ProductsPage({ api }: { api: PlannerApi }) {
   const [selectedCandidate, setSelectedCandidate] = useState<HistoricalProductCandidateView | null>(null);
   const [historicalForm, setHistoricalForm] = useState(blankHistorical);
   const [historicalMessage, setHistoricalMessage] = useState('');
+  const [qrCodes, setQrCodes] = useState<ProductQrCodeView[]>([]);
 
   const load = async (filters: Record<string, string | number> = { status: 'all' }) => {
     try { setItems(await api.listProducts(filters)); }
@@ -41,8 +44,10 @@ export function ProductsPage({ api }: { api: PlannerApi }) {
       api.listDictionaries('brand', false),
       api.listDictionaries('product_size', false),
       api.listDictionaries('appearance', false),
-    ]).then(([products, brandItems, sizeItems, appearanceItems]) => {
+      typeof (api as Partial<PlannerApi>).listQrCodes === 'function' ? api.listQrCodes() : Promise.resolve({ items: [] as ProductQrCodeView[] }),
+    ]).then(([products, brandItems, sizeItems, appearanceItems, qrCodeResult]) => {
       setItems(products); setAllProducts(products); setBrands(brandItems); setSizes(sizeItems); setAppearances(appearanceItems);
+      setQrCodes(qrCodeResult.items);
     }).catch((reason) => setError(reason instanceof Error ? reason.message : '产品档案加载失败'));
   }, []);
 
@@ -151,6 +156,11 @@ export function ProductsPage({ api }: { api: PlannerApi }) {
         { key: 'size', label: '品类尺寸', render: (item) => item.productSizeName },
         { key: 'appearance', label: '默认外观', render: (item) => item.defaultAppearanceName ?? '—' },
         { key: 'reference', label: '参考型号', render: (item) => item.referenceProductModel ?? '—' },
+        { key: 'qr', label: '二维码', render: (item) => {
+          const records = qrCodes.filter((code) => code.productId === item.id);
+          return records.length === 0 ? '—' : <div className="product-qr-summary">{records.map((code) => <button className="text-button" key={code.id} type="button"
+            onClick={() => onOpenQr?.(code.id)} disabled={!onOpenQr}>{qrLabel(code)} · {code.status === 'active' ? '启用中' : '已停用'}</button>)}</div>;
+        } },
         { key: 'status', label: '状态', render: (item) => item.status === 'active' ? '启用中' : '已停用' },
         { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active' && <button className="text-button danger" aria-label={`停用 ${item.model}`} onClick={() => void deactivate(item)} type="button">停用</button>}</div> },
       ]} renderExpandedRow={(item) => editorOpen && editingId === item.id ? productEditor : null} />}

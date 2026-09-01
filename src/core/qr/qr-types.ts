@@ -4,6 +4,9 @@ export type QrFileMatchStatus = 'matched' | 'pending' | 'unmatched';
 export interface ProductQrCode {
   id: number;
   productId: number;
+  sku: string | null;
+  model: string;
+  productCategory: string;
   purposeId: number;
   key: string;
   englishName: string;
@@ -14,12 +17,17 @@ export interface ProductQrCode {
   status: QrStatus;
   createdAt: string;
   updatedAt: string;
+  files: QrFileReference[];
+  pendingFiles: QrFileReference[];
 }
 
 export interface ProductQrCodeFilters {
   productId?: number;
   purposeId?: number;
   status?: QrStatus | 'all';
+  search?: string;
+  productCategory?: string;
+  fileStatus?: 'present' | 'missing' | 'none' | 'all';
 }
 
 export interface UpdateProductQrCodeInput {
@@ -45,5 +53,8 @@ export interface QrFileScanRecord {
 export interface QrFileReference {
   id: number;
   relativePath: string;
+  fileName: string;
+  mimeType: string;
   isPresent: boolean;
+  matchStatus: QrFileMatchStatus;
 }
