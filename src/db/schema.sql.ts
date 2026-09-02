@@ -474,6 +474,9 @@ export const schemaVersionNine = `
       AND relative_path NOT LIKE '%\\..\\%'
       AND relative_path NOT LIKE '%/..'
       AND relative_path NOT LIKE '%\\..'
+      AND replace(relative_path, '\\', '/') NOT LIKE '../%'
+      AND replace(relative_path, '\\', '/') NOT LIKE '%/../%'
+      AND replace(relative_path, '\\', '/') NOT LIKE '%/..'
     ),
     original_file_name TEXT NOT NULL,
     mime_type TEXT NOT NULL,
@@ -572,5 +575,176 @@ export const schemaVersionNine = `
       JOIN product_qr_codes qr ON qr.id = NEW.qr_code_id
       WHERE item.id = NEW.bom_item_id AND version.product_id = qr.product_id
     ) THEN RAISE(ABORT, 'BOM 项目只能关联同产品二维码') END;
+  END;
+`;
+
+export const schemaVersionTen = `
+  DROP TRIGGER IF EXISTS bom_item_assets_inherited_source_guard_insert;
+  DROP TRIGGER IF EXISTS bom_item_assets_inherited_source_guard_update;
+  DROP TRIGGER IF EXISTS bom_item_qr_codes_same_product_insert;
+  DROP TRIGGER IF EXISTS bom_item_qr_codes_same_product_update;
+
+  CREATE TRIGGER bom_assets_relative_path_guard_insert
+  BEFORE INSERT ON bom_assets
+  WHEN length(NEW.relative_path) = 0
+    OR substr(NEW.relative_path, 1, 1) IN ('/', '\\')
+    OR NEW.relative_path GLOB '[A-Za-z]:*'
+    OR NEW.relative_path IN ('.', '..')
+    OR replace(NEW.relative_path, '\\', '/') LIKE '../%'
+    OR replace(NEW.relative_path, '\\', '/') LIKE '%/../%'
+    OR replace(NEW.relative_path, '\\', '/') LIKE '%/..'
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 附件路径必须是工作区相对路径');
+  END;
+
+  CREATE TRIGGER bom_assets_relative_path_guard_update
+  BEFORE UPDATE OF relative_path ON bom_assets
+  WHEN length(NEW.relative_path) = 0
+    OR substr(NEW.relative_path, 1, 1) IN ('/', '\\')
+    OR NEW.relative_path GLOB '[A-Za-z]:*'
+    OR NEW.relative_path IN ('.', '..')
+    OR replace(NEW.relative_path, '\\', '/') LIKE '../%'
+    OR replace(NEW.relative_path, '\\', '/') LIKE '%/../%'
+    OR replace(NEW.relative_path, '\\', '/') LIKE '%/..'
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 附件路径必须是工作区相对路径');
+  END;
+
+  CREATE TRIGGER bom_item_assets_inherited_source_guard_insert
+  BEFORE INSERT ON bom_item_assets
+  WHEN NEW.inherited_from_bom_item_asset_id IS NOT NULL
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1
+      FROM bom_items destination_item
+      JOIN bom_versions destination_version ON destination_version.id = destination_item.bom_version_id
+      JOIN bom_item_assets source_asset ON source_asset.id = NEW.inherited_from_bom_item_asset_id
+      JOIN bom_items source_item ON source_item.id = source_asset.bom_item_id
+      JOIN bom_versions source_version ON source_version.id = source_item.bom_version_id
+      WHERE destination_item.id = NEW.bom_item_id
+        AND source_asset.id <> NEW.id
+        AND source_asset.asset_id = NEW.asset_id
+        AND source_asset.role = NEW.role
+        AND destination_version.previous_version_id = source_version.id
+        AND destination_version.product_id = source_version.product_id
+        AND destination_item.project_item_id = source_item.project_item_id
+    ) THEN RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目') END;
+  END;
+
+  CREATE TRIGGER bom_item_assets_inherited_source_guard_update
+  BEFORE UPDATE OF bom_item_id, asset_id, role, inherited_from_bom_item_asset_id ON bom_item_assets
+  WHEN NEW.inherited_from_bom_item_asset_id IS NOT NULL
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1
+      FROM bom_items destination_item
+      JOIN bom_versions destination_version ON destination_version.id = destination_item.bom_version_id
+      JOIN bom_item_assets source_asset ON source_asset.id = NEW.inherited_from_bom_item_asset_id
+      JOIN bom_items source_item ON source_item.id = source_asset.bom_item_id
+      JOIN bom_versions source_version ON source_version.id = source_item.bom_version_id
+      WHERE destination_item.id = NEW.bom_item_id
+        AND source_asset.id <> NEW.id
+        AND source_asset.asset_id = NEW.asset_id
+        AND source_asset.role = NEW.role
+        AND destination_version.previous_version_id = source_version.id
+        AND destination_version.product_id = source_version.product_id
+        AND destination_item.project_item_id = source_item.project_item_id
+    ) THEN RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目') END;
+  END;
+
+  CREATE TRIGGER bom_item_qr_codes_same_product_insert
+  BEFORE INSERT ON bom_item_qr_codes
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1
+      FROM bom_items item
+      JOIN bom_versions version ON version.id = item.bom_version_id
+      JOIN product_qr_codes qr ON qr.id = NEW.qr_code_id
+      WHERE item.id = NEW.bom_item_id AND version.product_id = qr.product_id
+    ) THEN RAISE(ABORT, 'BOM 项目只能关联同产品二维码') END;
+  END;
+
+  CREATE TRIGGER bom_item_qr_codes_same_product_update
+  BEFORE UPDATE OF bom_item_id, qr_code_id ON bom_item_qr_codes
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1
+      FROM bom_items item
+      JOIN bom_versions version ON version.id = item.bom_version_id
+      JOIN product_qr_codes qr ON qr.id = NEW.qr_code_id
+      WHERE item.id = NEW.bom_item_id AND version.product_id = qr.product_id
+    ) THEN RAISE(ABORT, 'BOM 项目只能关联同产品二维码') END;
+  END;
+
+  CREATE TRIGGER product_qr_codes_bom_link_product_guard
+  BEFORE UPDATE OF product_id ON product_qr_codes
+  WHEN EXISTS (
+    SELECT 1
+    FROM bom_item_qr_codes link
+    JOIN bom_items item ON item.id = link.bom_item_id
+    JOIN bom_versions version ON version.id = item.bom_version_id
+    WHERE link.qr_code_id = OLD.id AND version.product_id <> NEW.product_id
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 项目只能关联同产品二维码');
+  END;
+
+  CREATE TRIGGER bom_current_product_guard_insert
+  BEFORE INSERT ON bom_current
+  WHEN NOT EXISTS (
+    SELECT 1 FROM bom_versions version
+    WHERE version.id = NEW.version_id AND version.product_id = NEW.product_id
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 当前版本必须属于当前产品');
+  END;
+
+  CREATE TRIGGER bom_current_product_guard_update
+  BEFORE UPDATE OF product_id, version_id ON bom_current
+  WHEN NOT EXISTS (
+    SELECT 1 FROM bom_versions version
+    WHERE version.id = NEW.version_id AND version.product_id = NEW.product_id
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 当前版本必须属于当前产品');
+  END;
+
+  CREATE TRIGGER bom_versions_product_guard
+  BEFORE UPDATE OF product_id ON bom_versions
+  WHEN EXISTS (
+    SELECT 1 FROM bom_current current WHERE current.version_id = OLD.id AND current.product_id <> NEW.product_id
+  ) OR EXISTS (
+    SELECT 1
+    FROM bom_items item
+    JOIN bom_item_qr_codes link ON link.bom_item_id = item.id
+    JOIN product_qr_codes qr ON qr.id = link.qr_code_id
+    WHERE item.bom_version_id = OLD.id AND qr.product_id <> NEW.product_id
+  ) OR EXISTS (
+    SELECT 1
+    FROM bom_item_assets destination_asset
+    JOIN bom_items destination_item ON destination_item.id = destination_asset.bom_item_id
+    JOIN bom_versions destination_version ON destination_version.id = destination_item.bom_version_id
+    JOIN bom_item_assets source_asset ON source_asset.id = destination_asset.inherited_from_bom_item_asset_id
+    JOIN bom_items source_item ON source_item.id = source_asset.bom_item_id
+    JOIN bom_versions source_version ON source_version.id = source_item.bom_version_id
+    WHERE (destination_version.id = OLD.id AND source_version.product_id <> NEW.product_id)
+       OR (source_version.id = OLD.id AND destination_version.product_id <> NEW.product_id)
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 版本产品变更会破坏现有关联');
+  END;
+
+  CREATE TRIGGER bom_versions_previous_version_guard
+  BEFORE UPDATE OF previous_version_id ON bom_versions
+  WHEN EXISTS (
+    SELECT 1
+    FROM bom_item_assets destination_asset
+    JOIN bom_items destination_item ON destination_item.id = destination_asset.bom_item_id
+    JOIN bom_item_assets source_asset ON source_asset.id = destination_asset.inherited_from_bom_item_asset_id
+    JOIN bom_items source_item ON source_item.id = source_asset.bom_item_id
+    WHERE destination_item.bom_version_id = OLD.id AND source_item.bom_version_id <> NEW.previous_version_id
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目');
   END;
 `;

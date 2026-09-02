@@ -9,6 +9,7 @@ import { migrateDatabase } from '../../src/db/migrations';
 import {
   schemaVersionFive,
   schemaVersionEight,
+  schemaVersionNine,
   schemaVersionFour,
   schemaVersionOne,
   schemaVersionSix,
@@ -120,6 +121,20 @@ function seedV8Bom(database: ReturnType<typeof openDatabase>, productId: number,
   return { color, drawing, version, item };
 }
 
+function migrateSingleV8Bom() {
+  const { database, products } = createV8Database();
+  const legacy = seedV8Bom(database, products.refrigerator, '0', 4);
+  migrateDatabase(database, { databaseExists: false, createBackup: () => undefined });
+  return { database, products, legacy };
+}
+
+function createV9Database() {
+  const { database, products } = createV8Database();
+  database.exec(schemaVersionNine);
+  database.prepare('insert into schema_migrations (version, applied_at) values (9, ?)').run('2026-09-03T00:00:00.000Z');
+  return { database, products };
+}
+
 describe('database migrations', () => {
   it('preserves v8 BOM ids, current state, and formal snapshots while moving the current pointer to product level', () => {
     const { database, products } = createV8Database();
@@ -130,7 +145,7 @@ describe('database migrations', () => {
       .run('2026-09-02T00:00:00.000Z', '2026-09-02T00:00:00.000Z').lastInsertRowid);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 8, to: 9 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 8, to: 10 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare(`select id, product_id, version_number, previous_version_id, business_change_date,
@@ -203,12 +218,12 @@ describe('database migrations', () => {
     expect(() => database.prepare(`insert into bom_assets
       (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at)
       values ('C:\\outside.png', 'outside.png', 'image/png', 1, 'def456', ?)`)
-      .run(now)).toThrow(/CHECK constraint/);
+      .run(now)).toThrow('BOM 附件路径必须是工作区相对路径');
     const sourceAsset = Number(database.prepare(`insert into bom_item_assets (bom_item_id, asset_id, role)
       values (?, ?, 'image')`).run(legacy.item, asset).lastInsertRowid);
     const successorVersion = Number(database.prepare(`insert into bom_versions
-      (product_id, version_number, business_change_date, notes, created_at) values (?, 2, '2026-09-02', null, ?)`)
-      .run(products.refrigerator, now).lastInsertRowid);
+      (product_id, version_number, previous_version_id, business_change_date, notes, created_at) values (?, 2, ?, '2026-09-02', null, ?)`)
+      .run(products.refrigerator, legacy.version, now).lastInsertRowid);
     const successorItem = Number(database.prepare(`insert into bom_items
       (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material) values (?, ?, ?, 1, 0)`)
       .run(successorVersion,
@@ -218,13 +233,131 @@ describe('database migrations', () => {
       values (?, ?, 'image', ?)`).run(successorItem, asset, sourceAsset);
     expect(() => database.prepare(`insert into bom_item_assets (bom_item_id, asset_id, role, inherited_from_bom_item_asset_id)
       values (?, ?, 'diagram', ?)`).run(successorItem, asset, sourceAsset))
-      .toThrow('BOM 沿用附件必须引用同角色的相同资产');
+      .toThrow('BOM 沿用附件必须来自上一版对应项目');
     const sameProductQr = (database.prepare('select id from product_qr_codes where product_id = ? order by id limit 1').get(products.refrigerator) as { id: number }).id;
     const otherProductQr = (database.prepare('select id from product_qr_codes where product_id = ? order by id limit 1').get(products.airFryer) as { id: number }).id;
     database.prepare('insert into bom_item_qr_codes (bom_item_id, qr_code_id) values (?, ?)').run(legacy.item, sameProductQr);
     expect(() => database.prepare('insert into bom_item_qr_codes (bom_item_id, qr_code_id) values (?, ?)')
       .run(legacy.item, otherProductQr)).toThrow('BOM 项目只能关联同产品二维码');
     expect(database.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  it('rejects Windows traversal paths that mix slash directions', () => {
+    const { database } = migrateSingleV8Bom();
+    const now = '2026-09-03T00:00:00.000Z';
+
+    for (const relativePath of ['.\\../outside.png', './..\\outside.png', '.\\..\\outside.png', '\\\\server\\share.png']) {
+      expect(() => database.prepare(`insert into bom_assets
+        (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at)
+        values (?, 'outside.png', 'image/png', 1, 'abc123', ?)`).run(relativePath, now))
+        .toThrow(/CHECK constraint|BOM 附件路径/);
+    }
+  });
+
+  it('permits inheritance only from the matching item in the immediate previous version', () => {
+    const { database, products, legacy } = migrateSingleV8Bom();
+    const now = '2026-09-03T00:00:00.000Z';
+    const asset = Number(database.prepare(`insert into bom_assets
+      (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at)
+      values ('_图号规划器\\BOM附件\\SKU-ZC200\\photo.png', 'photo.png', 'image/png', 42, 'abc123', ?)`)
+      .run(now).lastInsertRowid);
+    const sourceAsset = Number(database.prepare(`insert into bom_item_assets (bom_item_id, asset_id, role)
+      values (?, ?, 'image')`).run(legacy.item, asset).lastInsertRowid);
+    const previousVersion = Number(database.prepare(`insert into bom_versions
+      (product_id, version_number, previous_version_id, business_change_date, created_at)
+      values (?, 2, ?, '2026-09-03', ?)`)
+      .run(products.refrigerator, legacy.version, now).lastInsertRowid);
+    const projectItem = (database.prepare('select project_item_id from bom_items where id = ?').get(legacy.item) as { project_item_id: number }).project_item_id;
+    const matchingItem = Number(database.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material) values (?, ?, ?, 1, 0)`)
+      .run(previousVersion, projectItem, legacy.drawing).lastInsertRowid);
+    const inheritedAsset = Number(database.prepare(`insert into bom_item_assets
+      (bom_item_id, asset_id, role, inherited_from_bom_item_asset_id) values (?, ?, 'image', ?)`)
+      .run(matchingItem, asset, sourceAsset).lastInsertRowid);
+    expect(database.prepare('select inherited_from_bom_item_asset_id from bom_item_assets where id = ?').get(inheritedAsset))
+      .toEqual({ inherited_from_bom_item_asset_id: sourceAsset });
+    expect(() => database.prepare('update bom_item_assets set inherited_from_bom_item_asset_id = id where id = ?')
+      .run(inheritedAsset)).toThrow('BOM 沿用附件必须来自上一版对应项目');
+    const parentId = (database.prepare('select parent_id from dictionary_items where id = ?').get(projectItem) as { parent_id: number }).parent_id;
+    const otherProject = Number(database.prepare(`insert into dictionary_items
+      (type, code, name, parent_id, created_at) values ('project_item', '02', '其他项目', ?, ?)`)
+      .run(parentId, now).lastInsertRowid);
+    const sameVersionItem = Number(database.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material) values (?, ?, ?, 1, 0)`)
+      .run(previousVersion, otherProject, legacy.drawing).lastInsertRowid);
+    const sameVersionSource = Number(database.prepare(`insert into bom_item_assets (bom_item_id, asset_id, role)
+      values (?, ?, 'image')`).run(sameVersionItem, asset).lastInsertRowid);
+    expect(() => database.prepare('update bom_item_assets set inherited_from_bom_item_asset_id = ? where id = ?')
+      .run(sameVersionSource, inheritedAsset)).toThrow('BOM 沿用附件必须来自上一版对应项目');
+    const unrelatedVersion = Number(database.prepare(`insert into bom_versions
+      (product_id, version_number, business_change_date, created_at) values (?, 3, '2026-09-03', ?)`)
+      .run(products.refrigerator, now).lastInsertRowid);
+    const unrelatedItem = Number(database.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material) values (?, ?, ?, 1, 0)`)
+      .run(unrelatedVersion, projectItem, legacy.drawing).lastInsertRowid);
+    expect(() => database.prepare(`insert into bom_item_assets
+      (bom_item_id, asset_id, role, inherited_from_bom_item_asset_id) values (?, ?, 'image', ?)`)
+      .run(unrelatedItem, asset, sourceAsset)).toThrow('BOM 沿用附件必须来自上一版对应项目');
+    const crossProductVersion = Number(database.prepare(`insert into bom_versions
+      (product_id, version_number, previous_version_id, business_change_date, created_at) values (?, 1, ?, '2026-09-03', ?)`)
+      .run(products.airFryer, legacy.version, now).lastInsertRowid);
+    const crossProductItem = Number(database.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material) values (?, ?, ?, 1, 0)`)
+      .run(crossProductVersion, projectItem, legacy.drawing).lastInsertRowid);
+    expect(() => database.prepare(`insert into bom_item_assets
+      (bom_item_id, asset_id, role, inherited_from_bom_item_asset_id) values (?, ?, 'image', ?)`)
+      .run(crossProductItem, asset, sourceAsset)).toThrow('BOM 沿用附件必须来自上一版对应项目');
+  });
+
+  it('prevents QR and BOM-version product changes from invalidating a linked BOM item', () => {
+    const { database, products, legacy } = migrateSingleV8Bom();
+    const sameProductQr = (database.prepare('select id from product_qr_codes where product_id = ? order by id limit 1').get(products.refrigerator) as { id: number }).id;
+    const otherProductQr = (database.prepare('select id from product_qr_codes where product_id = ? order by id limit 1').get(products.airFryer) as { id: number }).id;
+    database.prepare('insert into bom_item_qr_codes (bom_item_id, qr_code_id) values (?, ?)').run(legacy.item, sameProductQr);
+    database.prepare('delete from product_qr_codes where id = ?').run(otherProductQr);
+
+    expect(() => database.prepare('update product_qr_codes set product_id = ? where id = ?')
+      .run(products.airFryer, sameProductQr)).toThrow('BOM 项目只能关联同产品二维码');
+    expect(() => database.prepare('update bom_versions set product_id = ? where id = ?')
+      .run(products.airFryer, legacy.version)).toThrow('BOM 版本产品变更会破坏现有关联');
+  });
+
+  it('enforces bom_current product ownership on links and parent updates', () => {
+    const { database, products, legacy } = migrateSingleV8Bom();
+
+    expect(() => database.prepare(`insert into bom_current (product_id, version_id, updated_at)
+      values (?, ?, '2026-09-03T00:00:00.000Z')`).run(products.airFryer, legacy.version))
+      .toThrow('BOM 当前版本必须属于当前产品');
+    expect(() => database.prepare('update bom_current set product_id = ? where version_id = ?')
+      .run(products.airFryer, legacy.version)).toThrow('BOM 当前版本必须属于当前产品');
+  });
+
+  it('backs up and upgrades an existing valid v9 database to install durable BOM guards', () => {
+    const { database } = createV9Database();
+    const backup = vi.fn();
+
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 9, to: 10 });
+
+    expect(backup).toHaveBeenCalledOnce();
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 10 });
+    expect(database.prepare(`select count(*) as count from sqlite_master
+      where type = 'trigger' and name = 'bom_current_product_guard_insert'`).get()).toEqual({ count: 1 });
+  });
+
+  it('rolls v10 back when an existing v9 BOM asset path contains mixed-separator traversal', () => {
+    const { database } = createV9Database();
+    database.pragma('ignore_check_constraints = ON');
+    database.prepare(`insert into bom_assets
+      (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at)
+      values ('.\\../outside.png', 'outside.png', 'image/png', 1, 'abc123', '2026-09-03T00:00:00.000Z')`).run();
+    database.pragma('ignore_check_constraints = OFF');
+    const backup = vi.fn();
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: backup }))
+      .toThrow('BOM v9 数据校验失败，数据库未升级');
+    expect(backup).toHaveBeenCalledOnce();
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 9 });
+    expect(database.prepare('select relative_path from bom_assets').get()).toEqual({ relative_path: '.\\../outside.png' });
   });
 
   it('does not start a v9 migration when its safety backup fails', () => {
@@ -245,7 +378,7 @@ describe('database migrations', () => {
     const products = seedV7Products(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 7, to: 9 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 7, to: 10 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
@@ -418,11 +551,11 @@ describe('database migrations', () => {
     databases.push(db);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 9 });
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 9, to: 9 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 10 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 10, to: 10 });
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.prepare('select version from schema_migrations order by version').all()).toEqual([
-      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 },
+      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 },
     ]);
     const drawingColumns = (db.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).map((column) => column.name);
     expect(drawingColumns).toEqual(expect.arrayContaining([
@@ -453,7 +586,7 @@ describe('database migrations', () => {
     const db = openDatabase(':memory:'); databases.push(db); db.exec(schemaVersionOne); db.exec(schemaVersionTwo);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 9 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 10 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
@@ -469,7 +602,7 @@ describe('database migrations', () => {
     db.exec('drop index material_batches_relative_path_nocase_unique');
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 9, to: 9 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 10, to: 10 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'index' and name = 'material_batches_relative_path_nocase_unique'").get())
@@ -481,7 +614,7 @@ describe('database migrations', () => {
     db.exec(schemaVersionOne); db.exec(schemaVersionTwo); db.exec(schemaVersionThree);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 3, to: 9 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 3, to: 10 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name = 'pdf_files'").get())
@@ -518,7 +651,7 @@ describe('database migrations', () => {
       .run(product, color, main, item, now);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 9 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 10 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare(`select appearance_id, brand_code, product_size_code, appearance_code,
@@ -577,7 +710,7 @@ describe('database migrations', () => {
     db.prepare('delete from schema_migrations where version >= 2').run();
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 9 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 10 });
 
     expect(db.prepare('select appearance_id, appearance_code, notes from drawing_numbers').get()).toEqual({
       appearance_id: drawingAppearance, appearance_code: '2', notes: '不得丢失',
@@ -656,7 +789,7 @@ describe('database migrations', () => {
     const seeded = seedV6Rows(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 6, to: 9 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 6, to: 10 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
@@ -791,11 +924,11 @@ describe('database migrations', () => {
       .toEqual({ count: 0 });
   });
 
-  it('rejects databases above schema version nine', () => {
+  it('rejects databases above schema version ten', () => {
     const database = createV6Database();
-    database.prepare('insert into schema_migrations (version, applied_at) values (10, ?)').run('2026-09-01T00:00:00.000Z');
+    database.prepare('insert into schema_migrations (version, applied_at) values (11, ?)').run('2026-09-01T00:00:00.000Z');
 
     expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
-      .toThrow('数据库版本 10 高于当前软件支持的版本 9');
+      .toThrow('数据库版本 11 高于当前软件支持的版本 10');
   });
 });
