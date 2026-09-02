@@ -283,6 +283,14 @@ describe('database migrations', () => {
     const unrelatedVersion = Number(database.prepare(`insert into bom_versions
       (product_id, version_number, business_change_date, created_at) values (?, 3, '2026-09-03', ?)`)
       .run(products.refrigerator, now).lastInsertRowid);
+    expect(() => database.prepare('update bom_versions set previous_version_id = null where id = ?')
+      .run(previousVersion)).toThrow('BOM 沿用附件必须来自上一版对应项目');
+    expect(database.prepare('select previous_version_id from bom_versions where id = ?').get(previousVersion))
+      .toEqual({ previous_version_id: legacy.version });
+    expect(() => database.prepare('update bom_items set bom_version_id = ? where id = ?')
+      .run(unrelatedVersion, matchingItem)).toThrow('BOM 沿用附件必须来自上一版对应项目');
+    expect(database.prepare('select bom_version_id from bom_items where id = ?').get(matchingItem))
+      .toEqual({ bom_version_id: previousVersion });
     expect(() => database.prepare('update bom_item_assets set role = ? where id = ?')
       .run('diagram', sourceAsset)).toThrow('BOM 沿用附件必须来自上一版对应项目');
     expect(() => database.prepare('update bom_items set project_item_id = ? where id = ?')

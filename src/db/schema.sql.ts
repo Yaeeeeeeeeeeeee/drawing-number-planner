@@ -609,7 +609,7 @@ export const schemaVersionNine = `
     WHERE destination_asset.inherited_from_bom_item_asset_id = OLD.id
       AND (NEW.asset_id <> destination_asset.asset_id
         OR NEW.role <> destination_asset.role
-        OR destination_version.previous_version_id <> new_source_version.id
+        OR destination_version.previous_version_id IS NOT new_source_version.id
         OR destination_version.product_id <> new_source_version.product_id
         OR destination_item.project_item_id <> new_source_item.project_item_id)
   )
@@ -628,7 +628,7 @@ export const schemaVersionNine = `
     JOIN bom_versions source_version ON source_version.id = source_item.bom_version_id
     WHERE destination_asset.bom_item_id = OLD.id
       AND destination_asset.inherited_from_bom_item_asset_id IS NOT NULL
-      AND (new_destination_version.previous_version_id <> source_version.id
+      AND (new_destination_version.previous_version_id IS NOT source_version.id
         OR new_destination_version.product_id <> source_version.product_id
         OR NEW.project_item_id <> source_item.project_item_id)
   ) OR EXISTS (
@@ -638,7 +638,7 @@ export const schemaVersionNine = `
     JOIN bom_versions destination_version ON destination_version.id = destination_item.bom_version_id
     JOIN bom_item_assets source_asset ON source_asset.id = destination_asset.inherited_from_bom_item_asset_id
     WHERE source_asset.bom_item_id = OLD.id
-      AND (destination_version.previous_version_id <> NEW.bom_version_id
+      AND (destination_version.previous_version_id IS NOT NEW.bom_version_id
         OR destination_version.product_id <> (SELECT product_id FROM bom_versions WHERE id = NEW.bom_version_id)
         OR destination_item.project_item_id <> NEW.project_item_id)
   )
@@ -749,7 +749,7 @@ export const schemaVersionNine = `
     JOIN bom_items destination_item ON destination_item.id = destination_asset.bom_item_id
     JOIN bom_item_assets source_asset ON source_asset.id = destination_asset.inherited_from_bom_item_asset_id
     JOIN bom_items source_item ON source_item.id = source_asset.bom_item_id
-    WHERE destination_item.bom_version_id = OLD.id AND source_item.bom_version_id <> NEW.previous_version_id
+    WHERE destination_item.bom_version_id = OLD.id AND source_item.bom_version_id IS NOT NEW.previous_version_id
   )
   BEGIN
     SELECT RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目');
