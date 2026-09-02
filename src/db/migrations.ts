@@ -7,6 +7,7 @@ import {
   schemaVersionSix,
   schemaVersionSeven,
   schemaVersionEight,
+  schemaVersionNine,
   schemaVersionThree,
   schemaVersionTwo,
 } from './schema.sql.js';
@@ -101,6 +102,29 @@ type V7RowCounts = Record<
   number
 >;
 
+interface V8BomSnapshot {
+  counts: V7RowCounts & Record<'qrPurposes' | 'qrPurposeProductCategories' | 'productQrCodes' | 'qrCodeFiles', number>;
+  versions: Array<{
+    id: number;
+    product_id: number;
+    color_id: number;
+    version_number: number;
+    previous_version_id: number | null;
+    notes: string | null;
+    created_at: string;
+  }>;
+  items: Array<{
+    id: number;
+    bom_version_id: number;
+    project_item_id: number;
+    drawing_id: number;
+    quantity: number;
+    notes: string | null;
+    uses_white_material: number;
+  }>;
+  current: Array<{ product_id: number; color_id: number; version_id: number; updated_at: string }>;
+}
+
 function v7RowCounts(database: PlannerDatabase): V7RowCounts {
   const count = (table: string): number => (database.prepare(`select count(*) as count from ${table}`).get() as { count: number }).count;
   return {
@@ -116,6 +140,83 @@ function v7RowCounts(database: PlannerDatabase): V7RowCounts {
     bomItems: count('bom_items'),
     bomCurrent: count('bom_current'),
   };
+}
+
+function v8BomSnapshot(database: PlannerDatabase): V8BomSnapshot {
+  const count = (table: string): number => (database.prepare(`select count(*) as count from ${table}`).get() as { count: number }).count;
+  const current = database.prepare(`select product_id, color_id, version_id, updated_at from bom_current order by product_id`).all() as unknown as V8BomSnapshot['current'];
+  return {
+    counts: {
+      ...v7RowCounts(database),
+      qrPurposes: count('qr_purposes'),
+      qrPurposeProductCategories: count('qr_purpose_product_categories'),
+      productQrCodes: count('product_qr_codes'),
+      qrCodeFiles: count('qr_code_files'),
+    },
+    versions: database.prepare(`select id, product_id, color_id, version_number, previous_version_id, notes, created_at
+      from bom_versions order by id`).all() as V8BomSnapshot['versions'],
+    items: database.prepare(`select id, bom_version_id, project_item_id, drawing_id, quantity, notes, uses_white_material
+      from bom_items order by id`).all() as V8BomSnapshot['items'],
+    current,
+  };
+}
+
+function validateV8BomForMigration(snapshot: V8BomSnapshot): void {
+  const currentProductCount = new Set(snapshot.current.map((row) => row.product_id)).size;
+  if (currentProductCount !== snapshot.current.length) {
+    throw new Error('同一产品存在多个颜色当前 BOM，数据库未升级');
+  }
+  const versionsById = new Map(snapshot.versions.map((version) => [version.id, version]));
+  if (snapshot.current.some((current) => {
+    const version = versionsById.get(current.version_id);
+    return version?.product_id !== current.product_id || version?.color_id !== current.color_id;
+  })) {
+    throw new Error('BOM 当前指针关联无效，数据库未升级');
+  }
+}
+
+function validateBomMigration(database: PlannerDatabase, before: V8BomSnapshot): void {
+  const afterCounts = {
+    ...v7RowCounts(database),
+    qrPurposes: countRows(database, 'qr_purposes'),
+    qrPurposeProductCategories: countRows(database, 'qr_purpose_product_categories'),
+    productQrCodes: countRows(database, 'product_qr_codes'),
+    qrCodeFiles: countRows(database, 'qr_code_files'),
+  };
+  const copiedVersions = database.prepare(`select id, product_id, version_number, previous_version_id,
+    legacy_color_id, notes, created_at from bom_versions order by id`).all();
+  const copiedItems = database.prepare(`select id, bom_version_id, project_item_id, drawing_id, quantity, notes,
+    uses_white_material from bom_items order by id`).all();
+  const missingBusinessDates = (database.prepare(`select count(*) as count from bom_versions
+    where business_change_date is not null`).get() as { count: number }).count;
+  const unexpectedItemFields = (database.prepare(`select count(*) as count from bom_items
+    where effective_batch_relative_path is not null or effective_batch_name is not null
+      or effective_material_batch_id is not null or material is not null or dimensions is not null or position is not null`).get() as { count: number }).count;
+  const current = database.prepare('select product_id, version_id, updated_at from bom_current order by product_id').all();
+  const expectedCurrent = before.current.map(({ color_id: _colorId, ...row }) => row);
+  const expectedVersions = before.versions.map((version) => ({
+    id: version.id,
+    product_id: version.product_id,
+    version_number: version.version_number,
+    previous_version_id: version.previous_version_id,
+    legacy_color_id: version.color_id,
+    notes: version.notes,
+    created_at: version.created_at,
+  }));
+  const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
+  if (Object.keys(before.counts).some((key) => before.counts[key as keyof typeof before.counts] !== afterCounts[key as keyof typeof afterCounts])
+    || JSON.stringify(copiedVersions) !== JSON.stringify(expectedVersions)
+    || JSON.stringify(copiedItems) !== JSON.stringify(before.items)
+    || JSON.stringify(current) !== JSON.stringify(expectedCurrent)
+    || missingBusinessDates > 0 || unexpectedItemFields > 0
+    || countRows(database, 'bom_assets') !== 0 || countRows(database, 'bom_item_assets') !== 0 || countRows(database, 'bom_item_qr_codes') !== 0
+    || foreignKeyErrors.length > 0) {
+    throw new Error('BOM 数据校验失败，数据库未升级');
+  }
+}
+
+function countRows(database: PlannerDatabase, table: string): number {
+  return (database.prepare(`select count(*) as count from ${table}`).get() as { count: number }).count;
 }
 
 function validateQrMigration(database: PlannerDatabase, before: V7RowCounts): void {
@@ -214,8 +315,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 8) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 8`);
-  if (from >= 8) {
+  if (from > 9) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 9`);
+  if (from >= 9) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -291,6 +392,13 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (8, ?)').run(new Date().toISOString());
       validateQrMigration(database, before);
     }
+    if (from < 9) {
+      const before = v8BomSnapshot(database);
+      validateV8BomForMigration(before);
+      database.exec(schemaVersionNine);
+      database.prepare('insert into schema_migrations (version, applied_at) values (9, ?)').run(new Date().toISOString());
+      validateBomMigration(database, before);
+    }
   })();
-  return { from, to: 8 };
+  return { from, to: 9 };
 }

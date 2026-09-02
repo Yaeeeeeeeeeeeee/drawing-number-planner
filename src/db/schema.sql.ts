@@ -425,3 +425,152 @@ export const schemaVersionEight = `
         AND mapping.product_category = product.product_category
     );
 `;
+
+export const schemaVersionNine = `
+  CREATE TABLE bom_versions_v9 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    version_number INTEGER NOT NULL CHECK (version_number > 0),
+    previous_version_id INTEGER REFERENCES bom_versions_v9(id),
+    business_change_date TEXT,
+    legacy_color_id INTEGER REFERENCES dictionary_items(id),
+    notes TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE bom_items_v9 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bom_version_id INTEGER NOT NULL REFERENCES bom_versions_v9(id),
+    project_item_id INTEGER NOT NULL REFERENCES dictionary_items(id),
+    drawing_id INTEGER NOT NULL REFERENCES drawing_numbers(id),
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    effective_batch_relative_path TEXT,
+    effective_batch_name TEXT,
+    effective_material_batch_id INTEGER REFERENCES material_batches(id) ON DELETE SET NULL,
+    material TEXT,
+    dimensions TEXT,
+    position TEXT,
+    notes TEXT,
+    uses_white_material INTEGER NOT NULL DEFAULT 0 CHECK (uses_white_material IN (0, 1)),
+    UNIQUE (bom_version_id, project_item_id)
+  );
+
+  CREATE TABLE bom_current_v9 (
+    product_id INTEGER PRIMARY KEY REFERENCES products(id),
+    version_id INTEGER NOT NULL UNIQUE REFERENCES bom_versions_v9(id),
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE bom_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relative_path TEXT NOT NULL UNIQUE CHECK (
+      length(relative_path) > 0
+      AND substr(relative_path, 1, 1) NOT IN ('/', '\\')
+      AND relative_path NOT GLOB '[A-Za-z]:*'
+      AND relative_path NOT IN ('.', '..')
+      AND relative_path NOT LIKE '../%'
+      AND relative_path NOT LIKE '..\\%'
+      AND relative_path NOT LIKE '%/../%'
+      AND relative_path NOT LIKE '%\\..\\%'
+      AND relative_path NOT LIKE '%/..'
+      AND relative_path NOT LIKE '%\\..'
+    ),
+    original_file_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+    content_sha256 TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE bom_item_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bom_item_id INTEGER NOT NULL REFERENCES bom_items_v9(id) ON DELETE CASCADE,
+    asset_id INTEGER NOT NULL REFERENCES bom_assets(id) ON DELETE RESTRICT,
+    role TEXT NOT NULL CHECK (role IN ('image', 'diagram')),
+    inherited_from_bom_item_asset_id INTEGER REFERENCES bom_item_assets(id) ON DELETE RESTRICT,
+    UNIQUE (bom_item_id, role)
+  );
+
+  CREATE TABLE bom_item_qr_codes (
+    bom_item_id INTEGER NOT NULL REFERENCES bom_items_v9(id) ON DELETE CASCADE,
+    qr_code_id INTEGER NOT NULL REFERENCES product_qr_codes(id) ON DELETE RESTRICT,
+    PRIMARY KEY (bom_item_id, qr_code_id)
+  );
+
+  INSERT INTO bom_versions_v9 (
+    id, product_id, version_number, previous_version_id, business_change_date, legacy_color_id, notes, created_at
+  )
+  SELECT id, product_id, version_number, previous_version_id, NULL, color_id, notes, created_at
+  FROM bom_versions;
+
+  INSERT INTO bom_items_v9 (
+    id, bom_version_id, project_item_id, drawing_id, quantity, effective_batch_relative_path,
+    effective_batch_name, effective_material_batch_id, material, dimensions, position, notes, uses_white_material
+  )
+  SELECT id, bom_version_id, project_item_id, drawing_id, quantity, NULL, NULL, NULL, NULL, NULL, NULL, notes,
+    uses_white_material
+  FROM bom_items;
+
+  INSERT INTO bom_current_v9 (product_id, version_id, updated_at)
+  SELECT product_id, version_id, updated_at
+  FROM bom_current;
+
+  DROP TABLE bom_current;
+  DROP TABLE bom_items;
+  DROP TABLE bom_versions;
+  ALTER TABLE bom_versions_v9 RENAME TO bom_versions;
+  ALTER TABLE bom_items_v9 RENAME TO bom_items;
+  ALTER TABLE bom_current_v9 RENAME TO bom_current;
+
+  CREATE INDEX bom_items_effective_material_batch_idx ON bom_items(effective_material_batch_id);
+  CREATE INDEX bom_item_assets_asset_idx ON bom_item_assets(asset_id);
+  CREATE INDEX bom_item_qr_codes_qr_code_idx ON bom_item_qr_codes(qr_code_id);
+
+  CREATE TRIGGER bom_item_assets_inherited_source_guard_insert
+  BEFORE INSERT ON bom_item_assets
+  WHEN NEW.inherited_from_bom_item_asset_id IS NOT NULL
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1 FROM bom_item_assets source
+      WHERE source.id = NEW.inherited_from_bom_item_asset_id
+        AND source.asset_id = NEW.asset_id
+        AND source.role = NEW.role
+    ) THEN RAISE(ABORT, 'BOM 沿用附件必须引用同角色的相同资产') END;
+  END;
+
+  CREATE TRIGGER bom_item_assets_inherited_source_guard_update
+  BEFORE UPDATE OF asset_id, role, inherited_from_bom_item_asset_id ON bom_item_assets
+  WHEN NEW.inherited_from_bom_item_asset_id IS NOT NULL
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1 FROM bom_item_assets source
+      WHERE source.id = NEW.inherited_from_bom_item_asset_id
+        AND source.asset_id = NEW.asset_id
+        AND source.role = NEW.role
+    ) THEN RAISE(ABORT, 'BOM 沿用附件必须引用同角色的相同资产') END;
+  END;
+
+  CREATE TRIGGER bom_item_qr_codes_same_product_insert
+  BEFORE INSERT ON bom_item_qr_codes
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1
+      FROM bom_items item
+      JOIN bom_versions version ON version.id = item.bom_version_id
+      JOIN product_qr_codes qr ON qr.id = NEW.qr_code_id
+      WHERE item.id = NEW.bom_item_id AND version.product_id = qr.product_id
+    ) THEN RAISE(ABORT, 'BOM 项目只能关联同产品二维码') END;
+  END;
+
+  CREATE TRIGGER bom_item_qr_codes_same_product_update
+  BEFORE UPDATE OF bom_item_id, qr_code_id ON bom_item_qr_codes
+  BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+      SELECT 1
+      FROM bom_items item
+      JOIN bom_versions version ON version.id = item.bom_version_id
+      JOIN product_qr_codes qr ON qr.id = NEW.qr_code_id
+      WHERE item.id = NEW.bom_item_id AND version.product_id = qr.product_id
+    ) THEN RAISE(ABORT, 'BOM 项目只能关联同产品二维码') END;
+  END;
+`;

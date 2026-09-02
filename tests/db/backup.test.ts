@@ -45,16 +45,20 @@ describe('createDatabaseBackup', () => {
     expect([migration, daily, secondDaily].every(existsSync)).toBe(true);
   });
 
-  it('preserves committed schema v8 QR metadata in a readable SQLite backup', () => {
+  it('preserves committed schema v9 metadata in a readable SQLite backup', () => {
     const dir = mkdtempSync(join(tmpdir(), 'drawing-planner-v7-backup-'));
     const source = join(dir, 'planner.db');
     const database = openDatabase(source); opened.push(database);
-    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 0, to: 8 });
+    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 0, to: 9 });
 
     const result = createDatabaseBackup(database, source, join(dir, 'backups'), 'migration', new Date('2026-08-31T08:30:00.123Z'));
 
     const backup = new Database(result, { readonly: true }); opened.push(backup);
-    expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 8 });
+    expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 9 });
+    expect(backup.prepare(`select name from sqlite_master where type = 'table' and name in
+      ('bom_assets', 'bom_item_assets', 'bom_item_qr_codes') order by name`).all()).toEqual([
+      { name: 'bom_assets' }, { name: 'bom_item_assets' }, { name: 'bom_item_qr_codes' },
+    ]);
     expect(backup.prepare('select key, english_name, default_for_all, status from qr_purposes order by id').all()).toEqual([
       { key: 'user_manual', english_name: 'User Manual', default_for_all: 1, status: 'active' },
       { key: 'warranty', english_name: 'Warranty', default_for_all: 1, status: 'active' },
