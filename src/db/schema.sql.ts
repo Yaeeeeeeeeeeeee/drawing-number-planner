@@ -529,61 +529,6 @@ export const schemaVersionNine = `
   CREATE INDEX bom_item_assets_asset_idx ON bom_item_assets(asset_id);
   CREATE INDEX bom_item_qr_codes_qr_code_idx ON bom_item_qr_codes(qr_code_id);
 
-  CREATE TRIGGER bom_item_assets_inherited_source_guard_insert
-  BEFORE INSERT ON bom_item_assets
-  WHEN NEW.inherited_from_bom_item_asset_id IS NOT NULL
-  BEGIN
-    SELECT CASE WHEN NOT EXISTS (
-      SELECT 1 FROM bom_item_assets source
-      WHERE source.id = NEW.inherited_from_bom_item_asset_id
-        AND source.asset_id = NEW.asset_id
-        AND source.role = NEW.role
-    ) THEN RAISE(ABORT, 'BOM 沿用附件必须引用同角色的相同资产') END;
-  END;
-
-  CREATE TRIGGER bom_item_assets_inherited_source_guard_update
-  BEFORE UPDATE OF asset_id, role, inherited_from_bom_item_asset_id ON bom_item_assets
-  WHEN NEW.inherited_from_bom_item_asset_id IS NOT NULL
-  BEGIN
-    SELECT CASE WHEN NOT EXISTS (
-      SELECT 1 FROM bom_item_assets source
-      WHERE source.id = NEW.inherited_from_bom_item_asset_id
-        AND source.asset_id = NEW.asset_id
-        AND source.role = NEW.role
-    ) THEN RAISE(ABORT, 'BOM 沿用附件必须引用同角色的相同资产') END;
-  END;
-
-  CREATE TRIGGER bom_item_qr_codes_same_product_insert
-  BEFORE INSERT ON bom_item_qr_codes
-  BEGIN
-    SELECT CASE WHEN NOT EXISTS (
-      SELECT 1
-      FROM bom_items item
-      JOIN bom_versions version ON version.id = item.bom_version_id
-      JOIN product_qr_codes qr ON qr.id = NEW.qr_code_id
-      WHERE item.id = NEW.bom_item_id AND version.product_id = qr.product_id
-    ) THEN RAISE(ABORT, 'BOM 项目只能关联同产品二维码') END;
-  END;
-
-  CREATE TRIGGER bom_item_qr_codes_same_product_update
-  BEFORE UPDATE OF bom_item_id, qr_code_id ON bom_item_qr_codes
-  BEGIN
-    SELECT CASE WHEN NOT EXISTS (
-      SELECT 1
-      FROM bom_items item
-      JOIN bom_versions version ON version.id = item.bom_version_id
-      JOIN product_qr_codes qr ON qr.id = NEW.qr_code_id
-      WHERE item.id = NEW.bom_item_id AND version.product_id = qr.product_id
-    ) THEN RAISE(ABORT, 'BOM 项目只能关联同产品二维码') END;
-  END;
-`;
-
-export const schemaVersionTen = `
-  DROP TRIGGER IF EXISTS bom_item_assets_inherited_source_guard_insert;
-  DROP TRIGGER IF EXISTS bom_item_assets_inherited_source_guard_update;
-  DROP TRIGGER IF EXISTS bom_item_qr_codes_same_product_insert;
-  DROP TRIGGER IF EXISTS bom_item_qr_codes_same_product_update;
-
   CREATE TRIGGER bom_assets_relative_path_guard_insert
   BEFORE INSERT ON bom_assets
   WHEN length(NEW.relative_path) = 0
@@ -652,6 +597,55 @@ export const schemaVersionTen = `
     ) THEN RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目') END;
   END;
 
+  CREATE TRIGGER bom_item_assets_source_dependency_guard
+  BEFORE UPDATE OF bom_item_id, asset_id, role ON bom_item_assets
+  WHEN EXISTS (
+    SELECT 1
+    FROM bom_item_assets destination_asset
+    JOIN bom_items destination_item ON destination_item.id = destination_asset.bom_item_id
+    JOIN bom_versions destination_version ON destination_version.id = destination_item.bom_version_id
+    JOIN bom_items new_source_item ON new_source_item.id = NEW.bom_item_id
+    JOIN bom_versions new_source_version ON new_source_version.id = new_source_item.bom_version_id
+    WHERE destination_asset.inherited_from_bom_item_asset_id = OLD.id
+      AND (NEW.asset_id <> destination_asset.asset_id
+        OR NEW.role <> destination_asset.role
+        OR destination_version.previous_version_id <> new_source_version.id
+        OR destination_version.product_id <> new_source_version.product_id
+        OR destination_item.project_item_id <> new_source_item.project_item_id)
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目');
+  END;
+
+  CREATE TRIGGER bom_items_inheritance_dependency_guard
+  BEFORE UPDATE OF bom_version_id, project_item_id ON bom_items
+  WHEN EXISTS (
+    SELECT 1
+    FROM bom_item_assets destination_asset
+    JOIN bom_versions new_destination_version ON new_destination_version.id = NEW.bom_version_id
+    JOIN bom_item_assets source_asset ON source_asset.id = destination_asset.inherited_from_bom_item_asset_id
+    JOIN bom_items source_item ON source_item.id = source_asset.bom_item_id
+    JOIN bom_versions source_version ON source_version.id = source_item.bom_version_id
+    WHERE destination_asset.bom_item_id = OLD.id
+      AND destination_asset.inherited_from_bom_item_asset_id IS NOT NULL
+      AND (new_destination_version.previous_version_id <> source_version.id
+        OR new_destination_version.product_id <> source_version.product_id
+        OR NEW.project_item_id <> source_item.project_item_id)
+  ) OR EXISTS (
+    SELECT 1
+    FROM bom_item_assets destination_asset
+    JOIN bom_items destination_item ON destination_item.id = destination_asset.bom_item_id
+    JOIN bom_versions destination_version ON destination_version.id = destination_item.bom_version_id
+    JOIN bom_item_assets source_asset ON source_asset.id = destination_asset.inherited_from_bom_item_asset_id
+    WHERE source_asset.bom_item_id = OLD.id
+      AND (destination_version.previous_version_id <> NEW.bom_version_id
+        OR destination_version.product_id <> (SELECT product_id FROM bom_versions WHERE id = NEW.bom_version_id)
+        OR destination_item.project_item_id <> NEW.project_item_id)
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目');
+  END;
+
   CREATE TRIGGER bom_item_qr_codes_same_product_insert
   BEFORE INSERT ON bom_item_qr_codes
   BEGIN
@@ -684,6 +678,19 @@ export const schemaVersionTen = `
     JOIN bom_items item ON item.id = link.bom_item_id
     JOIN bom_versions version ON version.id = item.bom_version_id
     WHERE link.qr_code_id = OLD.id AND version.product_id <> NEW.product_id
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 项目只能关联同产品二维码');
+  END;
+
+  CREATE TRIGGER bom_items_qr_product_guard
+  BEFORE UPDATE OF bom_version_id ON bom_items
+  WHEN EXISTS (
+    SELECT 1
+    FROM bom_item_qr_codes link
+    JOIN product_qr_codes qr ON qr.id = link.qr_code_id
+    JOIN bom_versions version ON version.id = NEW.bom_version_id
+    WHERE link.bom_item_id = OLD.id AND qr.product_id <> version.product_id
   )
   BEGIN
     SELECT RAISE(ABORT, 'BOM 项目只能关联同产品二维码');

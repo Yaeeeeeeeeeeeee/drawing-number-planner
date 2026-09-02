@@ -8,7 +8,6 @@ import {
   schemaVersionSeven,
   schemaVersionEight,
   schemaVersionNine,
-  schemaVersionTen,
   schemaVersionThree,
   schemaVersionTwo,
 } from './schema.sql.js';
@@ -216,74 +215,6 @@ function validateBomMigration(database: PlannerDatabase, before: V8BomSnapshot):
   }
 }
 
-function validateV9BomForHardening(database: PlannerDatabase): void {
-  const invalidAssetPaths = countRows(database, `(
-    select 1 from bom_assets
-    where length(relative_path) = 0
-      or substr(relative_path, 1, 1) in ('/', '\\')
-      or relative_path glob '[A-Za-z]:*'
-      or relative_path in ('.', '..')
-      or replace(relative_path, '\\', '/') like '../%'
-      or replace(relative_path, '\\', '/') like '%/../%'
-      or replace(relative_path, '\\', '/') like '%/..'
-  )`);
-  const invalidCurrent = countRows(database, `(
-    select 1 from bom_current current
-    left join bom_versions version on version.id = current.version_id
-    where version.id is null or version.product_id <> current.product_id
-  )`);
-  const invalidQrLinks = countRows(database, `(
-    select 1 from bom_item_qr_codes link
-    join bom_items item on item.id = link.bom_item_id
-    join bom_versions version on version.id = item.bom_version_id
-    join product_qr_codes qr on qr.id = link.qr_code_id
-    where version.product_id <> qr.product_id
-  )`);
-  const invalidInheritedAssets = countRows(database, `(
-    select 1 from bom_item_assets destination_asset
-    join bom_items destination_item on destination_item.id = destination_asset.bom_item_id
-    join bom_versions destination_version on destination_version.id = destination_item.bom_version_id
-    left join bom_item_assets source_asset on source_asset.id = destination_asset.inherited_from_bom_item_asset_id
-    left join bom_items source_item on source_item.id = source_asset.bom_item_id
-    left join bom_versions source_version on source_version.id = source_item.bom_version_id
-    where destination_asset.inherited_from_bom_item_asset_id is not null
-      and (source_asset.id is null
-        or source_asset.id = destination_asset.id
-        or source_asset.asset_id <> destination_asset.asset_id
-        or source_asset.role <> destination_asset.role
-        or destination_version.previous_version_id <> source_version.id
-        or destination_version.product_id <> source_version.product_id
-        or destination_item.project_item_id <> source_item.project_item_id)
-  )`);
-  if (invalidAssetPaths > 0 || invalidCurrent > 0 || invalidQrLinks > 0 || invalidInheritedAssets > 0
-    || (database.pragma('foreign_key_check') as Array<unknown>).length > 0) {
-    throw new Error('BOM v9 数据校验失败，数据库未升级');
-  }
-}
-
-function validateV9BomHardening(database: PlannerDatabase): void {
-  const requiredTriggers = [
-    'bom_assets_relative_path_guard_insert',
-    'bom_assets_relative_path_guard_update',
-    'bom_item_assets_inherited_source_guard_insert',
-    'bom_item_assets_inherited_source_guard_update',
-    'bom_item_qr_codes_same_product_insert',
-    'bom_item_qr_codes_same_product_update',
-    'product_qr_codes_bom_link_product_guard',
-    'bom_current_product_guard_insert',
-    'bom_current_product_guard_update',
-    'bom_versions_product_guard',
-    'bom_versions_previous_version_guard',
-  ];
-  const triggerRows = database.prepare(`select name from sqlite_master where type = 'trigger'
-    and (name like 'bom_%' or name = 'product_qr_codes_bom_link_product_guard')`).all() as unknown as Array<{ name: string }>;
-  const installed = new Set(triggerRows.map((row) => row.name));
-  if (requiredTriggers.some((name) => !installed.has(name))) {
-    throw new Error('BOM v9 加固校验失败，数据库未升级');
-  }
-  validateV9BomForHardening(database);
-}
-
 function countRows(database: PlannerDatabase, table: string): number {
   return (database.prepare(`select count(*) as count from ${table}`).get() as { count: number }).count;
 }
@@ -384,8 +315,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 10) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 10`);
-  if (from >= 10) {
+  if (from > 9) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 9`);
+  if (from >= 9) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -468,12 +399,6 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (9, ?)').run(new Date().toISOString());
       validateBomMigration(database, before);
     }
-    if (from < 10) {
-      validateV9BomForHardening(database);
-      database.exec(schemaVersionTen);
-      database.prepare('insert into schema_migrations (version, applied_at) values (10, ?)').run(new Date().toISOString());
-      validateV9BomHardening(database);
-    }
   })();
-  return { from, to: 10 };
+  return { from, to: 9 };
 }
