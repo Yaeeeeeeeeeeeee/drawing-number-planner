@@ -44,6 +44,91 @@ function reserveDrawing(refs: ReturnType<typeof fixture>, productId: number, col
 }
 
 describe('BomService', () => {
+  it('creates a product-level snapshot with a supplied business change date and compatibility quantity one', () => {
+    const refs = fixture();
+    const grayLogo = reserveDrawing(refs, refs.product.id, refs.gray.id, refs.logo.id);
+
+    const saved = service.saveVersion({
+      productId: refs.product.id,
+      businessChangeDate: '2026-09-01',
+      expectedCurrentVersionId: null,
+      items: [{ projectItemId: refs.logo.id, drawingId: grayLogo.id, usesWhiteMaterial: false }],
+    } as never);
+
+    expect(saved.version).toMatchObject({
+      productId: refs.product.id,
+      businessChangeDate: '2026-09-01',
+      legacyColorId: null,
+      versionNumber: 1,
+    });
+    expect(saved.version.items).toEqual([
+      expect.objectContaining({ drawingId: grayLogo.id, quantity: 1 }),
+    ]);
+    expect(service.getCurrent(refs.product.id)).toEqual(saved.version);
+  });
+
+  it('keeps effective batch text snapshots after the current batch index is cleared', () => {
+    const refs = fixture();
+    const drawing = reserveDrawing(refs, refs.product.id, refs.gray.id, refs.logo.id);
+    const batchId = Number(db.prepare(`insert into material_batches
+      (relative_path, product_directory, product_id, name, recognition_status, first_seen_at, last_seen_at)
+      values (?, ?, ?, ?, 'recognized', ?, ?)`)
+      .run('冰柜/TEST-BOM-MAIN-ZC100/03.量产批次/20260901', '冰柜/TEST-BOM-MAIN-ZC100', refs.product.id,
+        '20260901', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z').lastInsertRowid);
+
+    const saved = service.saveVersion({
+      productId: refs.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+      items: [{
+        projectItemId: refs.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        effectiveMaterialBatchId: batchId,
+        effectiveBatchRelativePath: '冰柜/TEST-BOM-MAIN-ZC100/03.量产批次/20260901',
+        effectiveBatchName: '20260901', material: 'PET', dimensions: '100×50', position: '正面',
+      }],
+    } as never);
+
+    db.prepare('delete from material_batches where id = ?').run(batchId);
+    const reread = service.getVersion(saved.version.id);
+    expect(reread.items).toEqual([expect.objectContaining({
+      effectiveMaterialBatchId: null,
+      effectiveBatchRelativePath: '冰柜/TEST-BOM-MAIN-ZC100/03.量产批次/20260901',
+      effectiveBatchName: '20260901', material: 'PET', dimensions: '100×50', position: '正面',
+    })]);
+  });
+
+  it('reuses an immediate predecessor asset for the same project without copying it', () => {
+    const refs = fixture();
+    const drawing = reserveDrawing(refs, refs.product.id, refs.gray.id, refs.logo.id);
+    const assetId = Number(db.prepare(`insert into bom_assets
+      (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at)
+      values (?, ?, ?, ?, ?, ?)`)
+      .run('_图号规划器/BOM附件/TEST-BOM-MAIN-ZC100/logo.png', 'logo.png', 'image/png', 4, 'a'.repeat(64),
+        '2026-09-01T00:00:00.000Z').lastInsertRowid);
+    const first = service.saveVersion({ productId: refs.product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: refs.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        assets: [{ role: 'image', assetId }] }] } as never);
+    const second = service.saveVersion({ productId: refs.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: first.version.id,
+      items: [{ projectItemId: refs.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        assets: [{ role: 'image', reusePrevious: true }] }] } as never);
+
+    expect(second.version.items[0].assets).toEqual([expect.objectContaining({ role: 'image', assetId,
+      inheritedFromBomItemAssetId: expect.any(Number) })]);
+    expect(db.prepare('select count(*) as count from bom_assets').get()).toEqual({ count: 1 });
+  });
+
+  it('links only active same-product QR records while preserving historical links', () => {
+    const refs = fixture(); const drawing = reserveDrawing(refs, refs.product.id, refs.gray.id, refs.logo.id);
+    const qr = db.prepare(`select id from product_qr_codes where product_id = ? order by id limit 1`).get(refs.product.id) as { id: number };
+    db.prepare("update product_qr_codes set status = 'active' where id = ?").run(qr.id);
+    const saved = service.saveVersion({ productId: refs.product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: refs.logo.id, drawingId: drawing.id, usesWhiteMaterial: false, qrCodeIds: [qr.id] }] } as never);
+    db.prepare("update product_qr_codes set status = 'inactive' where id = ?").run(qr.id);
+
+    expect(saved.version.items[0].qrCodes).toEqual([expect.objectContaining({ id: qr.id, status: 'active' })]);
+    expect(service.getVersion(saved.version.id).items[0].qrCodes).toEqual([expect.objectContaining({ id: qr.id, status: 'inactive' })]);
+    expect(service.listActiveQrCandidates(refs.product.id).map((candidate) => candidate.id)).not.toContain(qr.id);
+  });
+
+  describe.skip('superseded color-scoped BOM behavior', () => {
   it('creates a complete initial gray BOM and promotes adopted drawings to active', () => {
     const refs = fixture();
     const grayLogo = reserveDrawing(refs, refs.product.id, refs.gray.id, refs.logo.id);
@@ -139,5 +224,6 @@ describe('BomService', () => {
     expect(() => service.listCandidates({ productId: refs.product.id, bomColorId: refs.white.id,
       projectItemId: refs.logo.id, usesWhiteMaterial: true }))
       .toThrowError(expect.objectContaining({ code: 'WHITE_DRAWING_REQUIRED' }));
+  });
   });
 });

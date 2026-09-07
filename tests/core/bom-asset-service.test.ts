@@ -1,0 +1,43 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { BomAssetService } from '../../src/core/bom/bom-asset-service';
+import { openDatabase, type PlannerDatabase } from '../../src/db/database';
+import { migrateDatabase } from '../../src/db/migrations';
+
+const directories: string[] = [];
+const databases: PlannerDatabase[] = [];
+afterEach(() => {
+  databases.splice(0).forEach((database) => database.close());
+  directories.splice(0).forEach((directory) => rmSync(directory, { recursive: true, force: true }));
+});
+
+describe('BomAssetService', () => {
+  it('copies a supported source into the managed workspace path without changing the source', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-assets-')); directories.push(workspace);
+    const source = join(workspace, 'incoming.png'); const original = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    writeFileSync(source, original);
+    const db = openDatabase(':memory:'); databases.push(db); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+
+    const asset = new BomAssetService(db, workspace).import({ sku: 'SKU-1', model: 'X100', sourcePath: source });
+
+    expect(asset.relativePath).toMatch(/^_图号规划器[\\/]BOM附件[\\/]SKU-1-X100[\\/]/);
+    expect(readFileSync(source)).toEqual(original);
+    expect(readFileSync(join(workspace, asset.relativePath))).toEqual(original);
+    expect(db.prepare('select relative_path from bom_assets').all()).toEqual([{ relative_path: asset.relativePath }]);
+  });
+
+  it('removes only its new managed copy when database registration fails', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-assets-fail-')); directories.push(workspace);
+    const source = join(workspace, 'incoming.jpg'); writeFileSync(source, Buffer.from([0xff, 0xd8, 0xff]));
+    const db = openDatabase(':memory:'); databases.push(db); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+    db.exec("create trigger reject_bom_asset before insert on bom_assets begin select raise(abort, 'blocked'); end");
+
+    expect(() => new BomAssetService(db, workspace).import({ sku: 'SKU-2', model: 'X200', sourcePath: source })).toThrow('blocked');
+    expect(readFileSync(source)).toEqual(Buffer.from([0xff, 0xd8, 0xff]));
+    expect(db.prepare('select count(*) as count from bom_assets').get()).toEqual({ count: 0 });
+  });
+});

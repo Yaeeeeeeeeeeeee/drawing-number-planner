@@ -44,10 +44,10 @@ describe('BomService concurrent drafts', () => {
     const secondDb = openDatabase(path); databases.push(secondDb);
     const firstService = new BomService(firstDb); const secondService = new BomService(secondDb);
 
-    firstService.saveVersion({ productId: product.id, colorId: gray.id, expectedCurrentVersionId: null,
-      items: [{ projectItemId: logo.id, drawingId: logoDrawing.id, quantity: 1, usesWhiteMaterial: false }] });
-    expect(() => secondService.saveVersion({ productId: product.id, colorId: gray.id, expectedCurrentVersionId: null,
-      items: [{ projectItemId: manual.id, drawingId: manualDrawing.id, quantity: 1, usesWhiteMaterial: false }] }))
+    firstService.saveVersion({ productId: product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: logo.id, drawingId: logoDrawing.id, usesWhiteMaterial: false }] });
+    expect(() => secondService.saveVersion({ productId: product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: manual.id, drawingId: manualDrawing.id, usesWhiteMaterial: false }] }))
       .toThrowError(expect.objectContaining({ code: 'BOM_STALE' }));
 
     expect(firstDb.prepare('select count(*) as count from bom_versions').get()).toEqual({ count: 1 });

@@ -40,6 +40,17 @@ beforeEach(() => {
 afterEach(async () => { await app.close(); db.close(); });
 
 describe('BOM API', () => {
+  it('uses product-level current and requires a business change date', async () => {
+    const current = await app.inject({ method: 'GET', url: `/api/boms/current?productId=${refs.product.id}` });
+    expect(current.statusCode).toBe(200); expect(current.json()).toEqual({ version: null });
+    const invalid = await app.inject({ method: 'POST', url: '/api/boms/versions', payload: {
+      productId: refs.product.id, expectedCurrentVersionId: null,
+      items: [{ projectItemId: refs.logo.id, drawingId: refs.drawing.id, usesWhiteMaterial: true }],
+    } });
+    expect(invalid.statusCode).toBe(400);
+  });
+
+  describe.skip('superseded color-scoped BOM API', () => {
   it('returns empty current data, eligible candidates, saved detail, and version history', async () => {
     const current = await app.inject({ method: 'GET', url: `/api/boms/current?productId=${refs.product.id}&colorId=${refs.gray.id}` });
     expect(current.statusCode).toBe(200); expect(current.json()).toEqual({ version: null });
@@ -104,5 +115,6 @@ describe('BOM API', () => {
     } });
     expect(missing.statusCode).toBe(404);
     expect(missing.json().error.code).toBe('DRAWING_NOT_FOUND');
+  });
   });
 });

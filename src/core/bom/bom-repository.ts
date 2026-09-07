@@ -1,73 +1,60 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { BomCandidate, BomCandidateInput, BomItemRecord, BomQueryFilters, BomVersionDetail, BomVersionSummary } from './bom-types.js';
+import type { BomAssetRole, BomCandidate, BomCandidateInput, BomItemRecord, BomQueryFilters, BomQrCodeRecord, BomVersionDetail, BomVersionSummary } from './bom-types.js';
 
-export interface BomContext {
-  productId: number;
-  model: string;
-  productStatus: 'active' | 'inactive';
-  colorId: number;
-  colorCode: string;
-  colorName: string;
-  colorType: string;
-  colorStatus: 'active' | 'inactive';
-}
+export interface BomContext { productId: number; productStatus: 'active' | 'inactive' }
 
 export interface BomDrawing {
-  id: number;
-  fullCode: string;
-  displayName: string;
-  productId: number;
-  colorId: number;
-  colorCode: string;
-  colorName: string;
-  projectItemId: number;
-  projectItemName: string;
-  status: 'reserved' | 'active' | 'voided';
+  id: number; fullCode: string; displayName: string; productId: number; colorId: number; colorCode: string; colorName: string;
+  projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'voided';
 }
 
 interface VersionRow {
-  id: number; product_id: number; model: string; color_id: number; color_name: string;
-  version_number: number; previous_version_id: number | null; notes: string | null; created_at: string;
+  id: number; product_id: number; model: string; version_number: number; previous_version_id: number | null;
+  business_change_date: string | null; legacy_color_id: number | null; legacy_color_name: string | null;
+  notes: string | null; created_at: string;
 }
 
 interface ItemRow {
   bom_item_id: number; id: number; full_code: string; display_name: string; color_id: number; color_name: string;
   project_item_id: number; project_item_name: string; status: 'reserved' | 'active' | 'voided'; quantity: number;
+  effective_batch_relative_path: string | null; effective_batch_name: string | null; effective_material_batch_id: number | null;
+  material: string | null; dimensions: string | null; position: string | null;
   notes: string | null; uses_white_material: 0 | 1;
 }
 
 const mapSummary = (row: VersionRow): BomVersionSummary => ({
-  id: row.id, productId: row.product_id, model: row.model, colorId: row.color_id, colorName: row.color_name,
-  versionNumber: row.version_number, previousVersionId: row.previous_version_id, notes: row.notes, createdAt: row.created_at,
+  id: row.id, productId: row.product_id, model: row.model, versionNumber: row.version_number,
+  previousVersionId: row.previous_version_id, businessChangeDate: row.business_change_date,
+  businessChangeDateLabel: row.business_change_date ?? '未补录', legacyColorId: row.legacy_color_id,
+  legacyColorName: row.legacy_color_name, notes: row.notes, createdAt: row.created_at,
 });
 
 const mapItem = (row: ItemRow): BomItemRecord => ({
   bomItemId: row.bom_item_id, drawingId: row.id, fullCode: row.full_code, displayName: row.display_name,
   colorId: row.color_id, colorName: row.color_name, projectItemId: row.project_item_id,
   projectItemName: row.project_item_name, status: row.status, quantity: row.quantity,
-  notes: row.notes, usesWhiteMaterial: row.uses_white_material === 1,
+  effectiveBatchRelativePath: row.effective_batch_relative_path, effectiveBatchName: row.effective_batch_name,
+  effectiveMaterialBatchId: row.effective_material_batch_id, material: row.material,
+  dimensions: row.dimensions, position: row.position,
+  notes: row.notes, usesWhiteMaterial: row.uses_white_material === 1, assets: [], qrCodes: [],
 });
 
-const versionSelect = `select version.id, version.product_id, product.model, version.color_id,
-  color.name as color_name, version.version_number, version.previous_version_id, version.notes, version.created_at
+const versionSelect = `select version.id, version.product_id, product.model, version.version_number,
+  version.previous_version_id, version.business_change_date, version.legacy_color_id,
+  legacy_color.name as legacy_color_name, version.notes, version.created_at
   from bom_versions version
   join products product on product.id = version.product_id
-  join dictionary_items color on color.id = version.color_id`;
+  left join dictionary_items legacy_color on legacy_color.id = version.legacy_color_id`;
 
 export class BomRepository {
   constructor(private readonly db: PlannerDatabase) {}
 
-  getContext(productId: number, colorId: number): BomContext | undefined {
-    return this.db.prepare(`select product.id as productId, product.model, product.status as productStatus,
-      color.id as colorId, color.code as colorCode, color.name as colorName,
-      color.type as colorType, color.status as colorStatus
-      from products product cross join dictionary_items color
-      where product.id = ? and color.id = ?`).get(productId, colorId) as BomContext | undefined;
+  getContext(productId: number): BomContext | undefined {
+    return this.db.prepare('select id as productId, status as productStatus from products where id = ?').get(productId) as BomContext | undefined;
   }
 
-  getCurrentVersionId(productId: number, colorId: number): number | null {
-    const row = this.db.prepare('select version_id from bom_current where product_id = ? and color_id = ?')
-      .get(productId, colorId) as { version_id: number } | undefined;
+  getCurrentVersionId(productId: number): number | null {
+    const row = this.db.prepare('select version_id from bom_current where product_id = ?').get(productId) as { version_id: number } | undefined;
     return row?.version_id ?? null;
   }
 
@@ -76,34 +63,40 @@ export class BomRepository {
     if (!row) return undefined;
     const items = this.db.prepare(`select item.id as bom_item_id, drawing.id, drawing.full_code, drawing.display_name,
       drawing.color_id, drawing_color.name as color_name, item.project_item_id,
-      project_item.name as project_item_name, drawing.status, item.quantity, item.notes, item.uses_white_material
+      project_item.name as project_item_name, drawing.status, item.quantity, item.effective_batch_relative_path,
+      item.effective_batch_name, item.effective_material_batch_id, item.material, item.dimensions, item.position,
+      item.notes, item.uses_white_material
       from bom_items item
       join drawing_numbers drawing on drawing.id = item.drawing_id
       join dictionary_items drawing_color on drawing_color.id = drawing.color_id
       join dictionary_items project_item on project_item.id = item.project_item_id
       where item.bom_version_id = ? order by item.project_item_id`).all(id) as ItemRow[];
-    return { ...mapSummary(row), items: items.map(mapItem) };
+    return { ...mapSummary(row), items: items.map((item) => ({ ...mapItem(item), assets: this.listItemAssets(item.bom_item_id),
+      qrCodes: this.listItemQrCodes(item.bom_item_id) })) };
   }
 
-  listVersions(productId: number, colorId: number): BomVersionSummary[] {
-    const rows = this.db.prepare(`${versionSelect} where version.product_id = ? and version.color_id = ?
-      order by version.version_number desc`).all(productId, colorId) as VersionRow[];
-    return rows.map(mapSummary);
+  listVersions(productId: number): BomVersionSummary[] {
+    return (this.db.prepare(`${versionSelect} where version.product_id = ?
+      order by version.business_change_date desc nulls last, version.created_at desc, version.id desc`).all(productId) as VersionRow[]).map(mapSummary);
   }
 
   queryVersions(filters: BomQueryFilters): BomVersionSummary[] {
-    const conditions: string[] = [];
-    const values: Array<string | number> = [];
+    const conditions: string[] = []; const values: Array<string | number> = [];
     if (filters.model?.trim()) { conditions.push('product.model like ?'); values.push(`%${filters.model.trim()}%`); }
-    if (filters.projectItemId !== undefined || filters.fullCode?.trim()) {
+    if (filters.businessChangeDate?.trim()) { conditions.push('version.business_change_date = ?'); values.push(filters.businessChangeDate.trim()); }
+    if (filters.projectItemId !== undefined || filters.fullCode?.trim() || filters.effectiveBatchRelativePath?.trim()) {
       const itemConditions: string[] = [];
       if (filters.projectItemId !== undefined) { itemConditions.push('item.project_item_id = ?'); values.push(filters.projectItemId); }
       if (filters.fullCode?.trim()) { itemConditions.push('drawing.full_code like ?'); values.push(`%${filters.fullCode.trim()}%`); }
+      if (filters.effectiveBatchRelativePath?.trim()) {
+        itemConditions.push('item.effective_batch_relative_path like ?'); values.push(`%${filters.effectiveBatchRelativePath.trim()}%`);
+      }
       conditions.push(`exists (select 1 from bom_items item join drawing_numbers drawing on drawing.id = item.drawing_id
         where item.bom_version_id = version.id and ${itemConditions.join(' and ')})`);
     }
     const where = conditions.length ? ` where ${conditions.join(' and ')}` : '';
-    return (this.db.prepare(`${versionSelect}${where} order by version.created_at desc, version.id desc`).all(...values) as VersionRow[]).map(mapSummary);
+    return (this.db.prepare(`${versionSelect}${where}
+      order by version.business_change_date desc nulls last, version.created_at desc, version.id desc`).all(...values) as VersionRow[]).map(mapSummary);
   }
 
   getDrawing(id: number): BomDrawing | undefined {
@@ -111,41 +104,90 @@ export class BomRepository {
       drawing.product_id as productId, drawing.color_id as colorId, color.code as colorCode, color.name as colorName,
       drawing.project_item_id as projectItemId, project_item.name as projectItemName, drawing.status
       from drawing_numbers drawing join dictionary_items color on color.id = drawing.color_id
-      join dictionary_items project_item on project_item.id = drawing.project_item_id where drawing.id = ?`)
-      .get(id) as BomDrawing | undefined;
+      join dictionary_items project_item on project_item.id = drawing.project_item_id where drawing.id = ?`).get(id) as BomDrawing | undefined;
   }
 
   listCandidates(input: BomCandidateInput, whiteColorCode: string): BomCandidate[] {
-    const colorClause = input.usesWhiteMaterial ? 'color.code = ?' : 'drawing.color_id = ?';
-    const colorValue = input.usesWhiteMaterial ? whiteColorCode : input.bomColorId;
+    const whiteClause = input.usesWhiteMaterial ? 'and color.code = ?' : '';
+    const values = input.usesWhiteMaterial
+      ? [input.productId, input.projectItemId, whiteColorCode]
+      : [input.productId, input.projectItemId];
     return this.db.prepare(`select drawing.id, drawing.full_code as fullCode, drawing.display_name as displayName,
       drawing.color_id as colorId, color.name as colorName, drawing.project_item_id as projectItemId,
       project_item.name as projectItemName, drawing.status
       from drawing_numbers drawing join dictionary_items color on color.id = drawing.color_id
       join dictionary_items project_item on project_item.id = drawing.project_item_id
-      where drawing.product_id = ? and drawing.project_item_id = ? and ${colorClause}
-        and drawing.status in ('reserved', 'active') order by drawing.sequence desc, drawing.id desc`)
-      .all(input.productId, input.projectItemId, colorValue) as BomCandidate[];
+      where drawing.product_id = ? and drawing.project_item_id = ? ${whiteClause}
+        and drawing.status in ('reserved', 'active') order by drawing.sequence desc, drawing.id desc`).all(...values) as BomCandidate[];
   }
 
-  insertVersion(productId: number, colorId: number, versionNumber: number, previousVersionId: number | null,
-    notes: string | null, createdAt: string): number {
+  insertVersion(productId: number, versionNumber: number, previousVersionId: number | null,
+    businessChangeDate: string, notes: string | null, createdAt: string): number {
     return Number(this.db.prepare(`insert into bom_versions
-      (product_id, color_id, version_number, previous_version_id, notes, created_at) values (?, ?, ?, ?, ?, ?)`)
-      .run(productId, colorId, versionNumber, previousVersionId, notes, createdAt).lastInsertRowid);
+      (product_id, version_number, previous_version_id, business_change_date, notes, created_at) values (?, ?, ?, ?, ?, ?)`)
+      .run(productId, versionNumber, previousVersionId, businessChangeDate, notes, createdAt).lastInsertRowid);
   }
 
-  insertItem(versionId: number, item: { projectItemId: number; drawingId: number; quantity: number;
-    notes: string | null; usesWhiteMaterial: boolean }): void {
-    this.db.prepare(`insert into bom_items
-      (bom_version_id, project_item_id, drawing_id, quantity, notes, uses_white_material) values (?, ?, ?, ?, ?, ?)`)
-      .run(versionId, item.projectItemId, item.drawingId, item.quantity, item.notes, item.usesWhiteMaterial ? 1 : 0);
+  insertItem(versionId: number, item: { projectItemId: number; drawingId: number; effectiveBatchRelativePath: string | null;
+    effectiveBatchName: string | null; effectiveMaterialBatchId: number | null; material: string | null;
+    dimensions: string | null; position: string | null; notes: string | null; usesWhiteMaterial: boolean }): number {
+    return Number(this.db.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, effective_batch_relative_path, effective_batch_name,
+        effective_material_batch_id, material, dimensions, position, notes, uses_white_material)
+      values (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(versionId, item.projectItemId, item.drawingId, item.effectiveBatchRelativePath, item.effectiveBatchName,
+        item.effectiveMaterialBatchId, item.material, item.dimensions, item.position, item.notes, item.usesWhiteMaterial ? 1 : 0).lastInsertRowid);
   }
 
-  setCurrent(productId: number, colorId: number, versionId: number, updatedAt: string): void {
-    this.db.prepare(`insert into bom_current (product_id, color_id, version_id, updated_at) values (?, ?, ?, ?)
-      on conflict(product_id, color_id) do update set version_id = excluded.version_id, updated_at = excluded.updated_at`)
-      .run(productId, colorId, versionId, updatedAt);
+  listItemAssets(bomItemId: number) {
+    return this.db.prepare(`select link.id, link.asset_id as assetId, link.role, link.inherited_from_bom_item_asset_id as inheritedFromBomItemAssetId,
+      asset.relative_path as relativePath, asset.original_file_name as originalFileName, asset.mime_type as mimeType
+      from bom_item_assets link join bom_assets asset on asset.id = link.asset_id
+      where link.bom_item_id = ? order by link.role`).all(bomItemId) as Array<{
+        id: number; assetId: number; role: BomAssetRole; inheritedFromBomItemAssetId: number | null;
+        relativePath: string; originalFileName: string; mimeType: string;
+      }>;
+  }
+
+  assetExists(assetId: number): boolean { return Boolean(this.db.prepare('select 1 from bom_assets where id = ?').get(assetId)); }
+
+  previousItemAsset(previousVersionId: number, projectItemId: number, role: BomAssetRole): { id: number; assetId: number } | undefined {
+    return this.db.prepare(`select link.id, link.asset_id as assetId from bom_item_assets link
+      join bom_items item on item.id = link.bom_item_id
+      where item.bom_version_id = ? and item.project_item_id = ? and link.role = ?`).get(previousVersionId, projectItemId, role) as {
+        id: number; assetId: number;
+      } | undefined;
+  }
+
+  insertItemAsset(bomItemId: number, assetId: number, role: BomAssetRole, inheritedFromBomItemAssetId: number | null): void {
+    this.db.prepare(`insert into bom_item_assets (bom_item_id, asset_id, role, inherited_from_bom_item_asset_id)
+      values (?, ?, ?, ?)`).run(bomItemId, assetId, role, inheritedFromBomItemAssetId);
+  }
+
+  listItemQrCodes(bomItemId: number): BomQrCodeRecord[] {
+    return this.db.prepare(`select qr.id, qr.name, qr.status, purpose.display_name as purposeDisplayName
+      from bom_item_qr_codes link join product_qr_codes qr on qr.id = link.qr_code_id
+      join qr_purposes purpose on purpose.id = qr.purpose_id where link.bom_item_id = ? order by qr.id`).all(bomItemId) as BomQrCodeRecord[];
+  }
+
+  listActiveQrCodes(productId: number): BomQrCodeRecord[] {
+    return this.db.prepare(`select qr.id, qr.name, qr.status, purpose.display_name as purposeDisplayName
+      from product_qr_codes qr join qr_purposes purpose on purpose.id = qr.purpose_id
+      where qr.product_id = ? and qr.status = 'active' order by purpose.english_name collate nocase, qr.id`).all(productId) as BomQrCodeRecord[];
+  }
+
+  activeQrCodeExists(productId: number, qrCodeId: number): boolean {
+    return Boolean(this.db.prepare(`select 1 from product_qr_codes where id = ? and product_id = ? and status = 'active'`)
+      .get(qrCodeId, productId));
+  }
+
+  insertItemQrCode(bomItemId: number, qrCodeId: number): void {
+    this.db.prepare('insert into bom_item_qr_codes (bom_item_id, qr_code_id) values (?, ?)').run(bomItemId, qrCodeId);
+  }
+
+  setCurrent(productId: number, versionId: number, updatedAt: string): void {
+    this.db.prepare(`insert into bom_current (product_id, version_id, updated_at) values (?, ?, ?)
+      on conflict(product_id) do update set version_id = excluded.version_id, updated_at = excluded.updated_at`).run(productId, versionId, updatedAt);
   }
 
   activateDrawings(ids: number[]): void {
