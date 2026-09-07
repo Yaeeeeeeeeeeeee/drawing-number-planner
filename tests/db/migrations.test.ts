@@ -198,6 +198,58 @@ describe('database migrations', () => {
     });
   });
 
+  it.each(['self', 'cross-product', 'two-node cycle', 'longer cycle'] as const)(
+    'rolls v9 back when legacy BOM predecessors contain a %s graph',
+    (graph) => {
+      const { database, products } = createV8Database();
+      const legacy = seedV8Bom(database, products.refrigerator, '0', 4);
+      const now = '2026-09-02T00:00:00.000Z';
+      const insertVersion = database.prepare(`insert into bom_versions
+        (product_id, color_id, version_number, previous_version_id, notes, created_at)
+        values (?, ?, ?, ?, null, ?)`);
+
+      if (graph === 'self') {
+        database.prepare('update bom_versions set previous_version_id = id where id = ?').run(legacy.version);
+      } else if (graph === 'cross-product') {
+        insertVersion.run(products.airFryer, legacy.color, 2, legacy.version, now);
+      } else {
+        const child = Number(insertVersion.run(products.refrigerator, legacy.color, 2, legacy.version, now).lastInsertRowid);
+        if (graph === 'two-node cycle') {
+          database.prepare('update bom_versions set previous_version_id = ? where id = ?').run(child, legacy.version);
+        } else {
+          const grandchild = Number(insertVersion.run(products.refrigerator, legacy.color, 3, child, now).lastInsertRowid);
+          database.prepare('update bom_versions set previous_version_id = ? where id = ?').run(grandchild, legacy.version);
+        }
+      }
+
+      const beforeVersions = database.prepare('select id, product_id, color_id, version_number, previous_version_id from bom_versions order by id').all();
+      const backup = vi.fn();
+      expect(() => migrateDatabase(database, { databaseExists: true, createBackup: backup }))
+        .toThrow('BOM 前序版本必须属于同产品且不能形成循环，数据库未升级');
+      expect(backup).toHaveBeenCalledOnce();
+      expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 8 });
+      expect((database.pragma('table_info(bom_versions)') as Array<{ name: string }>).map((column) => column.name))
+        .not.toContain('business_change_date');
+      expect(database.prepare('select id, product_id, color_id, version_number, previous_version_id from bom_versions order by id').all())
+        .toEqual(beforeVersions);
+    },
+  );
+
+  it('upgrades a valid acyclic legacy BOM predecessor chain', () => {
+    const { database, products } = createV8Database();
+    const legacy = seedV8Bom(database, products.refrigerator, '0', 4);
+    const now = '2026-09-02T00:00:00.000Z';
+    const insertVersion = database.prepare(`insert into bom_versions
+      (product_id, color_id, version_number, previous_version_id, notes, created_at)
+      values (?, ?, ?, ?, null, ?)`);
+    const child = Number(insertVersion.run(products.refrigerator, legacy.color, 2, legacy.version, now).lastInsertRowid);
+    const grandchild = Number(insertVersion.run(products.refrigerator, legacy.color, 3, child, now).lastInsertRowid);
+
+    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 8, to: 9 });
+    expect(database.prepare('select previous_version_id from bom_versions where id = ?').get(grandchild))
+      .toEqual({ previous_version_id: child });
+  });
+
   it('enforces workspace-relative BOM assets, valid inherited sources, and same-product QR links', () => {
     const { database, products } = createV8Database();
     const legacy = seedV8Bom(database, products.refrigerator, '0', 4);
@@ -314,8 +366,8 @@ describe('database migrations', () => {
       (bom_item_id, asset_id, role, inherited_from_bom_item_asset_id) values (?, ?, 'image', ?)`)
       .run(unrelatedItem, asset, sourceAsset)).toThrow('BOM 沿用附件必须来自上一版对应项目');
     const crossProductVersion = Number(database.prepare(`insert into bom_versions
-      (product_id, version_number, previous_version_id, business_change_date, created_at) values (?, 1, ?, '2026-09-03', ?)`)
-      .run(products.airFryer, legacy.version, now).lastInsertRowid);
+      (product_id, version_number, business_change_date, created_at) values (?, 1, '2026-09-03', ?)`)
+      .run(products.airFryer, now).lastInsertRowid);
     const crossProductItem = Number(database.prepare(`insert into bom_items
       (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material) values (?, ?, ?, 1, 0)`)
       .run(crossProductVersion, projectItem, legacy.drawing).lastInsertRowid);

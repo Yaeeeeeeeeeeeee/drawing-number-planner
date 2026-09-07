@@ -173,6 +173,21 @@ function validateV8BomForMigration(snapshot: V8BomSnapshot): void {
   })) {
     throw new Error('BOM 当前指针关联无效，数据库未升级');
   }
+  for (const version of snapshot.versions) {
+    const visited = new Set<number>();
+    let current: typeof version | undefined = version;
+    while (current && current.previous_version_id !== null) {
+      if (visited.has(current.id)) {
+        throw new Error('BOM 前序版本必须属于同产品且不能形成循环，数据库未升级');
+      }
+      visited.add(current.id);
+      const previous = versionsById.get(current.previous_version_id);
+      if (!previous || previous.product_id !== current.product_id) {
+        throw new Error('BOM 前序版本必须属于同产品且不能形成循环，数据库未升级');
+      }
+      current = previous;
+    }
+  }
 }
 
 function validateBomMigration(database: PlannerDatabase, before: V8BomSnapshot): void {
