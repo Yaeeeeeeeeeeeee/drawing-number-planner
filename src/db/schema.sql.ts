@@ -754,4 +754,65 @@ export const schemaVersionNine = `
   BEGIN
     SELECT RAISE(ABORT, 'BOM 沿用附件必须来自上一版对应项目');
   END;
+
+  CREATE TRIGGER bom_versions_predecessor_graph_guard_insert
+  BEFORE INSERT ON bom_versions
+  WHEN NEW.previous_version_id IS NOT NULL AND (
+    NEW.previous_version_id = NEW.id
+    OR NOT EXISTS (
+      SELECT 1 FROM bom_versions previous_version
+      WHERE previous_version.id = NEW.previous_version_id
+        AND previous_version.product_id = NEW.product_id
+    )
+    OR EXISTS (
+      WITH RECURSIVE predecessors(id) AS (
+        SELECT NEW.previous_version_id
+        UNION
+        SELECT version.previous_version_id
+        FROM bom_versions version
+        JOIN predecessors ON predecessors.id = version.id
+        WHERE version.previous_version_id IS NOT NULL
+      )
+      SELECT 1 FROM predecessors WHERE id = NEW.id
+    )
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 前序版本必须属于同产品且不能形成循环');
+  END;
+
+  CREATE TRIGGER bom_versions_predecessor_graph_guard_update
+  BEFORE UPDATE OF previous_version_id, product_id ON bom_versions
+  WHEN NEW.previous_version_id IS NOT NULL AND (
+    NEW.previous_version_id = NEW.id
+    OR NOT EXISTS (
+      SELECT 1 FROM bom_versions previous_version
+      WHERE previous_version.id = NEW.previous_version_id
+        AND previous_version.product_id = NEW.product_id
+    )
+    OR EXISTS (
+      WITH RECURSIVE predecessors(id) AS (
+        SELECT NEW.previous_version_id
+        UNION
+        SELECT version.previous_version_id
+        FROM bom_versions version
+        JOIN predecessors ON predecessors.id = version.id
+        WHERE version.previous_version_id IS NOT NULL
+      )
+      SELECT 1 FROM predecessors WHERE id = NEW.id
+    )
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 前序版本必须属于同产品且不能形成循环');
+  END;
+
+  CREATE TRIGGER bom_versions_predecessor_child_product_guard
+  BEFORE UPDATE OF product_id ON bom_versions
+  WHEN EXISTS (
+    SELECT 1 FROM bom_versions child_version
+    WHERE child_version.previous_version_id = OLD.id
+      AND child_version.product_id IS NOT NEW.product_id
+  )
+  BEGIN
+    SELECT RAISE(ABORT, 'BOM 前序版本必须属于同产品且不能形成循环');
+  END;
 `;

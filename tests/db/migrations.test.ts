@@ -324,6 +324,38 @@ describe('database migrations', () => {
       .run(crossProductItem, asset, sourceAsset)).toThrow('BOM 沿用附件必须来自上一版对应项目');
   });
 
+  it('enforces an acyclic same-product BOM predecessor graph', () => {
+    const { database, products } = migrateSingleV8Bom();
+    const now = '2026-09-03T00:00:00.000Z';
+    const insertVersion = database.prepare(`insert into bom_versions
+      (product_id, version_number, previous_version_id, business_change_date, created_at)
+      values (?, ?, ?, '2026-09-03', ?)`);
+    const root = Number(insertVersion.run(products.refrigerator, 20, null, now).lastInsertRowid);
+    const child = Number(insertVersion.run(products.refrigerator, 21, root, now).lastInsertRowid);
+    const grandchild = Number(insertVersion.run(products.refrigerator, 22, child, now).lastInsertRowid);
+
+    expect(database.prepare('select previous_version_id from bom_versions where id = ?').get(grandchild))
+      .toEqual({ previous_version_id: child });
+    expect(() => database.prepare(`insert into bom_versions
+      (id, product_id, version_number, previous_version_id, business_change_date, created_at)
+      values (9001, ?, 23, 9001, '2026-09-03', ?)`)
+      .run(products.refrigerator, now)).toThrow('BOM 前序版本必须属于同产品且不能形成循环');
+    expect(() => insertVersion.run(products.airFryer, 20, root, now))
+      .toThrow('BOM 前序版本必须属于同产品且不能形成循环');
+    expect(() => database.prepare('update bom_versions set previous_version_id = ? where id = ?')
+      .run(child, root)).toThrow('BOM 前序版本必须属于同产品且不能形成循环');
+    expect(database.prepare('select previous_version_id from bom_versions where id = ?').get(root))
+      .toEqual({ previous_version_id: null });
+    expect(() => database.prepare('update bom_versions set previous_version_id = ? where id = ?')
+      .run(grandchild, root)).toThrow('BOM 前序版本必须属于同产品且不能形成循环');
+    expect(database.prepare('select previous_version_id from bom_versions where id = ?').get(root))
+      .toEqual({ previous_version_id: null });
+    expect(() => database.prepare('update bom_versions set product_id = ? where id = ?')
+      .run(products.airFryer, root)).toThrow('BOM 前序版本必须属于同产品且不能形成循环');
+    expect(database.prepare('select product_id from bom_versions where id = ?').get(root))
+      .toEqual({ product_id: products.refrigerator });
+  });
+
   it('prevents QR and BOM-version product changes from invalidating a linked BOM item', () => {
     const { database, products, legacy } = migrateSingleV8Bom();
     const sameProductQr = (database.prepare('select id from product_qr_codes where product_id = ? order by id limit 1').get(products.refrigerator) as { id: number }).id;
