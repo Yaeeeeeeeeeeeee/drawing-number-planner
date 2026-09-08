@@ -92,7 +92,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings));
     registerMaterialBatchRoutes(server, new MaterialBatchService(database));
     registerPlanningRoutes(server, new PlanningService(database));
-    registerBomRoutes(server, new BomService(database));
+    registerBomRoutes(server, new BomService(database, () => workspaceSettings.get().workspaceRoot));
     await registerImportRoutes(server, database, () => {
       createDatabaseBackup(database, paths.database, paths.backups, 'import');
     });

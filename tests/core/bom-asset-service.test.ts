@@ -18,7 +18,7 @@ afterEach(() => {
 describe('BomAssetService', () => {
   it('copies a supported source into the managed workspace path without changing the source', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-assets-')); directories.push(workspace);
-    const source = join(workspace, 'incoming.png'); const original = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const source = join(workspace, 'incoming.png'); const original = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     writeFileSync(source, original);
     const db = openDatabase(':memory:'); databases.push(db); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
 

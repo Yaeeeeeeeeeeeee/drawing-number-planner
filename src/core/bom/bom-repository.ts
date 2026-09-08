@@ -52,10 +52,26 @@ export class BomRepository {
   getContext(productId: number): BomContext | undefined {
     return this.db.prepare('select id as productId, status as productStatus from products where id = ?').get(productId) as BomContext | undefined;
   }
+  getProductIdentity(productId: number): { sku: string | null; model: string } | undefined {
+    return this.db.prepare('select sku, model from products where id = ?').get(productId) as { sku: string | null; model: string } | undefined;
+  }
 
   getCurrentVersionId(productId: number): number | null {
     const row = this.db.prepare('select version_id from bom_current where product_id = ?').get(productId) as { version_id: number } | undefined;
     return row?.version_id ?? null;
+  }
+
+  getCurrentBatch(id: number): { id: number; productId: number | null; relativePath: string; name: string; isPresent: number } | undefined {
+    return this.db.prepare(`select id, product_id as productId, relative_path as relativePath, name, is_present as isPresent
+      from material_batches where id = ?`).get(id) as { id: number; productId: number | null; relativePath: string; name: string; isPresent: number } | undefined;
+  }
+
+  relinkBatch(batchId: number): number {
+    const batch = this.getCurrentBatch(batchId);
+    if (!batch || batch.isPresent !== 1) return 0;
+    return this.db.prepare(`update bom_items set effective_material_batch_id = ?
+      where effective_material_batch_id is null and lower(replace(effective_batch_relative_path, '/', '\\')) = lower(replace(?, '/', '\\'))`)
+      .run(batch.id, batch.relativePath).changes;
   }
 
   getVersion(id: number): BomVersionDetail | undefined {
@@ -141,11 +157,12 @@ export class BomRepository {
 
   listItemAssets(bomItemId: number) {
     return this.db.prepare(`select link.id, link.asset_id as assetId, link.role, link.inherited_from_bom_item_asset_id as inheritedFromBomItemAssetId,
-      asset.relative_path as relativePath, asset.original_file_name as originalFileName, asset.mime_type as mimeType
+      asset.relative_path as relativePath, asset.original_file_name as originalFileName, asset.mime_type as mimeType,
+      asset.size_bytes as sizeBytes, asset.content_sha256 as contentSha256, asset.created_at as createdAt
       from bom_item_assets link join bom_assets asset on asset.id = link.asset_id
       where link.bom_item_id = ? order by link.role`).all(bomItemId) as Array<{
         id: number; assetId: number; role: BomAssetRole; inheritedFromBomItemAssetId: number | null;
-        relativePath: string; originalFileName: string; mimeType: string;
+        relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string; createdAt: string;
       }>;
   }
 

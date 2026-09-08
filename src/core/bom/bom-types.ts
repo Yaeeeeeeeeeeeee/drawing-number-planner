@@ -4,7 +4,7 @@ export type BomAssetRole = 'image' | 'diagram';
 export interface BomItemAssetInput { role: BomAssetRole; assetId?: number; reusePrevious?: boolean }
 export interface BomItemAssetRecord {
   id: number; assetId: number; role: BomAssetRole; inheritedFromBomItemAssetId: number | null;
-  relativePath: string; originalFileName: string; mimeType: string;
+  relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string; createdAt: string;
 }
 export interface BomQrCodeRecord { id: number; name: string; status: 'active' | 'inactive'; purposeDisplayName: string }
 

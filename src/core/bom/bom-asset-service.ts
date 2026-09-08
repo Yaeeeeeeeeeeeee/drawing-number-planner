@@ -13,7 +13,13 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 
 export interface ImportBomAssetInput { sku: string; model: string; sourcePath: string }
 export interface ManagedBomAsset {
-  id: number; relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string;
+  id: number; relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string; createdAt: string;
+}
+
+function hasExpectedImageSignature(content: Buffer, extension: string): boolean {
+  if (extension === '.png') return content.length >= 8 && content.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if (extension === '.jpg' || extension === '.jpeg') return content.length >= 3 && content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff;
+  return content.length >= 12 && content.subarray(0, 4).toString('ascii') === 'RIFF' && content.subarray(8, 12).toString('ascii') === 'WEBP';
 }
 
 function safeSegment(value: string, label: string): string {
@@ -38,6 +44,9 @@ export class BomAssetService {
     const extension = extname(input.sourcePath).toLocaleLowerCase('en-US');
     const mimeType = MIME_BY_EXTENSION[extension];
     if (!mimeType) throw new BomError('ASSET_TYPE_INVALID', 'BOM 附件只支持 PNG、JPG、JPEG 或 WebP 图片');
+    if (!hasExpectedImageSignature(readFileSync(input.sourcePath), extension)) {
+      throw new BomError('ASSET_CONTENT_INVALID', 'BOM 附件内容与图片类型不匹配');
+    }
 
     const sku = safeSegment(input.sku, 'SKU'); const model = safeSegment(input.model, '型号');
     const originalFileName = basename(input.sourcePath);
@@ -52,12 +61,13 @@ export class BomAssetService {
       renameSync(temporary, destination);
       copied = true;
       const contentSha256 = createHash('sha256').update(readFileSync(destination)).digest('hex');
+      const createdAt = new Date().toISOString();
       const id = Number(this.db.prepare(`insert into bom_assets
         (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at) values (?, ?, ?, ?, ?, ?)`)
         .run(toWorkspaceRelativePath(this.workspaceRoot, destination), originalFileName, mimeType, sourceStats.size,
-          contentSha256, new Date().toISOString()).lastInsertRowid);
+          contentSha256, createdAt).lastInsertRowid);
       return { id, relativePath: toWorkspaceRelativePath(this.workspaceRoot, destination), originalFileName, mimeType,
-        sizeBytes: sourceStats.size, contentSha256 };
+        sizeBytes: sourceStats.size, contentSha256, createdAt };
     } catch (error) {
       rmSync(temporary, { force: true });
       if (copied) rmSync(destination, { force: true });

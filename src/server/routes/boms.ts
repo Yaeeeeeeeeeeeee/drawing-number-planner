@@ -1,7 +1,13 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import multipart from '@fastify/multipart';
+import { createWriteStream, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { z } from 'zod';
 
 import { BomError } from '../../core/bom/bom-errors.js';
+import { FileError } from '../../core/files/file-errors.js';
 import type { BomService } from '../../core/bom/bom-service.js';
 
 const productQuery = z.object({ productId: z.coerce.number().int().positive() }).strict();
@@ -30,6 +36,7 @@ const saveSchema = z.object({
 }).strict().refine((value) => new Set(value.items.map((item) => item.projectItemId)).size === value.items.length);
 
 function sendBomError(reply: FastifyReply, error: unknown) {
+  if (error instanceof FileError) return reply.code(422).send({ error: { code: 'ASSET_PATH_INVALID', message: error.message } });
   if (!(error instanceof BomError)) throw error;
   const status = error.code === 'BOM_STALE' ? 409
     : error.code === 'BOM_NOT_FOUND' || error.code === 'DRAWING_NOT_FOUND' || error.code === 'ASSET_NOT_FOUND' ? 404 : 422;
@@ -37,6 +44,7 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
+  app.register(multipart, { limits: { files: 1, fileSize: 10 * 1024 * 1024 } });
   app.get('/api/boms/query', async (request, reply) => {
     const query = bomQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
@@ -66,6 +74,30 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
     const query = productQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '二维码查询条件无效' } });
     try { return { items: service.listActiveQrCandidates(query.data.productId) }; } catch (error) { return sendBomError(reply, error); }
+  });
+  app.post('/api/boms/material-batches/:id/relink', async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).strict().safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '资料批次编号无效' } });
+    try { return service.relinkMaterialBatch(params.data.id); } catch (error) { return sendBomError(reply, error); }
+  });
+  app.post('/api/boms/assets', async (request, reply) => {
+    const upload = await request.file();
+    if (!upload) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '缺少 BOM 图片文件' } });
+    const productField = upload.fields.productId;
+    const productValue = !productField || Array.isArray(productField) || productField.type !== 'field' ? undefined : productField.value;
+    const productId = z.coerce.number().int().positive().safeParse(productValue);
+    if (!productId.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
+    const staging = mkdtempSync(join(tmpdir(), 'planner-bom-upload-'));
+    const originalName = upload.filename || 'upload';
+    const extension = originalName.includes('.') ? originalName.slice(originalName.lastIndexOf('.')) : '';
+    const sourcePath = join(staging, `upload${extension}`);
+    try {
+      await pipeline(upload.file, createWriteStream(sourcePath, { flags: 'wx' }));
+      const asset = service.importAsset(productId.data, sourcePath);
+      return reply.code(201).send({ asset });
+    } catch (error) {
+      return sendBomError(reply, error);
+    } finally { rmSync(staging, { recursive: true, force: true }); }
   });
   app.post('/api/boms/versions', async (request, reply) => {
     const input = saveSchema.safeParse(request.body);
