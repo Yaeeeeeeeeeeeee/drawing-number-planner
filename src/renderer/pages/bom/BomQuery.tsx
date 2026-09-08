@@ -1,12 +1,12 @@
-import type { BomVersionSummaryView, BomVersionView, DictionaryItemView, MaterialBatchView } from '../../data/client';
+import type { BomVersionSummaryView, BomVersionView, DictionaryItemView } from '../../data/client';
 
 const businessDateLabel = (item: { businessChangeDate: string | null; businessChangeDateLabel: string }) =>
   item.businessChangeDate ?? (item.businessChangeDateLabel === '未补录' ? '业务日期未补录' : item.businessChangeDateLabel);
 
-export function BomQuery({ model, businessChangeDate, effectiveBatchRelativePath, projectItemId, fullCode, projects, batches, busy, history, detail,
+export function BomQuery({ model, businessChangeDate, effectiveBatchRelativePath, projectItemId, fullCode, projects, busy, history, detail,
   setModel, setBusinessChangeDate, setEffectiveBatchRelativePath, setProjectItemId, setFullCode, onSearch, onView }: {
   model: string; businessChangeDate: string; effectiveBatchRelativePath: string; projectItemId: string; fullCode: string;
-  projects: DictionaryItemView[]; batches: MaterialBatchView[]; busy: boolean; history: BomVersionSummaryView[]; detail: BomVersionView | null;
+  projects: DictionaryItemView[]; busy: boolean; history: BomVersionSummaryView[]; detail: BomVersionView | null;
   setModel(value: string): void; setBusinessChangeDate(value: string): void; setEffectiveBatchRelativePath(value: string): void;
   setProjectItemId(value: string): void; setFullCode(value: string): void; onSearch(): Promise<void>; onView(id: number): Promise<void>;
 }) {
@@ -14,7 +14,7 @@ export function BomQuery({ model, businessChangeDate, effectiveBatchRelativePath
     <form className="filter-bar" onSubmit={(event) => { event.preventDefault(); void onSearch(); }}>
       <label><span>型号</span><input aria-label="查询 BOM 型号" value={model} onChange={(e) => setModel(e.target.value)} /></label>
       <label><span>业务日期</span><input aria-label="查询 BOM 业务日期" type="date" value={businessChangeDate} onChange={(e) => setBusinessChangeDate(e.target.value)} /></label>
-      <label><span>生效批次</span><select aria-label="查询 BOM 生效批次" value={effectiveBatchRelativePath} onChange={(e) => setEffectiveBatchRelativePath(e.target.value)}><option value="">全部</option>{batches.map((batch) => <option key={batch.id} value={batch.relativePath}>{batch.name}</option>)}</select></label>
+      <label><span>生效批次路径</span><input type="text" aria-label="查询 BOM 生效批次" placeholder="可输入历史快照路径" value={effectiveBatchRelativePath} onChange={(e) => setEffectiveBatchRelativePath(e.target.value)} /></label>
       <label><span>项目</span><select aria-label="查询 BOM 项目" value={projectItemId} onChange={(e) => setProjectItemId(e.target.value)}><option value="">全部</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <label><span>图号</span><input aria-label="查询 BOM 图号" value={fullCode} onChange={(e) => setFullCode(e.target.value)} /></label>
       <button className="primary-button" type="submit" disabled={busy}>{busy ? '查询中…' : '查询'}</button>

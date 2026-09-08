@@ -42,7 +42,8 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
 
   await page.getByRole('button', { name: '查询 BOM' }).click();
   await page.getByLabel('查询 BOM 业务日期').fill('2026-09-02');
-  await page.getByRole('button', { name: '查询' }).click();
+  const queryButton = page.getByRole('button', { name: '查询', exact: true });
+  await expect(queryButton).toBeEnabled(); await queryButton.click();
   await expect(page.getByRole('cell', { name: '2026-09-02', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /^查看 BOM / }).click();
   await expect(page.getByRole('region', { name: 'BOM 历史明细' })).toContainText(fullCode);

@@ -19,6 +19,9 @@ const currentWithReferences = { id: 20, productId: 1, model: 'ZC100', versionNum
     assets: [{ ...asset, assetId: 31, role: 'image' as const, inheritedFromBomItemAssetId: null }],
     qrCodes: [{ id: 9, name: '说明书二维码', purposeDisplayName: '说明书', status: 'inactive' as const }],
   }] };
+const activeCurrent = { ...currentWithReferences, items: [{ ...currentWithReferences.items[0], status: 'active' as const, qrCodes: [] }] };
+const secondProject = { id: 8, code: '02', name: '说明书', parentId: 6, status: 'active' as const };
+const replacementCandidate = { ...candidate, id: 11, fullCode: '02.0404.010.0401002', status: 'active' as const };
 
 function apiFixture() {
   return {
@@ -42,13 +45,14 @@ async function selectProduct(expectEmpty = true) {
 
 describe('BomPage product-level BOM', () => {
   it('defaults the business date from local calendar fields, not a UTC date', () => {
-    const localMidnightAfterUtcDay = { getFullYear: () => 2026, getMonth: () => 8, getDate: () => 2 } as Date;
-    expect(localBusinessDateToday(localMidnightAfterUtcDay)).toBe('2026-09-02');
+    const localDate = new Date(2026, 8, 2, 0, 30);
+    const expected = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+    expect(localBusinessDateToday(localDate)).toBe(expected);
   });
 
   it('uses the product-level form with a required business date, rather than BOM color or quantity', async () => {
     const api = apiFixture(); render(<BomPage api={api as never} />); await selectProduct();
-    expect(screen.getByLabelText('业务变更日期')).toHaveValue(new Date().toISOString().slice(0, 10));
+    expect(screen.getByLabelText('业务变更日期')).toHaveValue(localBusinessDateToday());
     expect(screen.queryByLabelText('BOM 颜色')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     expect(screen.queryByLabelText('第 1 行数量')).not.toBeInTheDocument();
@@ -83,14 +87,15 @@ describe('BomPage product-level BOM', () => {
     for (const label of ['查询 BOM 型号', '查询 BOM 业务日期', '查询 BOM 生效批次', '查询 BOM 项目', '查询 BOM 图号']) expect(screen.getByLabelText(label)).toBeVisible();
     fireEvent.change(screen.getByLabelText('查询 BOM 型号'), { target: { value: 'ZC100' } });
     fireEvent.change(screen.getByLabelText('查询 BOM 业务日期'), { target: { value: '2026-09-02' } });
-    fireEvent.change(screen.getByLabelText('查询 BOM 生效批次'), { target: { value: 'X/20260901' } });
+    expect(screen.getByLabelText('查询 BOM 生效批次')).toHaveAttribute('type', 'text');
+    fireEvent.change(screen.getByLabelText('查询 BOM 生效批次'), { target: { value: 'legacy/removed-snapshot' } });
     fireEvent.change(screen.getByLabelText('查询 BOM 项目'), { target: { value: '7' } });
     fireEvent.change(screen.getByLabelText('查询 BOM 图号'), { target: { value: '0401001' } });
     await waitFor(() => expect(screen.getByRole('button', { name: '查询' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     expect(await screen.findByText('业务日期未补录')).toBeVisible();
     await waitFor(() => expect(api.queryBomVersions).toHaveBeenLastCalledWith({ model: 'ZC100', businessChangeDate: '2026-09-02',
-      effectiveBatchRelativePath: 'X/20260901', projectItemId: 7, fullCode: '0401001' }));
+      effectiveBatchRelativePath: 'legacy/removed-snapshot', projectItemId: 7, fullCode: '0401001' }));
   });
 
   it('keeps voided drawings and inactive historical QR links visible until the user resolves them', async () => {
@@ -104,8 +109,8 @@ describe('BomPage product-level BOM', () => {
   });
 
   it('only offers previous-asset reuse when a source exists and makes a new upload replace it', async () => {
-    const api = apiFixture(); const active = { ...currentWithReferences, items: [{ ...currentWithReferences.items[0], status: 'active' as const, qrCodes: [] }] };
-    api.getCurrentBom.mockResolvedValue(active); render(<BomPage api={api as never} />); await selectProduct(false);
+    const api = apiFixture();
+    api.getCurrentBom.mockResolvedValue(activeCurrent); render(<BomPage api={api as never} />); await selectProduct(false);
     expect(await screen.findByLabelText('第 1 行沿用图片')).toBeChecked();
     expect(screen.getByText('沿用上一次 BOM：客户示意图.png')).toBeVisible();
     const replacement = new File(['new'], '新版图片.png', { type: 'image/png' });
@@ -114,5 +119,44 @@ describe('BomPage product-level BOM', () => {
     expect(screen.getByLabelText('第 1 行沿用图片')).not.toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     expect(screen.queryByLabelText('第 2 行沿用图片')).not.toBeInTheDocument();
+  });
+
+  it('reloads eligible candidates after saving so an item can be replaced immediately', async () => {
+    const api = apiFixture(); api.saveBomVersion.mockResolvedValue({ version: activeCurrent, diff: [] });
+    api.listBomCandidates.mockResolvedValue([candidate, replacementCandidate]);
+    render(<BomPage api={api as never} />); await selectProduct();
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+    fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '7' } });
+    fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
+    await waitFor(() => expect(api.listBomCandidates).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole('option', { name: /0401002/ })).toBeVisible());
+  });
+
+  it('clears project-scoped assets, reuse state, candidates and QR links when the project changes', async () => {
+    const api = apiFixture(); api.listDictionaries.mockResolvedValue([project, secondProject]);
+    api.getCurrentBom.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], qrCodes: [{ id: 9, name: '说明书二维码', purposeDisplayName: '说明书', status: 'active' as const }] }] });
+    render(<BomPage api={api as never} />); await selectProduct(false);
+    await screen.findByText('沿用上一次 BOM：客户示意图.png');
+    fireEvent.change(screen.getByLabelText('第 1 行项目'), { target: { value: '8' } });
+    await waitFor(() => expect(api.listBomCandidates).toHaveBeenLastCalledWith({ productId: 1, projectItemId: 8, usesWhiteMaterial: false }));
+    expect(screen.getByLabelText('第 1 行图号')).toHaveValue('');
+    expect(screen.queryByText('客户示意图.png')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('第 1 行沿用图片')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('第 1 行二维码 9')).not.toBeChecked();
+  });
+
+  it('does not let an older history detail response overwrite the newest selection', async () => {
+    let resolveFirst!: (value: typeof activeCurrent) => void; let resolveSecond!: (value: typeof activeCurrent) => void;
+    const api = apiFixture(); api.queryBomVersions.mockResolvedValue([activeCurrent, { ...activeCurrent, id: 21, versionNumber: 2 }]);
+    api.getBomVersion.mockImplementation((id: number) => new Promise((resolve) => { if (id === 20) resolveFirst = resolve; else resolveSecond = resolve; }));
+    render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '查询' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await screen.findByRole('button', { name: '查看 BOM 20' });
+    fireEvent.click(screen.getByRole('button', { name: '查看 BOM 20' })); fireEvent.click(screen.getByRole('button', { name: '查看 BOM 21' }));
+    resolveSecond({ ...activeCurrent, id: 21, items: [{ ...activeCurrent.items[0], fullCode: 'NEW-CODE' }] }); await screen.findByText('NEW-CODE');
+    resolveFirst({ ...activeCurrent, id: 20, items: [{ ...activeCurrent.items[0], fullCode: 'OLD-CODE' }] });
+    await waitFor(() => expect(screen.queryByText('OLD-CODE')).not.toBeInTheDocument());
   });
 });
