@@ -16,6 +16,16 @@ afterEach(() => {
 });
 
 describe('BomAssetService', () => {
+  it('rejects fake image content and oversized files without creating a managed asset', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-assets-invalid-')); directories.push(workspace);
+    const fake = join(workspace, 'fake.png'); writeFileSync(fake, Buffer.from('not-an-image'));
+    const huge = join(workspace, 'huge.png'); writeFileSync(huge, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(10 * 1024 * 1024)]));
+    const db = openDatabase(':memory:'); databases.push(db); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+    const assets = new BomAssetService(db, workspace);
+    expect(() => assets.import({ sku: 'SKU', model: 'M', sourcePath: fake })).toThrow(/内容/);
+    expect(() => assets.import({ sku: 'SKU', model: 'M', sourcePath: huge })).toThrow(/超过/);
+    expect(db.prepare('select count(*) as count from bom_assets').get()).toEqual({ count: 0 });
+  });
   it('copies a supported source into the managed workspace path without changing the source', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-assets-')); directories.push(workspace);
     const source = join(workspace, 'incoming.png'); const original = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
