@@ -11,7 +11,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
 };
 
-export interface ImportBomAssetInput { sku: string; model: string; sourcePath: string }
+export interface ImportBomAssetInput { sku: string; model: string; sourcePath: string; originalFileName?: string }
 export interface ManagedBomAsset {
   id: number; relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string; createdAt: string;
 }
@@ -49,7 +49,7 @@ export class BomAssetService {
     }
 
     const sku = safeSegment(input.sku, 'SKU'); const model = safeSegment(input.model, '型号');
-    const originalFileName = basename(input.sourcePath);
+    const originalFileName = basename(input.originalFileName || input.sourcePath);
     const fileName = `${randomUUID()}-${originalFileName}`;
     const relativePath = join('_图号规划器', 'BOM附件', `${sku}-${model}`, fileName);
     const destination = resolveWorkspacePath(this.workspaceRoot, relativePath, { requireExistingParent: true });

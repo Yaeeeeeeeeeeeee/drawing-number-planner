@@ -69,9 +69,11 @@ export class BomRepository {
   relinkBatch(batchId: number): number {
     const batch = this.getCurrentBatch(batchId);
     if (!batch || batch.isPresent !== 1) return 0;
+    if (batch.productId === null) return 0;
     return this.db.prepare(`update bom_items set effective_material_batch_id = ?
-      where effective_material_batch_id is null and lower(replace(effective_batch_relative_path, '/', '\\')) = lower(replace(?, '/', '\\'))`)
-      .run(batch.id, batch.relativePath).changes;
+      where effective_material_batch_id is null and lower(replace(effective_batch_relative_path, '/', '\\')) = lower(replace(?, '/', '\\'))
+        and exists (select 1 from bom_versions version where version.id = bom_items.bom_version_id and version.product_id = ?)`)
+      .run(batch.id, batch.relativePath, batch.productId).changes;
   }
 
   getVersion(id: number): BomVersionDetail | undefined {

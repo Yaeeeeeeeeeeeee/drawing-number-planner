@@ -36,11 +36,11 @@ function buildDiff(previous: BomVersionDetail | null, current: BomVersionDetail)
     else type = JSON.stringify({ drawingId: oldItem.drawingId, effectiveBatchRelativePath: oldItem.effectiveBatchRelativePath,
       effectiveBatchName: oldItem.effectiveBatchName, effectiveMaterialBatchId: oldItem.effectiveMaterialBatchId,
       material: oldItem.material, dimensions: oldItem.dimensions, position: oldItem.position, notes: oldItem.notes,
-      usesWhiteMaterial: oldItem.usesWhiteMaterial, assets: oldItem.assets, qrCodes: oldItem.qrCodes })
+      usesWhiteMaterial: oldItem.usesWhiteMaterial, assets: oldItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: oldItem.qrCodes.map((qr) => qr.id) })
       === JSON.stringify({ drawingId: newItem.drawingId, effectiveBatchRelativePath: newItem.effectiveBatchRelativePath,
         effectiveBatchName: newItem.effectiveBatchName, effectiveMaterialBatchId: newItem.effectiveMaterialBatchId,
         material: newItem.material, dimensions: newItem.dimensions, position: newItem.position, notes: newItem.notes,
-        usesWhiteMaterial: newItem.usesWhiteMaterial, assets: newItem.assets, qrCodes: newItem.qrCodes }) ? 'unchanged' : 'replaced';
+        usesWhiteMaterial: newItem.usesWhiteMaterial, assets: newItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: newItem.qrCodes.map((qr) => qr.id) }) ? 'unchanged' : 'replaced';
     const item = newItem ?? oldItem!;
     return { type, projectItemId, projectItemName: item.projectItemName,
       previousDrawingId: oldItem?.drawingId ?? null, previousFullCode: oldItem?.fullCode ?? null,
@@ -52,12 +52,12 @@ export class BomService {
   private readonly repository: BomRepository;
   constructor(private readonly db: PlannerDatabase, private readonly workspaceRoot?: () => string | null) { this.repository = new BomRepository(db); }
 
-  importAsset(productId: number, sourcePath: string): ManagedBomAsset {
+  importAsset(productId: number, sourcePath: string, originalFileName?: string): ManagedBomAsset {
     this.validateProduct(productId);
     const product = this.repository.getProductIdentity(productId);
     const workspaceRoot = this.workspaceRoot?.();
     if (!product?.sku || !workspaceRoot) throw new BomError('ASSET_SOURCE_INVALID', '资料根目录或产品 SKU 未配置，无法导入 BOM 附件');
-    return new BomAssetService(this.db, workspaceRoot).import({ sku: product.sku, model: product.model, sourcePath });
+    return new BomAssetService(this.db, workspaceRoot).import({ sku: product.sku, model: product.model, sourcePath, originalFileName });
   }
 
   getCurrent(productId: number, _legacyColorId?: number): BomVersionDetail | null {
@@ -85,7 +85,7 @@ export class BomService {
   }
   relinkMaterialBatch(batchId: number): { relinked: number } {
     const batch = this.repository.getCurrentBatch(batchId);
-    if (!batch || batch.isPresent !== 1) throw new BomError('BATCH_NOT_ELIGIBLE', '资料批次不存在或已缺失，无法重新关联');
+    if (!batch || batch.productId === null || batch.isPresent !== 1) throw new BomError('BATCH_NOT_ELIGIBLE', '资料批次不存在、未关联产品或已缺失，无法重新关联');
     return { relinked: this.repository.relinkBatch(batchId) };
   }
 
@@ -142,7 +142,7 @@ export class BomService {
         throw new BomError('BATCH_SNAPSHOT_MISMATCH', '生效资料批次快照必须由当前索引生成');
       }
       effectiveBatchRelativePath = batch.relativePath; effectiveBatchName = batch.name;
-    }
+    } else if (effectiveBatchRelativePath || effectiveBatchName) throw new BomError('BATCH_NOT_ELIGIBLE', '新 BOM 的生效批次必须选择当前资料批次');
     if (effectiveBatchRelativePath) validateWorkspaceRelativePath(effectiveBatchRelativePath);
     return { projectItemId: item.projectItemId, drawingId: item.drawingId,
       effectiveBatchRelativePath, effectiveBatchName,

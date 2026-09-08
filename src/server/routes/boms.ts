@@ -44,7 +44,7 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
-  app.register(multipart, { limits: { files: 1, fileSize: 10 * 1024 * 1024 } });
+  app.register(multipart, { limits: { files: 1, fileSize: 20 * 1024 * 1024 } });
   app.get('/api/boms/query', async (request, reply) => {
     const query = bomQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
@@ -93,7 +93,10 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
     const sourcePath = join(staging, `upload${extension}`);
     try {
       await pipeline(upload.file, createWriteStream(sourcePath, { flags: 'wx' }));
-      const asset = service.importAsset(productId.data, sourcePath);
+      if (upload.file.truncated) return reply.code(422).send({ error: { code: 'ASSET_TOO_LARGE', message: 'BOM 图片不能超过 10485760 字节' } });
+      const size = (await import('node:fs')).statSync(sourcePath).size;
+      if (size > 10 * 1024 * 1024) return reply.code(422).send({ error: { code: 'ASSET_TOO_LARGE', message: 'BOM 图片不能超过 10485760 字节' } });
+      const asset = service.importAsset(productId.data, sourcePath, originalName);
       return reply.code(201).send({ asset });
     } catch (error) {
       return sendBomError(reply, error);
