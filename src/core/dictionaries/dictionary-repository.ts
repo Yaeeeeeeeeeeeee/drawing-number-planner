@@ -54,8 +54,8 @@ export class DictionaryRepository {
     const direct = this.db.prepare(`select (
       exists(select 1 from products where brand_id = ? or product_size_id = ? or default_appearance_id = ?)
       or exists(select 1 from drawing_numbers where appearance_id = ? or color_id = ? or main_category_id = ? or project_item_id = ?)
-      or exists(select 1 from bom_versions where color_id = ?)
-      or exists(select 1 from bom_current where color_id = ?)
+      or exists(select 1 from bom_versions where legacy_color_id = ?)
+      or exists(select 1 from bom_items item join drawing_numbers drawing on drawing.id = item.drawing_id where drawing.color_id = ?)
       or exists(select 1 from bom_items where project_item_id = ?)
       or exists(select 1 from dictionary_items where parent_id = ?)
     ) as referenced`).get(id, id, id, id, id, id, id, id, id, id, id) as { referenced: number };

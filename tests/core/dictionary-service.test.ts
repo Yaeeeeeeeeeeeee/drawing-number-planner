@@ -60,9 +60,11 @@ describe('DictionaryService', () => {
        sequence, status, created_at) values (?, 'LOGO', ?, ?, ?, ?, ?, '02', '0404', '01', '0', '04', '01', 1, 'active', '2026-08-24')`)
       .run(fullCode, productId, appearance.id, color.id, main.id, item.id).lastInsertRowid);
     const bomVersionId = Number(db.prepare(`insert into bom_versions
-      (product_id, color_id, version_number, created_at) values (?, ?, 1, '2026-08-24')`).run(productId, color.id).lastInsertRowid);
+      (product_id, version_number, business_change_date, created_at) values (?, 1, '2026-08-24', '2026-08-24')`).run(productId).lastInsertRowid);
     db.prepare(`insert into bom_items (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material)
       values (?, ?, ?, 1, 0)`).run(bomVersionId, item.id, drawingId);
+    db.prepare(`insert into bom_current (product_id, version_id, updated_at) values (?, ?, '2026-08-24')`)
+      .run(productId, bomVersionId);
     db.prepare(`insert into historical_drawing_numbers
       (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
        sequence, first_seen_at, last_seen_at) values (?, '02', '0404', '01', '0', '04', '01', 2, '2026-08-24', '2026-08-24')`)
@@ -142,9 +144,11 @@ describe('DictionaryService', () => {
        sequence, status, created_at) values ('02.0209.010.0401001', 'LOGO', ?, ?, ?, ?, ?, '02', '0209', '01', '0', '04', '01', 1, 'active', '2026-08-28')`)
       .run(productId, appearance.id, color.id, main.id, item.id).lastInsertRowid);
     const versionId = Number(db.prepare(`insert into bom_versions
-      (product_id, color_id, version_number, created_at) values (?, ?, 1, '2026-08-28')`).run(productId, color.id).lastInsertRowid);
+      (product_id, version_number, business_change_date, created_at) values (?, 1, '2026-08-28', '2026-08-28')`).run(productId).lastInsertRowid);
     db.prepare(`insert into bom_items (bom_version_id, project_item_id, drawing_id, quantity, uses_white_material)
       values (?, ?, ?, 1, 0)`).run(versionId, item.id, drawingId);
+    db.prepare(`insert into bom_current (product_id, version_id, updated_at) values (?, ?, '2026-08-28')`)
+      .run(productId, versionId);
     db.prepare(`insert into historical_drawing_numbers
       (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
        sequence, first_seen_at, last_seen_at) values ('02.0209.010.0401002', '02', '0209', '01', '0', '04', '01', 2, '2026-08-28', '2026-08-28')`).run();
