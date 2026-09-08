@@ -14,6 +14,17 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('uses product-level BOM endpoints and sends browser uploads as multipart data', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'bom-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ asset: { id: 3 } }), { status: 201, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiClient.uploadBomAsset(7, new File(['png'], '示意图.png', { type: 'image/png' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/boms/assets', expect.objectContaining({ method: 'POST', body: expect.any(FormData),
+      headers: expect.objectContaining({ 'x-planner-token': 'bom-token' }) }));
+  });
+
   it('uses the shared request layer for QR filters, updates, state changes, and manual file association', async () => {
     const code = { id: 11, name: '说明书' };
     const fetchMock = vi.fn()
@@ -150,7 +161,7 @@ describe('renderer API client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await apiClient.createDictionary('brand', { code: '02', name: 'SAMKYO' });
-    await apiClient.saveBomVersion({ productId: 1, colorId: 5, expectedCurrentVersionId: null, items: [] });
+    await apiClient.saveBomVersion({ productId: 1, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [] });
     await apiClient.updateWorkspaceSettings('X:\\Library');
     await apiClient.scanPdfFiles();
     await apiClient.searchPdfFiles({ keyword: '转曲', matchStatus: 'unmatched', materialBatchId: 7, page: 1, pageSize: 20 });
@@ -162,7 +173,7 @@ describe('renderer API client', () => {
     }));
     expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/boms/versions', expect.objectContaining({
       method: 'POST', headers: expect.objectContaining({ 'x-planner-token': 'fresh-launch-token' }),
-      body: JSON.stringify({ productId: 1, colorId: 5, expectedCurrentVersionId: null, items: [] }),
+      body: JSON.stringify({ productId: 1, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [] }),
     }));
     expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/files/settings', expect.objectContaining({
       method: 'PUT', headers: expect.objectContaining({ 'x-planner-token': 'fresh-launch-token' }),

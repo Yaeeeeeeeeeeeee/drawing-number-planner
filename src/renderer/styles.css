@@ -156,11 +156,15 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .bom-basics { margin-bottom: 24px; }
 .bom-empty { display: flex; align-items: baseline; gap: 12px; padding: 22px 0; color: var(--muted); border-block: 1px solid var(--line); }
 .bom-empty strong { color: #172033; }
-.bom-row-fields { grid-template-columns: 1fr .8fr minmax(280px, 2fr) .55fr 1fr; }
+.bom-row-fields { grid-template-columns: repeat(4, minmax(150px, 1fr)); }
 .bom-white-toggle > span:last-child { display: flex; min-height: 40px; align-items: center; gap: 8px; }
 .bom-white-toggle input { width: 16px; height: 16px; }
 .bom-white-toggle small, .bom-candidate-rule, .bom-candidate-empty { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .bom-candidate-empty { color: #8a5b14; }
+.bom-qr { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0 0; padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); }
+.bom-qr legend { width: 100%; color: var(--muted); font-size: 12px; }
+.bom-qr label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.bom-qr .bom-inactive-qr { color: #9a4a25; }
 .bom-actions { display: flex; gap: 10px; margin: 18px 0; }
 .bom-diff, .bom-history { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
 .bom-diff-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }

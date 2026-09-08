@@ -75,17 +75,26 @@ export interface ReservedDrawingView {
 }
 
 export interface BomCandidateView {
-  id: number; fullCode: string; displayName: string; colorId: number; colorName: string;
+  id: number; fullCode: string; displayName: string;
   projectItemId: number; projectItemName: string; status: 'reserved' | 'active';
 }
+export interface BomAssetView {
+  id: number; relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number;
+  contentSha256: string; createdAt: string;
+}
+export interface BomItemAssetView extends BomAssetView { assetId: number; role: 'image' | 'diagram'; inheritedFromBomItemAssetId: number | null; }
+export interface BomQrCodeView { id: number; name: string; purposeDisplayName: string; status: 'active' | 'inactive'; }
+export interface BomQrCandidateView extends BomQrCodeView { status: 'active'; }
 export interface BomItemView {
-  bomItemId: number; drawingId: number; fullCode: string; displayName: string; colorId: number; colorName: string;
-  projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'voided'; quantity: number;
-  notes: string | null; usesWhiteMaterial: boolean;
+  bomItemId: number; drawingId: number; fullCode: string; displayName: string;
+  projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'voided';
+  effectiveMaterialBatchId: number | null; effectiveBatchRelativePath: string | null; effectiveBatchName: string | null;
+  material: string | null; dimensions: string | null; position: string | null; notes: string | null; usesWhiteMaterial: boolean;
+  assets: BomItemAssetView[]; qrCodes: BomQrCodeView[];
 }
 export interface BomVersionSummaryView {
-  id: number; productId: number; model: string; colorId: number; colorName: string; versionNumber: number;
-  previousVersionId: number | null; notes: string | null; createdAt: string;
+  id: number; productId: number; model: string; versionNumber: number; previousVersionId: number | null;
+  businessChangeDate: string | null; businessChangeDateLabel: string; notes: string | null; createdAt: string;
 }
 export interface BomVersionView extends BomVersionSummaryView { items: BomItemView[] }
 export interface BomDiffView {
@@ -93,8 +102,10 @@ export interface BomDiffView {
   previousDrawingId: number | null; previousFullCode: string | null; drawingId: number | null; fullCode: string | null;
 }
 export interface SaveBomView {
-  productId: number; colorId: number; expectedCurrentVersionId: number | null; notes?: string;
-  items: Array<{ projectItemId: number; drawingId: number; quantity: number; notes?: string; usesWhiteMaterial: boolean }>;
+  productId: number; businessChangeDate: string; expectedCurrentVersionId: number | null; notes?: string;
+  items: Array<{ projectItemId: number; drawingId: number; usesWhiteMaterial: boolean; effectiveMaterialBatchId?: number;
+    material?: string; dimensions?: string; position?: string; notes?: string;
+    assets?: Array<{ role: 'image' | 'diagram'; assetId?: number; reusePrevious?: boolean }>; qrCodeIds?: number[] }>;
 }
 
 export interface WorkspaceSettingsView {
@@ -178,12 +189,14 @@ export interface PlannerApi {
   previewPlan(input: { productId: number; appearanceId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
   reservePlan(input: { productId: number; appearanceId?: number;
     rows: Array<PlanningRowInputView & { expectedFullCode: string }> }): Promise<ReservedDrawingView[]>;
-  getCurrentBom(productId: number, colorId: number): Promise<BomVersionView | null>;
-  listBomVersions(productId: number, colorId: number): Promise<BomVersionSummaryView[]>;
-  queryBomVersions(filters?: { model?: string; projectItemId?: number; fullCode?: string }): Promise<BomVersionSummaryView[]>;
+  getCurrentBom(productId: number): Promise<BomVersionView | null>;
+  listBomVersions(productId: number): Promise<BomVersionSummaryView[]>;
+  queryBomVersions(filters?: { model?: string; businessChangeDate?: string; effectiveBatchRelativePath?: string; projectItemId?: number; fullCode?: string }): Promise<BomVersionSummaryView[]>;
   getBomVersion(id: number): Promise<BomVersionView>;
-  listBomCandidates(input: { productId: number; bomColorId: number; projectItemId: number;
-    usesWhiteMaterial: boolean }): Promise<BomCandidateView[]>;
+  listBomCandidates(input: { productId: number; projectItemId: number; usesWhiteMaterial: boolean }): Promise<BomCandidateView[]>;
+  listBomQrCandidates(productId: number): Promise<BomQrCandidateView[]>;
+  uploadBomAsset(productId: number, file: File): Promise<BomAssetView>;
+  relinkBomMaterialBatch(id: number): Promise<{ relinked: number }>;
   saveBomVersion(input: SaveBomView): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
   getWorkspaceSettings(): Promise<WorkspaceSettingsView>;
   updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
@@ -353,15 +366,22 @@ export const apiClient: PlannerApi = {
   confirmImport: (auditId, selections) => request('/api/import/excel/confirm', json('POST', { auditId, selections })),
   previewPlan: (input) => request('/api/planning/preview', json('POST', input)),
   reservePlan: async (input) => (await request<{ items: ReservedDrawingView[] }>('/api/planning/reserve', json('POST', input))).items,
-  getCurrentBom: async (productId, colorId) => (await request<{ version: BomVersionView | null }>(
-    `/api/boms/current${queryString({ productId, colorId })}`)).version,
-  listBomVersions: async (productId, colorId) => (await request<{ items: BomVersionSummaryView[] }>(
-    `/api/boms/versions${queryString({ productId, colorId })}`)).items,
+  getCurrentBom: async (productId) => (await request<{ version: BomVersionView | null }>(
+    `/api/boms/current${queryString({ productId })}`)).version,
+  listBomVersions: async (productId) => (await request<{ items: BomVersionSummaryView[] }>(
+    `/api/boms/versions${queryString({ productId })}`)).items,
   queryBomVersions: async (filters = {}) => (await request<{ items: BomVersionSummaryView[] }>(
     `/api/boms/query${queryString(filters)}`)).items,
   getBomVersion: (id) => request(`/api/boms/versions/${id}`),
   listBomCandidates: async (input) => (await request<{ items: BomCandidateView[] }>(
     `/api/boms/candidates${queryString(input)}`)).items,
+  listBomQrCandidates: async (productId) => (await request<{ items: BomQrCandidateView[] }>(
+    `/api/boms/qr-candidates${queryString({ productId })}`)).items,
+  uploadBomAsset: async (productId, file) => {
+    const body = new FormData(); body.append('productId', String(productId)); body.append('file', file);
+    return (await request<{ asset: BomAssetView }>('/api/boms/assets', { method: 'POST', body })).asset;
+  },
+  relinkBomMaterialBatch: (id) => request(`/api/boms/material-batches/${id}/relink`, { method: 'POST' }),
   saveBomVersion: (input) => request('/api/boms/versions', json('POST', input)),
   getWorkspaceSettings: () => request('/api/files/settings'),
   updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
