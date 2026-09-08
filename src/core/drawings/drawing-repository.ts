@@ -165,14 +165,15 @@ export class DrawingRepository {
       }>;
     const files = fileRows.map((file): DrawingFileRecord => ({ ...file, isPresent: file.isPresent === 1 }));
     const currentBomUsage = drawing.origin === 'planned' ? (this.db.prepare(`select version.id as bomVersionId,
-      version.product_id as productId, product.model, version.color_id as colorId, color.name as colorName,
+      version.product_id as productId, product.model, usage_drawing.color_id as colorId, color.name as colorName,
       version.version_number as versionNumber, item.project_item_id as projectItemId,
       project.name as projectItemName, item.quantity, item.uses_white_material as usesWhiteMaterial
       from bom_current current_bom
       join bom_versions version on version.id = current_bom.version_id
       join products product on product.id = version.product_id
-      join dictionary_items color on color.id = version.color_id
       join bom_items item on item.bom_version_id = version.id
+      join drawing_numbers usage_drawing on usage_drawing.id = item.drawing_id
+      join dictionary_items color on color.id = usage_drawing.color_id
       join dictionary_items project on project.id = item.project_item_id
       where item.drawing_id = ? order by product.model, color.name, project.name`)
       .all(drawing.id) as DrawingBomUsageRow[]).map((row): DrawingBomUsage => ({

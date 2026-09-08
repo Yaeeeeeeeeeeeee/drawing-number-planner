@@ -352,12 +352,12 @@ describe('FileRepository', () => {
     repository.replaceScan([indexed], [{ ...historical, directoryContext: {
       productCategory: '03.冰柜', sku: 'TEST-FILE-REPOSITORY', model: 'ZC100',
     } }], '2026-08-25T04:00:00.000Z');
-    const drawingReferences = db.prepare('select product_id as productId, color_id as colorId from drawing_numbers where id = ?')
-      .get(drawing.id) as { productId: number; colorId: number };
-    const bom = db.prepare(`insert into bom_versions (product_id, color_id, version_number, created_at)
-      values (?, ?, 1, '2026-08-25T04:00:00.000Z') returning id`).get(drawingReferences.productId, drawingReferences.colorId) as { id: number };
-    db.prepare('insert into bom_current (product_id, color_id, version_id, updated_at) values (?, ?, ?, ?)')
-      .run(drawingReferences.productId, drawingReferences.colorId, bom.id, '2026-08-25T04:00:00.000Z');
+    const drawingReferences = db.prepare('select product_id as productId from drawing_numbers where id = ?')
+      .get(drawing.id) as { productId: number };
+    const bom = db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at)
+      values (?, 1, '2026-08-25', '2026-08-25T04:00:00.000Z') returning id`).get(drawingReferences.productId) as { id: number };
+    db.prepare('insert into bom_current (product_id, version_id, updated_at) values (?, ?, ?)')
+      .run(drawingReferences.productId, bom.id, '2026-08-25T04:00:00.000Z');
     const preserved = {
       dictionaries: db.prepare('select count(*) as count from dictionary_items').get(),
       products: db.prepare('select count(*) as count from products').get(),

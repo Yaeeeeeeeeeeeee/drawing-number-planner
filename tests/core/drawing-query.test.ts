@@ -119,17 +119,17 @@ describe('DrawingQueryService', () => {
       values ('outlined/missing.pdf', 'missing.pdf', ?, 'matched', '[]', 'outlined', 20, ?, ?, 0)`)
       .run(ids.first, now, now).lastInsertRowid);
     const versionId = Number(db.prepare(`insert into bom_versions
-      (product_id, color_id, version_number, previous_version_id, notes, created_at)
-      select product_id, color_id, 1, null, 'current', ? from drawing_numbers where id = ?`)
+      (product_id, version_number, previous_version_id, business_change_date, notes, created_at)
+      select product_id, 1, null, '2026-08-26', 'current', ? from drawing_numbers where id = ?`)
       .run(now, ids.first).lastInsertRowid);
     db.prepare(`insert into bom_items
       (bom_version_id, project_item_id, drawing_id, quantity, notes, uses_white_material)
       values (?, ?, ?, 2, 'used', 0)`).run(versionId, ids.logo, ids.first);
-    db.prepare(`insert into bom_current (product_id, color_id, version_id, updated_at)
-      select product_id, color_id, ?, ? from drawing_numbers where id = ?`).run(versionId, now, ids.first);
+    db.prepare(`insert into bom_current (product_id, version_id, updated_at)
+      select product_id, ?, ? from drawing_numbers where id = ?`).run(versionId, now, ids.first);
     const staleVersionId = Number(db.prepare(`insert into bom_versions
-      (product_id, color_id, version_number, previous_version_id, notes, created_at)
-      select product_id, color_id, 2, ?, 'not current', ? from drawing_numbers where id = ?`)
+      (product_id, version_number, previous_version_id, business_change_date, notes, created_at)
+      select product_id, 2, ?, '2026-08-27', 'not current', ? from drawing_numbers where id = ?`)
       .run(versionId, now, ids.first).lastInsertRowid);
     db.prepare(`insert into bom_items
       (bom_version_id, project_item_id, drawing_id, quantity, notes, uses_white_material)
