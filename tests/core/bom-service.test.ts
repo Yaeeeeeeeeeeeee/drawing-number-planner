@@ -16,10 +16,106 @@ function setup() {
   const draw = (productId: number, colorId: number, projectItemId: number) => { const input = { productId, rows: [{ clientId: `${productId}-${colorId}-${projectItemId}-${Math.random()}`, colorId, mainCategoryId: main.id, projectItemId }] }; const preview = planning.preview(input); return planning.reserve({ ...input, rows: [{ ...input.rows[0], expectedFullCode: preview.rows[0].fullCode }] })[0]; };
   return { white, gray, logo, manual, product, other, draw };
 }
+function insertBatch(productId: number | null, relativePath: string, name = '01.20260901', isPresent = true): number {
+  return Number(db.prepare(`insert into material_batches
+    (relative_path, product_directory, product_id, name, sequence_number, business_date, recognition_status,
+      is_present, first_seen_at, last_seen_at)
+    values (?, ?, ?, ?, 1, '2026-09-01', 'recognized', ?, '2026-09-01', '2026-09-01')`)
+    .run(relativePath, relativePath.split('\\03.')[0], productId, name, isPresent ? 1 : 0).lastInsertRowid);
+}
+function insertAsset(name: string): number {
+  return Number(db.prepare(`insert into bom_assets
+    (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at)
+    values (?, ?, 'image/png', 8, ?, '2026-09-01')`)
+    .run(`_图号规划器\\BOM附件\\${name}`, name, name.padEnd(64, '0').slice(0, 64)).lastInsertRowid);
+}
 describe('product-level BOM service', () => {
   it('saves immutable product snapshots with date, formal fields, fixed quantity, and field diffs', () => { const r = setup(); const d = r.draw(r.product.id, r.gray.id, r.logo.id); const first = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, material: 'PET', dimensions: '10', position: 'front', notes: 'n' }] }); const second = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: first.version.id, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, material: 'PP', dimensions: '10', position: 'front', notes: 'n' }] }); expect(first.version.items[0]).toMatchObject({ quantity: 1, material: 'PET' }); expect(second.diff[0].type).toBe('replaced'); expect(service.getVersion(first.version.id).items[0].material).toBe('PET'); });
   it('rejects invalid drawings, duplicates, empty BOMs and invalid dates', () => { const r = setup(); const own = r.draw(r.product.id, r.gray.id, r.logo.id); const other = r.draw(r.other.id, r.gray.id, r.logo.id); const wrong = r.draw(r.product.id, r.gray.id, r.manual.id); db.prepare("update drawing_numbers set status = 'voided' where id = ?").run(own.id); const save = (item: object) => () => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [item as never] }); expect(save({ projectItemId: r.logo.id, drawingId: other.id, usesWhiteMaterial: false })).toThrow(/其他型号/); expect(save({ projectItemId: r.logo.id, drawingId: wrong.id, usesWhiteMaterial: false })).toThrow(/项目不一致/); expect(save({ projectItemId: r.logo.id, drawingId: own.id, usesWhiteMaterial: false })).toThrow(/作废/); expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: 'bad', expectedCurrentVersionId: null, items: [] })).toThrow(/日期/); });
   it('enforces white-share and returns product/project candidates only', () => { const r = setup(); const gray = r.draw(r.product.id, r.gray.id, r.logo.id); const white = r.draw(r.product.id, r.white.id, r.logo.id); r.draw(r.other.id, r.gray.id, r.logo.id); expect(service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id, usesWhiteMaterial: true }).map(x => x.id)).toEqual([white.id]); expect(service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id, usesWhiteMaterial: false }).map(x => x.id)).toContain(gray.id); expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: gray.id, usesWhiteMaterial: true }] })).toThrow(/白色/); });
-  it('keeps legacy NULL date label and filters/sorts by date, batch, project and drawing', () => { const r = setup(); const d = r.draw(r.product.id, r.gray.id, r.logo.id); db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at) values (?, 99, null, ?)`).run(r.product.id, '2020-01-01T00:00:00Z'); const saved = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, effectiveBatchRelativePath: 'A/B', effectiveBatchName: 'B' }] }); expect(service.queryVersions({ businessChangeDate: '2026-09-02', effectiveBatchRelativePath: 'A', projectItemId: r.logo.id, fullCode: d.fullCode })[0].id).toBe(saved.version.id); expect(service.listVersions(r.product.id).at(-1)?.businessChangeDateLabel).toBe('未补录'); });
+  it('keeps legacy NULL date label and filters/sorts by date, batch, project and drawing', () => { const r = setup(); const d = r.draw(r.product.id, r.gray.id, r.logo.id); db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at) values (?, 99, null, ?)`).run(r.product.id, '2020-01-01T00:00:00Z'); const batchPath = '01.冰柜\\SKU1-X1\\03.量产后的变更文件\\01.20260901'; const batchId = insertBatch(r.product.id, batchPath); const saved = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, effectiveMaterialBatchId: batchId }] }); expect(service.queryVersions({ businessChangeDate: '2026-09-02', effectiveBatchRelativePath: '20260901', projectItemId: r.logo.id, fullCode: d.fullCode })[0].id).toBe(saved.version.id); expect(service.listVersions(r.product.id).at(-1)?.businessChangeDateLabel).toBe('未补录'); });
   it('rejects invalid QR references and missing predecessor assets', () => { const r = setup(); const d = r.draw(r.product.id, r.gray.id, r.logo.id); const qr = db.prepare('select id from product_qr_codes where product_id = ? limit 1').get(r.product.id) as { id: number }; expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, qrCodeIds: [qr.id] }] })).toThrow(/启用/); expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, assets: [{ role: 'image', reusePrevious: true }] }] })).toThrow(/上一版/); });
+
+  it('rejects an empty BOM and duplicate projects using an otherwise valid request', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [] }))
+      .toThrowError(expect.objectContaining({ code: 'INVALID_BOM_ITEM_COUNT' }));
+    const item = { projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false };
+    expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [item, item] }))
+      .toThrowError(expect.objectContaining({ code: 'DUPLICATE_PROJECT' }));
+  });
+
+  it('derives batch snapshots on the server and relinks only the owning product', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    const path = '01.冰柜\\SKU1-X1\\03.量产后的变更文件\\01.20260901';
+    const batchId = insertBatch(r.product.id, path);
+    expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        effectiveMaterialBatchId: batchId, effectiveBatchRelativePath: 'client\\forged', effectiveBatchName: 'forged' }] }))
+      .toThrowError(expect.objectContaining({ code: 'BATCH_SNAPSHOT_MISMATCH' }));
+    const saved = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false, effectiveMaterialBatchId: batchId }] });
+    expect(saved.version.items[0]).toMatchObject({ effectiveMaterialBatchId: batchId, effectiveBatchRelativePath: path,
+      effectiveBatchName: '01.20260901' });
+
+    db.prepare('update bom_items set effective_material_batch_id = null where bom_version_id = ?').run(saved.version.id);
+    const otherDrawing = r.draw(r.other.id, r.gray.id, r.logo.id);
+    const otherVersion = Number(db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at)
+      values (?, 1, '2026-09-02', '2026-09-02')`).run(r.other.id).lastInsertRowid);
+    const otherItem = Number(db.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id, quantity, effective_batch_relative_path, effective_batch_name, uses_white_material)
+      values (?, ?, ?, 1, ?, '01.20260901', 0)`).run(otherVersion, r.logo.id, otherDrawing.id, path).lastInsertRowid);
+    expect(service.relinkMaterialBatch(batchId)).toEqual({ relinked: 1 });
+    expect(db.prepare('select effective_material_batch_id as id from bom_items where id = ?').get(otherItem)).toEqual({ id: null });
+    const unowned = insertBatch(null, '01.冰柜\\UNKNOWN-X\\03.量产后的变更文件\\01.20260901');
+    expect(() => service.relinkMaterialBatch(unowned)).toThrowError(expect.objectContaining({ code: 'BATCH_NOT_ELIGIBLE' }));
+  });
+
+  it('treats inherited links and later batch relinking as semantic no-ops, but detects actual asset changes', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id); const firstAsset = insertAsset('first.png');
+    const first = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        assets: [{ role: 'image', assetId: firstAsset }] }] });
+    const inherited = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: first.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        assets: [{ role: 'image', reusePrevious: true }] }] });
+    expect(inherited.diff).toEqual([expect.objectContaining({ type: 'unchanged' })]);
+    expect(inherited.version.items[0].assets[0]).toMatchObject({ assetId: firstAsset,
+      inheritedFromBomItemAssetId: first.version.items[0].assets[0].id });
+    const replacement = insertAsset('replacement.png');
+    const replaced = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-04', expectedCurrentVersionId: inherited.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        assets: [{ role: 'image', assetId: replacement }] }] });
+    expect(replaced.diff).toEqual([expect.objectContaining({ type: 'replaced' })]);
+  });
+
+  it('does not report a replacement when a rescanned batch keeps the same snapshot but receives a new database id', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    const path = '01.冰柜\\SKU1-X1\\03.量产后的变更文件\\01.20260901';
+    const firstBatch = insertBatch(r.product.id, path);
+    const first = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        effectiveMaterialBatchId: firstBatch }] });
+    db.prepare('delete from material_batches where id = ?').run(firstBatch);
+    const rescannedBatch = insertBatch(r.product.id, path);
+    const second = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-03',
+      expectedCurrentVersionId: first.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false,
+        effectiveMaterialBatchId: rescannedBatch }] });
+    expect(second.diff).toEqual([expect.objectContaining({ type: 'unchanged' })]);
+  });
+
+  it('accepts only active same-product QR codes for new BOMs while preserving later inactive history', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    const ownQr = db.prepare('select id from product_qr_codes where product_id = ? limit 1').get(r.product.id) as { id: number };
+    const otherQr = db.prepare('select id from product_qr_codes where product_id = ? limit 1').get(r.other.id) as { id: number };
+    db.prepare("update product_qr_codes set status = 'active' where id in (?, ?)").run(ownQr.id, otherQr.id);
+    expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false, qrCodeIds: [otherQr.id] }] }))
+      .toThrowError(expect.objectContaining({ code: 'QR_CODE_NOT_ELIGIBLE' }));
+    const saved = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false, qrCodeIds: [ownQr.id] }] });
+    db.prepare("update product_qr_codes set status = 'inactive' where id = ?").run(ownQr.id);
+    expect(service.getVersion(saved.version.id).items[0].qrCodes).toEqual([expect.objectContaining({ id: ownQr.id, status: 'inactive' })]);
+  });
 });

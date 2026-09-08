@@ -34,11 +34,11 @@ function buildDiff(previous: BomVersionDetail | null, current: BomVersionDetail)
     if (!oldItem) type = 'added';
     else if (!newItem) type = 'removed';
     else type = JSON.stringify({ drawingId: oldItem.drawingId, effectiveBatchRelativePath: oldItem.effectiveBatchRelativePath,
-      effectiveBatchName: oldItem.effectiveBatchName, effectiveMaterialBatchId: oldItem.effectiveMaterialBatchId,
+      effectiveBatchName: oldItem.effectiveBatchName,
       material: oldItem.material, dimensions: oldItem.dimensions, position: oldItem.position, notes: oldItem.notes,
       usesWhiteMaterial: oldItem.usesWhiteMaterial, assets: oldItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: oldItem.qrCodes.map((qr) => qr.id) })
       === JSON.stringify({ drawingId: newItem.drawingId, effectiveBatchRelativePath: newItem.effectiveBatchRelativePath,
-        effectiveBatchName: newItem.effectiveBatchName, effectiveMaterialBatchId: newItem.effectiveMaterialBatchId,
+        effectiveBatchName: newItem.effectiveBatchName,
         material: newItem.material, dimensions: newItem.dimensions, position: newItem.position, notes: newItem.notes,
         usesWhiteMaterial: newItem.usesWhiteMaterial, assets: newItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: newItem.qrCodes.map((qr) => qr.id) }) ? 'unchanged' : 'replaced';
     const item = newItem ?? oldItem!;

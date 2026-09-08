@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import multipart from '@fastify/multipart';
 import { createWriteStream, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +8,7 @@ import { z } from 'zod';
 import { BomError } from '../../core/bom/bom-errors.js';
 import { FileError } from '../../core/files/file-errors.js';
 import type { BomService } from '../../core/bom/bom-service.js';
+import { ensureMultipart } from '../multipart.js';
 
 const productQuery = z.object({ productId: z.coerce.number().int().positive() }).strict();
 const candidateQuery = z.object({
@@ -44,7 +44,7 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
-  app.register(multipart, { limits: { files: 1, fileSize: 20 * 1024 * 1024 } });
+  ensureMultipart(app);
   app.get('/api/boms/query', async (request, reply) => {
     const query = bomQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
@@ -81,17 +81,18 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
     try { return service.relinkMaterialBatch(params.data.id); } catch (error) { return sendBomError(reply, error); }
   });
   app.post('/api/boms/assets', async (request, reply) => {
-    const upload = await request.file();
-    if (!upload) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '缺少 BOM 图片文件' } });
-    const productField = upload.fields.productId;
-    const productValue = !productField || Array.isArray(productField) || productField.type !== 'field' ? undefined : productField.value;
-    const productId = z.coerce.number().int().positive().safeParse(productValue);
-    if (!productId.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
-    const staging = mkdtempSync(join(tmpdir(), 'planner-bom-upload-'));
-    const originalName = upload.filename || 'upload';
-    const extension = originalName.includes('.') ? originalName.slice(originalName.lastIndexOf('.')) : '';
-    const sourcePath = join(staging, `upload${extension}`);
+    let staging: string | null = null;
     try {
+      const upload = await request.file();
+      if (!upload) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '缺少 BOM 图片文件' } });
+      const productField = upload.fields.productId;
+      const productValue = !productField || Array.isArray(productField) || productField.type !== 'field' ? undefined : productField.value;
+      const productId = z.coerce.number().int().positive().safeParse(productValue);
+      if (!productId.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
+      staging = mkdtempSync(join(tmpdir(), 'planner-bom-upload-'));
+      const originalName = upload.filename || 'upload';
+      const extension = originalName.includes('.') ? originalName.slice(originalName.lastIndexOf('.')) : '';
+      const sourcePath = join(staging, `upload${extension}`);
       await pipeline(upload.file, createWriteStream(sourcePath, { flags: 'wx' }));
       if (upload.file.truncated) return reply.code(422).send({ error: { code: 'ASSET_TOO_LARGE', message: 'BOM 图片不能超过 10485760 字节' } });
       const size = (await import('node:fs')).statSync(sourcePath).size;
@@ -99,8 +100,12 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
       const asset = service.importAsset(productId.data, sourcePath, originalName);
       return reply.code(201).send({ asset });
     } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      if (code === 'FST_REQ_FILE_TOO_LARGE' || code === 'FST_FILES_LIMIT') {
+        return reply.code(422).send({ error: { code: 'ASSET_TOO_LARGE', message: 'BOM 图片不能超过 10485760 字节' } });
+      }
       return sendBomError(reply, error);
-    } finally { rmSync(staging, { recursive: true, force: true }); }
+    } finally { if (staging) rmSync(staging, { recursive: true, force: true }); }
   });
   app.post('/api/boms/versions', async (request, reply) => {
     const input = saveSchema.safeParse(request.body);

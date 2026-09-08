@@ -1,4 +1,3 @@
-import multipart from '@fastify/multipart';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
@@ -6,6 +5,7 @@ import { ExcelAuditError, auditWorkbook, includeDatabaseConflicts, type ImportAu
 import { ExcelImportError, importApprovedRows } from '../../core/import/excel-import.js';
 import { DictionaryError } from '../../core/dictionaries/dictionary-service.js';
 import type { PlannerDatabase } from '../../db/database.js';
+import { ensureMultipart } from '../multipart.js';
 
 const confirmSchema = z.object({
   auditId: z.string().uuid(),
@@ -30,10 +30,7 @@ export async function registerImportRoutes(
 ): Promise<void> {
   const audits = new Map<string, { report: ImportAuditReport; createdAt: number }>();
   const auditLifetimeMs = 30 * 60 * 1000;
-  await app.after();
-  if (!app.hasDecorator('multipartErrors')) {
-    await app.register(multipart, { limits: { files: 1, fileSize: 20 * 1024 * 1024 } });
-  }
+  ensureMultipart(app);
 
   app.post('/api/import/excel/audit', async (request, reply) => {
     const upload = await request.file();
