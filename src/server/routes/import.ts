@@ -30,7 +30,10 @@ export async function registerImportRoutes(
 ): Promise<void> {
   const audits = new Map<string, { report: ImportAuditReport; createdAt: number }>();
   const auditLifetimeMs = 30 * 60 * 1000;
-  await app.register(multipart, { limits: { files: 1, fileSize: 20 * 1024 * 1024 } });
+  await app.after();
+  if (!app.hasDecorator('multipartErrors')) {
+    await app.register(multipart, { limits: { files: 1, fileSize: 20 * 1024 * 1024 } });
+  }
 
   app.post('/api/import/excel/audit', async (request, reply) => {
     const upload = await request.file();
