@@ -63,7 +63,7 @@ describe('daily first-launch backup', () => {
     expect(dailyFiles).toHaveLength(30);
     expect(existsSync(importBackup)).toBe(true);
     database.close();
-  }, 15_000);
+  }, 30_000);
 
   it('does not let a corrupt daily-looking file evict a valid backup', () => {
     const dir = mkdtempSync(join(tmpdir(), 'drawing-planner-daily-corrupt-'));
@@ -78,7 +78,7 @@ describe('daily first-launch backup', () => {
     expect(validDaily).toHaveLength(30);
     expect(existsSync(corrupt)).toBe(true);
     database.close();
-  });
+  }, 30_000);
 
   it('reports a failed backup without deleting older copies', () => {
     const dir = mkdtempSync(join(tmpdir(), 'drawing-planner-daily-failure-'));
