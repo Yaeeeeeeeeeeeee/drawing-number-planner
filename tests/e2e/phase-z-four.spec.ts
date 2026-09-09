@@ -63,7 +63,7 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   await expect(page.getByText('资料根目录已保存')).toBeVisible();
   await page.getByRole('button', { name: '扫描资料库' }).click();
   await expect(page.getByText('资料库扫描完成')).toBeVisible();
-  await expect(page.getByText('4 个 PDF')).toBeVisible();
+  await expect(page.getByText('4 个索引文件（PDF / 二维码）')).toBeVisible();
   await expect(page.getByText('2 已匹配')).toBeVisible();
   await expect(page.getByText('1 未匹配')).toBeVisible();
   await expect(page.getByText('1 待确认')).toBeVisible();
