@@ -78,7 +78,7 @@ export interface FileScanRunView extends FileScanComparison {
 
 export interface FileScanChangeView {
   id: number; type: 'added' | 'missing' | 'moved' | 'changed'; relativePath: string;
-  previousRelativePath: string | null; fileName: string; fullCode: string | null;
+  indexKind: 'pdf' | 'qr'; previousRelativePath: string | null; fileName: string; fullCode: string | null;
 }
 
 export interface FileScanChangesView {

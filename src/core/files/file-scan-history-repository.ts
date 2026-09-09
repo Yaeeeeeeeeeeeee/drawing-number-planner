@@ -26,9 +26,9 @@ export class FileScanHistoryRepository {
       added_count as added, missing_count as missing, moved_count as moved, changed_count as changed,
       unchanged_count as unchanged from file_scan_runs where id = ?`).get(id) as ScanRunRow | undefined;
     if (!scan) return null;
-    const rows = this.db.prepare(`select id, change_type as type, relative_path as relativePath,
+    const rows = this.db.prepare(`select id, change_type as type, index_kind as indexKind, relative_path as relativePath,
       previous_relative_path as previousRelativePath, file_name as fileName, full_code as fullCode
-      from file_scan_changes where scan_run_id = ? and index_kind = 'pdf'
+      from file_scan_changes where scan_run_id = ?
         and change_type in ('added', 'missing', 'moved', 'changed') order by id`).all(id) as FileScanChangeView[];
     const changes: FileScanChangesView['changes'] = { added: [], missing: [], changed: [] };
     for (const row of rows) {

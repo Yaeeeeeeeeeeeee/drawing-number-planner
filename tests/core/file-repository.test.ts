@@ -5,6 +5,7 @@ import { DrawingQueryService } from '../../src/core/drawings/drawing-query-servi
 import { FileRepository } from '../../src/core/files/file-repository';
 import { FileError } from '../../src/core/files/file-errors';
 import type { FileScanRecord } from '../../src/core/files/file-types';
+import type { QrFileScanRecord } from '../../src/core/qr/qr-types';
 import { parseMaterialBatch } from '../../src/core/files/material-batch-parser';
 import { parseDrawingCode } from '../../src/core/drawings/drawing-code';
 import { PlanningService } from '../../src/core/planning/planning-service';
@@ -184,6 +185,23 @@ describe('FileRepository', () => {
       .toEqual({ total_current: 3, added_count: 3, missing_count: 0, moved_count: 0, changed_count: 0, unchanged_count: 0 });
     expect(db.prepare("select index_kind, change_type, file_index_id from file_scan_changes order by id").all()).toHaveLength(3);
     expect(db.prepare('select count(*) as count from pdf_files where last_seen_scan_run_id is not null').get()).toEqual({ count: 3 });
+  });
+
+  it('exposes QR additions and missing files in scan history with their index kind', () => {
+    const qr: QrFileScanRecord = {
+      relativePath: 'QR100-Manual（网址编码）.png', fileName: 'QR100-Manual（网址编码）.png', mimeType: 'image/png',
+      sizeBytes: 120, modifiedAt: '2026-08-25T01:00:00.000Z', qrCodeId: null, matchStatus: 'pending', classificationWarning: null,
+    };
+
+    repository.replaceScan([], [], '2026-08-25T04:00:00.000Z', [qr]);
+    expect(repository.scanChanges(1)?.changes.added).toEqual([
+      expect.objectContaining({ relativePath: qr.relativePath, indexKind: 'qr', type: 'added' }),
+    ]);
+
+    repository.replaceScan([], [], '2026-08-26T04:00:00.000Z');
+    expect(repository.scanChanges(2)?.changes.missing).toEqual([
+      expect.objectContaining({ relativePath: qr.relativePath, indexKind: 'qr', type: 'missing' }),
+    ]);
   });
 
   it('records a uniquely hash-matched move against the current file index identity', () => {

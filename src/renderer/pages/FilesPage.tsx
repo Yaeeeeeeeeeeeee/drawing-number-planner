@@ -139,7 +139,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       setFilters(nextFilters);
       setFiles([]); setTotal(0); setBatches([]); setPage(1);
       setSummary(null); setScanChanges(null); setShowChanges(false);
-      setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
+      setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.qrCodeFiles} 条二维码索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
       await refreshAfterIndexClear(nextFilters);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引失败'); }
     finally { setClearingIndex(false); }
@@ -172,7 +172,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     </section>
     {error && <p className="error-banner">{error}</p>}{message && <p className="success-banner"><strong>{message}</strong></p>}
     {summary && <>
-      <section className="scan-summary" aria-label="当前资料库状态"><strong>当前资料库状态</strong><span>{summary.currentTotal} 个 PDF</span>
+      <section className="scan-summary" aria-label="当前资料库状态"><strong>当前资料库状态</strong><span>{summary.currentTotal} 个索引文件（PDF / 二维码）</span>
         <span>{summary.matched} 已匹配</span><span>{summary.pending} 待确认</span>
         <span>{summary.historicalRegistered} 个历史图号已登记</span><span>{summary.unmatched} 未匹配</span>
         <span>{summary.conflict} 冲突</span><span>{summary.source} 转曲前</span><span>{summary.outlined} 转曲后</span></section>
@@ -185,7 +185,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       {showChanges && scanChanges && <section id="scan-change-details" className="scan-change-details" aria-label="本次扫描变化详情">
         {([['新增', scanChanges.changes.added], ['删除/缺失', scanChanges.changes.missing], ['变化', scanChanges.changes.changed]] as const)
           .map(([label, items]) => <div className="scan-change-group" key={label}><strong>{label}</strong>
-            {items.length ? <ul>{items.map((item) => <li key={`${label}-${item.id}`}><span>{item.fileName}</span><small className="mono">{item.relativePath}{item.previousRelativePath ? ` ← ${item.previousRelativePath}` : ''}</small></li>)}</ul>
+            {items.length ? <ul>{items.map((item) => <li key={`${label}-${item.id}`}><span>{item.indexKind === 'qr' ? '二维码' : 'PDF'} · {item.fileName}</span><small className="mono">{item.relativePath}{item.previousRelativePath ? ` ← ${item.previousRelativePath}` : ''}</small></li>)}</ul>
               : <p className="muted-text">无</p>}</div>)}
       </section>}
     </>}
@@ -221,7 +221,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     {indexClearPreview && !indexClearConfirming && <section className="file-cleanup-confirmation" role="dialog" aria-label="确认清空资料库索引">
       <strong>清空资料库索引</strong>
       <p>资料根目录：{indexClearPreview.workspaceRoot ?? '未配置'}</p>
-      <ul><li>PDF 索引：{indexClearPreview.counts.pdfFiles}</li><li>资料批次：{indexClearPreview.counts.materialBatches}</li>
+      <ul><li>PDF 索引：{indexClearPreview.counts.pdfFiles}</li><li>二维码索引：{indexClearPreview.counts.qrCodeFiles}</li><li>资料批次：{indexClearPreview.counts.materialBatches}</li>
         <li>扫描变化：{indexClearPreview.counts.scanChanges}</li><li>扫描记录：{indexClearPreview.counts.scanRuns}</li></ul>
       <p>不会删除 {indexClearPreview.workspaceRoot ?? '当前资料根目录'} 中的任何实际文件。</p>
       <div><button className="secondary-button" type="button" disabled={clearingIndex} onClick={cancelIndexClear}>取消</button>

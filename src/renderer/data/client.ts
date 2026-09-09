@@ -138,10 +138,10 @@ export interface MaterialBatchLogicalMaterialView {
 export interface FileScanComparisonView { added: number; missing: number; moved: number; changed: number; unchanged: number }
 export interface FileScanRunView extends FileScanComparisonView { id: number; completedAt: string; currentTotal: number }
 export interface FileScanChangeView { id: number; type: 'added' | 'missing' | 'moved' | 'changed'; relativePath: string;
-  previousRelativePath: string | null; fileName: string; fullCode: string | null }
+  indexKind: 'pdf' | 'qr'; previousRelativePath: string | null; fileName: string; fullCode: string | null }
 export interface FileScanChangesView { scan: FileScanRunView;
   changes: { added: FileScanChangeView[]; missing: FileScanChangeView[]; changed: FileScanChangeView[] } }
-export interface FileIndexClearResultView { pdfFiles: number; materialBatches: number; scanChanges: number; scanRuns: number }
+export interface FileIndexClearResultView { pdfFiles: number; qrCodeFiles: number; materialBatches: number; scanChanges: number; scanRuns: number }
 export interface FileIndexClearPreviewView { workspaceRoot: string | null; counts: FileIndexClearResultView }
 export interface PdfFileView {
   id: number; relativePath: string; fileName: string; drawingId: number | null; historicalDrawingId: number | null;
