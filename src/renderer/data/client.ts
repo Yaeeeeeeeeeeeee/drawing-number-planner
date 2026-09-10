@@ -78,6 +78,11 @@ export interface BomCandidateView {
   id: number; fullCode: string; displayName: string;
   projectItemId: number; projectItemName: string; status: 'reserved' | 'active';
 }
+
+export interface ProductReferenceSummaryView {
+  referenceProductCount: number; plannedDrawingCount: number; historicalDrawingCount: number;
+  materialBatchCount: number; bomCount: number; configuredQrCount: number;
+}
 export interface BomAssetView {
   id: number; relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number;
   contentSha256: string; createdAt: string;
@@ -176,6 +181,8 @@ export interface PlannerApi {
   createProduct(input: Record<string, unknown>): Promise<ProductView>;
   updateProduct(id: number, input: Record<string, unknown>): Promise<ProductView>;
   deactivateProduct(id: number): Promise<ProductView>;
+  activateProduct(id: number): Promise<ProductView>;
+  deleteProduct(id: number): Promise<{ deleted: true }>;
   listQrCodes(filters?: ProductQrCodeFilters): Promise<{ items: ProductQrCodeView[] }>;
   getQrCode(id: number): Promise<ProductQrCodeView>;
   updateQrCode(id: number, input: { name: string; targetUrl: string | null }): Promise<ProductQrCodeView>;
@@ -212,7 +219,7 @@ export interface PlannerApi {
 }
 
 export class ApiError extends Error {
-  constructor(public readonly code: string, message: string) { super(message); }
+  constructor(public readonly code: string, message: string, public readonly referenceSummary?: ProductReferenceSummaryView) { super(message); }
 }
 
 type ResponseBody =
@@ -253,7 +260,7 @@ function responseError(response: Response, body: ResponseBody): ApiError {
   const value = body.kind === 'json' ? body.value : undefined;
   const backendError = value && typeof value === 'object' ? value.error : undefined;
   if (backendError?.code || backendError?.message) {
-    return new ApiError(backendError.code ?? 'REQUEST_FAILED', backendError.message ?? '请求失败');
+    return new ApiError(backendError.code ?? 'REQUEST_FAILED', backendError.message ?? '请求失败', backendError.referenceSummary);
   }
   const jsonMessage = value && typeof value === 'object' && typeof value.message === 'string'
     ? value.message
@@ -350,6 +357,8 @@ export const apiClient: PlannerApi = {
   createProduct: (input) => request('/api/products', json('POST', input)),
   updateProduct: (id, input) => request(`/api/products/${id}`, json('PUT', input)),
   deactivateProduct: (id) => request(`/api/products/${id}/deactivate`, json('POST')),
+  activateProduct: (id) => request(`/api/products/${id}/activate`, json('POST')),
+  deleteProduct: (id) => request(`/api/products/${id}`, { method: 'DELETE' }),
   listQrCodes: (filters = {}) => request(`/api/qr-codes${queryString(filters)}`),
   getQrCode: (id) => request(`/api/qr-codes/${id}`),
   updateQrCode: (id, input) => request(`/api/qr-codes/${id}`, json('PUT', input)),

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
-import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductQrCodeView, ProductView } from '../data/client';
+import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductQrCodeView, ProductReferenceSummaryView, ProductView } from '../data/client';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 
@@ -10,6 +10,13 @@ const sameCandidate = (left: HistoricalProductCandidateView, right: HistoricalPr
   left.productCategory === right.productCategory && left.sku === right.sku && left.model === right.model;
 
 const qrLabel = (item: ProductQrCodeView) => ({ user_manual: '说明书', warranty: '售后', recipe: '菜谱' }[item.key] ?? item.displayName);
+const referenceLabels: Array<[keyof ProductReferenceSummaryView, string]> = [
+  ['referenceProductCount', '参考产品'], ['plannedDrawingCount', '计划图号'], ['historicalDrawingCount', '历史图号'],
+  ['materialBatchCount', '资料批次'], ['bomCount', 'BOM'], ['configuredQrCount', '已配置二维码'],
+];
+const referenceDetails = (summary: Partial<ProductReferenceSummaryView>) => referenceLabels
+  .filter(([key]) => (summary[key] ?? 0) > 0)
+  .map(([key, label]) => `${label}（${summary[key]}）`);
 
 export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id: number) => void }) {
   const [items, setItems] = useState<ProductView[]>([]);
@@ -89,6 +96,26 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
       const replace = (current: ProductView[]) => current.map((entry) => entry.id === item.id ? updated : entry);
       setItems(replace); setAllProducts(replace);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '产品停用失败'); }
+  };
+  const activate = async (item: ProductView) => {
+    try {
+      const updated = await api.activateProduct(item.id);
+      const replace = (current: ProductView[]) => current.map((entry) => entry.id === item.id ? updated : entry);
+      setItems(replace); setAllProducts(replace);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '产品启用失败'); }
+  };
+  const deleteProduct = async (item: ProductView) => {
+    if (!window.confirm(`确认删除产品 ${item.model}？只有未被业务记录引用的产品可以删除。`)) return;
+    if (!window.confirm(`再次确认删除 ${item.model}？此操作会同时移除未配置的默认二维码占位记录。`)) return;
+    try {
+      await api.deleteProduct(item.id);
+      const remove = (current: ProductView[]) => current.filter((entry) => entry.id !== item.id);
+      setItems(remove); setAllProducts(remove); setQrCodes((current) => current.filter((code) => code.productId !== item.id));
+    } catch (reason) {
+      const error = reason as { code?: string; message?: string; referenceSummary?: Partial<ProductReferenceSummaryView> };
+      const details = error.code === 'PRODUCT_REFERENCED' && error.referenceSummary ? referenceDetails(error.referenceSummary) : [];
+      setError(details.length ? `${error.message ?? '产品删除失败'}：${details.join('、')}` : (reason instanceof Error ? reason.message : '产品删除失败'));
+    }
   };
   const openHistoricalCandidates = async () => {
     setHistoricalOpen(true); setHistoricalLoading(true); setHistoricalMessage(''); setSelectedCandidate(null);
@@ -174,7 +201,9 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
             onClick={() => onOpenQr?.(code.id)} disabled={!onOpenQr}>{qrLabel(code)} · {code.status === 'active' ? '启用中' : '已停用'}</button>)}</div>;
         } },
         { key: 'status', label: '状态', render: (item) => item.status === 'active' ? '启用中' : '已停用' },
-        { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active' && <button className="text-button danger" aria-label={`停用 ${item.model}`} onClick={() => void deactivate(item)} type="button">停用</button>}</div> },
+        { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active'
+          ? <button className="text-button danger" aria-label={`停用 ${item.model}`} onClick={() => void deactivate(item)} type="button">停用</button>
+          : <button className="text-button" aria-label={`启用 ${item.model}`} onClick={() => void activate(item)} type="button">启用</button>}<button className="text-button danger" aria-label={`删除 ${item.model}`} onClick={() => void deleteProduct(item)} type="button">删除</button></div> },
       ]} renderExpandedRow={(item) => editorOpen && editingId === item.id ? productEditor : null} />}
   </section>;
 }

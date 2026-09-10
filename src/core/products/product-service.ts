@@ -1,13 +1,13 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { QrRepository } from '../qr/qr-repository.js';
 import { ProductRepository } from './product-repository.js';
-import type { ConfirmHistoricalProductCandidateInput, HistoricalProductCandidate, Product, ProductFilters, ProductInput } from './product-types.js';
+import type { ConfirmHistoricalProductCandidateInput, HistoricalProductCandidate, Product, ProductFilters, ProductInput, ProductReferenceSummary } from './product-types.js';
 
 export type ProductErrorCode = 'DUPLICATE_MODEL' | 'DUPLICATE_SKU' | 'INVALID_SKU' | 'INVALID_DICTIONARY_REFERENCE' | 'INVALID_REFERENCE_PRODUCT' | 'PRODUCT_REFERENCED' | 'NOT_FOUND'
   | 'INVALID_HISTORICAL_CANDIDATE' | 'AMBIGUOUS_HISTORICAL_CANDIDATE' | 'STALE_HISTORICAL_CANDIDATE';
 
 export class ProductError extends Error {
-  constructor(public readonly code: ProductErrorCode, message: string) { super(message); }
+  constructor(public readonly code: ProductErrorCode, message: string, public readonly referenceSummary?: ProductReferenceSummary) { super(message); }
 }
 
 export class ProductService {
@@ -48,6 +48,22 @@ export class ProductService {
   deactivate(id: number): Product {
     this.get(id);
     return this.repository.deactivate(id);
+  }
+
+  activate(id: number): Product {
+    this.get(id);
+    return this.repository.activate(id);
+  }
+
+  delete(id: number): { deleted: true } {
+    return this.database.transaction(() => {
+      this.get(id);
+      this.rejectIfReferenced(this.repository.getReferenceSummary(id));
+      this.repository.deleteBlankDefaultQrPlaceholders(id);
+      this.rejectIfReferenced(this.repository.getReferenceSummary(id));
+      if (!this.repository.delete(id)) throw new ProductError('NOT_FOUND', '产品档案不存在');
+      return { deleted: true } as const;
+    })();
   }
 
   listHistoricalCandidates(): { items: HistoricalProductCandidate[] } {
@@ -134,5 +150,11 @@ export class ProductService {
       || current.model !== next.model
       || current.productCategory !== next.productCategory
       || current.referenceProductId !== next.referenceProductId;
+  }
+
+  private rejectIfReferenced(summary: ProductReferenceSummary): void {
+    if (Object.values(summary).some((count) => count > 0)) {
+      throw new ProductError('PRODUCT_REFERENCED', '产品仍被业务记录引用，不能删除', summary);
+    }
   }
 }

@@ -31,6 +31,15 @@ export interface ProductFilters {
   status?: 'active' | 'inactive' | 'all';
 }
 
+export interface ProductReferenceSummary {
+  referenceProductCount: number;
+  plannedDrawingCount: number;
+  historicalDrawingCount: number;
+  materialBatchCount: number;
+  bomCount: number;
+  configuredQrCount: number;
+}
+
 export interface HistoricalProductCandidate {
   productCategory: string;
   sku: string;

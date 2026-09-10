@@ -77,6 +77,43 @@ describe('product API', () => {
     await app.close();
   });
 
+  it('activates a deactivated product and deletes an unreferenced product through lifecycle routes', async () => {
+    const app = Fastify();
+    registerProductRoutes(app, new ProductService(db));
+    const created = await app.inject({ method: 'POST', url: '/api/products',
+      payload: { ...refs, sku: 'SKU-LIFECYCLE', model: 'ZC220', productCategory: '冰柜' } });
+    const id = created.json().id as number;
+    await app.inject({ method: 'POST', url: `/api/products/${id}/deactivate` });
+
+    const activated = await app.inject({ method: 'POST', url: `/api/products/${id}/activate` });
+    expect(activated.statusCode).toBe(200);
+    expect(activated.json()).toEqual(expect.objectContaining({ id, status: 'active' }));
+
+    const deleted = await app.inject({ method: 'DELETE', url: `/api/products/${id}` });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toEqual({ deleted: true });
+    expect((await app.inject({ method: 'GET', url: `/api/products/${id}` })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('returns module counts instead of a foreign-key error when deletion is blocked', async () => {
+    const service = new ProductService(db);
+    const product = service.create({ ...refs, sku: 'SKU-QR', model: 'ZC220', productCategory: '冰柜' });
+    db.prepare(`update product_qr_codes set target_url = 'https://example.test/manual' where id = (
+      select id from product_qr_codes where product_id = ? order by id limit 1
+    )`).run(product.id);
+    const app = Fastify(); registerProductRoutes(app, service);
+
+    const response = await app.inject({ method: 'DELETE', url: `/api/products/${product.id}` });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: {
+      code: 'PRODUCT_REFERENCED', message: '产品仍被业务记录引用，不能删除',
+      referenceSummary: expect.objectContaining({ configuredQrCount: 1 }),
+    } });
+    await app.close();
+  });
+
   it('returns a stable error for invalid dictionary references', async () => {
     const app = Fastify();
     registerProductRoutes(app, new ProductService(db));

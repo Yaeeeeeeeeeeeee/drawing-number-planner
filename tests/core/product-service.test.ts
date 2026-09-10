@@ -87,6 +87,65 @@ describe('ProductService', () => {
     expect(products.list({ status: 'inactive' }).items.map((item) => item.id)).toEqual([target.id]);
   });
 
+  it('reactivates a deactivated product without changing its identity', () => {
+    const refs = validReferences();
+    const product = products.create({ ...refs, sku: 'SKU-REACTIVATE', model: 'ZC220', productCategory: '冰柜' });
+    products.deactivate(product.id);
+
+    expect(products.activate(product.id)).toEqual(expect.objectContaining({
+      id: product.id, sku: 'SKU-REACTIVATE', status: 'active',
+    }));
+    expect(products.list({ status: 'active' }).items.map((item) => item.id)).toContain(product.id);
+  });
+
+  it('deletes an unreferenced product and its blank inactive default QR placeholders', () => {
+    const refs = validReferences();
+    const product = products.create({ ...refs, sku: 'SKU-DELETE', model: 'ZC220', productCategory: '冰柜' });
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual({ count: 2 });
+
+    expect(products.delete(product.id)).toEqual({ deleted: true });
+    expect(products.list({ status: 'all' }).items).toEqual([]);
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual({ count: 0 });
+  });
+
+  it('reports each business module that protects a referenced product from deletion', () => {
+    const refs = validReferences();
+    const protectedProduct = products.create({ ...refs, sku: 'SKU-PROTECTED', model: 'ZC220', productCategory: '冰柜' });
+    products.create({ ...refs, sku: 'SKU-REFERENCE', model: 'ZC221', productCategory: '冰柜', referenceProductId: protectedProduct.id });
+    const color = dictionaries.create({ type: 'color', code: '0', name: '白色' });
+    const main = dictionaries.create({ type: 'main_category', code: '04', name: '印刷件类' });
+    const item = dictionaries.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
+    db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, created_at) values ('02.0209.010.0401001', '图号', ?, ?, ?, ?, ?,
+       '02', '0209', '01', '0', '04', '01', 1, 'active', '2026-08-24')`)
+      .run(protectedProduct.id, refs.defaultAppearanceId, color.id, main.id, item.id);
+    insertHistorical({ fullCode: '02.0209.010.0401002', productId: protectedProduct.id });
+    db.prepare(`insert into material_batches
+      (relative_path, product_directory, product_id, name, recognition_status, first_seen_at, last_seen_at)
+      values ('SKU-PROTECTED/batch.pdf', 'SKU-PROTECTED', ?, 'batch.pdf', 'recognized', '2026-08-24', '2026-08-24')`)
+      .run(protectedProduct.id);
+    db.prepare(`insert into bom_versions (product_id, version_number, created_at)
+      values (?, 1, '2026-08-24')`).run(protectedProduct.id);
+    db.prepare(`update product_qr_codes set target_url = 'https://example.test/manual' where id = (
+      select id from product_qr_codes where product_id = ? order by id limit 1
+    )`).run(protectedProduct.id);
+
+    expect(() => products.delete(protectedProduct.id)).toThrowError(expect.objectContaining({
+      code: 'PRODUCT_REFERENCED',
+      referenceSummary: {
+        referenceProductCount: 1,
+        plannedDrawingCount: 1,
+        historicalDrawingCount: 1,
+        materialBatchCount: 1,
+        bomCount: 1,
+        configuredQrCount: 1,
+      },
+    }));
+    expect(products.get(protectedProduct.id)).toEqual(expect.objectContaining({ id: protectedProduct.id }));
+  });
+
   it('updates editable archive fields while revalidating references', () => {
     const refs = validReferences();
     const product = products.create({ ...refs, sku: 'SKU-1', model: 'ZC220', productCategory: '冰柜' });

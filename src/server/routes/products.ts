@@ -26,7 +26,7 @@ const historicalCandidateSchema = z.object({
 function sendProductError(error: unknown, reply: FastifyReply) {
   if (error instanceof ProductError) {
     const status = error.code === 'NOT_FOUND' ? 404 : ['DUPLICATE_MODEL', 'DUPLICATE_SKU', 'PRODUCT_REFERENCED'].includes(error.code) ? 409 : 400;
-    return reply.code(status).send({ error: { code: error.code, message: error.message } });
+    return reply.code(status).send({ error: { code: error.code, message: error.message, ...(error.referenceSummary ? { referenceSummary: error.referenceSummary } : {}) } });
   }
   throw error;
 }
@@ -78,6 +78,20 @@ export function registerProductRoutes(app: FastifyInstance, service: ProductServ
     const params = idSchema.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
     try { return service.deactivate(params.data.id); }
+    catch (error) { return sendProductError(error, reply); }
+  });
+
+  app.post('/api/products/:id/activate', async (request, reply) => {
+    const params = idSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
+    try { return service.activate(params.data.id); }
+    catch (error) { return sendProductError(error, reply); }
+  });
+
+  app.delete('/api/products/:id', async (request, reply) => {
+    const params = idSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '产品编号无效' } });
+    try { return service.delete(params.data.id); }
     catch (error) { return sendProductError(error, reply); }
   });
 }

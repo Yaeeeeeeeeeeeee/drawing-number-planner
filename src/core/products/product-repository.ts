@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { HistoricalProductCandidateIdentity, Product, ProductFilters, ProductInput } from './product-types.js';
+import type { HistoricalProductCandidateIdentity, Product, ProductFilters, ProductInput, ProductReferenceSummary } from './product-types.js';
 
 interface ProductRow {
   id: number; sku: string | null; brand_id: number; brand_name: string;
@@ -87,6 +87,62 @@ export class ProductRepository {
     this.db.prepare("update products set status = 'inactive', deactivated_at = ? where id = ?")
       .run(new Date().toISOString(), id);
     return this.get(id)!;
+  }
+
+  activate(id: number): Product {
+    this.db.prepare("update products set status = 'active', deactivated_at = null where id = ?").run(id);
+    return this.get(id)!;
+  }
+
+  getReferenceSummary(id: number): ProductReferenceSummary {
+    const row = this.db.prepare(`select
+      (select count(*) from products where reference_product_id = @id) as reference_product_count,
+      (select count(*) from drawing_numbers where product_id = @id or source_product_id = @id) as planned_drawing_count,
+      (select count(*) from historical_drawing_numbers where product_id = @id) as historical_drawing_count,
+      (select count(*) from material_batches where product_id = @id) as material_batch_count,
+      (select count(*) from bom_versions where product_id = @id) as bom_count,
+      (select count(*) from product_qr_codes code
+        join qr_purposes purpose on purpose.id = code.purpose_id
+        join products product on product.id = code.product_id
+        where code.product_id = @id and not (
+          code.status = 'inactive' and coalesce(trim(code.target_url), '') = ''
+          and not exists (select 1 from qr_code_files file where file.qr_code_id = code.id)
+          and not exists (select 1 from bom_item_qr_codes bom_qr where bom_qr.qr_code_id = code.id)
+          and (purpose.default_for_all = 1 or exists (
+            select 1 from qr_purpose_product_categories category
+            where category.purpose_id = purpose.id and category.product_category = product.product_category
+          ))
+        )) as configured_qr_count`).get({ id }) as {
+      reference_product_count: number; planned_drawing_count: number; historical_drawing_count: number;
+      material_batch_count: number; bom_count: number; configured_qr_count: number;
+    };
+    return {
+      referenceProductCount: row.reference_product_count,
+      plannedDrawingCount: row.planned_drawing_count,
+      historicalDrawingCount: row.historical_drawing_count,
+      materialBatchCount: row.material_batch_count,
+      bomCount: row.bom_count,
+      configuredQrCount: row.configured_qr_count,
+    };
+  }
+
+  deleteBlankDefaultQrPlaceholders(id: number): void {
+    this.db.prepare(`delete from product_qr_codes where id in (
+      select code.id from product_qr_codes code
+      join qr_purposes purpose on purpose.id = code.purpose_id
+      join products product on product.id = code.product_id
+      where code.product_id = @id and code.status = 'inactive' and coalesce(trim(code.target_url), '') = ''
+        and not exists (select 1 from qr_code_files file where file.qr_code_id = code.id)
+        and not exists (select 1 from bom_item_qr_codes bom_qr where bom_qr.qr_code_id = code.id)
+        and (purpose.default_for_all = 1 or exists (
+          select 1 from qr_purpose_product_categories category
+          where category.purpose_id = purpose.id and category.product_category = product.product_category
+        ))
+    )`).run({ id });
+  }
+
+  delete(id: number): boolean {
+    return this.db.prepare('delete from products where id = ?').run(id).changes === 1;
   }
 
   isActiveDictionary(id: number, type: string): boolean {
