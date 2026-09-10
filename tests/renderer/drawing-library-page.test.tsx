@@ -167,7 +167,7 @@ describe('DrawingLibraryPage', () => {
       projectItemName: 'LOGO', status: 'active', origin: 'planned', hasSourceFile: true,
       hasOutlinedFile: false, dictionaryMappingStatus: 'mapped' };
     const api = {
-      listDictionaries: vi.fn().mockResolvedValue([]),
+      listDictionaries: vi.fn().mockResolvedValue([]), listProducts: vi.fn().mockResolvedValue([{ productCategory: '冰柜' }]),
       searchDrawings: vi.fn().mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 20 })
         .mockResolvedValueOnce({ items: [drawing], total: 1, page: 1, pageSize: 20 }),
       getDrawing: vi.fn().mockResolvedValue(drawing),
@@ -177,11 +177,11 @@ describe('DrawingLibraryPage', () => {
 
     fireEvent.change(screen.getByLabelText('完整图号'), { target: { value: '02.0209' } });
     fireEvent.change(screen.getByLabelText('型号'), { target: { value: 'ZC220' } });
+    fireEvent.click(screen.getByRole('button', { name: '更多筛选' }));
     fireEvent.change(screen.getByLabelText('关键词'), { target: { value: 'LOGO' } });
     fireEvent.change(screen.getByLabelText('状态'), { target: { value: 'active' } });
     fireEvent.click(screen.getByLabelText('精确图号'));
     fireEvent.change(screen.getByLabelText('产品类别'), { target: { value: '冰柜' } });
-    fireEvent.click(screen.getByRole('button', { name: '更多筛选' }));
     fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 'SKDZC220JP' } });
     fireEvent.change(screen.getByLabelText('源文件'), { target: { value: 'present' } });
     fireEvent.change(screen.getByLabelText('转曲后文件'), { target: { value: 'missing' } });
@@ -362,5 +362,44 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getByText('停用不释放号码')).toBeVisible();
     expect(screen.queryByRole('button', { name: '正式使用' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('搜索现有 PDF')).not.toBeInTheDocument();
+  });
+
+  it('passes explicit pagination and resets it when selectable drawing filters or views change', async () => {
+    const drawing = { id: 1, fullCode: '02.0209.010.0401001', displayName: '长路径图号', sku: 'SKU-220', productId: 5,
+      model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
+      projectItemName: 'LOGO', status: 'active', origin: 'planned', hasSourceFile: true, hasOutlinedFile: true,
+      dictionaryMappingStatus: 'mapped' } as const;
+    const api = {
+      searchDrawings: vi.fn().mockResolvedValue({ items: [drawing], total: 128, page: 1, pageSize: 20 }),
+      listProducts: vi.fn().mockResolvedValue([{ productCategory: '冰柜' }]),
+      listMaterialBatches: vi.fn().mockResolvedValue([{ id: 44, name: '01.20260827', sku: 'SKU-220', model: 'ZC220' }]),
+      listDictionaries: vi.fn((type: string) => Promise.resolve(type === 'main_category'
+        ? [{ id: 12, code: '04', name: '印刷件类', status: 'active' }]
+        : type === 'project_item'
+          ? [{ id: 21, code: '01', name: 'LOGO', parentId: 12, status: 'active' }, { id: 22, code: '02', name: '说明书', parentId: 13, status: 'active' }]
+          : type === 'appearance' ? [{ id: 31, code: '01', name: '一号外观', status: 'active' }] : [])),
+      getDrawing: vi.fn().mockResolvedValue(drawing),
+    };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 20 })));
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));
+    fireEvent.click(screen.getByRole('button', { name: '更多筛选' }));
+    fireEvent.change(await screen.findByRole('combobox', { name: '产品类别' }), { target: { value: '冰柜' } });
+    fireEvent.change(screen.getByLabelText('主类别'), { target: { value: '12' } });
+    expect(screen.getByRole('option', { name: 'LOGO' })).toBeVisible();
+    expect(screen.queryByRole('option', { name: '说明书' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('项目明细'), { target: { value: '21' } });
+    fireEvent.change(screen.getByLabelText('外观'), { target: { value: '31' } });
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '44' } });
+    fireEvent.click(screen.getByRole('button', { name: '检索' }));
+    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({
+      productCategory: '冰柜', mainCategoryId: 12, projectItemId: 21, appearanceId: 31, materialBatchId: 44,
+      page: 1, pageSize: 20,
+    })));
+    fireEvent.click(screen.getByRole('button', { name: '按资料批次' }));
+    fireEvent.click(screen.getByRole('button', { name: '按图号' }));
+    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 20 })));
   });
 });

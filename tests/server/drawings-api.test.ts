@@ -114,6 +114,28 @@ describe('drawing library API', () => {
     await app.close();
   });
 
+  it('accepts appearance and material-batch drawing query parameters', async () => {
+    const planned = seedPlannedDrawing(db);
+    const batchId = Number(db.prepare(`insert into material_batches
+      (relative_path, product_directory, name, recognition_status, is_present, first_seen_at, last_seen_at)
+      values ('C\\SKU\\01.20260827', 'C\\SKU', '01.20260827', 'recognized', 1, '2026-08-27T00:00:00.000Z', '2026-08-27T00:00:00.000Z')`)
+      .run().lastInsertRowid);
+    db.prepare(`insert into pdf_files
+      (relative_path, file_name, drawing_id, material_batch_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('C\\SKU\\01.20260827\\drawing.pdf', 'drawing.pdf', ?, ?, 'matched', '[]', 'outlined', 1,
+       '2026-08-27T00:00:00.000Z', '2026-08-27T00:00:00.000Z', 1)`).run(planned.id, batchId);
+    const appearanceId = (db.prepare('select appearance_id as id from drawing_numbers where id = ?').get(planned.id) as { id: number }).id;
+    const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+
+    const response = await app.inject({ method: 'GET', url: `/api/drawings?appearanceId=${appearanceId}&materialBatchId=${batchId}` });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(expect.objectContaining({ total: 1,
+      items: [expect.objectContaining({ id: planned.id })] }));
+    await app.close();
+  });
+
   it('toggles historical business status without exposing removal of its permanent occupancy', async () => {
     const historicalId = seedHistoricalDrawing(db);
     const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));

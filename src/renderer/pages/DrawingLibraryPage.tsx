@@ -14,13 +14,16 @@ import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 import { openIndexedPdfLocation } from '../desktop-files';
 
-const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', mainCategoryId: '', projectItemId: '', colorId: '', status: '', exactDrawingNumber: false };
+const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', appearanceId: '', mainCategoryId: '', projectItemId: '', colorId: '', materialBatchId: '', status: '', exactDrawingNumber: false };
 
 export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [view, setView] = useState<'drawing' | 'batch'>('drawing');
   const [filters, setFilters] = useState(emptyFilters);
   const [options, setOptions] = useState<Record<string, DictionaryItemView[]>>({});
   const [items, setItems] = useState<DrawingView[]>([]); const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(20);
+  const [productCategories, setProductCategories] = useState<string[]>([]);
+  const [materialBatchOptions, setMaterialBatchOptions] = useState<MaterialBatchView[]>([]);
   const [selected, setSelected] = useState<DrawingDetailView | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [pdfCandidates, setPdfCandidates] = useState<PdfFileView[]>([]); const [pdfKeyword, setPdfKeyword] = useState('');
   const [selectedPdfId, setSelectedPdfId] = useState(''); const [maintaining, setMaintaining] = useState(false);
@@ -29,25 +32,41 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<MaterialBatchView | null>(null);
   const [batchMaterials, setBatchMaterials] = useState<MaterialBatchLogicalMaterialView[]>([]);
-  const search = async (values: Record<string, string | number | boolean> = {}) => {
+  const search = async (values: Record<string, string | number | boolean> = filters, requestedPage = page, requestedPageSize = pageSize) => {
     setLoading(true); setError('');
-    try { const result = await api.searchDrawings(values); setItems(result.items); setTotal(result.total); }
+    try {
+      const result = await api.searchDrawings({ ...values,
+        brandId: values.brandId ? Number(values.brandId) : '', appearanceId: values.appearanceId ? Number(values.appearanceId) : '',
+        mainCategoryId: values.mainCategoryId ? Number(values.mainCategoryId) : '', projectItemId: values.projectItemId ? Number(values.projectItemId) : '',
+        colorId: values.colorId ? Number(values.colorId) : '', materialBatchId: values.materialBatchId ? Number(values.materialBatchId) : '',
+        page: requestedPage, pageSize: requestedPageSize,
+      });
+      const lastPage = Math.max(1, Math.ceil(result.total / requestedPageSize));
+      if (requestedPage > lastPage) return await search(values, lastPage, requestedPageSize);
+      setItems(result.items); setTotal(result.total); setPage(requestedPage);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : '图号检索失败'); }
     finally { setLoading(false); }
   };
   useEffect(() => {
     void search();
-    void Promise.all(['brand', 'main_category', 'project_item', 'color'].map((type) => api.listDictionaries(type, false)))
-      .then(([brand, main_category, project_item, color]) => setOptions({ brand, main_category, project_item, color }))
+    void Promise.all([
+      Promise.all(['brand', 'appearance', 'main_category', 'project_item', 'color'].map((type) => api.listDictionaries(type, false))),
+      api.listProducts?.() ?? Promise.resolve([]), api.listMaterialBatches?.() ?? Promise.resolve([]),
+    ])
+      .then(([[brand, appearance, main_category, project_item, color], products, materialBatches]) => {
+        setOptions({ brand, appearance, main_category, project_item, color });
+        setProductCategories([...new Set(products.map((product) => product.productCategory).filter(Boolean))].sort());
+        setMaterialBatchOptions(materialBatches);
+      })
       .catch((reason) => setError(reason instanceof Error ? reason.message : '筛选项加载失败'));
   }, []);
-  const set = (key: keyof typeof filters, value: string | boolean) => setFilters((current) => ({ ...current, [key]: value }));
+  const set = (key: keyof typeof filters, value: string | boolean) => setFilters((current) => ({ ...current, [key]: value,
+    ...(key === 'mainCategoryId' ? { projectItemId: '' } : {}),
+  }));
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    void search({ ...filters,
-      brandId: filters.brandId ? Number(filters.brandId) : '', mainCategoryId: filters.mainCategoryId ? Number(filters.mainCategoryId) : '',
-      projectItemId: filters.projectItemId ? Number(filters.projectItemId) : '', colorId: filters.colorId ? Number(filters.colorId) : '',
-    });
+    setPage(1); void search(filters, 1, pageSize);
   };
   const loadPdfCandidates = async (keyword = '') => {
     if (!api.searchPdfFiles) return;
@@ -111,27 +130,34 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     try { setSelectedBatch(batch); setBatchMaterials(await api.getMaterialBatchMaterials(batch.id)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '批次文件加载失败'); }
   };
-  const dictionarySelect = (label: string, key: 'brandId' | 'mainCategoryId' | 'projectItemId' | 'colorId', type: string) =>
-    <label><span>{label}</span><select aria-label={label} value={filters[key]} onChange={(event) => set(key, event.target.value)}><option value="">全部</option>{(options[type] ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>;
+  const dictionarySelect = (label: string, key: 'brandId' | 'appearanceId' | 'mainCategoryId' | 'projectItemId' | 'colorId', type: string) => {
+    const items = type === 'project_item' && filters.mainCategoryId
+      ? (options[type] ?? []).filter((item) => item.parentId === Number(filters.mainCategoryId)) : options[type] ?? [];
+    return <label><span>{label}</span><select aria-label={label} value={filters[key]} onChange={(event) => set(key, event.target.value)}><option value="">全部</option>{items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>;
+  };
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const visiblePages = [...new Set([1, page - 1, page, page + 1, totalPages].filter((value) => value >= 1 && value <= totalPages))].sort((left, right) => left - right);
+  const goToPage = (nextPage: number) => void search(filters, nextPage, pageSize);
 
   return <section className="page-surface page-enter">
     <header className="page-header"><div><p className="eyebrow">DRAWING LIBRARY</p><h1>图号库</h1><p>统一检索正式规划与历史扫描图号，并核对文件完整性。</p></div><span className="record-count">{total} 条记录</span></header>
     <nav className="segmented-tabs" aria-label="图号库查看方式">
-      <button type="button" aria-selected={view === 'drawing'} onClick={() => { setView('drawing'); setSelectedBatch(null); }}>按图号</button>
-      <button type="button" aria-selected={view === 'batch'} onClick={() => { setView('batch'); setSelected(null); }}>按资料批次</button>
+      <button type="button" aria-selected={view === 'drawing'} onClick={() => { setView('drawing'); setSelectedBatch(null); setPage(1); void search(filters, 1, pageSize); }}>按图号</button>
+      <button type="button" aria-selected={view === 'batch'} onClick={() => { setView('batch'); setSelected(null); setPage(1); }}>按资料批次</button>
     </nav>
     {error && <p className="error-banner">{error}</p>}
     {view === 'drawing' ? <>
     <form className="filter-bar filter-grid" onSubmit={submit}>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
-      <label><span>产品类别</span><input aria-label="产品类别" value={filters.productCategory} onChange={(event) => set('productCategory', event.target.value)} /></label>
-      <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
-      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
+      <label><span>SKU</span><input aria-label="SKU" value={filters.sku} onChange={(event) => set('sku', event.target.value)} /></label>
+      <label><span>资料批次</span><select aria-label="资料批次" value={filters.materialBatchId} onChange={(event) => set('materialBatchId', event.target.value)}><option value="">全部</option>{materialBatchOptions.map((batch) => <option key={batch.id} value={batch.id}>{batch.sku ?? 'SKU待识别'} · {batch.model ?? '型号待识别'} · {batch.name}</option>)}</select></label>
       <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
-      {moreFilters && <><label><span>SKU</span><input aria-label="SKU" value={filters.sku} onChange={(event) => set('sku', event.target.value)} /></label>
-        {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}
+      {moreFilters && <><label><span>产品类别</span><select aria-label="产品类别" value={filters.productCategory} onChange={(event) => set('productCategory', event.target.value)}><option value="">全部</option>{productCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+        {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}{dictionarySelect('外观', 'appearanceId', 'appearance')}
+        <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
+        <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
         <label><span>源文件</span><select aria-label="源文件" value={filters.sourcePresence} onChange={(event) => set('sourcePresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label>
         <label><span>转曲后文件</span><select aria-label="转曲后文件" value={filters.outlinedPresence} onChange={(event) => set('outlinedPresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label></>}
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
@@ -151,6 +177,12 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
         setSelectedPdfId={setSelectedPdfId} onClose={() => setSelected(null)} onStatus={changeStatus} onOpen={openLocation}
         onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus} onError={setError} /> : null} />}
+    {!loading && total > 0 && <nav className="drawing-pagination" aria-label="图号分页"><span>共 {total} 条 · 第 {page} / {totalPages} 页</span>
+      <button className="secondary-button" type="button" disabled={page <= 1} onClick={() => goToPage(page - 1)}>上一页</button>
+      <span className="page-number-list">{visiblePages.map((value, index) => <span key={value}>{index > 0 && value - visiblePages[index - 1] > 1 && <i>…</i>}<button type="button" className={value === page ? 'current' : ''} aria-current={value === page ? 'page' : undefined} onClick={() => goToPage(value)}>{value}</button></span>)}</span>
+      <button className="secondary-button" type="button" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>下一页</button>
+      <label><span>每页条数</span><select aria-label="每页条数" value={pageSize} onChange={(event) => { const nextSize = Number(event.target.value); setPageSize(nextSize); setPage(1); void search(filters, 1, nextSize); }}><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label>
+    </nav>}
     </> : <BatchBrowser key={selectedBatch?.id ?? 'none'} search={batchSearch} setSearch={setBatchSearch} loading={loading} batches={batches}
       selected={selectedBatch} materials={batchMaterials} onSearch={searchBatches} onSelect={openBatch} onOpen={openLocation} />}
   </section>;

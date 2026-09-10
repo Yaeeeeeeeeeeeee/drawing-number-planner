@@ -112,9 +112,17 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
   if (filters.model?.trim()) { conditions.push('record.model like ?'); values.push(`%${filters.model.trim()}%`); }
   if (filters.productCategory?.trim()) { conditions.push('record.product_category like ?'); values.push(`%${filters.productCategory.trim()}%`); }
   if (filters.brandId !== undefined) { conditions.push('record.brand_id = ?'); values.push(filters.brandId); }
+  if (filters.appearanceId !== undefined) { conditions.push('record.appearance_id = ?'); values.push(filters.appearanceId); }
   if (filters.mainCategoryId !== undefined) { conditions.push('record.main_category_id = ?'); values.push(filters.mainCategoryId); }
   if (filters.projectItemId !== undefined) { conditions.push('record.project_item_id = ?'); values.push(filters.projectItemId); }
   if (filters.colorId !== undefined) { conditions.push('record.color_id = ?'); values.push(filters.colorId); }
+  if (filters.materialBatchId !== undefined) {
+    conditions.push(`exists(select 1 from pdf_files file where file.material_batch_id = ? and (
+      (record.origin = 'planned' and file.drawing_id = record.id)
+      or (record.origin = 'historical' and file.historical_drawing_id = -record.id)
+    ))`);
+    values.push(filters.materialBatchId);
+  }
   if (filters.status !== undefined) { conditions.push('record.status = ?'); values.push(filters.status); }
   if (filters.sourcePresence && filters.sourcePresence !== 'all') {
     conditions.push('record.has_source_file = ?'); values.push(filters.sourcePresence === 'present' ? 1 : 0);

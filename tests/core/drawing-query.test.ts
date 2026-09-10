@@ -67,6 +67,46 @@ describe('DrawingQueryService', () => {
     }));
   });
 
+  it('filters drawing queries by appearance and material batch', () => {
+    const now = '2026-08-27T00:00:00.000Z';
+    const alternateAppearance = new DictionaryService(db).create({ type: 'appearance', code: '02', name: '2号外观' });
+    db.prepare('update drawing_numbers set appearance_id = ?, appearance_code = ? where id = ?')
+      .run(alternateAppearance.id, '02', ids.second);
+    const batchId = Number(db.prepare(`insert into material_batches
+      (relative_path, product_directory, name, recognition_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜\\TEST-DRAWING-QUERY\\01.20260827', '冰柜\\TEST-DRAWING-QUERY', '01.20260827', 'recognized', 1, ?, ?)`)
+      .run(now, now).lastInsertRowid);
+    db.prepare(`insert into pdf_files
+      (relative_path, file_name, drawing_id, material_batch_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('冰柜\\TEST-DRAWING-QUERY\\01.20260827\\drawing.pdf', 'drawing.pdf', ?, ?, 'matched', '[]', 'outlined', 1, ?, ?, 1)`)
+      .run(ids.second, batchId, now, now);
+
+    expect(drawings.search({ appearanceId: alternateAppearance.id }).items.map((item) => item.id)).toEqual([ids.second]);
+    expect(drawings.search({ materialBatchId: batchId }).items.map((item) => item.id)).toEqual([ids.second]);
+  });
+
+  it('returns stable pages for 128 drawing records at every supported library page size', () => {
+    const insert = db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, created_at) values (?, ?, (select product_id from drawing_numbers where id = ?),
+       (select appearance_id from drawing_numbers where id = ?), ?, ?, ?, '02', '0209', '01', '0', '04', '01', ?, 'reserved', ?)`);
+    for (let sequence = 3; sequence <= 128; sequence += 1) {
+      insert.run(`02.0209.010.0401${String(sequence).padStart(3, '0')}`, `批量图号 ${sequence}`, ids.first, ids.first,
+        ids.white, ids.main, ids.logo, sequence, '2026-08-27T00:00:00.000Z');
+    }
+
+    expect(drawings.search({ page: 1, pageSize: 20 })).toEqual(expect.objectContaining({ total: 128 }));
+    expect(drawings.search({ page: 1, pageSize: 20 }).items[0]).toEqual(expect.objectContaining({ fullCode: '02.0209.010.0401128' }));
+    expect(drawings.search({ page: 2, pageSize: 20 }).items[0]).toEqual(expect.objectContaining({ fullCode: '02.0209.010.0401108' }));
+    expect(drawings.search({ page: 7, pageSize: 20 }).items[0]).toEqual(expect.objectContaining({ fullCode: '02.0209.010.0401008' }));
+    expect(drawings.search({ page: 1, pageSize: 50 }).items[0]).toEqual(expect.objectContaining({ fullCode: '02.0209.010.0401128' }));
+    expect(drawings.search({ page: 2, pageSize: 50 }).items[0]).toEqual(expect.objectContaining({ fullCode: '02.0209.010.0401078' }));
+    expect(drawings.search({ page: 1, pageSize: 100 }).items[0]).toEqual(expect.objectContaining({ fullCode: '02.0209.010.0401128' }));
+    expect(drawings.search({ page: 2, pageSize: 100 }).items[0]).toEqual(expect.objectContaining({ fullCode: '02.0209.010.0401028' }));
+  });
+
   it('returns a joined detail record', () => {
     expect(drawings.get(ids.first)).toEqual(expect.objectContaining({
       fullCode: '02.0209.010.0401001', brandName: 'SAMKYO', productCategory: '冰柜', status: 'active',

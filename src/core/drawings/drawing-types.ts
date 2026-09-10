@@ -85,9 +85,11 @@ export interface DrawingSearchFilters {
   sku?: string;
   productCategory?: string;
   brandId?: number;
+  appearanceId?: number;
   mainCategoryId?: number;
   projectItemId?: number;
   colorId?: number;
+  materialBatchId?: number;
   status?: DrawingStatus;
   sourcePresence?: FilePresenceFilter;
   outlinedPresence?: FilePresenceFilter;
