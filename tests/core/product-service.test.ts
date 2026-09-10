@@ -108,6 +108,19 @@ describe('ProductService', () => {
     expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual({ count: 0 });
   });
 
+  it('preserves a renamed inactive QR record instead of treating it as a blank default placeholder', () => {
+    const refs = validReferences();
+    const product = products.create({ ...refs, sku: 'SKU-RENAMED-QR', model: 'ZC220', productCategory: '冰柜' });
+    db.prepare(`update product_qr_codes set name = '自定义说明书' where id = (
+      select id from product_qr_codes where product_id = ? order by id limit 1
+    )`).run(product.id);
+
+    expect(() => products.delete(product.id)).toThrowError(expect.objectContaining({
+      code: 'PRODUCT_REFERENCED', referenceSummary: expect.objectContaining({ configuredQrCount: 1 }),
+    }));
+    expect(products.get(product.id)).toEqual(expect.objectContaining({ id: product.id }));
+  });
+
   it('reports each business module that protects a referenced product from deletion', () => {
     const refs = validReferences();
     const protectedProduct = products.create({ ...refs, sku: 'SKU-PROTECTED', model: 'ZC220', productCategory: '冰柜' });

@@ -105,7 +105,7 @@ export class ProductRepository {
         join qr_purposes purpose on purpose.id = code.purpose_id
         join products product on product.id = code.product_id
         where code.product_id = @id and not (
-          code.status = 'inactive' and coalesce(trim(code.target_url), '') = ''
+          code.status = 'inactive' and code.name = purpose.display_name and coalesce(trim(code.target_url), '') = ''
           and not exists (select 1 from qr_code_files file where file.qr_code_id = code.id)
           and not exists (select 1 from bom_item_qr_codes bom_qr where bom_qr.qr_code_id = code.id)
           and (purpose.default_for_all = 1 or exists (
@@ -131,7 +131,7 @@ export class ProductRepository {
       select code.id from product_qr_codes code
       join qr_purposes purpose on purpose.id = code.purpose_id
       join products product on product.id = code.product_id
-      where code.product_id = @id and code.status = 'inactive' and coalesce(trim(code.target_url), '') = ''
+      where code.product_id = @id and code.status = 'inactive' and code.name = purpose.display_name and coalesce(trim(code.target_url), '') = ''
         and not exists (select 1 from qr_code_files file where file.qr_code_id = code.id)
         and not exists (select 1 from bom_item_qr_codes bom_qr where bom_qr.qr_code_id = code.id)
         and (purpose.default_for_all = 1 or exists (
