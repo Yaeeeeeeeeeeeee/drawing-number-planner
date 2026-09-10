@@ -32,6 +32,13 @@ describe('verified Excel drawing code contract', () => {
     });
   });
 
+  it.each([
+    ['02.0404.012.0103001', '01', '2'],
+    ['02.0404.022.0103001', '02', '2'],
+  ])('keeps the appearance segment from complete code %s', (fullCode, appearanceCode, colorCode) => {
+    expect(parseDrawingCode(fullCode)).toMatchObject({ fullCode, appearanceCode, colorCode });
+  });
+
   it.each(['02.0404.012.0103000', '2.0404.012.0103001', '02.0404.012.0103001x', '02.0404.012.01030001'])
     ('rejects malformed full code %s', (value) => {
       expect(parseDrawingCode(value)).toBeNull();

@@ -53,6 +53,14 @@ function insertUnbatchedSource(productDirectory: string, historicalId: number, s
 }
 
 describe('MaterialBatchService', () => {
+  it('keeps 00.首批大货 below dated batches when selecting the current batch', () => {
+    const product = '01.洗碗机\\\\SKU-T40';
+    insertBatch(product, '00.首批大货', 0);
+    const dated = insertBatch(product, '01.20241210', 1);
+
+    expect(service.getCurrentBatchSelection(product)).toEqual({ status: 'selected', batchId: dated });
+  });
+
   it('selects the unique highest recognized sequence and never uses PDF modification time', () => {
     const product = '01.洗碗机\\\\SKU-T40';
     const first = insertBatch(product, '00.首批大货', 0);
