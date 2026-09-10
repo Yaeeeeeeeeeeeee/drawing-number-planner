@@ -287,6 +287,31 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getAllByText('作废').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('double-confirms reservation deletion and explains every blocking reference', async () => {
+    const reserved = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
+      model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
+      projectItemName: 'LOGO', status: 'reserved', origin: 'planned', hasSourceFile: false, hasOutlinedFile: false,
+      dictionaryMappingStatus: 'mapped', readOnly: false, readOnlyMessage: null, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] } as const;
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [reserved], total: 1, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(reserved),
+      searchPdfFiles: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 }),
+      deleteReservedDrawing: vi.fn().mockRejectedValue(Object.assign(new Error('图号仍被文件、BOM 或版本关系引用，不能删除'), {
+        code: 'DRAWING_REFERENCED', referenceSummary: { pdfCount: 1, bomCount: 2, previousDrawingCount: 1,
+          successorCount: 3, sourceDrawingCount: 1, sourceReferenceCount: 2 },
+      })) };
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirm.mockClear();
+
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(reserved.fullCode));
+    fireEvent.click(await screen.findByRole('button', { name: '删除未使用预留' }));
+
+    await waitFor(() => expect(api.deleteReservedDrawing).toHaveBeenCalledWith(10));
+    expect(confirm).toHaveBeenNthCalledWith(1, '仅能删除从未使用的预留图号。是否继续？');
+    expect(confirm).toHaveBeenNthCalledWith(2, '最后确认删除 02.0209.010.0401001？删除后该号码会重新参与推荐。');
+    expect(await screen.findByText(/PDF 关联（1）、BOM 使用（2）、关联前版（1）、后续版本（3）、引用源图号（1）、被引用为源图号（2）/)).toBeVisible();
+  });
+
   it('associates a searched current PDF and refreshes detail and row while surfacing failures', async () => {
     const detail = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
       model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',

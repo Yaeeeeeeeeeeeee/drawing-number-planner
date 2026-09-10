@@ -78,6 +78,10 @@ export interface BomCandidateView {
   id: number; fullCode: string; displayName: string;
   projectItemId: number; projectItemName: string; status: 'reserved' | 'active';
 }
+export interface DrawingReferenceSummaryView {
+  pdfCount: number; bomCount: number; previousDrawingCount: number; successorCount: number;
+  sourceDrawingCount: number; sourceReferenceCount: number;
+}
 
 export interface ProductReferenceSummaryView {
   referenceProductCount: number; plannedDrawingCount: number; historicalDrawingCount: number;
@@ -165,6 +169,7 @@ export interface PlannerApi {
   getDrawing(id: number): Promise<DrawingDetailView>;
   activateDrawing(id: number): Promise<DrawingDetailView>;
   voidDrawing(id: number): Promise<DrawingDetailView>;
+  deleteReservedDrawing(id: number): Promise<{ deleted: true }>;
   activateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
   deactivateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
   associateDrawingPdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): Promise<DrawingDetailView>;
@@ -219,7 +224,7 @@ export interface PlannerApi {
 }
 
 export class ApiError extends Error {
-  constructor(public readonly code: string, message: string, public readonly referenceSummary?: ProductReferenceSummaryView) { super(message); }
+  constructor(public readonly code: string, message: string, public readonly referenceSummary?: ProductReferenceSummaryView | DrawingReferenceSummaryView) { super(message); }
 }
 
 type ResponseBody =
@@ -334,6 +339,7 @@ export const apiClient: PlannerApi = {
   getDrawing: (id) => request(`/api/drawings/${id}`),
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
+  deleteReservedDrawing: (id) => request(`/api/drawings/${id}`, json('DELETE', { confirmed: true })),
   activateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/activate`, json('POST', { confirmed: true })),
   deactivateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/deactivate`, json('POST', { confirmed: true })),
   associateDrawingPdf: (id, pdfIndexId, conversionType) => request(`/api/drawings/${id}/associate-pdf`,

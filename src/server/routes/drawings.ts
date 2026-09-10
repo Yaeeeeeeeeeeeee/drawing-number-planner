@@ -32,7 +32,7 @@ function sendDrawingError(reply: FastifyReply, error: unknown) {
   if (!(error instanceof DrawingQueryError)) throw error;
   const status = error.code === 'NOT_FOUND' ? 404
     : error.code === 'INVALID_TRANSITION' || error.code === 'HISTORICAL_READ_ONLY' ? 409 : 422;
-  return reply.code(status).send({ error: { code: error.code, message: error.message } });
+  return reply.code(status).send({ error: { code: error.code, message: error.message, referenceSummary: error.referenceSummary } });
 }
 
 export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQueryService): void {
@@ -64,6 +64,15 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   app.post('/api/drawings/:id/activate', transition('active', '正式使用确认请求无效'));
   app.post('/api/drawings/:id/void', transition('voided', '作废确认请求无效'));
 
+  app.delete('/api/drawings/:id', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '删除预留图号确认请求无效' } });
+    }
+    try { return service.deleteReservedDrawing(params.data.id, input.data.confirmed); }
+    catch (error) { return sendDrawingError(reply, error); }
+  });
+
   const historicalTransition = (target: 'active' | 'inactive', invalidMessage: string) => async (request: any, reply: FastifyReply) => {
     const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
     if (!params.success || !input.success) {
@@ -74,6 +83,12 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   };
   app.post('/api/historical-drawings/:id/activate', historicalTransition('active', '历史图号启用确认请求无效'));
   app.post('/api/historical-drawings/:id/deactivate', historicalTransition('inactive', '历史图号停用确认请求无效'));
+  app.delete('/api/historical-drawings/:id', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '历史图号编号无效' } });
+    try { return service.deleteReservedDrawing(-params.data.id, true); }
+    catch (error) { return sendDrawingError(reply, error); }
+  });
 
   app.post('/api/drawings/:id/associate-pdf', async (request, reply) => {
     const params = paramsSchema.safeParse(request.params); const input = associationSchema.safeParse(request.body);

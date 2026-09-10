@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
+import type { DrawingBomUsage, DrawingDeletionPreview, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingReferenceSummary, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
 
 interface DrawingRow {
   id: number; origin: DrawingRecord['origin']; sku: string | null; full_code: string; display_name: string;
@@ -202,6 +202,42 @@ export class DrawingRepository {
 
   updateHistoricalStatus(id: number, status: HistoricalDrawingStatus): void {
     this.db.prepare('update historical_drawing_numbers set status = ? where id = ?').run(status, id);
+  }
+
+  deleteUnusedReservation(id: number): { kind: 'deleted' | 'not-found' | 'not-deletable' | 'referenced'; preview?: DrawingDeletionPreview } {
+    return this.db.transaction(() => {
+      const drawing = this.db.prepare('select id, full_code as fullCode, status from drawing_numbers where id = ?')
+        .get(id) as { id: number; fullCode: string; status: DrawingRecord['status'] } | undefined;
+      if (!drawing) return { kind: 'not-found' } as const;
+      const referenceSummary = this.getReferenceSummary(drawing.id, drawing.fullCode);
+      const preview: DrawingDeletionPreview = {
+        deletable: drawing.status === 'reserved' && this.hasNoReferences(referenceSummary),
+        referenceSummary,
+      };
+      if (drawing.status !== 'reserved') return { kind: 'not-deletable', preview } as const;
+      if (!preview.deletable) return { kind: 'referenced', preview } as const;
+
+      const deleted = this.db.prepare("delete from drawing_numbers where id = ? and status = 'reserved'").run(id);
+      return deleted.changes === 1 ? { kind: 'deleted' } as const : { kind: 'not-found' } as const;
+    }).immediate();
+  }
+
+  private getReferenceSummary(id: number, fullCode: string): DrawingReferenceSummary {
+    const counts = this.db.prepare(`select
+      (select count(*) from pdf_files file left join historical_drawing_numbers historical
+        on historical.id = file.historical_drawing_id
+        where file.drawing_id = ? or historical.full_code = ?) as pdfCount,
+      (select count(*) from bom_items where drawing_id = ?) as bomCount,
+      (select count(*) from drawing_numbers where id = ? and previous_drawing_id is not null) as previousDrawingCount,
+      (select count(*) from drawing_numbers where previous_drawing_id = ?) as successorCount,
+      (select count(*) from drawing_numbers where id = ? and source_drawing_id is not null) as sourceDrawingCount,
+      (select count(*) from drawing_numbers where source_drawing_id = ?) as sourceReferenceCount`)
+      .get(id, fullCode, id, id, id, id, id) as DrawingReferenceSummary;
+    return counts;
+  }
+
+  private hasNoReferences(summary: DrawingReferenceSummary): boolean {
+    return Object.values(summary).every((count) => count === 0);
   }
 
   associatePdf(drawingId: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): boolean {

@@ -108,6 +108,28 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : '历史图号状态更新失败'); }
     finally { setMaintaining(false); }
   };
+  const deleteReservation = async () => {
+    if (!selected) return;
+    if (!window.confirm('仅能删除从未使用的预留图号。是否继续？')) return;
+    if (!window.confirm(`最后确认删除 ${selected.fullCode}？删除后该号码会重新参与推荐。`)) return;
+    setMaintaining(true); setError('');
+    try {
+      await api.deleteReservedDrawing(selected.id);
+      setSelected(null);
+      await search(filters, 1, pageSize);
+    } catch (reason) {
+      const summary = typeof reason === 'object' && reason !== null && 'referenceSummary' in reason
+        ? (reason as { referenceSummary?: Record<string, unknown> }).referenceSummary : undefined;
+      const labels: Array<[string, string]> = [
+        ['pdfCount', 'PDF 关联'], ['bomCount', 'BOM 使用'], ['previousDrawingCount', '关联前版'],
+        ['successorCount', '后续版本'], ['sourceDrawingCount', '引用源图号'], ['sourceReferenceCount', '被引用为源图号'],
+      ];
+      const details = summary ? labels.flatMap(([key, label]) => typeof summary[key] === 'number' && summary[key] > 0
+        ? [`${label}（${summary[key]}）`] : []).join('、') : '';
+      const message = reason instanceof Error ? reason.message : '删除预留图号失败';
+      setError(details ? `${message}：${details}` : message);
+    } finally { setMaintaining(false); }
+  };
   const associatePdf = async (conversionType: 'source' | 'outlined') => {
     if (!selected || !selectedPdfId) return;
     setMaintaining(true); setError('');
@@ -176,7 +198,8 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
       ]} renderExpandedRow={(item) => selected?.id === item.id ? <DrawingDetailPanel selected={selected} maintaining={maintaining}
         pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
         setSelectedPdfId={setSelectedPdfId} onClose={() => setSelected(null)} onStatus={changeStatus} onOpen={openLocation}
-        onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus} onError={setError} /> : null} />}
+        onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus}
+        onDeleteReservation={deleteReservation} onError={setError} /> : null} />}
     {!loading && total > 0 && <nav className="drawing-pagination" aria-label="图号分页"><span>共 {total} 条 · 第 {page} / {totalPages} 页</span>
       <button className="secondary-button" type="button" disabled={page <= 1} onClick={() => goToPage(page - 1)}>上一页</button>
       <span className="page-number-list">{visiblePages.map((value, index) => <span key={value}>{index > 0 && value - visiblePages[index - 1] > 1 && <i>…</i>}<button type="button" className={value === page ? 'current' : ''} aria-current={value === page ? 'page' : undefined} onClick={() => goToPage(value)}>{value}</button></span>)}</span>
@@ -196,12 +219,13 @@ const usageLabel = (status: 'current' | 'historical' | 'unbatched' | 'indetermin
   status === 'current' ? '当前使用' : status === 'historical' ? '历史使用' : status === 'indeterminate' ? '待确认' : '未归入批次';
 
 function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
-  setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus, onError }: {
+  setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus, onDeleteReservation, onError }: {
   selected: DrawingDetailView; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
   pdfCandidates: PdfFileView[]; selectedPdfId: string; setSelectedPdfId(value: string): void; onClose(): void;
   onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
   onSearchPdf(keyword: string): Promise<void>; onAssociate(type: 'source' | 'outlined'): Promise<void>;
   onHistoricalStatus(target: 'active' | 'inactive'): Promise<void>;
+  onDeleteReservation(): Promise<void>;
   onError(message: string): void;
 }) {
   return <aside className="drawing-maintenance inline-drawing-detail panel-enter" aria-label="图号详情"><button className="panel-close" onClick={onClose} type="button">关闭</button>
@@ -215,7 +239,8 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
         : <button className="primary-button" disabled={maintaining} onClick={() => void onHistoricalStatus('active')} type="button">启用</button>}
     </div><p className="muted-text">停用不释放号码</p></> : <div className="drawing-actions">
       {selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">正式使用</button>}
-      {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}</div>}
+      {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}
+      {selected.status === 'reserved' && <button className="text-button danger" disabled={maintaining} onClick={() => void onDeleteReservation()} type="button">删除未使用预留</button>}</div>}
     <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={onOpen} />
     <FileSection title="转曲后文件" present={selected.hasOutlinedFile} files={selected.outlinedFiles ?? []} onOpen={onOpen} />
     <section className="drawing-detail-section"><h3>资料批次</h3>{!selected.batchUsage || selected.batchUsage.occurrences.length === 0
