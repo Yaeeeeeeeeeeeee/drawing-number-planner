@@ -199,6 +199,20 @@ describe('DrawingLibraryPage', () => {
     expect(await screen.findByRole('complementary', { name: '图号详情' })).toHaveTextContent('SAMKYO-ZC220白色-LOGO');
   });
 
+  it('includes inactive product categories in the drawing filter dropdown', async () => {
+    const api = {
+      searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+      listDictionaries: vi.fn().mockResolvedValue([]),
+      listProducts: vi.fn().mockResolvedValue([{ productCategory: '在售冰柜', status: 'active' }, { productCategory: '停用酒柜', status: 'inactive' }]),
+    };
+
+    render(<DrawingLibraryPage api={api as never} />);
+    await waitFor(() => expect(api.listProducts).toHaveBeenCalledWith({ status: 'all' }));
+    fireEvent.click(screen.getByRole('button', { name: '更多筛选' }));
+
+    expect(await screen.findByRole('option', { name: '停用酒柜' })).toBeVisible();
+  });
+
   it('shows dictionary filter loading failures instead of silently empty options', async () => {
     const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }), listDictionaries: vi.fn().mockRejectedValue(new Error('筛选项加载失败')) };
     render(<DrawingLibraryPage api={api as never} />);

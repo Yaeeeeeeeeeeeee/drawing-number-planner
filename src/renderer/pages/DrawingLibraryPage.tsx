@@ -52,7 +52,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     void search();
     void Promise.all([
       Promise.all(['brand', 'appearance', 'main_category', 'project_item', 'color'].map((type) => api.listDictionaries(type, false))),
-      api.listProducts?.() ?? Promise.resolve([]), api.listMaterialBatches?.() ?? Promise.resolve([]),
+      api.listProducts?.({ status: 'all' }) ?? Promise.resolve([]), api.listMaterialBatches?.() ?? Promise.resolve([]),
     ])
       .then(([[brand, appearance, main_category, project_item, color], products, materialBatches]) => {
         setOptions({ brand, appearance, main_category, project_item, color });

@@ -119,6 +119,8 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
   if (filters.materialBatchId !== undefined) {
     conditions.push(`exists(select 1 from pdf_files file where file.material_batch_id = ? and (
       (record.origin = 'planned' and file.drawing_id = record.id)
+      or (record.origin = 'planned' and exists(select 1 from historical_drawing_numbers historical
+        where historical.id = file.historical_drawing_id and historical.full_code = record.full_code))
       or (record.origin = 'historical' and file.historical_drawing_id = -record.id)
     ))`);
     values.push(filters.materialBatchId);

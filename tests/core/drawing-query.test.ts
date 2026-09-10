@@ -86,6 +86,26 @@ describe('DrawingQueryService', () => {
     expect(drawings.search({ materialBatchId: batchId }).items.map((item) => item.id)).toEqual([ids.second]);
   });
 
+  it('matches a planned drawing to a material batch through an identical historical full code', () => {
+    const now = '2026-08-27T00:00:00.000Z';
+    const historicalId = Number(db.prepare(`insert into historical_drawing_numbers
+      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+       project_item_code, sequence, first_seen_at, last_seen_at)
+      values ('02.0209.011.0402002', '02', '0209', '01', '1', '04', '02', 2, ?, ?)`)
+      .run(now, now).lastInsertRowid);
+    const batchId = Number(db.prepare(`insert into material_batches
+      (relative_path, product_directory, name, recognition_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜\\TEST-DRAWING-QUERY\\02.20260827', '冰柜\\TEST-DRAWING-QUERY', '02.20260827', 'recognized', 1, ?, ?)`)
+      .run(now, now).lastInsertRowid);
+    db.prepare(`insert into pdf_files
+      (relative_path, file_name, historical_drawing_id, material_batch_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('冰柜\\TEST-DRAWING-QUERY\\02.20260827\\historical.pdf', 'historical.pdf', ?, ?, 'matched', '[]', 'outlined', 1, ?, ?, 1)`)
+      .run(historicalId, batchId, now, now);
+
+    expect(drawings.search({ materialBatchId: batchId }).items.map((item) => item.id)).toEqual([ids.second]);
+  });
+
   it('returns stable pages for 128 drawing records at every supported library page size', () => {
     const insert = db.prepare(`insert into drawing_numbers
       (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
