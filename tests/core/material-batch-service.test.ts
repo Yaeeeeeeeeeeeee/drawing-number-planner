@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { parseMaterialBatch } from '../../src/core/files/material-batch-parser';
 import { MaterialBatchService } from '../../src/core/files/material-batch-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
@@ -15,13 +16,17 @@ beforeEach(() => {
 });
 afterEach(() => db.close());
 
-function insertBatch(productDirectory: string, name: string, sequence: number | null,
-  status: 'recognized' | 'pending' = 'recognized'): number {
+function insertBatch(productDirectory: string, batchName: string): number {
+  const relativeFilePath = `${productDirectory}\\03.量产后的变更文件\\${batchName}\\fixture.pdf`;
+  const batch = parseMaterialBatch(relativeFilePath);
+  if (!batch) throw new Error(`Expected a material batch for ${relativeFilePath}`);
+
   return Number(db.prepare(`insert into material_batches
-    (relative_path, product_directory, name, sequence_number, recognition_status, is_present, first_seen_at, last_seen_at)
-    values (?, ?, ?, ?, ?, 1, ?, ?)`).run(
-    `${productDirectory}\\03.量产后的变更文件\\${name}`,
-    productDirectory, name, sequence, status, now, now,
+    (relative_path, product_directory, name, sequence_number, business_date, recognition_status,
+     classification_warning, is_present, first_seen_at, last_seen_at)
+    values (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`).run(
+    batch.relativePath, batch.productDirectory, batch.name, batch.sequenceNumber, batch.businessDate,
+    batch.recognitionStatus, batch.classificationWarning, now, now,
   ).lastInsertRowid);
 }
 
@@ -53,20 +58,29 @@ function insertUnbatchedSource(productDirectory: string, historicalId: number, s
 }
 
 describe('MaterialBatchService', () => {
-  it('keeps 00.首批大货 below dated batches when selecting the current batch', () => {
-    const product = '01.洗碗机\\\\SKU-T40';
-    insertBatch(product, '00.首批大货', 0);
-    const dated = insertBatch(product, '01.20241210', 1);
+  it('parses and orders 00.首批大货, 01.20241210, and 06.20260309', () => {
+    const product = '01.洗碗机\\SKU-T40';
+    const first = insertBatch(product, '00.首批大货');
+    const old = insertBatch(product, '01.20241210');
+    const latest = insertBatch(product, '06.20260309');
 
-    expect(service.getCurrentBatchSelection(product)).toEqual({ status: 'selected', batchId: dated });
+    expect(service.getCurrentBatchSelection(product)).toEqual({ status: 'selected', batchId: latest });
+    expect(service.list()).toEqual([
+      expect.objectContaining({ id: latest, name: '06.20260309', sequenceNumber: 6,
+        businessDate: '2026-03-09', currentState: 'current' }),
+      expect.objectContaining({ id: old, name: '01.20241210', sequenceNumber: 1,
+        businessDate: '2024-12-10', currentState: 'historical' }),
+      expect.objectContaining({ id: first, name: '00.首批大货', sequenceNumber: 0,
+        businessDate: null, currentState: 'historical' }),
+    ]);
   });
 
   it('selects the unique highest recognized sequence and never uses PDF modification time', () => {
-    const product = '01.洗碗机\\\\SKU-T40';
-    const first = insertBatch(product, '00.首批大货', 0);
-    const old = insertBatch(product, '01.20241210', 1);
-    const latest = insertBatch(product, '06.20260309', 6);
-    const pending = insertBatch(product, '预案', null, 'pending');
+    const product = '01.洗碗机\\SKU-T40';
+    const first = insertBatch(product, '00.首批大货');
+    const old = insertBatch(product, '01.20241210');
+    const latest = insertBatch(product, '06.20260309');
+    const pending = insertBatch(product, '预案');
     const drawing = insertHistorical('02.0209.010.0401001');
     insertFile(first, drawing, 'first');
     insertFile(old, drawing, 'old', '2099-01-01T00:00:00.000Z');
@@ -89,9 +103,9 @@ describe('MaterialBatchService', () => {
   });
 
   it('returns indeterminate when the highest sequence is ambiguous', () => {
-    const product = '01.洗碗机\\\\SKU-T40';
-    insertBatch(product, '06.20260309', 6);
-    insertBatch(product, '06.补充资料', 6);
+    const product = '01.洗碗机\\SKU-T40';
+    insertBatch(product, '06.20260309');
+    insertBatch(product, '06.补充资料');
 
     expect(service.getCurrentBatchSelection(product)).toEqual({ status: 'indeterminate', batchId: null });
   });
@@ -99,11 +113,11 @@ describe('MaterialBatchService', () => {
   it('keeps current and historical states per product and flags a voided current-use conflict', () => {
     const code = '02.0209.010.0401001';
     const drawing = insertHistorical(code);
-    const t40Current = insertBatch('01.洗碗机\\\\SKU-T40', '06.20260309', 6);
+    const t40Current = insertBatch('01.洗碗机\\SKU-T40', '06.20260309');
     insertFile(t40Current, drawing, 't40-current');
-    const t60Old = insertBatch('01.洗碗机\\\\SKU-T60', '01.20241210', 1);
+    const t60Old = insertBatch('01.洗碗机\\SKU-T60', '01.20241210');
     insertFile(t60Old, drawing, 't60-old');
-    insertBatch('01.洗碗机\\\\SKU-T60', '02.20250304', 2);
+    insertBatch('01.洗碗机\\SKU-T60', '02.20250304');
 
     const usage = service.getDrawingUsage(code, 'voided');
 
@@ -111,8 +125,8 @@ describe('MaterialBatchService', () => {
     expect(usage.historicalProductCount).toBe(1);
     expect(usage.conflictWithBusinessStatus).toBe(true);
     expect(usage.occurrences).toEqual(expect.arrayContaining([
-      expect.objectContaining({ productDirectory: '01.洗碗机\\\\SKU-T40', usageState: 'current' }),
-      expect.objectContaining({ productDirectory: '01.洗碗机\\\\SKU-T60', usageState: 'historical' }),
+      expect.objectContaining({ productDirectory: '01.洗碗机\\SKU-T40', usageState: 'current' }),
+      expect.objectContaining({ productDirectory: '01.洗碗机\\SKU-T60', usageState: 'historical' }),
     ]));
   });
 
@@ -120,9 +134,9 @@ describe('MaterialBatchService', () => {
     const code = '02.0209.010.0401001';
     const drawing = insertHistorical(code);
     const productDirectory = '01.洗碗机\\SKU-T40';
-    const selected = insertBatch(productDirectory, '06.20260309', 6);
-    const earlier = insertBatch(productDirectory, '05.20251216', 5);
-    const anotherProduct = insertBatch('01.洗碗机\\SKU-T60', '06.20260309', 6);
+    const selected = insertBatch(productDirectory, '06.20260309');
+    const earlier = insertBatch(productDirectory, '05.20251216');
+    const anotherProduct = insertBatch('01.洗碗机\\SKU-T60', '06.20260309');
     insertFile(selected, drawing, '00-outlined-missing', now, 'outlined', false);
     insertFile(selected, drawing, '99-outlined-present');
     insertFile(earlier, drawing, 'source-same-product', now, 'source');
@@ -147,7 +161,7 @@ describe('MaterialBatchService', () => {
   });
 
   it('keeps an unrecognized outlined batch file as its own unpaired material row', () => {
-    const selected = insertBatch('01.洗碗机\\SKU-T40', '06.20260309', 6);
+    const selected = insertBatch('01.洗碗机\\SKU-T40', '06.20260309');
     db.prepare(`insert into pdf_files
       (relative_path, path_key, material_batch_id, file_name, match_status, detected_codes_json,
        conversion_type, size_bytes, modified_at, scanned_at, is_present)
