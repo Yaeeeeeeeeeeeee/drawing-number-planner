@@ -184,6 +184,10 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .bom-history-detail .eyebrow { margin-bottom: 4px; }
 .bom-history-detail td { min-width: 0; vertical-align: top; }
 .bom-history-detail .code-cell small { display: block; margin-top: 4px; color: var(--muted); font-family: inherit; font-weight: 500; }
+.danger-zone { margin-top: 18px; padding: 14px; border: 1px solid #efc0ba; border-radius: 8px; background: #fff8f7; }
+.danger-zone h4 { margin: 0 0 6px; color: #8f271f; }
+.danger-zone label { display: inline-flex; gap: 8px; align-items: center; margin-right: 10px; }
+.primary-button.danger { background: #b42318; }
 .bom-asset-paths { display: grid; min-width: 0; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bom-asset-paths li { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .bom-asset-paths li > span { display: grid; min-width: 0; gap: 3px; }

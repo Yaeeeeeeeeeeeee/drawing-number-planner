@@ -28,6 +28,29 @@ describe('product-level BOM API',()=>{
    expect((await app.inject({method:'GET',url:'/api/boms/query?fullCode=0401008'})).json().items).toHaveLength(1);
  });
  it('saves, queries and maps stale/malformed/domain errors',async()=>{ expect((await app.inject({method:'GET',url:`/api/boms/current?productId=${refs.product.id}`})).json()).toEqual({version:null}); const bad=await app.inject({method:'POST',url:'/api/boms/versions',payload:{productId:refs.product.id,expectedCurrentVersionId:null,items:[]}}); expect(bad.statusCode).toBe(400); const payload={productId:refs.product.id,businessChangeDate:'2026-09-02',expectedCurrentVersionId:null,items:[{projectItemId:refs.logo.id,drawingId:refs.drawing.id,usesWhiteMaterial:true}]}; const saved=await app.inject({method:'POST',url:'/api/boms/versions',payload}); expect(saved.statusCode).toBe(201); expect((await app.inject({method:'POST',url:'/api/boms/versions',payload})).statusCode).toBe(409); expect((await app.inject({method:'GET',url:`/api/boms/query?model=X&fullCode=${encodeURIComponent(refs.drawing.fullCode)}&businessChangeDate=2026-09-02`})).json().items).toHaveLength(1); });
+ it('previews and soft-deletes only the selected BOM change, then hides it from normal queries',async()=>{
+   const payload={productId:refs.product.id,businessChangeDate:'2026-09-02',expectedCurrentVersionId:null,
+     items:[{projectItemId:refs.logo.id,drawingId:refs.drawing.id,usesWhiteMaterial:true}]};
+   const first=(await app.inject({method:'POST',url:'/api/boms/versions',payload})).json().version;
+   const second=(await app.inject({method:'POST',url:'/api/boms/versions',payload:{...payload,businessChangeDate:'2026-09-03',expectedCurrentVersionId:first.id}})).json().version;
+   const preview=await app.inject({method:'GET',url:`/api/boms/versions/${second.id}/delete-preview`});
+   expect(preview.statusCode).toBe(200); expect(preview.json()).toMatchObject({isCurrent:true,fallbackVersionId:first.id,fallbackVersionNumber:1});
+   expect((await app.inject({method:'DELETE',url:`/api/boms/versions/${second.id}`,payload:{confirmed:false}})).statusCode).toBe(422);
+   const deleted=await app.inject({method:'DELETE',url:`/api/boms/versions/${second.id}`,payload:{confirmed:true}});
+   expect(deleted.statusCode).toBe(200); expect(deleted.json()).toMatchObject({deletedVersionId:second.id,currentVersionId:first.id});
+   expect((await app.inject({method:'GET',url:`/api/boms/current?productId=${refs.product.id}`})).json().version.id).toBe(first.id);
+   expect((await app.inject({method:'GET',url:`/api/boms/versions/${second.id}`})).statusCode).toBe(404);
+   expect((await app.inject({method:'GET',url:`/api/boms/versions?productId=${refs.product.id}`})).json().items.map((item:{id:number})=>item.id)).toEqual([first.id]);
+ });
+ it('protects whole-product BOM deletion with exact model confirmation',async()=>{
+   const payload={productId:refs.product.id,businessChangeDate:'2026-09-02',expectedCurrentVersionId:null,
+     items:[{projectItemId:refs.logo.id,drawingId:refs.drawing.id,usesWhiteMaterial:true}]};
+   await app.inject({method:'POST',url:'/api/boms/versions',payload});
+   const mismatch=await app.inject({method:'DELETE',url:`/api/boms/products/${refs.product.id}`,payload:{modelConfirmation:'x'}});
+   expect(mismatch.statusCode).toBe(422); expect(mismatch.json().error.code).toBe('BOM_MODEL_CONFIRMATION_MISMATCH');
+   const deleted=await app.inject({method:'DELETE',url:`/api/boms/products/${refs.product.id}`,payload:{modelConfirmation:'X'}});
+   expect(deleted.statusCode).toBe(200); expect(deleted.json()).toMatchObject({deletedCount:1,currentVersionId:null});
+ });
  it('keeps the shared multipart parser at 20MiB so Excel uploads above the BOM limit still reach Excel validation',async()=>{
    await registerImportRoutes(app,db,()=>undefined);
    const boundary='EXCEL-BOUNDARY'; const body=Buffer.concat([

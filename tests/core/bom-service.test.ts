@@ -181,4 +181,78 @@ describe('product-level BOM service', () => {
     db.prepare("update product_qr_codes set status = 'inactive' where id = ?").run(ownQr.id);
     expect(service.getVersion(saved.version.id).items[0].qrCodes).toEqual([expect.objectContaining({ id: ownQr.id, status: 'inactive' })]);
   });
+
+  it('soft-deletes a non-current history record without changing the current BOM', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    const first = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    const second = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: first.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+
+    expect(service.deleteBomVersion(first.version.id, true)).toMatchObject({ deletedVersionId: first.version.id,
+      productId: r.product.id, wasCurrent: false, currentVersionId: second.version.id });
+    expect(service.getCurrent(r.product.id)?.id).toBe(second.version.id);
+    expect(service.listVersions(r.product.id).map((version) => version.id)).toEqual([second.version.id]);
+    expect(service.queryVersions({}).map((version) => version.id)).toEqual([second.version.id]);
+    expect(() => service.getVersion(first.version.id)).toThrowError(expect.objectContaining({ code: 'BOM_NOT_FOUND' }));
+  });
+
+  it('requires confirmation and rolls the current BOM back to the latest undeleted predecessor', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    const first = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    const second = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: first.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    const third = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: second.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    service.deleteBomVersion(second.version.id, true);
+
+    expect(service.previewBomVersionDeletion(third.version.id)).toMatchObject({ isCurrent: true,
+      fallbackVersionId: first.version.id, fallbackVersionNumber: 1 });
+    expect(() => service.deleteBomVersion(third.version.id, false)).toThrowError(expect.objectContaining({ code: 'BOM_DELETE_CONFIRMATION_REQUIRED' }));
+    expect(service.deleteBomVersion(third.version.id, true)).toMatchObject({ wasCurrent: true,
+      currentVersionId: first.version.id, currentVersionNumber: 1 });
+    expect(service.getCurrent(r.product.id)?.id).toBe(first.version.id);
+
+    const fourth = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-04', expectedCurrentVersionId: first.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    expect(fourth.version.versionNumber).toBe(4);
+  });
+
+  it('clears the current pointer when deleting the only BOM version and rejects repeat deletion', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    const only = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+
+    expect(service.deleteBomVersion(only.version.id, true)).toMatchObject({ wasCurrent: true, currentVersionId: null });
+    expect(service.getCurrent(r.product.id)).toBeNull();
+    expect(() => service.deleteBomVersion(only.version.id, true)).toThrowError(expect.objectContaining({ code: 'BOM_ALREADY_DELETED' }));
+  });
+
+  it('deletes an entire product BOM only after exact model confirmation and leaves other products intact', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id); const otherDrawing = r.draw(r.other.id, r.gray.id, r.logo.id);
+    service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    service.saveVersion({ productId: r.other.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: otherDrawing.id, usesWhiteMaterial: false }] });
+
+    expect(() => service.deleteProductBom(r.product.id, 'x1')).toThrowError(expect.objectContaining({ code: 'BOM_MODEL_CONFIRMATION_MISMATCH' }));
+    expect(service.listVersions(r.product.id)).toHaveLength(1);
+    expect(service.deleteProductBom(r.product.id, 'X1')).toMatchObject({ productId: r.product.id, deletedCount: 1, currentVersionId: null });
+    expect(service.listVersions(r.product.id)).toHaveLength(0);
+    expect(service.listVersions(r.other.id)).toHaveLength(1);
+  });
+
+  it('rolls back the version tombstone when updating the current pointer fails', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.gray.id, r.logo.id);
+    const first = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-01', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    const current = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: first.version.id,
+      items: [{ projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false }] });
+    db.exec(`create trigger fail_bom_current_update before update on bom_current begin select raise(abort, 'forced rollback'); end`);
+
+    expect(() => service.deleteBomVersion(current.version.id, true)).toThrow(/forced rollback/);
+    expect(db.prepare('select deleted_at from bom_versions where id = ?').get(current.version.id)).toEqual({ deleted_at: null });
+    expect(service.getCurrent(r.product.id)?.id).toBe(current.version.id);
+  });
 });

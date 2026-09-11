@@ -111,6 +111,14 @@ export interface BomVersionSummaryView {
   id: number; productId: number; model: string; versionNumber: number; previousVersionId: number | null;
   businessChangeDate: string | null; businessChangeDateLabel: string; notes: string | null; createdAt: string;
 }
+export interface BomVersionDeletionPreviewView {
+  versionId: number; productId: number; model: string; versionNumber: number; isCurrent: boolean;
+  fallbackVersionId: number | null; fallbackVersionNumber: number | null;
+}
+export interface BomVersionDeletionResultView {
+  deletedVersionId: number; productId: number; wasCurrent: boolean;
+  currentVersionId: number | null; currentVersionNumber: number | null;
+}
 export interface BomVersionView extends BomVersionSummaryView { items: BomItemView[] }
 export interface BomDiffView {
   type: 'added' | 'replaced' | 'removed' | 'unchanged'; projectItemId: number; projectItemName: string;
@@ -223,6 +231,9 @@ export interface PlannerApi {
   listBomVersions(productId: number): Promise<BomVersionSummaryView[]>;
   queryBomVersions(filters?: { model?: string; businessChangeDate?: string; effectiveBatchRelativePath?: string; projectItemId?: number; fullCode?: string }): Promise<BomVersionSummaryView[]>;
   getBomVersion(id: number): Promise<BomVersionView>;
+  previewBomVersionDeletion(id: number): Promise<BomVersionDeletionPreviewView>;
+  deleteBomVersion(id: number, confirmed: boolean): Promise<BomVersionDeletionResultView>;
+  deleteProductBom(productId: number, modelConfirmation: string): Promise<{ productId: number; deletedCount: number; currentVersionId: null }>;
   listBomCandidates(input: { productId: number; projectItemId: number; usesWhiteMaterial: boolean; entryMode: BomEntryModeView }): Promise<BomCandidateView[]>;
   listBomQrCandidates(productId: number): Promise<BomQrCandidateView[]>;
   uploadBomAsset(productId: number, file: File): Promise<BomAssetView>;
@@ -412,6 +423,9 @@ export const apiClient: PlannerApi = {
   queryBomVersions: async (filters = {}) => (await request<{ items: BomVersionSummaryView[] }>(
     `/api/boms/query${queryString(filters)}`)).items,
   getBomVersion: (id) => request(`/api/boms/versions/${id}`),
+  previewBomVersionDeletion: (id) => request(`/api/boms/versions/${id}/delete-preview`),
+  deleteBomVersion: (id, confirmed) => request(`/api/boms/versions/${id}`, json('DELETE', { confirmed })),
+  deleteProductBom: (productId, modelConfirmation) => request(`/api/boms/products/${productId}`, json('DELETE', { modelConfirmation })),
   listBomCandidates: async (input) => (await request<{ items: BomCandidateView[] }>(
     `/api/boms/candidates${queryString(input)}`)).items,
   listBomQrCandidates: async (productId) => (await request<{ items: BomQrCandidateView[] }>(

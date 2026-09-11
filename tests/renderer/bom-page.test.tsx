@@ -36,6 +36,11 @@ function apiFixture() {
     queryBomVersions: vi.fn().mockResolvedValue([]), listBomCandidates: vi.fn().mockResolvedValue([candidate]),
     listBomQrCandidates: vi.fn().mockResolvedValue([{ id: 9, name: '说明书二维码', purposeDisplayName: '说明书', status: 'active' }]),
     uploadBomAsset: vi.fn().mockResolvedValue(asset), getBomVersion: vi.fn(),
+    previewBomVersionDeletion: vi.fn().mockResolvedValue({ versionId: 20, productId: 1, model: 'ZC100', versionNumber: 1,
+      isCurrent: true, fallbackVersionId: null, fallbackVersionNumber: null }),
+    deleteBomVersion: vi.fn().mockResolvedValue({ deletedVersionId: 20, productId: 1, wasCurrent: true,
+      currentVersionId: null, currentVersionNumber: null }),
+    deleteProductBom: vi.fn().mockResolvedValue({ productId: 1, deletedCount: 1, currentVersionId: null }),
     saveBomVersion: vi.fn().mockResolvedValue({ version: { id: 20, productId: 1, model: 'ZC100', versionNumber: 1,
       previousVersionId: null, businessChangeDate: '2026-09-02', businessChangeDateLabel: '2026-09-02', notes: null,
       createdAt: '2026-09-02T00:00:00Z', items: [] }, diff: [] }),
@@ -199,6 +204,31 @@ describe('BomPage product-level BOM', () => {
     resolveSecond({ ...activeCurrent, id: 21, items: [{ ...activeCurrent.items[0], fullCode: 'NEW-CODE' }] }); await screen.findByText('NEW-CODE');
     resolveFirst({ ...activeCurrent, id: 20, items: [{ ...activeCurrent.items[0], fullCode: 'OLD-CODE' }] });
     await waitFor(() => expect(screen.queryByText('OLD-CODE')).not.toBeInTheDocument());
+  });
+
+  it('previews record deletion, explains current rollback, and deletes only the selected change after confirmation', async () => {
+    const api = apiFixture(); api.queryBomVersions.mockResolvedValue([activeCurrent]);
+    api.previewBomVersionDeletion.mockResolvedValue({ versionId: 20, productId: 1, model: 'ZC100', versionNumber: 1,
+      isCurrent: true, fallbackVersionId: 19, fallbackVersionNumber: 3 });
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
+    fireEvent.click(await screen.findByRole('button', { name: '删除 BOM 20' }));
+    await waitFor(() => expect(confirmation).toHaveBeenCalledWith(expect.stringMatching(/当前 BOM.*V3/)));
+    expect(api.deleteBomVersion).toHaveBeenCalledWith(20, true);
+    await waitFor(() => expect(api.queryBomVersions).toHaveBeenCalledTimes(2));
+    confirmation.mockRestore();
+  });
+
+  it('keeps whole-product BOM deletion in a separate model-confirmed danger area', async () => {
+    const api = apiFixture(); api.queryBomVersions.mockResolvedValue([activeCurrent]); api.getBomVersion.mockResolvedValue(activeCurrent);
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
+    fireEvent.change(await screen.findByLabelText('输入型号确认删除整个 BOM'), { target: { value: 'ZC100' } });
+    fireEvent.click(screen.getByRole('button', { name: '删除整个型号 BOM' }));
+    await waitFor(() => expect(api.deleteProductBom).toHaveBeenCalledWith(1, 'ZC100'));
+    expect(confirmation).toHaveBeenCalledWith(expect.stringMatching(/整个型号.*全部.*BOM/));
+    confirmation.mockRestore();
   });
 
   it('shows complete wrapping attachment paths and opens their location through the desktop shell', async () => {

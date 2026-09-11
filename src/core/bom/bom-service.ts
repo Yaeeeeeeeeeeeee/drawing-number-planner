@@ -4,7 +4,7 @@ import { BomError } from './bom-errors.js';
 import { BomRepository } from './bom-repository.js';
 import { BomAssetService, type ManagedBomAsset } from './bom-asset-service.js';
 import type { BomCandidate, BomCandidateInput, BomDiffEntry, BomDrawingReference, BomItemInput, BomQueryFilters, BomVersionDetail,
-  BomVersionSummary, SaveBomInput, SavedBomVersion } from './bom-types.js';
+  BomVersionDeletionPreview, BomVersionDeletionResult, BomVersionSummary, ProductBomDeletionResult, SaveBomInput, SavedBomVersion } from './bom-types.js';
 
 export const WHITE_COLOR_CODE = '0';
 
@@ -81,6 +81,45 @@ export class BomService {
   listVersions(productId: number, _legacyColorId?: number): BomVersionSummary[] { return this.repository.listVersions(productId); }
   queryVersions(filters: BomQueryFilters): BomVersionSummary[] { return this.repository.queryVersions(filters); }
 
+  previewBomVersionDeletion(id: number): BomVersionDeletionPreview {
+    const version = this.repository.getDeletionVersion(id);
+    if (!version) throw new BomError('BOM_NOT_FOUND', 'BOM 版本不存在');
+    if (version.deletedAt) throw new BomError('BOM_ALREADY_DELETED', '该 BOM 变更记录已经删除');
+    return this.repository.previewDeletion(id)!;
+  }
+
+  deleteBomVersion(id: number, confirmed: boolean): BomVersionDeletionResult {
+    return this.db.transaction(() => {
+      const preview = this.previewBomVersionDeletion(id);
+      if (!confirmed) throw new BomError('BOM_DELETE_CONFIRMATION_REQUIRED', '删除 BOM 变更记录需要二次确认');
+      const now = new Date().toISOString();
+      if (this.repository.markVersionDeleted(id, now, '用户删除单次 BOM 变更') !== 1) {
+        throw new BomError('BOM_ALREADY_DELETED', '该 BOM 变更记录已经删除');
+      }
+      if (preview.isCurrent) {
+        if (preview.fallbackVersionId === null) this.repository.clearCurrent(preview.productId);
+        else this.repository.setCurrent(preview.productId, preview.fallbackVersionId, now);
+      }
+      return { deletedVersionId: id, productId: preview.productId, wasCurrent: preview.isCurrent,
+        currentVersionId: preview.isCurrent ? preview.fallbackVersionId : this.repository.getCurrentVersionId(preview.productId),
+        currentVersionNumber: preview.isCurrent ? preview.fallbackVersionNumber
+          : this.repository.previewDeletion(this.repository.getCurrentVersionId(preview.productId) ?? -1)?.versionNumber ?? null };
+    }).immediate();
+  }
+
+  deleteProductBom(productId: number, modelConfirmation: string): ProductBomDeletionResult {
+    return this.db.transaction(() => {
+      const identity = this.repository.getProductIdentity(productId);
+      if (!identity) throw new BomError('BOM_NOT_FOUND', '产品不存在');
+      if (modelConfirmation !== identity.model) {
+        throw new BomError('BOM_MODEL_CONFIRMATION_MISMATCH', '输入的型号与产品档案不一致，未删除 BOM');
+      }
+      const deletedCount = this.repository.markProductVersionsDeleted(productId, new Date().toISOString(), '用户删除整个型号 BOM');
+      this.repository.clearCurrent(productId);
+      return { productId, deletedCount, currentVersionId: null };
+    }).immediate();
+  }
+
   listCandidates(input: BomCandidateInput): BomCandidate[] {
     this.validateProduct(input.productId);
     return this.repository.listCandidates(input, WHITE_COLOR_CODE);
@@ -110,7 +149,7 @@ export class BomService {
       const validated = input.items.map((item) => this.validateItem(item, input.productId, projectIds, entryMode));
       const previous = currentId === null ? null : this.getVersion(currentId);
       const now = new Date().toISOString();
-      const versionId = this.repository.insertVersion(input.productId, (previous?.versionNumber ?? 0) + 1,
+      const versionId = this.repository.insertVersion(input.productId, this.repository.nextVersionNumber(input.productId),
         currentId, input.businessChangeDate, normalizedNotes(input.notes), now);
       validated.forEach((item) => {
         const bomItemId = this.repository.insertItem(versionId, item);

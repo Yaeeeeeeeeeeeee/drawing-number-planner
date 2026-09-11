@@ -92,6 +92,30 @@ export interface BomVersionSummary {
   createdAt: string;
 }
 
+export interface BomVersionDeletionPreview {
+  versionId: number;
+  productId: number;
+  model: string;
+  versionNumber: number;
+  isCurrent: boolean;
+  fallbackVersionId: number | null;
+  fallbackVersionNumber: number | null;
+}
+
+export interface BomVersionDeletionResult {
+  deletedVersionId: number;
+  productId: number;
+  wasCurrent: boolean;
+  currentVersionId: number | null;
+  currentVersionNumber: number | null;
+}
+
+export interface ProductBomDeletionResult {
+  productId: number;
+  deletedCount: number;
+  currentVersionId: null;
+}
+
 export interface BomQueryFilters {
   model?: string;
   businessChangeDate?: string;

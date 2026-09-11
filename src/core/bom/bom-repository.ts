@@ -1,5 +1,6 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { BomAssetRole, BomCandidate, BomCandidateInput, BomDrawingReference, BomItemRecord, BomQueryFilters, BomQrCodeRecord, BomVersionDetail, BomVersionSummary } from './bom-types.js';
+import type { BomAssetRole, BomCandidate, BomCandidateInput, BomDrawingReference, BomItemRecord, BomQueryFilters, BomQrCodeRecord,
+  BomVersionDeletionPreview, BomVersionDetail, BomVersionSummary } from './bom-types.js';
 
 export interface BomContext { productId: number; productStatus: 'active' | 'inactive' }
 
@@ -16,6 +17,11 @@ interface VersionRow {
   id: number; product_id: number; model: string; version_number: number; previous_version_id: number | null;
   business_change_date: string | null; legacy_color_id: number | null; legacy_color_name: string | null;
   notes: string | null; created_at: string;
+}
+
+interface DeletionVersionRow {
+  id: number; productId: number; model: string; versionNumber: number; previousVersionId: number | null;
+  deletedAt: string | null; isCurrent: 0 | 1;
 }
 
 interface ItemRow {
@@ -84,7 +90,7 @@ export class BomRepository {
   }
 
   getVersion(id: number): BomVersionDetail | undefined {
-    const row = this.db.prepare(`${versionSelect} where version.id = ?`).get(id) as VersionRow | undefined;
+    const row = this.db.prepare(`${versionSelect} where version.id = ? and version.deleted_at is null`).get(id) as VersionRow | undefined;
     if (!row) return undefined;
     const items = this.db.prepare(`select item.id as bom_item_id, item.drawing_id, item.historical_drawing_id,
       case when item.drawing_id is not null then 'planned' else 'historical' end as origin,
@@ -109,6 +115,7 @@ export class BomRepository {
 
   listVersions(productId: number): BomVersionSummary[] {
     return (this.db.prepare(`${versionSelect} where version.product_id = ?
+      and version.deleted_at is null
       order by version.business_change_date desc nulls last, version.created_at desc, version.id desc`).all(productId) as VersionRow[]).map(mapSummary);
   }
 
@@ -127,7 +134,8 @@ export class BomRepository {
         left join historical_drawing_numbers historical on historical.id = item.historical_drawing_id
         where item.bom_version_id = version.id and ${itemConditions.join(' and ')})`);
     }
-    const where = conditions.length ? ` where ${conditions.join(' and ')}` : '';
+    conditions.unshift('version.deleted_at is null');
+    const where = ` where ${conditions.join(' and ')}`;
     return (this.db.prepare(`${versionSelect}${where}
       order by version.business_change_date desc nulls last, version.created_at desc, version.id desc`).all(...values) as VersionRow[]).map(mapSummary);
   }
@@ -193,6 +201,57 @@ export class BomRepository {
       (product_id, version_number, previous_version_id, business_change_date, notes, created_at) values (?, ?, ?, ?, ?, ?)`)
       .run(productId, versionNumber, previousVersionId, businessChangeDate, notes, createdAt).lastInsertRowid);
   }
+
+  nextVersionNumber(productId: number): number {
+    const row = this.db.prepare('select coalesce(max(version_number), 0) + 1 as next from bom_versions where product_id = ?')
+      .get(productId) as { next: number };
+    return row.next;
+  }
+
+  getDeletionVersion(id: number): DeletionVersionRow | undefined {
+    return this.db.prepare(`select version.id, version.product_id as productId, product.model,
+      version.version_number as versionNumber, version.previous_version_id as previousVersionId,
+      version.deleted_at as deletedAt,
+      case when current.version_id = version.id then 1 else 0 end as isCurrent
+      from bom_versions version join products product on product.id = version.product_id
+      left join bom_current current on current.product_id = version.product_id
+      where version.id = ?`).get(id) as DeletionVersionRow | undefined;
+  }
+
+  getDeletionFallback(versionId: number): { id: number; versionNumber: number } | undefined {
+    return this.db.prepare(`with recursive predecessors(id, previous_version_id, version_number, depth) as (
+        select previous.id, previous.previous_version_id, previous.version_number, 1
+        from bom_versions target join bom_versions previous on previous.id = target.previous_version_id
+        where target.id = ?
+        union all
+        select previous.id, previous.previous_version_id, previous.version_number, predecessors.depth + 1
+        from predecessors join bom_versions previous on previous.id = predecessors.previous_version_id
+      ) select predecessors.id, predecessors.version_number as versionNumber
+      from predecessors join bom_versions version on version.id = predecessors.id
+      where version.deleted_at is null order by predecessors.depth limit 1`).get(versionId) as
+      { id: number; versionNumber: number } | undefined;
+  }
+
+  previewDeletion(id: number): BomVersionDeletionPreview | undefined {
+    const version = this.getDeletionVersion(id);
+    if (!version) return undefined;
+    const fallback = version.isCurrent ? this.getDeletionFallback(id) : undefined;
+    return { versionId: version.id, productId: version.productId, model: version.model,
+      versionNumber: version.versionNumber, isCurrent: version.isCurrent === 1,
+      fallbackVersionId: fallback?.id ?? null, fallbackVersionNumber: fallback?.versionNumber ?? null };
+  }
+
+  markVersionDeleted(id: number, deletedAt: string, reason: string): number {
+    return this.db.prepare(`update bom_versions set deleted_at = ?, deleted_reason = ? where id = ? and deleted_at is null`)
+      .run(deletedAt, reason, id).changes;
+  }
+
+  markProductVersionsDeleted(productId: number, deletedAt: string, reason: string): number {
+    return this.db.prepare(`update bom_versions set deleted_at = ?, deleted_reason = ?
+      where product_id = ? and deleted_at is null`).run(deletedAt, reason, productId).changes;
+  }
+
+  clearCurrent(productId: number): void { this.db.prepare('delete from bom_current where product_id = ?').run(productId); }
 
   insertItem(versionId: number, item: { projectItemId: number; drawingReference: BomDrawingReference; effectiveBatchRelativePath: string | null;
     effectiveBatchName: string | null; effectiveMaterialBatchId: number | null; material: string | null;

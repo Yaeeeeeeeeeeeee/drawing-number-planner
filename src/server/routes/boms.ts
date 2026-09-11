@@ -42,6 +42,9 @@ const saveSchema = z.object({
   expectedCurrentVersionId: z.number().int().positive().nullable(), notes: z.string().max(1000).optional(),
   items: z.array(itemSchema).max(500),
 }).strict().refine((value) => new Set(value.items.map((item) => item.projectItemId)).size === value.items.length);
+const versionParams = z.object({ id: z.coerce.number().int().positive() }).strict();
+const deleteVersionSchema = z.object({ confirmed: z.boolean() }).strict();
+const deleteProductSchema = z.object({ modelConfirmation: z.string() }).strict();
 
 function sendBomError(reply: FastifyReply, error: unknown) {
   if (error instanceof FileError) return reply.code(422).send({ error: { code: 'ASSET_PATH_INVALID', message: error.message } });
@@ -68,10 +71,25 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
     return { items: service.listVersions(query.data.productId) };
   });
+  app.get('/api/boms/versions/:id/delete-preview', async (request, reply) => {
+    const params = versionParams.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 版本编号无效' } });
+    try { return service.previewBomVersionDeletion(params.data.id); } catch (error) { return sendBomError(reply, error); }
+  });
   app.get('/api/boms/versions/:id', async (request, reply) => {
-    const params = z.object({ id: z.coerce.number().int().positive() }).strict().safeParse(request.params);
+    const params = versionParams.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 版本编号无效' } });
     try { return service.getVersion(params.data.id); } catch (error) { return sendBomError(reply, error); }
+  });
+  app.delete('/api/boms/versions/:id', async (request, reply) => {
+    const params = versionParams.safeParse(request.params); const body = deleteVersionSchema.safeParse(request.body);
+    if (!params.success || !body.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 删除确认无效' } });
+    try { return service.deleteBomVersion(params.data.id, body.data.confirmed); } catch (error) { return sendBomError(reply, error); }
+  });
+  app.delete('/api/boms/products/:productId', async (request, reply) => {
+    const params = productQuery.safeParse(request.params); const body = deleteProductSchema.safeParse(request.body);
+    if (!params.success || !body.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '整型号 BOM 删除确认无效' } });
+    try { return service.deleteProductBom(params.data.productId, body.data.modelConfirmation); } catch (error) { return sendBomError(reply, error); }
   });
   app.get('/api/boms/candidates', async (request, reply) => {
     const query = candidateQuery.safeParse(request.query);
