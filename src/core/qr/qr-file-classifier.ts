@@ -17,18 +17,20 @@ export interface QrFileClassification {
   productId: number | null;
   purposeId: number | null;
   model: string | null;
+  detectedIdentifier: string | null;
   classificationWarning: string | null;
 }
 
-const QR_NAME = /^(?<name>.+)（(?:二维码的)?网址编码）\.[^.]+$/u;
+const QR_NAME = /^(?<name>.+)（(?<identifier>[^（）]*)）\.[^.]+$/u;
+
+const normalizePurpose = (value: string) => value.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
+const normalizeCategory = (value: string) => normalizePurpose(value).replace(/^\d+[.．、\s-]*/u, '');
 
 function purposeMatches(fileName: string, product: QrClassifierProduct, purpose: QrClassifierPurpose): boolean {
   const prefix = `${product.model}-`;
-  if (!fileName.startsWith(prefix)) return false;
+  if (!normalizePurpose(fileName).startsWith(normalizePurpose(prefix))) return false;
   const value = fileName.slice(prefix.length);
-  return purpose.englishName.toLocaleLowerCase('en-US') === 'warranty'
-    ? value.localeCompare(purpose.englishName, 'en-US', { sensitivity: 'accent' }) === 0
-    : value === purpose.englishName;
+  return normalizePurpose(value) === normalizePurpose(purpose.englishName);
 }
 
 export function classifyQrFile(input: {
@@ -40,26 +42,35 @@ export function classifyQrFile(input: {
   const parsed = QR_NAME.exec(input.fileName);
   if (!parsed?.groups) {
     return { matchStatus: 'unmatched', productId: null, purposeId: null, model: null,
+      detectedIdentifier: null,
       classificationWarning: 'qr-filename-unrecognized' };
+  }
+  const detectedIdentifier = parsed.groups.identifier.trim() || null;
+  if (detectedIdentifier == null) {
+    return { matchStatus: 'pending', productId: null, purposeId: null, model: null, detectedIdentifier,
+      classificationWarning: 'qr-identifier-empty' };
   }
   const directory = input.relativePath.split(/[\\/]+/).filter(Boolean);
   if (directory.length !== 3) {
     return { matchStatus: 'pending', productId: null, purposeId: null, model: null,
+      detectedIdentifier,
       classificationWarning: 'qr-nested-directory' };
   }
   const [productCategory, productDirectory] = directory;
   const activeProducts = input.products.filter((product) => product.status !== 'inactive'
-    && product.productCategory === productCategory && product.sku != null
-    && `${product.sku}-${product.model}` === productDirectory);
+    && normalizeCategory(product.productCategory) === normalizeCategory(productCategory) && product.sku != null
+    && normalizePurpose(`${product.sku}-${product.model}`) === normalizePurpose(productDirectory));
   const activePurposes = input.purposes.filter((purpose) => purpose.status !== 'inactive');
-  const matches = activeProducts.flatMap((product) => activePurposes
-    .filter((purpose) => purposeMatches(parsed.groups!.name, product, purpose))
-    .map((purpose) => ({ product, purpose })));
-  if (matches.length === 1) {
-    const { product, purpose } = matches[0];
-    return { matchStatus: 'matched', productId: product.id, purposeId: purpose.id, model: product.model, classificationWarning: null };
+  if (activeProducts.length !== 1) {
+    return { matchStatus: 'pending', productId: null, purposeId: null, model: null, detectedIdentifier,
+      classificationWarning: activeProducts.length > 1 ? 'qr-product-ambiguous' : 'qr-product-unresolved' };
   }
-  const hasPurposeName = activePurposes.some((purpose) => activeProducts.some((product) => purposeMatches(parsed.groups!.name, product, purpose)));
+  const product = activeProducts[0];
+  const purposes = activePurposes.filter((purpose) => purposeMatches(parsed.groups!.name, product, purpose));
+  if (purposes.length === 1) {
+    return { matchStatus: 'matched', productId: product.id, purposeId: purposes[0].id, model: product.model,
+      detectedIdentifier, classificationWarning: null };
+  }
   return { matchStatus: 'pending', productId: null, purposeId: null, model: null,
-    classificationWarning: hasPurposeName ? 'qr-product-unresolved' : 'qr-purpose-unrecognized' };
+    detectedIdentifier, classificationWarning: purposes.length > 1 ? 'qr-purpose-ambiguous' : 'qr-purpose-unrecognized' };
 }

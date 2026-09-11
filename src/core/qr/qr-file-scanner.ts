@@ -12,7 +12,7 @@ export interface ScannedQrFile {
   modifiedAt: string;
 }
 
-const QR_FILE_NAME = /^.+?-.+?（(?:二维码的)?网址编码）\.(?:png|jpe?g|webp|gif|pdf)$/iu;
+const QR_FILE_NAME = /^(?!\d{2}\.\d{4}\.\d{3}\.\d{7}(?:-|（)).+?-.+?（[^（）]*）\.(?:png|jpe?g|webp|gif|pdf)$/iu;
 
 function mimeType(fileName: string): string {
   const extension = fileName.slice(fileName.lastIndexOf('.') + 1).toLocaleLowerCase('en-US');

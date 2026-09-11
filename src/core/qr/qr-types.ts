@@ -1,6 +1,35 @@
 export type QrStatus = 'active' | 'inactive';
 export type QrFileMatchStatus = 'matched' | 'pending' | 'unmatched';
 
+export interface QrPurpose {
+  id: number;
+  key: string;
+  englishName: string;
+  displayName: string;
+  defaultForAll: boolean;
+  status: QrStatus;
+  productCategories: string[];
+}
+
+export interface CreateQrPurposeInput {
+  key: string;
+  englishName: string;
+  displayName: string;
+  defaultForAll: boolean;
+  productCategories: string[];
+}
+
+export interface CreateProductQrCodeInput {
+  productId: number;
+  purposeId: number;
+  name: string;
+  targetUrl: string | null;
+  status: QrStatus;
+  qrFileId?: number | null;
+}
+
+export interface QrReferenceSummary { files: number; bomItems: number }
+
 export interface ProductQrCode {
   id: number;
   productId: number;
@@ -48,6 +77,7 @@ export interface QrFileScanRecord {
   qrCodeId: number | null;
   matchStatus: QrFileMatchStatus;
   classificationWarning: string | null;
+  detectedIdentifier?: string | null;
 }
 
 export interface QrFileReference {
@@ -57,4 +87,5 @@ export interface QrFileReference {
   mimeType: string;
   isPresent: boolean;
   matchStatus: QrFileMatchStatus;
+  detectedIdentifier: string | null;
 }

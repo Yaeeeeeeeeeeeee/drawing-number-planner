@@ -191,12 +191,15 @@ describe('FileRepository', () => {
     const qr: QrFileScanRecord = {
       relativePath: 'QR100-Manual（网址编码）.png', fileName: 'QR100-Manual（网址编码）.png', mimeType: 'image/png',
       sizeBytes: 120, modifiedAt: '2026-08-25T01:00:00.000Z', qrCodeId: null, matchStatus: 'pending', classificationWarning: null,
+      detectedIdentifier: '网址编码',
     };
 
     repository.replaceScan([], [], '2026-08-25T04:00:00.000Z', [qr]);
     expect(repository.scanChanges(1)?.changes.added).toEqual([
       expect.objectContaining({ relativePath: qr.relativePath, indexKind: 'qr', type: 'added' }),
     ]);
+    expect(db.prepare('select detected_identifier as detectedIdentifier from qr_code_files').get())
+      .toEqual({ detectedIdentifier: '网址编码' });
 
     repository.replaceScan([], [], '2026-08-26T04:00:00.000Z');
     expect(repository.scanChanges(2)?.changes.missing).toEqual([

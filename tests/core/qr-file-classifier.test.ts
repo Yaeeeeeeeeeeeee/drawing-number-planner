@@ -13,6 +13,7 @@ describe('classifyQrFile', () => {
 
     expect(result).toEqual({
       matchStatus: 'matched', productId: 7, purposeId: 3, model: 'AF30',
+      detectedIdentifier: '二维码的网址编码',
       classificationWarning: null,
     });
   });
@@ -27,6 +28,7 @@ describe('classifyQrFile', () => {
 
     expect(result).toEqual({
       matchStatus: 'matched', productId: 4, purposeId: 2, model: 'ZC100',
+      detectedIdentifier: '网址编码',
       classificationWarning: null,
     });
   });
@@ -66,6 +68,51 @@ describe('classifyQrFile', () => {
     });
 
     expect(result).toMatchObject({ matchStatus: 'matched', productId: 8, purposeId: 5, model: 'AF-30' });
+  });
+
+  it('captures a non-empty identifier and normalizes purpose case and repeated spaces', () => {
+    const result = classifyQrFile({
+      relativePath: '空气炸锅/SKUAF-AF30/AF30-user   manual（qagp85g）.pdf',
+      fileName: 'AF30-user   manual（qagp85g）.pdf',
+      products: [{ id: 7, sku: 'SKUAF', model: 'AF30', productCategory: '空气炸锅' }],
+      purposes: [{ id: 3, englishName: 'User Manual' }],
+    });
+
+    expect(result).toMatchObject({ matchStatus: 'matched', productId: 7, purposeId: 3,
+      detectedIdentifier: 'qagp85g', classificationWarning: null });
+  });
+
+  it('matches numbered category folders to the same product category without weakening SKU-model checks', () => {
+    const result = classifyQrFile({
+      relativePath: '02.空气炸锅/SKAFF020JP-F20/F20-Recipe（l7fet8r）.pdf',
+      fileName: 'F20-Recipe（l7fet8r）.pdf',
+      products: [{ id: 12, sku: 'SKAFF020JP', model: 'F20', productCategory: '空气炸锅' }],
+      purposes: [{ id: 3, englishName: 'Recipe' }],
+    });
+
+    expect(result).toMatchObject({ matchStatus: 'matched', productId: 12, purposeId: 3,
+      detectedIdentifier: 'l7fet8r' });
+  });
+
+  it('keeps empty identifiers and ambiguous products pending without guessing', () => {
+    const emptyIdentifier = classifyQrFile({
+      relativePath: '冰柜/SKUZC-ZC100/ZC100-Warranty（）.pdf', fileName: 'ZC100-Warranty（）.pdf',
+      products: [{ id: 4, sku: 'SKUZC', model: 'ZC100', productCategory: '冰柜' }],
+      purposes: [{ id: 2, englishName: 'Warranty' }],
+    });
+    const ambiguousProduct = classifyQrFile({
+      relativePath: '冰柜/SKUZC-ZC100/ZC100-Warranty（pdgp845）.pdf', fileName: 'ZC100-Warranty（pdgp845）.pdf',
+      products: [
+        { id: 4, sku: 'SKUZC', model: 'ZC100', productCategory: '冰柜' },
+        { id: 5, sku: 'SKUZC', model: 'ZC100', productCategory: '冰柜' },
+      ],
+      purposes: [{ id: 2, englishName: 'Warranty' }],
+    });
+
+    expect(emptyIdentifier).toMatchObject({ matchStatus: 'pending', detectedIdentifier: null,
+      classificationWarning: 'qr-identifier-empty' });
+    expect(ambiguousProduct).toMatchObject({ matchStatus: 'pending', productId: null, purposeId: null,
+      detectedIdentifier: 'pdgp845', classificationWarning: 'qr-product-ambiguous' });
   });
 
   it('leaves nested candidates, inactive purposes, and case-colliding purpose combinations pending', () => {

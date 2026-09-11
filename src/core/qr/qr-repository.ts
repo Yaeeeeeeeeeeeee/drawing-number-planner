@@ -1,12 +1,16 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { ProductQrCode, ProductQrCodeFilters, QrFileReference, QrFileMatchStatus, QrStatus, UpdateProductQrCodeInput } from './qr-types.js';
+import type { CreateProductQrCodeInput, CreateQrPurposeInput, ProductQrCode, ProductQrCodeFilters, QrFileReference,
+  QrFileMatchStatus, QrPurpose, QrReferenceSummary, QrStatus, UpdateProductQrCodeInput } from './qr-types.js';
 
 interface QrRow {
   id: number; product_id: number; sku: string | null; model: string; product_category: string;
   purpose_id: number; key: string; english_name: string; display_name: string;
   purpose_status: QrStatus; name: string; target_url: string | null; status: QrStatus; created_at: string; updated_at: string;
 }
-interface QrFileRow { id: number; relative_path: string; file_name: string; mime_type: string; is_present: number; match_status: QrFileMatchStatus; qr_code_id: number | null }
+interface QrFileRow { id: number; relative_path: string; file_name: string; mime_type: string; is_present: number;
+  match_status: QrFileMatchStatus; qr_code_id: number | null; detected_identifier: string | null }
+interface QrPurposeRow { id: number; key: string; english_name: string; display_name: string; default_for_all: number;
+  status: QrStatus }
 
 const selectQrCodes = `select code.id, code.product_id, code.purpose_id, purpose.key, purpose.english_name, purpose.display_name,
   purpose.status as purpose_status, code.name, code.target_url, code.status, code.created_at, code.updated_at,
@@ -16,7 +20,7 @@ const selectQrCodes = `select code.id, code.product_id, code.purpose_id, purpose
 
 function toFile(row: QrFileRow): QrFileReference {
   return { id: row.id, relativePath: row.relative_path, fileName: row.file_name, mimeType: row.mime_type,
-    isPresent: row.is_present === 1, matchStatus: row.match_status };
+    isPresent: row.is_present === 1, matchStatus: row.match_status, detectedIdentifier: row.detected_identifier };
 }
 
 function toCode(row: QrRow, files: QrFileReference[], pendingFiles: QrFileReference[]): ProductQrCode {
@@ -53,6 +57,48 @@ export class QrRepository {
     return row ? this.toCode(row) : null;
   }
 
+  listPurposes(): QrPurpose[] {
+    const rows = this.db.prepare(`select id, key, english_name, display_name, default_for_all, status
+      from qr_purposes order by display_name collate nocase, id`).all() as QrPurposeRow[];
+    const categories = this.db.prepare(`select product_category from qr_purpose_product_categories
+      where purpose_id = ? order by product_category collate nocase`);
+    return rows.map((row) => ({ id: row.id, key: row.key, englishName: row.english_name,
+      displayName: row.display_name, defaultForAll: row.default_for_all === 1, status: row.status,
+      productCategories: (categories.all(row.id) as Array<{ product_category: string }>).map((item) => item.product_category) }));
+  }
+
+  createPurpose(input: CreateQrPurposeInput): QrPurpose {
+    const id = this.db.transaction(() => {
+      const now = new Date().toISOString();
+      const result = this.db.prepare(`insert into qr_purposes
+        (key, english_name, display_name, default_for_all, status, created_at, updated_at)
+        values (?, ?, ?, ?, 'active', ?, ?)`).run(input.key, input.englishName, input.displayName,
+        input.defaultForAll ? 1 : 0, now, now);
+      const purposeId = Number(result.lastInsertRowid);
+      const insertCategory = this.db.prepare(`insert into qr_purpose_product_categories
+        (purpose_id, product_category, created_at) values (?, ?, ?)`);
+      for (const category of input.productCategories) insertCategory.run(purposeId, category, now);
+      return purposeId;
+    }).immediate();
+    return this.listPurposes().find((purpose) => purpose.id === id)!;
+  }
+
+  productIsActive(id: number): boolean {
+    return this.db.prepare("select 1 from products where id = ? and status = 'active'").get(id) != null;
+  }
+
+  purposeIsActive(id: number): boolean {
+    return this.db.prepare("select 1 from qr_purposes where id = ? and status = 'active'").get(id) != null;
+  }
+
+  create(input: CreateProductQrCodeInput): ProductQrCode {
+    const now = new Date().toISOString();
+    const result = this.db.prepare(`insert into product_qr_codes
+      (product_id, purpose_id, name, target_url, status, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`)
+      .run(input.productId, input.purposeId, input.name, input.targetUrl, input.status, now, now);
+    return this.get(Number(result.lastInsertRowid))!;
+  }
+
   list(filters: ProductQrCodeFilters = {}): ProductQrCode[] {
     const where: string[] = []; const params: Record<string, unknown> = {};
     if (filters.productId != null) { where.push('code.product_id = @productId'); params.productId = filters.productId; }
@@ -79,7 +125,7 @@ export class QrRepository {
   }
 
   private filesForCode(qrCodeId: number): QrFileReference[] {
-    return (this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id
+    return (this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id, detected_identifier
       from qr_code_files where qr_code_id = ? order by relative_path collate nocase`).all(qrCodeId) as QrFileRow[]).map(toFile);
   }
 
@@ -87,16 +133,29 @@ export class QrRepository {
     const expectedDirectory = `${code.sku ?? ''}-${code.model}`;
     const expectedName = `${code.model}-${code.english_name}`;
     if (!code.sku) return [];
-    return (this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id
+    return (this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id, detected_identifier
       from qr_code_files where qr_code_id is null and match_status = 'pending'
         and lower(replace(relative_path, char(92), '/')) like lower(@directory) and lower(file_name) like lower(@name)
       order by relative_path collate nocase`).all({ directory: `%/${expectedDirectory}/%`, name: `${expectedName}%` }) as QrFileRow[]).map(toFile);
   }
 
+  pendingFilesForProductPurpose(productId: number, purposeId: number): QrFileReference[] {
+    const context = this.db.prepare(`select product.sku, product.model, purpose.english_name as englishName
+      from products product cross join qr_purposes purpose where product.id = ? and purpose.id = ?`)
+      .get(productId, purposeId) as { sku: string | null; model: string; englishName: string } | undefined;
+    if (!context?.sku) return [];
+    const directory = `${context.sku}-${context.model}`;
+    const name = `${context.model}-${context.englishName}`;
+    return (this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id, detected_identifier
+      from qr_code_files where qr_code_id is null and match_status = 'pending' and is_present = 1
+        and lower(replace(relative_path, char(92), '/')) like lower(@directory) and lower(file_name) like lower(@name)
+      order by relative_path collate nocase`).all({ directory: `%/${directory}/%`, name: `${name}%` }) as QrFileRow[]).map(toFile);
+  }
+
   associatePendingFile(qrCodeId: number, qrFileId: number): ProductQrCode | null {
     const code = this.get(qrCodeId);
     if (!code) return null;
-    const file = this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id
+    const file = this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id, detected_identifier
       from qr_code_files where id = ?`).get(qrFileId) as QrFileRow | undefined;
     if (!file) return null;
     if (file.qr_code_id != null) throw new Error('QR_FILE_ALREADY_LINKED');
@@ -129,6 +188,20 @@ export class QrRepository {
     this.db.prepare('update product_qr_codes set status = ?, updated_at = ? where id = ?')
       .run(status, new Date().toISOString(), id);
     return this.get(id)!;
+  }
+
+  referenceSummary(id: number): QrReferenceSummary {
+    const files = (this.db.prepare('select count(*) as count from qr_code_files where qr_code_id = ?').get(id) as { count: number }).count;
+    const bomItems = (this.db.prepare('select count(*) as count from bom_item_qr_codes where qr_code_id = ?').get(id) as { count: number }).count;
+    return { files, bomItems };
+  }
+
+  deleteIfUnreferenced(id: number): { deleted: boolean; references: QrReferenceSummary } {
+    return this.db.transaction(() => {
+      const references = this.referenceSummary(id);
+      if (references.files > 0 || references.bomItems > 0) return { deleted: false, references };
+      return { deleted: this.db.prepare('delete from product_qr_codes where id = ?').run(id).changes === 1, references };
+    }).immediate();
   }
 
   listClassifierProducts(): Array<{ id: number; sku: string | null; model: string; productCategory: string }> {

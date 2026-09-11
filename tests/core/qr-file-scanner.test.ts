@@ -12,13 +12,15 @@ describe('scanQrWorkspace', () => {
     const directory = join(root, '冰柜', 'SKUZC-ZC100', '二维码'); mkdirSync(directory, { recursive: true });
     const qrFile = join(directory, 'ZC100-User Manual（二维码的网址编码）.png');
     const legacyPdf = join(directory, 'ZC100-Warranty（网址编码）.pdf');
-    writeFileSync(qrFile, 'png-contents'); writeFileSync(legacyPdf, '%PDF-contents');
+    const dottedModel = join(directory, 'ZC.100-Warranty（abc7）.pdf');
+    writeFileSync(qrFile, 'png-contents'); writeFileSync(legacyPdf, '%PDF-contents'); writeFileSync(dottedModel, '%PDF-dotted-model');
     writeFileSync(join(directory, '02.0404.010.0401001-history.pdf'), '%PDF drawing');
     const before = statSync(qrFile);
 
     const files = await scanQrWorkspace(root);
 
     expect(files.map((file) => file.relativePath)).toEqual([
+      '冰柜\\SKUZC-ZC100\\二维码\\ZC.100-Warranty（abc7）.pdf',
       '冰柜\\SKUZC-ZC100\\二维码\\ZC100-User Manual（二维码的网址编码）.png',
       '冰柜\\SKUZC-ZC100\\二维码\\ZC100-Warranty（网址编码）.pdf',
     ]);

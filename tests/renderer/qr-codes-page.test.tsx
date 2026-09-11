@@ -8,11 +8,38 @@ const manual = {
   key: 'user_manual', englishName: 'User Manual', displayName: '说明书二维码', purposeStatus: 'active',
   name: 'Q100 使用说明', targetUrl: 'https://example.test/manual', status: 'active',
   createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-02T00:00:00Z',
-  files: [{ id: 81, relativePath: '冰柜/SKU-Q1-Q100/Q100-User Manual（网址编码）.png', fileName: 'Q100-User Manual（网址编码）.png', mimeType: 'image/png', isPresent: true, matchStatus: 'matched' }],
+  files: [{ id: 81, relativePath: '冰柜/SKU-Q1-Q100/Q100-User Manual（网址编码）.png', fileName: 'Q100-User Manual（网址编码）.png', mimeType: 'image/png', isPresent: true, matchStatus: 'matched', detectedIdentifier: '网址编码' }],
   pendingFiles: [{ id: 82, relativePath: '冰柜/SKU-Q1-Q100/待确认/Q100-User Manual（网址编码）.png', fileName: 'Q100-User Manual（网址编码）.png', mimeType: 'image/png', isPresent: false, matchStatus: 'pending' }],
 };
 
 describe('QrCodesPage', () => {
+  it('offers nearby create, edit, status, and protected delete controls with separate match status', async () => {
+    const created = { ...manual, id: 99, name: 'Q100 新说明书', status: 'inactive' as const };
+    const api = { listQrCodes: vi.fn().mockResolvedValue({ items: [manual] }), getQrCode: vi.fn().mockResolvedValue(manual),
+      listQrPurposes: vi.fn().mockResolvedValue({ items: [{ id: 1, key: 'user_manual', englishName: 'User Manual', displayName: '说明书二维码', status: 'active', defaultForAll: true, productCategories: [] }] }),
+      listProducts: vi.fn().mockResolvedValue([{ id: 3, sku: 'SKU-Q1', model: 'Q100', productCategory: '冰柜', status: 'active' }]),
+      listPendingQrFiles: vi.fn().mockResolvedValue({ items: [manual.pendingFiles[0]] }),
+      createQrCode: vi.fn().mockResolvedValue(created), deleteQrCode: vi.fn().mockResolvedValue({ deleted: true }),
+      createQrPurpose: vi.fn(), updateQrCode: vi.fn(), activateQrCode: vi.fn(), deactivateQrCode: vi.fn(), associateQrFile: vi.fn() };
+    render(<QrCodesPage api={api as never} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '新增二维码' }));
+    expect(screen.getByLabelText('新增二维码产品')).toBeVisible();
+    expect(screen.getByLabelText('新增二维码用途')).toBeVisible();
+    expect(await screen.findByLabelText('待确认关联文件')).toBeVisible();
+    fireEvent.change(screen.getByLabelText('新增二维码状态'), { target: { value: 'active' } });
+    fireEvent.change(screen.getByLabelText('二维码名称'), { target: { value: 'Q100 新说明书' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存新增二维码' }));
+    await waitFor(() => expect(api.createQrCode).toHaveBeenCalledWith(expect.objectContaining({ productId: 3, purposeId: 1,
+      name: 'Q100 新说明书' })));
+    expect(api.createQrCode).toHaveBeenCalledWith(expect.objectContaining({ status: 'active', qrFileId: 82 }));
+
+    fireEvent.click(screen.getByRole('button', { name: '展开 Q100 的二维码用途' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看 Q100 使用说明' }));
+    expect(await screen.findByText('扫描匹配状态')).toBeVisible();
+    expect(screen.getByText('标识：网址编码')).toBeVisible();
+    expect(screen.getByRole('button', { name: '删除二维码' })).toBeVisible();
+  });
   it('lists independent QR management filters and keeps business and file status distinct in details', async () => {
     const api = { listQrCodes: vi.fn().mockResolvedValue({ items: [manual] }), getQrCode: vi.fn().mockResolvedValue(manual),
       updateQrCode: vi.fn(), activateQrCode: vi.fn(), deactivateQrCode: vi.fn(), associateQrFile: vi.fn() };

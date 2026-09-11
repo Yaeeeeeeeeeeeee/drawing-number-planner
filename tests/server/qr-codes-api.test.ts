@@ -24,6 +24,55 @@ async function appWithProduct() {
 }
 
 describe('QR code API', () => {
+  it('creates extensible purposes and product QR records with an optional pending file', async () => {
+    const { app, product } = await appWithProduct();
+    const purposeResponse = await app.inject({ method: 'POST', url: '/api/qr-purposes', payload: {
+      key: 'installation', englishName: 'Installation Guide', displayName: '安装指南', defaultForAll: false,
+      productCategories: ['冰柜'],
+    } });
+    expect(purposeResponse.statusCode).toBe(201);
+    const purpose = purposeResponse.json() as { id: number };
+    expect((await app.inject({ method: 'GET', url: '/api/qr-purposes' })).json().items)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: purpose.id, englishName: 'Installation Guide' })]));
+
+    const pending = db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present,
+       detected_identifier, first_seen_at, last_seen_at)
+      values ('冰柜/SKUAPI-API100/待确认/API100-Installation Guide（api7）.pdf',
+        '冰柜\\skuapi-api100\\待确认\\api100-installation guide（api7）.pdf',
+        'API100-Installation Guide（api7）.pdf', 'application/pdf', 1, '2026-09-01', 'pending', 1,
+        'api7', '2026-09-01', '2026-09-01')`).run();
+    const pendingResponse = await app.inject({ method: 'GET',
+      url: `/api/qr-files/pending?productId=${product.id}&purposeId=${purpose.id}` });
+    expect(pendingResponse.json().items).toEqual([expect.objectContaining({ id: Number(pending.lastInsertRowid) })]);
+
+    const created = await app.inject({ method: 'POST', url: '/api/qr-codes', payload: {
+      productId: product.id, purposeId: purpose.id, name: 'API100 安装指南', targetUrl: null, status: 'active',
+      qrFileId: Number(pending.lastInsertRowid),
+    } });
+    expect(created.statusCode).toBe(201);
+    const code = created.json() as { id: number; status: string; files: unknown[] };
+    expect(code).toMatchObject({ status: 'active', files: [expect.objectContaining({ id: Number(pending.lastInsertRowid) })] });
+    const blocked = await app.inject({ method: 'DELETE', url: `/api/qr-codes/${code.id}` });
+    expect(blocked.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it('returns a conflict with concrete reference counts when deleting a linked QR record', async () => {
+    const { app, product } = await appWithProduct();
+    const code = (await app.inject({ method: 'GET', url: `/api/qr-codes?productId=${product.id}` })).json().items[0] as { id: number };
+    db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, qr_code_id, match_status,
+       first_seen_at, last_seen_at)
+      values ('冰柜/SKUAPI-API100/API100-User Manual（abc）.pdf', '冰柜\\skuapi-api100\\api100-user manual（abc）.pdf',
+        'API100-User Manual（abc）.pdf', 'application/pdf', 1, '2026-09-01', ?, 'matched', '2026-09-01', '2026-09-01')`).run(code.id);
+
+    const response = await app.inject({ method: 'DELETE', url: `/api/qr-codes/${code.id}` });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: 'QR_CODE_REFERENCED', referenceSummary: { files: 1, bomItems: 0 } } });
+    await app.close();
+  });
+
   it('lists product QR records and preserves their URL while toggling status', async () => {
     const { app, product } = await appWithProduct();
     const listed = await app.inject({ method: 'GET', url: `/api/qr-codes?productId=${product.id}` });

@@ -133,7 +133,10 @@ export type QrFileStatus = 'present' | 'missing' | 'none' | 'all';
 export interface QrFileView {
   id: number; relativePath: string; fileName: string; mimeType: string; isPresent: boolean;
   matchStatus: 'matched' | 'pending' | 'unmatched';
+  detectedIdentifier: string | null;
 }
+export interface QrPurposeView { id: number; key: string; englishName: string; displayName: string;
+  defaultForAll: boolean; status: QrBusinessStatus; productCategories: string[] }
 export interface ProductQrCodeView {
   id: number; productId: number; sku: string | null; model: string; productCategory: string;
   purposeId: number; key: string; englishName: string; displayName: string; purposeStatus: QrBusinessStatus;
@@ -193,10 +196,17 @@ export interface PlannerApi {
   activateProduct(id: number): Promise<ProductView>;
   deleteProduct(id: number): Promise<{ deleted: true }>;
   listQrCodes(filters?: ProductQrCodeFilters): Promise<{ items: ProductQrCodeView[] }>;
+  listQrPurposes(): Promise<{ items: QrPurposeView[] }>;
+  createQrPurpose(input: { key: string; englishName: string; displayName: string; defaultForAll: boolean;
+    productCategories: string[] }): Promise<QrPurposeView>;
+  createQrCode(input: { productId: number; purposeId: number; name: string; targetUrl: string | null;
+    status: QrBusinessStatus; qrFileId?: number | null }): Promise<ProductQrCodeView>;
+  listPendingQrFiles(productId: number, purposeId: number): Promise<{ items: QrFileView[] }>;
   getQrCode(id: number): Promise<ProductQrCodeView>;
   updateQrCode(id: number, input: { name: string; targetUrl: string | null }): Promise<ProductQrCodeView>;
   activateQrCode(id: number): Promise<ProductQrCodeView>;
   deactivateQrCode(id: number): Promise<ProductQrCodeView>;
+  deleteQrCode(id: number): Promise<{ deleted: true }>;
   associateQrFile(id: number, qrFileId: number): Promise<ProductQrCodeView>;
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
   confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
@@ -371,10 +381,15 @@ export const apiClient: PlannerApi = {
   activateProduct: (id) => request(`/api/products/${id}/activate`, json('POST')),
   deleteProduct: (id) => request(`/api/products/${id}`, { method: 'DELETE' }),
   listQrCodes: (filters = {}) => request(`/api/qr-codes${queryString(filters)}`),
+  listQrPurposes: () => request('/api/qr-purposes'),
+  createQrPurpose: (input) => request('/api/qr-purposes', json('POST', input)),
+  createQrCode: (input) => request('/api/qr-codes', json('POST', input)),
+  listPendingQrFiles: (productId, purposeId) => request(`/api/qr-files/pending${queryString({ productId, purposeId })}`),
   getQrCode: (id) => request(`/api/qr-codes/${id}`),
   updateQrCode: (id, input) => request(`/api/qr-codes/${id}`, json('PUT', input)),
   activateQrCode: (id) => request(`/api/qr-codes/${id}/activate`, json('POST')),
   deactivateQrCode: (id) => request(`/api/qr-codes/${id}/deactivate`, json('POST')),
+  deleteQrCode: (id) => request(`/api/qr-codes/${id}`, { method: 'DELETE' }),
   associateQrFile: (id, qrFileId) => request(`/api/qr-codes/${id}/associate-file`, json('POST', { qrFileId })),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(
     '/api/products/historical-candidates')).items,

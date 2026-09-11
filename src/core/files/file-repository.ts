@@ -219,18 +219,20 @@ export class FileRepository {
         contentSha256: record.contentSha256 ?? null, scanRunId: scanRun.id });
       const upsertQr = this.db.prepare(`insert into qr_code_files
         (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, content_sha256, qr_code_id,
-          match_status, classification_warning, is_present, last_seen_scan_run_id, first_seen_at, last_seen_at)
+          match_status, classification_warning, detected_identifier, is_present, last_seen_scan_run_id, first_seen_at, last_seen_at)
         values (@relativePath, @pathKey, @fileName, @mimeType, @sizeBytes, @modifiedAt, @contentSha256, @qrCodeId,
-          @matchStatus, @classificationWarning, 1, @scanRunId, @scannedAt, @scannedAt)
+          @matchStatus, @classificationWarning, @detectedIdentifier, 1, @scanRunId, @scannedAt, @scannedAt)
         on conflict(path_key) do update set relative_path = excluded.relative_path, file_name = excluded.file_name,
           mime_type = excluded.mime_type, size_bytes = excluded.size_bytes, modified_at = excluded.modified_at,
           content_sha256 = coalesce(excluded.content_sha256, qr_code_files.content_sha256), qr_code_id = excluded.qr_code_id,
-          match_status = excluded.match_status, classification_warning = excluded.classification_warning, is_present = 1,
+          match_status = excluded.match_status, classification_warning = excluded.classification_warning,
+          detected_identifier = excluded.detected_identifier, is_present = 1,
           last_seen_scan_run_id = excluded.last_seen_scan_run_id, last_seen_at = excluded.last_seen_at`);
       for (const record of qrRecords) upsertQr.run({ relativePath: record.relativePath, pathKey: record.pathKey,
         fileName: record.fileName, mimeType: record.mimeType, sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt,
         contentSha256: record.contentSha256 ?? null, qrCodeId: record.qrCodeId, matchStatus: record.matchStatus,
-        classificationWarning: record.classificationWarning, scanRunId: scanRun.id, scannedAt });
+        classificationWarning: record.classificationWarning, detectedIdentifier: record.detectedIdentifier,
+        scanRunId: scanRun.id, scannedAt });
       const idRows = this.db.prepare('select id, path_key as pathKey from pdf_files where last_seen_scan_run_id = ?').all(scanRun.id) as Array<{ id: number; pathKey: string }>;
       const idsByPath = new Map(idRows.map((row) => [row.pathKey, row.id]));
       const insertChange = this.db.prepare(`insert into file_scan_changes

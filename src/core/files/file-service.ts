@@ -100,7 +100,8 @@ export class FileService {
         const classification = classifyQrFile({ ...file, products: qrProducts, purposes: qrPurposes });
         return { ...file, pathKey: toWorkspacePathKey(file.relativePath), contentSha256: qrFingerprints[index].contentSha256,
           productId: classification.productId, purposeId: classification.purposeId, qrCodeId: null,
-          matchStatus: classification.matchStatus, classificationWarning: classification.classificationWarning };
+          matchStatus: classification.matchStatus, classificationWarning: classification.classificationWarning,
+          detectedIdentifier: classification.detectedIdentifier };
       });
       const historicalCodes: HistoricalDrawingScanRecord[] = [];
       const records = files.map((file, index): FileScanRecord => {
