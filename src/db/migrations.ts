@@ -237,10 +237,17 @@ function countRows(database: PlannerDatabase, table: string): number {
 
 interface V9MaintenanceSnapshot {
   tableCounts: Record<string, number>;
-  paths: Record<'pdfFiles' | 'materialBatches' | 'qrCodeFiles' | 'bomAssets', Array<{ id: number; relative_path: string }>>;
+  paths: {
+    pdfFiles: Array<{ id: number; relative_path: string }>;
+    materialBatches: Array<{ id: number; relative_path: string }>;
+    qrCodeFiles: Array<{ id: number; relative_path: string }>;
+    bomAssets: Array<{ id: number; relative_path: string }>;
+    scanChanges: Array<{ id: number; relative_path: string; previous_relative_path: string | null }>;
+  };
   bomVersions: Array<Record<string, unknown>>;
   bomItems: Array<Record<string, unknown>>;
   bomCurrent: Array<Record<string, unknown>>;
+  bomItemsSequence: number | null;
 }
 
 function v9TableCounts(database: PlannerDatabase): Record<string, number> {
@@ -261,6 +268,12 @@ function v9MaintenanceSnapshot(database: PlannerDatabase): V9MaintenanceSnapshot
       materialBatches: paths('material_batches'),
       qrCodeFiles: paths('qr_code_files'),
       bomAssets: paths('bom_assets'),
+      scanChanges: database.prepare(`select id, relative_path, previous_relative_path
+        from file_scan_changes order by id`).all() as Array<{
+          id: number;
+          relative_path: string;
+          previous_relative_path: string | null;
+        }>,
     },
     bomVersions: database.prepare(`select id, product_id, version_number, previous_version_id,
       business_change_date, legacy_color_id, notes, created_at from bom_versions order by id`).all() as Array<Record<string, unknown>>,
@@ -268,6 +281,8 @@ function v9MaintenanceSnapshot(database: PlannerDatabase): V9MaintenanceSnapshot
       effective_batch_relative_path, effective_batch_name, effective_material_batch_id,
       material, dimensions, position, notes, uses_white_material from bom_items order by id`).all() as Array<Record<string, unknown>>,
     bomCurrent: database.prepare('select product_id, version_id, updated_at from bom_current order by product_id').all() as Array<Record<string, unknown>>,
+    bomItemsSequence: (database.prepare("select seq from sqlite_sequence where name = 'bom_items'").get() as
+      { seq: number } | undefined)?.seq ?? null,
   };
 }
 
@@ -278,6 +293,8 @@ function validateMaintenanceMigration(database: PlannerDatabase, before: V9Maint
     materialBatches: paths('material_batches'),
     qrCodeFiles: paths('qr_code_files'),
     bomAssets: paths('bom_assets'),
+    scanChanges: database.prepare(`select id, relative_path, previous_relative_path
+      from file_scan_changes order by id`).all(),
   };
   const copiedVersions = database.prepare(`select id, product_id, version_number, previous_version_id,
     business_change_date, legacy_color_id, notes, created_at, deleted_at, deleted_reason
@@ -314,6 +331,8 @@ function validateMaintenanceMigration(database: PlannerDatabase, before: V9Maint
     where detected_identifier is not null`).get() as { count: number }).count;
   const hasHistoricalIndex = (database.pragma('index_list(bom_items)') as Array<{ name: string }>)
     .some(({ name }) => name === 'bom_items_historical_drawing_idx');
+  const bomItemsSequence = (database.prepare("select seq from sqlite_sequence where name = 'bom_items'").get() as
+    { seq: number } | undefined)?.seq ?? null;
   const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
   if (foreignKeyErrors.length > 0) throw new Error('BOM v10 外键校验失败，数据库未升级');
   if (JSON.stringify(v9TableCounts(database)) !== JSON.stringify(before.tableCounts)
@@ -322,8 +341,25 @@ function validateMaintenanceMigration(database: PlannerDatabase, before: V9Maint
     || JSON.stringify(copiedItems) !== JSON.stringify(expectedItems)
     || JSON.stringify(copiedCurrent) !== JSON.stringify(before.bomCurrent)
     || invalidReferences > 0 || initializedDeletionFields > 0 || initializedIdentifiers > 0
+    || (before.bomItemsSequence !== null
+      && (bomItemsSequence === null || bomItemsSequence < before.bomItemsSequence))
     || !hasHistoricalIndex) {
     throw new Error('BOM 维护数据校验失败，数据库未升级');
+  }
+}
+
+function restoreAutoincrementHighWater(
+  database: PlannerDatabase,
+  table: string,
+  previousSequence: number | null,
+): void {
+  if (previousSequence === null) return;
+  const current = database.prepare('select seq from sqlite_sequence where name = ?').get(table) as
+    { seq: number } | undefined;
+  if (!current) {
+    database.prepare('insert into sqlite_sequence (name, seq) values (?, ?)').run(table, previousSequence);
+  } else if (current.seq < previousSequence) {
+    database.prepare('update sqlite_sequence set seq = ? where name = ?').run(previousSequence, table);
   }
 }
 
@@ -521,6 +557,7 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
     if (from < 10) {
       const before = v9MaintenanceSnapshot(database);
       preserveBomItemTriggersDuringRebuild(database, () => database.exec(schemaVersionTen));
+      restoreAutoincrementHighWater(database, 'bom_items', before.bomItemsSequence);
       database.prepare('insert into schema_migrations (version, applied_at) values (10, ?)').run(new Date().toISOString());
       validateMaintenanceMigration(database, before);
     }

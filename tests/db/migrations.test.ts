@@ -178,6 +178,16 @@ function seedV9MaintenanceRows(database: ReturnType<typeof openDatabase>, produc
   return { historical };
 }
 
+function seedV9ScanChange(database: ReturnType<typeof openDatabase>) {
+  const run = Number(database.prepare(`insert into file_scan_runs
+    (started_at, completed_at, total_current, moved_count) values (?, ?, 1, 1)`)
+    .run('2026-09-03T00:00:00.000Z', '2026-09-03T00:01:00.000Z').lastInsertRowid);
+  return Number(database.prepare(`insert into file_scan_changes
+    (scan_run_id, change_type, index_kind, file_index_id, relative_path, previous_relative_path, file_name)
+    values (?, 'moved', 'pdf', 1, '资料\\current.pdf', '资料\\previous.pdf', 'current.pdf')`)
+    .run(run).lastInsertRowid);
+}
+
 function v9TableCounts(database: ReturnType<typeof openDatabase>) {
   const tables = database.prepare(`select name from sqlite_master
     where type = 'table' and name not like 'sqlite_%' and name <> 'schema_migrations'
@@ -190,12 +200,15 @@ describe('database migrations', () => {
   it('preserves every v9 row, path, and planned BOM reference while adding the v10 maintenance fields', () => {
     const { database, products, legacy } = createV9Database();
     const seeded = seedV9MaintenanceRows(database, products.refrigerator, legacy.item);
+    seedV9ScanChange(database);
     const beforeCounts = v9TableCounts(database);
     const beforePaths = {
       pdf: database.prepare('select id, relative_path from pdf_files order by id').all(),
       qr: database.prepare('select id, relative_path from qr_code_files order by id').all(),
       batches: database.prepare('select id, relative_path from material_batches order by id').all(),
       assets: database.prepare('select id, relative_path from bom_assets order by id').all(),
+      scanChanges: database.prepare(`select id, relative_path, previous_relative_path
+        from file_scan_changes order by id`).all(),
     };
     const beforeLinks = {
       assets: database.prepare('select * from bom_item_assets order by id').all(),
@@ -212,6 +225,8 @@ describe('database migrations', () => {
       qr: database.prepare('select id, relative_path from qr_code_files order by id').all(),
       batches: database.prepare('select id, relative_path from material_batches order by id').all(),
       assets: database.prepare('select id, relative_path from bom_assets order by id').all(),
+      scanChanges: database.prepare(`select id, relative_path, previous_relative_path
+        from file_scan_changes order by id`).all(),
     }).toEqual(beforePaths);
     expect({
       assets: database.prepare('select * from bom_item_assets order by id').all(),
@@ -237,6 +252,48 @@ describe('database migrations', () => {
     database.prepare('update bom_items set drawing_id = null, historical_drawing_id = ? where id = ?')
       .run(seeded.historical, legacy.item);
     expect(database.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  it('preserves the bom_items AUTOINCREMENT high water when the highest v9 id was deleted', () => {
+    const { database, legacy } = createV9Database();
+    const item = database.prepare(`select version.product_id, item.project_item_id, item.drawing_id
+      from bom_items item join bom_versions version on version.id = item.bom_version_id where item.id = ?`)
+      .get(legacy.item) as { product_id: number; project_item_id: number; drawing_id: number };
+    const successorVersion = Number(database.prepare(`insert into bom_versions
+      (product_id, version_number, previous_version_id, created_at) values (?, 2, ?, ?)`)
+      .run(item.product_id, legacy.version, '2026-09-03T00:00:00.000Z').lastInsertRowid);
+    const retiredId = Number(database.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id) values (?, ?, ?)`)
+      .run(successorVersion, item.project_item_id, item.drawing_id).lastInsertRowid);
+    database.prepare('delete from bom_items where id = ?').run(retiredId);
+    const oldSequence = (database.prepare("select seq from sqlite_sequence where name = 'bom_items'")
+      .get() as { seq: number }).seq;
+    expect(oldSequence).toBe(retiredId);
+
+    migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() });
+    const insertedId = Number(database.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, drawing_id) values (?, ?, ?)`)
+      .run(successorVersion, item.project_item_id, item.drawing_id).lastInsertRowid);
+
+    expect(insertedId).toBeGreaterThan(oldSequence);
+  });
+
+  it('rolls v10 back when a migration-boundary side effect changes scan-history paths', () => {
+    const { database } = createV9Database();
+    const changeId = seedV9ScanChange(database);
+    const before = database.prepare(`select relative_path, previous_relative_path
+      from file_scan_changes where id = ?`).get(changeId);
+    database.exec(`create trigger corrupt_v10_scan_paths after insert on schema_migrations
+      when new.version = 10 begin
+        update file_scan_changes set relative_path = 'corrupt-current', previous_relative_path = 'corrupt-previous'
+          where id = ${changeId};
+      end;`);
+
+    expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
+      .toThrow('BOM 维护数据校验失败，数据库未升级');
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 9 });
+    expect(database.prepare(`select relative_path, previous_relative_path
+      from file_scan_changes where id = ?`).get(changeId)).toEqual(before);
   });
 
   it.each(['dual', 'none'] as const)('rolls v10 back when a migration-boundary side effect creates %s drawing references', (kind) => {
