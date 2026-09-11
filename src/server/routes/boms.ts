@@ -14,6 +14,7 @@ const productQuery = z.object({ productId: z.coerce.number().int().positive() })
 const candidateQuery = z.object({
   productId: z.coerce.number().int().positive(), projectItemId: z.coerce.number().int().positive(),
   usesWhiteMaterial: z.enum(['true', 'false']).transform((value) => value === 'true'),
+  entryMode: z.enum(['current', 'historical']).default('current'),
 }).strict();
 const bomQuery = z.object({
   model: z.string().trim().optional(), businessChangeDate: z.string().trim().optional(),
@@ -21,16 +22,22 @@ const bomQuery = z.object({
   fullCode: z.string().trim().optional(),
 }).strict();
 const itemSchema = z.object({
-  projectItemId: z.number().int().positive(), drawingId: z.number().int().positive(), usesWhiteMaterial: z.boolean(),
+  projectItemId: z.number().int().positive(),
+  drawingReference: z.discriminatedUnion('origin', [
+    z.object({ origin: z.literal('planned'), drawingId: z.number().int().positive() }).strict(),
+    z.object({ origin: z.literal('historical'), historicalDrawingId: z.number().int().positive() }).strict(),
+  ]).optional(),
+  drawingId: z.number().int().positive().optional(), usesWhiteMaterial: z.boolean(),
   effectiveBatchRelativePath: z.string().max(1000).optional(), effectiveBatchName: z.string().max(500).optional(),
   effectiveMaterialBatchId: z.number().int().positive().nullable().optional(), material: z.string().max(1000).optional(),
   dimensions: z.string().max(1000).optional(), position: z.string().max(1000).optional(), notes: z.string().max(1000).optional(),
   assets: z.array(z.object({ role: z.enum(['image', 'diagram']), assetId: z.number().int().positive().optional(),
     reusePrevious: z.boolean().optional() }).strict()).max(2).optional(),
   qrCodeIds: z.array(z.number().int().positive()).max(100).optional(),
-}).strict();
+}).strict().refine((value) => Boolean(value.drawingReference) !== Boolean(value.drawingId));
 const saveSchema = z.object({
   productId: z.number().int().positive(), businessChangeDate: z.string().trim(),
+  entryMode: z.enum(['current', 'historical']).default('current'),
   expectedCurrentVersionId: z.number().int().positive().nullable(), notes: z.string().max(1000).optional(),
   items: z.array(itemSchema).max(500),
 }).strict().refine((value) => new Set(value.items.map((item) => item.projectItemId)).size === value.items.length);

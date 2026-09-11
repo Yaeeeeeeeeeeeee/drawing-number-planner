@@ -8,6 +8,11 @@ interface Dependencies {
   showItemInFolder(path: string): void;
 }
 
+interface BomAssetDependencies {
+  resolveBomAssetPath(id: unknown): string;
+  showItemInFolder(path: string): void;
+}
+
 export function createShowFileInFolderHandler(dependencies: Dependencies) {
   return async (_event: unknown, pdfFileId: unknown): Promise<DesktopFileResult> => {
     if (!Number.isInteger(pdfFileId) || Number(pdfFileId) <= 0) {
@@ -21,6 +26,23 @@ export function createShowFileInFolderHandler(dependencies: Dependencies) {
       return { ok: false, error: {
         code: typeof error === 'object' && error && 'code' in error ? String(error.code) : 'OPEN_FILE_LOCATION_FAILED',
         message: error instanceof Error ? error.message : '打开文件位置失败',
+      } };
+    }
+  };
+}
+
+export function createShowBomAssetInFolderHandler(dependencies: BomAssetDependencies) {
+  return async (_event: unknown, assetId: unknown): Promise<DesktopFileResult> => {
+    if (!Number.isInteger(assetId) || Number(assetId) <= 0) {
+      return { ok: false, error: { code: 'INVALID_BOM_ASSET_ID', message: 'BOM 附件索引无效' } };
+    }
+    try {
+      dependencies.showItemInFolder(dependencies.resolveBomAssetPath(assetId));
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: {
+        code: typeof error === 'object' && error && 'code' in error ? String(error.code) : 'BOM_ASSET_UNAVAILABLE',
+        message: error instanceof Error ? error.message : 'BOM 附件当前不可用',
       } };
     }
   };

@@ -11,6 +11,22 @@ function multipartAsset(productId: number, filename: string, content: Buffer, bo
 }
 beforeEach(() => { db=openDatabase(':memory:'); migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined}); const d=new DictionaryService(db), p=new ProductService(db), brand=d.create({type:'brand',code:'02',name:'B'}), size=d.create({type:'product_size',code:'0404',name:'S'}), appearance=d.create({type:'appearance',code:'01',name:'A'}), white=d.create({type:'color',code:'0',name:'W'}), main=d.create({type:'main_category',code:'04',name:'M'}), logo=d.create({type:'project_item',code:'01',name:'L',parentId:main.id}), product=p.create({sku:'SKU',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id,model:'X',productCategory:'冰柜'}), plan=new PlanningService(db), input={productId:product.id,rows:[{clientId:'x',colorId:white.id,mainCategoryId:main.id,projectItemId:logo.id}]}, preview=plan.preview(input), drawing=plan.reserve({...input,rows:[{...input.rows[0],expectedFullCode:preview.rows[0].fullCode}]})[0]; refs={product,logo,drawing}; app=Fastify(); registerBomRoutes(app,new BomService(db)); }); afterEach(async()=>{await app.close();db.close();});
 describe('product-level BOM API',()=>{
+ it('accepts and returns a historical drawing reference only in historical entry mode',async()=>{
+   const historicalDrawingId=Number(db.prepare(`insert into historical_drawing_numbers
+     (full_code,brand_code,product_size_code,appearance_code,color_code,main_category_code,project_item_code,sequence,
+      product_id,detected_sku,detected_model,detected_product_category,first_seen_at,last_seen_at,status)
+     values ('02.0404.010.0401008','02','0404','01','0','04','01',8,?,'SKU','X','冰柜','2026-09-01','2026-09-01','inactive')`)
+     .run(refs.product.id).lastInsertRowid);
+   const candidates=await app.inject({method:'GET',url:`/api/boms/candidates?productId=${refs.product.id}&projectItemId=${refs.logo.id}&usesWhiteMaterial=true&entryMode=historical`});
+   expect(candidates.statusCode).toBe(200);
+   expect(candidates.json().items).toContainEqual(expect.objectContaining({origin:'historical',historicalDrawingId,status:'inactive'}));
+   const saved=await app.inject({method:'POST',url:'/api/boms/versions',payload:{productId:refs.product.id,entryMode:'historical',
+     businessChangeDate:'2020-01-02',expectedCurrentVersionId:null,items:[{projectItemId:refs.logo.id,
+       drawingReference:{origin:'historical',historicalDrawingId},usesWhiteMaterial:true}]}});
+   expect(saved.statusCode).toBe(201);
+   expect(saved.json().version.items[0]).toMatchObject({origin:'historical',historicalDrawingId,fullCode:'02.0404.010.0401008'});
+   expect((await app.inject({method:'GET',url:'/api/boms/query?fullCode=0401008'})).json().items).toHaveLength(1);
+ });
  it('saves, queries and maps stale/malformed/domain errors',async()=>{ expect((await app.inject({method:'GET',url:`/api/boms/current?productId=${refs.product.id}`})).json()).toEqual({version:null}); const bad=await app.inject({method:'POST',url:'/api/boms/versions',payload:{productId:refs.product.id,expectedCurrentVersionId:null,items:[]}}); expect(bad.statusCode).toBe(400); const payload={productId:refs.product.id,businessChangeDate:'2026-09-02',expectedCurrentVersionId:null,items:[{projectItemId:refs.logo.id,drawingId:refs.drawing.id,usesWhiteMaterial:true}]}; const saved=await app.inject({method:'POST',url:'/api/boms/versions',payload}); expect(saved.statusCode).toBe(201); expect((await app.inject({method:'POST',url:'/api/boms/versions',payload})).statusCode).toBe(409); expect((await app.inject({method:'GET',url:`/api/boms/query?model=X&fullCode=${encodeURIComponent(refs.drawing.fullCode)}&businessChangeDate=2026-09-02`})).json().items).toHaveLength(1); });
  it('keeps the shared multipart parser at 20MiB so Excel uploads above the BOM limit still reach Excel validation',async()=>{
    await registerImportRoutes(app,db,()=>undefined);

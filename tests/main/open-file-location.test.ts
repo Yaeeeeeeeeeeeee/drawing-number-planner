@@ -1,8 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createShowFileInFolderHandler } from '../../src/main/open-file-location';
+import { createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from '../../src/main/open-file-location';
 
 describe('desktop open-file handler', () => {
+  it('reveals a validated BOM asset without accepting a renderer-supplied path', async () => {
+    const resolveBomAssetPath = vi.fn().mockReturnValue('C:\\library\\_图号规划器\\BOM附件\\image.png');
+    const showItemInFolder = vi.fn();
+    const handler = createShowBomAssetInFolderHandler({ resolveBomAssetPath, showItemInFolder });
+
+    await expect(handler({}, 31)).resolves.toEqual({ ok: true });
+    expect(resolveBomAssetPath).toHaveBeenCalledWith(31);
+    expect(showItemInFolder).toHaveBeenCalledWith('C:\\library\\_图号规划器\\BOM附件\\image.png');
+  });
   it('passes only the PDF index ID to the resolver and invokes the shell after successful validation', async () => {
     const resolvePdfFilePath = vi.fn().mockReturnValue('C:\\library\\inside.pdf');
     const showItemInFolder = vi.fn();

@@ -46,6 +46,7 @@ export interface RunningServer {
   url: string;
   token: string;
   resolvePdfFilePath(id: unknown): string;
+  resolveBomAssetPath(id: unknown): string;
   resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
   close(): Promise<void>;
 }
@@ -104,6 +105,23 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       url: address,
       token,
       resolvePdfFilePath: (id) => indexedPdfResolver.resolve(id),
+      resolveBomAssetPath: (id) => {
+        if (!Number.isInteger(id) || Number(id) <= 0) throw qrFileError('INVALID_BOM_ASSET_ID', 'BOM 附件索引无效');
+        const indexed = database.prepare('select relative_path as relativePath from bom_assets where id = ?')
+          .get(id) as { relativePath: string } | undefined;
+        if (!indexed) throw qrFileError('BOM_ASSET_NOT_FOUND', '未找到 BOM 附件');
+        const workspaceRoot = workspaceSettings.get().workspaceRoot;
+        if (!workspaceRoot) throw qrFileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
+        const resolved = resolveWorkspacePath(workspaceRoot, indexed.relativePath, { requireExistingParent: true });
+        try {
+          const canonical = realpathSync.native(resolved);
+          if (!statSync(canonical).isFile()) throw qrFileError('BOM_ASSET_UNAVAILABLE', 'BOM 附件当前不可用');
+          return canonical;
+        } catch (error) {
+          if (error instanceof QrFileResolverError) throw error;
+          throw qrFileError('BOM_ASSET_UNAVAILABLE', 'BOM 附件当前不可用');
+        }
+      },
       resolveQrFilePath: (relativePath) => {
         const indexed = qrRepository.getIndexedQrFile(relativePath);
         if (!indexed) throw qrFileError('QR_FILE_NOT_FOUND', '未找到已关联的二维码文件');

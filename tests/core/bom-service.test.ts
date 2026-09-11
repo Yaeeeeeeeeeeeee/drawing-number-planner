@@ -29,10 +29,63 @@ function insertAsset(name: string): number {
     values (?, ?, 'image/png', 8, ?, '2026-09-01')`)
     .run(`_图号规划器\\BOM附件\\${name}`, name, name.padEnd(64, '0').slice(0, 64)).lastInsertRowid);
 }
+function insertHistorical(productId: number | null, projectItemCode: string, status: 'active' | 'inactive' = 'active',
+  sequence = 1): number {
+  const fullCode = `02.0404.010.04${projectItemCode}${String(sequence).padStart(3, '0')}`;
+  return Number(db.prepare(`insert into historical_drawing_numbers
+    (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+      project_item_code, sequence, product_id, detected_sku, detected_model, detected_product_category,
+      first_seen_at, last_seen_at, status)
+    values (?, '02', '0404', '01', '0', '04', ?, ?, ?, 'SKU1', 'X1', '冰柜', '2026-09-01', '2026-09-01', ?)`)
+    .run(fullCode, projectItemCode, sequence, productId, status).lastInsertRowid);
+}
 describe('product-level BOM service', () => {
+  it('offers planned drawings in both entry modes and confirmed historical drawings only in historical mode', () => {
+    const r = setup();
+    const planned = r.draw(r.product.id, r.white.id, r.logo.id);
+    const activeHistorical = insertHistorical(r.product.id, '01', 'active', 7);
+    const inactiveHistorical = insertHistorical(r.product.id, '01', 'inactive', 8);
+    insertHistorical(null, '01', 'active', 9);
+    insertHistorical(r.other.id, '01', 'active', 10);
+    const current = service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id,
+      usesWhiteMaterial: true, entryMode: 'current' });
+    expect(current).toEqual([expect.objectContaining({ origin: 'planned', drawingId: planned.id })]);
+    const historical = service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id,
+      usesWhiteMaterial: true, entryMode: 'historical' });
+    expect(historical).toEqual(expect.arrayContaining([
+      expect.objectContaining({ origin: 'planned', drawingId: planned.id, status: 'reserved' }),
+      expect.objectContaining({ origin: 'historical', historicalDrawingId: activeHistorical, status: 'active' }),
+      expect.objectContaining({ origin: 'historical', historicalDrawingId: inactiveHistorical, status: 'inactive' }),
+    ]));
+    expect(historical.filter((item) => item.origin === 'historical')).toHaveLength(2);
+  });
+
+  it('persists, queries and diffs a confirmed historical drawing reference without losing its origin', () => {
+    const r = setup(); const historicalDrawingId = insertHistorical(r.product.id, '01', 'inactive', 11);
+    const saved = service.saveVersion({ productId: r.product.id, entryMode: 'historical', businessChangeDate: '2020-01-02',
+      expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id,
+        drawingReference: { origin: 'historical', historicalDrawingId }, usesWhiteMaterial: true }] });
+    expect(saved.version.items[0]).toMatchObject({ origin: 'historical', historicalDrawingId,
+      fullCode: '02.0404.010.0401011', status: 'inactive' });
+    expect(saved.diff[0]).toMatchObject({ type: 'added', drawingReference: { origin: 'historical', historicalDrawingId } });
+    expect(service.queryVersions({ fullCode: '0401011' })).toEqual([expect.objectContaining({ id: saved.version.id })]);
+    expect(service.getVersion(saved.version.id).items[0]).toMatchObject({ origin: 'historical', historicalDrawingId });
+  });
+
+  it('rejects historical references outside historical mode, another product, or an unconfirmed product assignment', () => {
+    const r = setup(); const own = insertHistorical(r.product.id, '01'); const other = insertHistorical(r.other.id, '01', 'active', 2);
+    const unconfirmed = insertHistorical(null, '01', 'active', 3);
+    const save = (entryMode: 'current' | 'historical', historicalDrawingId: number) => () => service.saveVersion({
+      productId: r.product.id, entryMode, businessChangeDate: '2020-01-02', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingReference: { origin: 'historical', historicalDrawingId }, usesWhiteMaterial: true }],
+    });
+    expect(save('current', own)).toThrow(/历史 BOM/);
+    expect(save('historical', other)).toThrow(/其他型号/);
+    expect(save('historical', unconfirmed)).toThrow(/确认产品归属/);
+  });
   it('saves immutable product snapshots with date, formal fields, fixed quantity, and field diffs', () => { const r = setup(); const d = r.draw(r.product.id, r.gray.id, r.logo.id); const first = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, material: 'PET', dimensions: '10', position: 'front', notes: 'n' }] }); const second = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: first.version.id, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, material: 'PP', dimensions: '10', position: 'front', notes: 'n' }] }); expect(first.version.items[0]).toMatchObject({ quantity: 1, material: 'PET' }); expect(second.diff[0].type).toBe('replaced'); expect(service.getVersion(first.version.id).items[0].material).toBe('PET'); });
   it('rejects invalid drawings, duplicates, empty BOMs and invalid dates', () => { const r = setup(); const own = r.draw(r.product.id, r.gray.id, r.logo.id); const other = r.draw(r.other.id, r.gray.id, r.logo.id); const wrong = r.draw(r.product.id, r.gray.id, r.manual.id); db.prepare("update drawing_numbers set status = 'voided' where id = ?").run(own.id); const save = (item: object) => () => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [item as never] }); expect(save({ projectItemId: r.logo.id, drawingId: other.id, usesWhiteMaterial: false })).toThrow(/其他型号/); expect(save({ projectItemId: r.logo.id, drawingId: wrong.id, usesWhiteMaterial: false })).toThrow(/项目不一致/); expect(save({ projectItemId: r.logo.id, drawingId: own.id, usesWhiteMaterial: false })).toThrow(/作废/); expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: 'bad', expectedCurrentVersionId: null, items: [] })).toThrow(/日期/); });
-  it('enforces white-share and returns product/project candidates only', () => { const r = setup(); const gray = r.draw(r.product.id, r.gray.id, r.logo.id); const white = r.draw(r.product.id, r.white.id, r.logo.id); r.draw(r.other.id, r.gray.id, r.logo.id); expect(service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id, usesWhiteMaterial: true }).map(x => x.id)).toEqual([white.id]); expect(service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id, usesWhiteMaterial: false }).map(x => x.id)).toContain(gray.id); expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: gray.id, usesWhiteMaterial: true }] })).toThrow(/白色/); });
+  it('enforces white-share and returns product/project candidates only', () => { const r = setup(); const gray = r.draw(r.product.id, r.gray.id, r.logo.id); const white = r.draw(r.product.id, r.white.id, r.logo.id); r.draw(r.other.id, r.gray.id, r.logo.id); expect(service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id, usesWhiteMaterial: true }).map(x => x.origin === 'planned' ? x.drawingId : -1)).toEqual([white.id]); expect(service.listCandidates({ productId: r.product.id, projectItemId: r.logo.id, usesWhiteMaterial: false }).map(x => x.origin === 'planned' ? x.drawingId : -1)).toContain(gray.id); expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: gray.id, usesWhiteMaterial: true }] })).toThrow(/白色/); });
   it('keeps legacy NULL date label and filters/sorts by date, batch, project and drawing', () => { const r = setup(); const d = r.draw(r.product.id, r.gray.id, r.logo.id); db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at) values (?, 99, null, ?)`).run(r.product.id, '2020-01-01T00:00:00Z'); const batchPath = '01.冰柜\\SKU1-X1\\03.量产后的变更文件\\01.20260901'; const batchId = insertBatch(r.product.id, batchPath); const saved = service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, effectiveMaterialBatchId: batchId }] }); expect(service.queryVersions({ businessChangeDate: '2026-09-02', effectiveBatchRelativePath: '20260901', projectItemId: r.logo.id, fullCode: d.fullCode })[0].id).toBe(saved.version.id); expect(service.listVersions(r.product.id).at(-1)?.businessChangeDateLabel).toBe('未补录'); });
   it('rejects invalid QR references and missing predecessor assets', () => { const r = setup(); const d = r.draw(r.product.id, r.gray.id, r.logo.id); const qr = db.prepare('select id from product_qr_codes where product_id = ? limit 1').get(r.product.id) as { id: number }; expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, qrCodeIds: [qr.id] }] })).toThrow(/启用/); expect(() => service.saveVersion({ productId: r.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null, items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, assets: [{ role: 'image', reusePrevious: true }] }] })).toThrow(/上一版/); });
 

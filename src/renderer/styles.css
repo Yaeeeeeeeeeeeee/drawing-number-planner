@@ -182,6 +182,13 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .bom-history-detail { margin-top: 16px; padding: 16px; border: 1px solid #b8cde7; border-left: 4px solid #3978c8; border-radius: 8px; background: #f7faff; box-shadow: 0 6px 18px rgb(42 81 123 / 8%); }
 .bom-history-detail h3 { margin: 0; font-size: 15px; }
 .bom-history-detail .eyebrow { margin-bottom: 4px; }
+.bom-history-detail td { min-width: 0; vertical-align: top; }
+.bom-history-detail .code-cell small { display: block; margin-top: 4px; color: var(--muted); font-family: inherit; font-weight: 500; }
+.bom-asset-paths { display: grid; min-width: 0; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.bom-asset-paths li { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.bom-asset-paths li > span { display: grid; min-width: 0; gap: 3px; }
+.bom-asset-path { overflow-wrap: anywhere; word-break: break-word; color: var(--muted); font-size: 11px; }
+.bom-asset-paths .text-button { flex: 0 0 auto; white-space: nowrap; }
 .muted-text { color: var(--muted); }
 .secondary-button { min-height: 40px; padding: 0 17px; color: #244566; border: 1px solid #bfccdc; border-radius: 5px; background: #fff; font-weight: 600; }
 .secondary-button:hover:not(:disabled) { border-color: #8eacd0; background: #f7faff; } .secondary-button:disabled { opacity: .55; }

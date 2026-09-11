@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { startServer, type RunningServer } from '../server/start-server.js';
-import { createQrFileActionHandler, createShowFileInFolderHandler } from './open-file-location.js';
+import { createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
 
 let runningServer: RunningServer | undefined;
 let mainWindow: BrowserWindow | undefined;
@@ -43,6 +43,13 @@ app.whenReady().then(() => {
     resolvePdfFilePath: (id) => {
       if (!runningServer) throw new Error('本机文件服务尚未启动');
       return runningServer.resolvePdfFilePath(id);
+    },
+    showItemInFolder: (path) => shell.showItemInFolder(path),
+  }));
+  ipcMain.handle('planner:show-bom-asset-in-folder', createShowBomAssetInFolderHandler({
+    resolveBomAssetPath: (id) => {
+      if (!runningServer) throw new Error('本机文件服务尚未启动');
+      return runningServer.resolveBomAssetPath(id);
     },
     showItemInFolder: (path) => shell.showItemInFolder(path),
   }));

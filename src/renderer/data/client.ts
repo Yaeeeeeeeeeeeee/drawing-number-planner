@@ -74,10 +74,13 @@ export interface ReservedDrawingView {
   id: number; fullCode: string; displayName: string; status: 'reserved';
 }
 
-export interface BomCandidateView {
-  id: number; fullCode: string; displayName: string;
-  projectItemId: number; projectItemName: string; status: 'reserved' | 'active';
-}
+export type BomEntryModeView = 'current' | 'historical';
+export type BomDrawingReferenceView = { origin: 'planned'; drawingId: number }
+  | { origin: 'historical'; historicalDrawingId: number };
+export type BomCandidateView = BomDrawingReferenceView & {
+  fullCode: string; displayName: string; projectItemId: number; projectItemName: string;
+  status: 'reserved' | 'active' | 'inactive';
+};
 export interface DrawingReferenceSummaryView {
   pdfCount: number; bomCount: number; previousDrawingCount: number; successorCount: number;
   sourceDrawingCount: number; sourceReferenceCount: number;
@@ -97,13 +100,13 @@ export interface BomAssetView {
 export interface BomItemAssetView extends BomAssetView { assetId: number; role: 'image' | 'diagram'; inheritedFromBomItemAssetId: number | null; }
 export interface BomQrCodeView { id: number; name: string; purposeDisplayName: string; status: 'active' | 'inactive'; }
 export interface BomQrCandidateView extends BomQrCodeView { status: 'active'; }
-export interface BomItemView {
-  bomItemId: number; drawingId: number; fullCode: string; displayName: string;
-  projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'voided';
+export type BomItemView = BomDrawingReferenceView & {
+  bomItemId: number; fullCode: string; displayName: string;
+  projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'inactive' | 'voided';
   effectiveMaterialBatchId: number | null; effectiveBatchRelativePath: string | null; effectiveBatchName: string | null;
   material: string | null; dimensions: string | null; position: string | null; notes: string | null; usesWhiteMaterial: boolean;
   assets: BomItemAssetView[]; qrCodes: BomQrCodeView[];
-}
+};
 export interface BomVersionSummaryView {
   id: number; productId: number; model: string; versionNumber: number; previousVersionId: number | null;
   businessChangeDate: string | null; businessChangeDateLabel: string; notes: string | null; createdAt: string;
@@ -111,11 +114,12 @@ export interface BomVersionSummaryView {
 export interface BomVersionView extends BomVersionSummaryView { items: BomItemView[] }
 export interface BomDiffView {
   type: 'added' | 'replaced' | 'removed' | 'unchanged'; projectItemId: number; projectItemName: string;
-  previousDrawingId: number | null; previousFullCode: string | null; drawingId: number | null; fullCode: string | null;
+  previousDrawingId: number | null; previousDrawingReference: BomDrawingReferenceView | null; previousFullCode: string | null;
+  drawingId: number | null; drawingReference: BomDrawingReferenceView | null; fullCode: string | null;
 }
 export interface SaveBomView {
-  productId: number; businessChangeDate: string; expectedCurrentVersionId: number | null; notes?: string;
-  items: Array<{ projectItemId: number; drawingId: number; usesWhiteMaterial: boolean; effectiveMaterialBatchId?: number;
+  productId: number; entryMode?: BomEntryModeView; businessChangeDate: string; expectedCurrentVersionId: number | null; notes?: string;
+  items: Array<{ projectItemId: number; drawingReference: BomDrawingReferenceView; usesWhiteMaterial: boolean; effectiveMaterialBatchId?: number;
     material?: string; dimensions?: string; position?: string; notes?: string;
     assets?: Array<{ role: 'image' | 'diagram'; assetId?: number; reusePrevious?: boolean }>; qrCodeIds?: number[] }>;
 }
@@ -219,7 +223,7 @@ export interface PlannerApi {
   listBomVersions(productId: number): Promise<BomVersionSummaryView[]>;
   queryBomVersions(filters?: { model?: string; businessChangeDate?: string; effectiveBatchRelativePath?: string; projectItemId?: number; fullCode?: string }): Promise<BomVersionSummaryView[]>;
   getBomVersion(id: number): Promise<BomVersionView>;
-  listBomCandidates(input: { productId: number; projectItemId: number; usesWhiteMaterial: boolean }): Promise<BomCandidateView[]>;
+  listBomCandidates(input: { productId: number; projectItemId: number; usesWhiteMaterial: boolean; entryMode: BomEntryModeView }): Promise<BomCandidateView[]>;
   listBomQrCandidates(productId: number): Promise<BomQrCandidateView[]>;
   uploadBomAsset(productId: number, file: File): Promise<BomAssetView>;
   relinkBomMaterialBatch(id: number): Promise<{ relinked: number }>;

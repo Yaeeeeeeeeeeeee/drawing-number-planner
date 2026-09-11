@@ -3,7 +3,7 @@ import { validateWorkspaceRelativePath } from '../files/workspace-paths.js';
 import { BomError } from './bom-errors.js';
 import { BomRepository } from './bom-repository.js';
 import { BomAssetService, type ManagedBomAsset } from './bom-asset-service.js';
-import type { BomCandidate, BomCandidateInput, BomDiffEntry, BomItemInput, BomQueryFilters, BomVersionDetail,
+import type { BomCandidate, BomCandidateInput, BomDiffEntry, BomDrawingReference, BomItemInput, BomQueryFilters, BomVersionDetail,
   BomVersionSummary, SaveBomInput, SavedBomVersion } from './bom-types.js';
 
 export const WHITE_COLOR_CODE = '0';
@@ -33,19 +33,26 @@ function buildDiff(previous: BomVersionDetail | null, current: BomVersionDetail)
     let type: BomDiffEntry['type'];
     if (!oldItem) type = 'added';
     else if (!newItem) type = 'removed';
-    else type = JSON.stringify({ drawingId: oldItem.drawingId, effectiveBatchRelativePath: oldItem.effectiveBatchRelativePath,
+    else type = JSON.stringify({ drawingReference: referenceOf(oldItem), effectiveBatchRelativePath: oldItem.effectiveBatchRelativePath,
       effectiveBatchName: oldItem.effectiveBatchName,
       material: oldItem.material, dimensions: oldItem.dimensions, position: oldItem.position, notes: oldItem.notes,
       usesWhiteMaterial: oldItem.usesWhiteMaterial, assets: oldItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: oldItem.qrCodes.map((qr) => qr.id) })
-      === JSON.stringify({ drawingId: newItem.drawingId, effectiveBatchRelativePath: newItem.effectiveBatchRelativePath,
+      === JSON.stringify({ drawingReference: referenceOf(newItem), effectiveBatchRelativePath: newItem.effectiveBatchRelativePath,
         effectiveBatchName: newItem.effectiveBatchName,
         material: newItem.material, dimensions: newItem.dimensions, position: newItem.position, notes: newItem.notes,
         usesWhiteMaterial: newItem.usesWhiteMaterial, assets: newItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: newItem.qrCodes.map((qr) => qr.id) }) ? 'unchanged' : 'replaced';
     const item = newItem ?? oldItem!;
     return { type, projectItemId, projectItemName: item.projectItemName,
-      previousDrawingId: oldItem?.drawingId ?? null, previousFullCode: oldItem?.fullCode ?? null,
-      drawingId: newItem?.drawingId ?? null, fullCode: newItem?.fullCode ?? null };
+      previousDrawingId: oldItem?.origin === 'planned' ? oldItem.drawingId : null,
+      previousDrawingReference: oldItem ? referenceOf(oldItem) : null, previousFullCode: oldItem?.fullCode ?? null,
+      drawingId: newItem?.origin === 'planned' ? newItem.drawingId : null,
+      drawingReference: newItem ? referenceOf(newItem) : null, fullCode: newItem?.fullCode ?? null };
   });
+}
+
+function referenceOf(item: BomDrawingReference): BomDrawingReference {
+  return item.origin === 'planned' ? { origin: 'planned', drawingId: item.drawingId }
+    : { origin: 'historical', historicalDrawingId: item.historicalDrawingId };
 }
 
 export class BomService {
@@ -99,7 +106,8 @@ export class BomService {
       const currentId = this.repository.getCurrentVersionId(input.productId);
       if (currentId !== input.expectedCurrentVersionId) throw new BomError('BOM_STALE', '当前 BOM 已变化，请刷新后重新保存');
       const projectIds = new Set<number>();
-      const validated = input.items.map((item) => this.validateItem(item, input.productId, projectIds));
+      const entryMode = input.entryMode ?? 'current';
+      const validated = input.items.map((item) => this.validateItem(item, input.productId, projectIds, entryMode));
       const previous = currentId === null ? null : this.getVersion(currentId);
       const now = new Date().toISOString();
       const versionId = this.repository.insertVersion(input.productId, (previous?.versionNumber ?? 0) + 1,
@@ -109,7 +117,8 @@ export class BomService {
         this.saveItemAssets(bomItemId, item.projectItemId, currentId, item.assets);
         this.saveItemQrCodes(bomItemId, input.productId, item.qrCodeIds);
       });
-      this.repository.activateDrawings(validated.map((item) => item.drawingId));
+      this.repository.activateDrawings(validated.flatMap((item) => item.drawingReference.origin === 'planned'
+        ? [item.drawingReference.drawingId] : []));
       this.repository.setCurrent(input.productId, versionId, now);
       const version = this.getVersion(versionId);
       return { version, diff: buildDiff(previous, version) };
@@ -121,15 +130,33 @@ export class BomService {
     if (!context || context.productStatus !== 'active') throw new BomError('PRODUCT_NOT_ACTIVE', '产品不存在或已停用');
   }
 
-  private validateItem(item: BomItemInput, productId: number, projectIds: Set<number>) {
+  private validateItem(item: BomItemInput, productId: number, projectIds: Set<number>, entryMode: 'current' | 'historical') {
     if (projectIds.has(item.projectItemId)) throw new BomError('DUPLICATE_PROJECT', '同一 BOM 不能重复添加项目');
     projectIds.add(item.projectItemId);
-    const drawing = this.repository.getDrawing(item.drawingId);
-    if (!drawing) throw new BomError('DRAWING_NOT_FOUND', '图号不存在');
-    if (drawing.productId !== productId) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
-    if (drawing.projectItemId !== item.projectItemId) throw new BomError('DRAWING_WRONG_PROJECT', '图号与 BOM 项目不一致');
-    if (drawing.status === 'voided') throw new BomError('DRAWING_NOT_ELIGIBLE', '已作废图号不能加入 BOM');
-    if (item.usesWhiteMaterial && drawing.colorCode !== WHITE_COLOR_CODE) {
+    const drawingReference = item.drawingReference ?? (item.drawingId === undefined ? undefined
+      : { origin: 'planned' as const, drawingId: item.drawingId });
+    if (!drawingReference) throw new BomError('DRAWING_NOT_FOUND', '图号不存在');
+    let colorCode: string;
+    if (drawingReference.origin === 'planned') {
+      const drawing = this.repository.getDrawing(drawingReference.drawingId);
+      if (!drawing) throw new BomError('DRAWING_NOT_FOUND', '图号不存在');
+      if (drawing.productId !== productId) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
+      if (drawing.projectItemId !== item.projectItemId) throw new BomError('DRAWING_WRONG_PROJECT', '图号与 BOM 项目不一致');
+      if (drawing.status === 'voided') throw new BomError('DRAWING_NOT_ELIGIBLE', '已作废图号不能加入 BOM');
+      colorCode = drawing.colorCode;
+    } else {
+      const drawing = this.repository.getHistoricalDrawing(drawingReference.historicalDrawingId);
+      if (!drawing) throw new BomError('DRAWING_NOT_FOUND', '历史图号不存在');
+      if (entryMode !== 'historical') throw new BomError('DRAWING_NOT_ELIGIBLE', '历史图号只能在历史 BOM 录入模式使用');
+      if (drawing.productId === null) throw new BomError('DRAWING_PRODUCT_UNCONFIRMED', '历史图号尚未确认产品归属');
+      if (drawing.productId !== productId) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
+      const project = this.repository.getProjectCodes(item.projectItemId);
+      if (!project || drawing.projectItemCode !== project.projectItemCode || drawing.mainCategoryCode !== project.mainCategoryCode) {
+        throw new BomError('DRAWING_WRONG_PROJECT', '图号与 BOM 项目不一致');
+      }
+      colorCode = drawing.colorCode;
+    }
+    if (item.usesWhiteMaterial && colorCode !== WHITE_COLOR_CODE) {
       throw new BomError('WHITE_DRAWING_REQUIRED', '颜色共用必须引用同型号白色图号');
     }
     let effectiveBatchRelativePath = normalizedText(item.effectiveBatchRelativePath);
@@ -144,7 +171,7 @@ export class BomService {
       effectiveBatchRelativePath = batch.relativePath; effectiveBatchName = batch.name;
     } else if (effectiveBatchRelativePath || effectiveBatchName) throw new BomError('BATCH_NOT_ELIGIBLE', '新 BOM 的生效批次必须选择当前资料批次');
     if (effectiveBatchRelativePath) validateWorkspaceRelativePath(effectiveBatchRelativePath);
-    return { projectItemId: item.projectItemId, drawingId: item.drawingId,
+    return { projectItemId: item.projectItemId, drawingReference,
       effectiveBatchRelativePath, effectiveBatchName,
       effectiveMaterialBatchId, material: normalizedText(item.material),
       dimensions: normalizedText(item.dimensions), position: normalizedText(item.position), assets: item.assets ?? [],

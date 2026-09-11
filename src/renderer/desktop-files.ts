@@ -6,9 +6,24 @@ export interface DesktopFileResult {
 declare global {
   interface PlannerDesktop {
     showFileInFolder(pdfFileId: number): Promise<DesktopFileResult>;
+    showBomAssetInFolder?(assetId: number): Promise<DesktopFileResult>;
   }
   interface Window {
     plannerDesktop?: PlannerDesktop;
+  }
+}
+
+export async function openBomAssetLocation(assetId: number): Promise<DesktopFileResult> {
+  if (!Number.isInteger(assetId) || assetId <= 0) {
+    return { ok: false, error: { code: 'INVALID_BOM_ASSET_ID', message: 'BOM 附件索引无效' } };
+  }
+  if (!window.plannerDesktop?.showBomAssetInFolder) {
+    return { ok: false, error: { code: 'DESKTOP_ONLY', message: '请在 Windows 桌面版打开文件位置' } };
+  }
+  try { return await window.plannerDesktop.showBomAssetInFolder(assetId); }
+  catch (error) {
+    return { ok: false, error: { code: 'OPEN_BOM_ASSET_FAILED',
+      message: error instanceof Error ? error.message : '打开 BOM 附件位置失败' } };
   }
 }
 

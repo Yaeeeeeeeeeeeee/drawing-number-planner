@@ -1,13 +1,15 @@
 import type { BomCandidateView, BomDiffView, BomItemAssetView, BomItemView, BomQrCandidateView, BomQrCodeView, BomVersionView, DictionaryItemView, MaterialBatchView } from '../../data/client';
 
-export type DraftCandidate = Omit<BomCandidateView, 'status'> & { status: BomItemView['status'] };
+type DraftStatus<T> = T extends unknown ? Omit<T, 'status'>
+  & { status: 'reserved' | 'active' | 'inactive' | 'voided' } : never;
+export type DraftCandidate = DraftStatus<BomCandidateView>;
 
 export interface DraftRow {
-  clientId: string; projectItemId: string; drawingId: string; usesWhiteMaterial: boolean;
+  clientId: string; mainCategoryId: string; projectItemId: string; drawingId: string; usesWhiteMaterial: boolean;
   effectiveMaterialBatchId: string; material: string; dimensions: string; position: string; notes: string;
   imageAsset: BomItemAssetView | null; diagramAsset: BomItemAssetView | null;
   reuseImage: boolean; reuseDiagram: boolean; previousImageName: string | null; previousDiagramName: string | null;
-  qrCodeIds: number[]; inactiveQrCodes: BomQrCodeView[];
+  qrCodeIds: number[]; inactiveQrCodes: BomQrCodeView[]; showQrCodes: boolean;
   candidates: DraftCandidate[]; candidatesLoaded: boolean;
 }
 
@@ -15,11 +17,19 @@ const describeDiff = (item: BomDiffView) => item.type === 'added' ? `${item.proj
   : item.type === 'removed' ? `${item.projectItemName}：移除 ${item.previousFullCode}`
     : item.type === 'replaced' ? `${item.projectItemName}：${item.previousFullCode} → ${item.fullCode}` : `${item.projectItemName}：未变化`;
 
-export function BomEditor({ base, rows, projects, batches, qrCandidates, busy, complete, needsRefresh, savedMessage, diff,
-  onAdd, onDelete, onProject, onWhite, onDrawing, onChange, onUpload, onQr, onSave, onRefresh }: {
-  base: BomVersionView | null; rows: DraftRow[]; projects: DictionaryItemView[]; batches: MaterialBatchView[]; qrCandidates: BomQrCandidateView[];
+export const candidateKey = (candidate: DraftCandidate) => candidate.origin === 'planned'
+  ? `planned:${candidate.drawingId}` : `historical:${candidate.historicalDrawingId}`;
+const candidateLabel = (candidate: DraftCandidate) => candidate.origin === 'historical'
+  ? `历史已用 · ${candidate.status === 'inactive' ? '已停用' : '使用中'}`
+  : candidate.status === 'reserved' ? '正式规划 · 已占号'
+    : candidate.status === 'voided' ? '正式规划 · 作废，需替换' : '正式规划 · 正式使用';
+
+export function BomEditor({ base, rows, mainCategories, projects, batches, qrCandidates, busy, complete, needsRefresh, savedMessage, diff,
+  onAdd, onDelete, onMainCategory, onProject, onWhite, onDrawing, onChange, onUpload, onQr, onSave, onRefresh }: {
+  base: BomVersionView | null; rows: DraftRow[]; mainCategories: DictionaryItemView[]; projects: DictionaryItemView[]; batches: MaterialBatchView[]; qrCandidates: BomQrCandidateView[];
   busy: boolean; complete: boolean; needsRefresh: boolean; savedMessage: string; diff: BomDiffView[];
-  onAdd(): void; onDelete(clientId: string): void; onProject(row: DraftRow, value: string): void; onWhite(row: DraftRow, value: boolean): void;
+  onAdd(): void; onDelete(clientId: string): void; onMainCategory(row: DraftRow, value: string): void;
+  onProject(row: DraftRow, value: string): void; onWhite(row: DraftRow, value: boolean): void;
   onDrawing(row: DraftRow, value: string): void; onChange(row: DraftRow, field: keyof DraftRow, value: string | boolean): void;
   onUpload(row: DraftRow, role: 'image' | 'diagram', file: File): Promise<void>; onQr(row: DraftRow, id: number, checked: boolean): void;
   onSave(): Promise<void>; onRefresh(): void;
@@ -32,9 +42,10 @@ export function BomEditor({ base, rows, projects, batches, qrCandidates, busy, c
       <div className="planning-row-title"><strong>项目 {index + 1}</strong><button className="link-button" type="button" disabled={busy}
         aria-label={`删除 BOM 项目 ${index + 1}`} onClick={() => onDelete(row.clientId)}>删除</button></div>
       <div className="form-grid bom-row-fields">
-        <label><span>项目</span><select aria-label={`第 ${index + 1} 行项目`} disabled={busy} value={row.projectItemId} onChange={(e) => onProject(row, e.target.value)}><option value="">请选择</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
+        <label><span>主类别</span><select aria-label={`第 ${index + 1} 行主类别`} disabled={busy} value={row.mainCategoryId} onChange={(e) => onMainCategory(row, e.target.value)}><option value="">请选择</option>{mainCategories.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
+        <label><span>项目明细</span><select aria-label={`第 ${index + 1} 行项目明细`} disabled={busy || !row.mainCategoryId} value={row.projectItemId} onChange={(e) => onProject(row, e.target.value)}><option value="">请选择</option>{projects.filter((item) => item.parentId === Number(row.mainCategoryId)).map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
         <label className="bom-white-toggle"><span>颜色共用</span><span><input type="checkbox" aria-label={`第 ${index + 1} 行引用白色图号`} disabled={busy} checked={row.usesWhiteMaterial} onChange={(e) => onWhite(row, e.target.checked)} /> 引用白色图号</span></label>
-        <label className="bom-drawing-field"><span>正式图号</span><select aria-label={`第 ${index + 1} 行图号`} disabled={busy || !row.projectItemId} value={row.drawingId} onChange={(e) => onDrawing(row, e.target.value)}><option value="">请选择</option>{row.candidates.map((item) => <option disabled={item.status === 'voided'} key={item.id} value={item.id}>{item.fullCode} · {item.displayName} · {item.status === 'reserved' ? '已占号' : item.status === 'voided' ? '作废，需替换' : '正式使用'}</option>)}</select><small className="bom-candidate-rule">仅显示当前产品、项目及共用规则下可用于新 BOM 的正式规划图号。</small>{row.candidates.some((item) => item.id === Number(row.drawingId) && item.status === 'voided') && <small className="bom-candidate-empty">当前引用图号已作废，请选择可用图号替换后再保存。</small>}{row.projectItemId && row.candidatesLoaded && row.candidates.length === 0 && <small className="bom-candidate-empty">没有符合条件的正式规划图号。</small>}</label>
+        <label className="bom-drawing-field"><span>图号</span><select aria-label={`第 ${index + 1} 行图号`} disabled={busy || !row.projectItemId} value={row.drawingId} onChange={(e) => onDrawing(row, e.target.value)}><option value="">请选择</option>{row.candidates.map((item) => <option disabled={item.status === 'voided'} key={candidateKey(item)} value={candidateKey(item)}>{item.fullCode} · {item.displayName} · {candidateLabel(item)}</option>)}</select><small className="bom-candidate-rule">当前录入可引用的图号会明确标记“正式规划”或“历史已用”。</small>{row.candidates.some((item) => candidateKey(item) === row.drawingId && item.status === 'voided') && <small className="bom-candidate-empty">当前引用图号已作废，请选择可用图号替换后再保存。</small>}{row.projectItemId && row.candidatesLoaded && row.candidates.length === 0 && <small className="bom-candidate-empty">没有符合条件的图号。</small>}</label>
         <label><span>生效资料批次（可选）</span><select aria-label={`第 ${index + 1} 行生效资料批次`} disabled={busy} value={row.effectiveMaterialBatchId} onChange={(e) => onChange(row, 'effectiveMaterialBatchId', e.target.value)}><option value="">未选择</option>{batches.filter((batch) => batch.isPresent).map((batch) => <option key={batch.id} value={batch.id}>{batch.name} · {batch.relativePath}</option>)}</select></label>
         <label><span>材质</span><input aria-label={`第 ${index + 1} 行材质`} disabled={busy} value={row.material} onChange={(e) => onChange(row, 'material', e.target.value)} /></label>
         <label><span>尺寸</span><input aria-label={`第 ${index + 1} 行尺寸`} disabled={busy} value={row.dimensions} onChange={(e) => onChange(row, 'dimensions', e.target.value)} /></label>
@@ -44,7 +55,7 @@ export function BomEditor({ base, rows, projects, batches, qrCandidates, busy, c
         <label><span>示意图</span><input aria-label={`第 ${index + 1} 行示意图`} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onUpload(row, 'diagram', file); }} />{row.diagramAsset && <small>{row.diagramAsset.originalFileName}</small>}</label>
         {base && row.previousImageName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用图片`} checked={row.reuseImage} disabled={busy} onChange={(e) => onChange(row, 'reuseImage', e.target.checked)} /> 沿用上一次 BOM：{row.previousImageName}</span></label>}{base && row.previousDiagramName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用示意图`} checked={row.reuseDiagram} disabled={busy} onChange={(e) => onChange(row, 'reuseDiagram', e.target.checked)} /> 沿用上一次 BOM：{row.previousDiagramName}</span></label>}
       </div>
-      {(qrCandidates.length > 0 || row.inactiveQrCodes.length > 0) && <fieldset className="bom-qr"><legend>关联二维码（仅当前产品启用项）</legend>{qrCandidates.map((qr) => <label key={qr.id}><input type="checkbox" aria-label={`第 ${index + 1} 行二维码 ${qr.id}`} checked={row.qrCodeIds.includes(qr.id)} onChange={(e) => onQr(row, qr.id, e.target.checked)} /> {qr.purposeDisplayName || qr.name}</label>)}{row.inactiveQrCodes.map((qr) => row.qrCodeIds.includes(qr.id) && <label className="bom-inactive-qr" key={qr.id}><input type="checkbox" aria-label={`第 ${index + 1} 行停用二维码 ${qr.id}`} checked onChange={(e) => onQr(row, qr.id, e.target.checked)} /> 二维码“{qr.purposeDisplayName || qr.name}”已停用，请取消关联后再保存。</label>)}</fieldset>}
+      {(qrCandidates.length > 0 || row.inactiveQrCodes.length > 0) && <section className="bom-qr"><button className="text-button" type="button" aria-expanded={row.showQrCodes} aria-label={`第 ${index + 1} 行使用二维码`} onClick={() => onChange(row, 'showQrCodes', !row.showQrCodes)}>使用二维码（可选）</button>{row.showQrCodes && <fieldset><legend>使用已有二维码</legend><small>这里只引用二维码管理中已有记录，不在 BOM 中新建或匹配文件。</small>{qrCandidates.map((qr) => <label key={qr.id}><input type="checkbox" aria-label={`第 ${index + 1} 行二维码 ${qr.id}`} checked={row.qrCodeIds.includes(qr.id)} onChange={(e) => onQr(row, qr.id, e.target.checked)} /> {qr.purposeDisplayName || qr.name}</label>)}{row.inactiveQrCodes.map((qr) => row.qrCodeIds.includes(qr.id) && <label className="bom-inactive-qr" key={qr.id}><input type="checkbox" aria-label={`第 ${index + 1} 行停用二维码 ${qr.id}`} checked onChange={(e) => onQr(row, qr.id, e.target.checked)} /> 二维码“{qr.purposeDisplayName || qr.name}”已停用，请取消关联后再保存。</label>)}</fieldset>}</section>}
     </article>)}</div>
     <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete} onClick={() => void onSave()}>{busy ? '保存中…' : '保存当前 BOM'}</button>{needsRefresh && <button className="secondary-button" type="button" disabled={busy} onClick={onRefresh}>刷新当前 BOM</button>}</div>
     {savedMessage && <p className="success-banner"><strong>{savedMessage}</strong></p>}

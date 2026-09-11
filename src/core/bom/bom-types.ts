@@ -1,5 +1,8 @@
 export type BomDiffType = 'added' | 'replaced' | 'removed' | 'unchanged';
 export type BomAssetRole = 'image' | 'diagram';
+export type BomEntryMode = 'current' | 'historical';
+export type BomDrawingReference = { origin: 'planned'; drawingId: number }
+  | { origin: 'historical'; historicalDrawingId: number };
 
 export interface BomItemAssetInput { role: BomAssetRole; assetId?: number; reusePrevious?: boolean }
 export interface BomItemAssetRecord {
@@ -10,7 +13,9 @@ export interface BomQrCodeRecord { id: number; name: string; status: 'active' | 
 
 export interface BomItemInput {
   projectItemId: number;
-  drawingId: number;
+  drawingReference?: BomDrawingReference;
+  /** Deprecated request compatibility. New clients use drawingReference. */
+  drawingId?: number;
   /** Compatibility-only. New BOM records always persist quantity as 1. */
   quantity?: number;
   effectiveBatchRelativePath?: string;
@@ -27,6 +32,7 @@ export interface BomItemInput {
 
 export interface SaveBomInput {
   productId: number;
+  entryMode?: BomEntryMode;
   businessChangeDate?: string;
   /** Deprecated compatibility field; product-level BOMs do not use it. */
   colorId?: number;
@@ -35,27 +41,26 @@ export interface SaveBomInput {
   items: BomItemInput[];
 }
 
-export interface BomCandidate {
-  id: number;
+interface BomCandidateFields {
   fullCode: string;
   displayName: string;
-  colorId: number;
+  colorId: number | null;
   colorName: string;
   projectItemId: number;
   projectItemName: string;
-  status: 'reserved' | 'active';
+  status: 'reserved' | 'active' | 'inactive';
 }
+export type BomCandidate = BomCandidateFields & BomDrawingReference;
 
-export interface BomItemRecord {
+interface BomItemRecordFields {
   bomItemId: number;
-  drawingId: number;
   fullCode: string;
   displayName: string;
-  colorId: number;
+  colorId: number | null;
   colorName: string;
   projectItemId: number;
   projectItemName: string;
-  status: 'reserved' | 'active' | 'voided';
+  status: 'reserved' | 'active' | 'inactive' | 'voided';
   /** Compatibility-only; every newly saved value is 1. */
   quantity: number;
   effectiveBatchRelativePath: string | null;
@@ -69,6 +74,7 @@ export interface BomItemRecord {
   notes: string | null;
   usesWhiteMaterial: boolean;
 }
+export type BomItemRecord = BomItemRecordFields & BomDrawingReference;
 
 export interface BomVersionSummary {
   id: number;
@@ -101,8 +107,10 @@ export interface BomDiffEntry {
   projectItemId: number;
   projectItemName: string;
   previousDrawingId: number | null;
+  previousDrawingReference: BomDrawingReference | null;
   previousFullCode: string | null;
   drawingId: number | null;
+  drawingReference: BomDrawingReference | null;
   fullCode: string | null;
 }
 
@@ -113,6 +121,7 @@ export interface SavedBomVersion {
 
 export interface BomCandidateInput {
   productId: number;
+  entryMode?: BomEntryMode;
   /** Deprecated compatibility field; candidate color is determined by the drawing. */
   bomColorId?: number;
   projectItemId: number;

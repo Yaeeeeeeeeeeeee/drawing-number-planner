@@ -1,11 +1,15 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { BomAssetRole, BomCandidate, BomCandidateInput, BomItemRecord, BomQueryFilters, BomQrCodeRecord, BomVersionDetail, BomVersionSummary } from './bom-types.js';
+import type { BomAssetRole, BomCandidate, BomCandidateInput, BomDrawingReference, BomItemRecord, BomQueryFilters, BomQrCodeRecord, BomVersionDetail, BomVersionSummary } from './bom-types.js';
 
 export interface BomContext { productId: number; productStatus: 'active' | 'inactive' }
 
 export interface BomDrawing {
   id: number; fullCode: string; displayName: string; productId: number; colorId: number; colorCode: string; colorName: string;
   projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'voided';
+}
+export interface BomHistoricalDrawing {
+  id: number; fullCode: string; productId: number | null; colorCode: string; mainCategoryCode: string;
+  projectItemCode: string; status: 'active' | 'inactive';
 }
 
 interface VersionRow {
@@ -15,8 +19,9 @@ interface VersionRow {
 }
 
 interface ItemRow {
-  bom_item_id: number; id: number; full_code: string; display_name: string; color_id: number; color_name: string;
-  project_item_id: number; project_item_name: string; status: 'reserved' | 'active' | 'voided'; quantity: number;
+  bom_item_id: number; drawing_id: number | null; historical_drawing_id: number | null; origin: 'planned' | 'historical';
+  full_code: string; display_name: string; color_id: number | null; color_name: string;
+  project_item_id: number; project_item_name: string; status: 'reserved' | 'active' | 'inactive' | 'voided'; quantity: number;
   effective_batch_relative_path: string | null; effective_batch_name: string | null; effective_material_batch_id: number | null;
   material: string | null; dimensions: string | null; position: string | null;
   notes: string | null; uses_white_material: 0 | 1;
@@ -30,7 +35,9 @@ const mapSummary = (row: VersionRow): BomVersionSummary => ({
 });
 
 const mapItem = (row: ItemRow): BomItemRecord => ({
-  bomItemId: row.bom_item_id, drawingId: row.id, fullCode: row.full_code, displayName: row.display_name,
+  ...(row.origin === 'planned' ? { origin: 'planned' as const, drawingId: row.drawing_id! }
+    : { origin: 'historical' as const, historicalDrawingId: row.historical_drawing_id! }),
+  bomItemId: row.bom_item_id, fullCode: row.full_code, displayName: row.display_name,
   colorId: row.color_id, colorName: row.color_name, projectItemId: row.project_item_id,
   projectItemName: row.project_item_name, status: row.status, quantity: row.quantity,
   effectiveBatchRelativePath: row.effective_batch_relative_path, effectiveBatchName: row.effective_batch_name,
@@ -79,14 +86,21 @@ export class BomRepository {
   getVersion(id: number): BomVersionDetail | undefined {
     const row = this.db.prepare(`${versionSelect} where version.id = ?`).get(id) as VersionRow | undefined;
     if (!row) return undefined;
-    const items = this.db.prepare(`select item.id as bom_item_id, drawing.id, drawing.full_code, drawing.display_name,
-      drawing.color_id, drawing_color.name as color_name, item.project_item_id,
-      project_item.name as project_item_name, drawing.status, item.quantity, item.effective_batch_relative_path,
+    const items = this.db.prepare(`select item.id as bom_item_id, item.drawing_id, item.historical_drawing_id,
+      case when item.drawing_id is not null then 'planned' else 'historical' end as origin,
+      coalesce(drawing.full_code, historical.full_code) as full_code,
+      coalesce(drawing.display_name, historical.full_code) as display_name,
+      drawing.color_id, coalesce(drawing_color.name, historical_color.name, historical.color_code) as color_name,
+      item.project_item_id, project_item.name as project_item_name,
+      coalesce(drawing.status, historical.status) as status, item.quantity, item.effective_batch_relative_path,
       item.effective_batch_name, item.effective_material_batch_id, item.material, item.dimensions, item.position,
       item.notes, item.uses_white_material
       from bom_items item
-      join drawing_numbers drawing on drawing.id = item.drawing_id
-      join dictionary_items drawing_color on drawing_color.id = drawing.color_id
+      left join drawing_numbers drawing on drawing.id = item.drawing_id
+      left join historical_drawing_numbers historical on historical.id = item.historical_drawing_id
+      left join dictionary_items drawing_color on drawing_color.id = drawing.color_id
+      left join dictionary_items historical_color on historical_color.type = 'color'
+        and historical_color.code = historical.color_code
       join dictionary_items project_item on project_item.id = item.project_item_id
       where item.bom_version_id = ? order by item.project_item_id`).all(id) as ItemRow[];
     return { ...mapSummary(row), items: items.map((item) => ({ ...mapItem(item), assets: this.listItemAssets(item.bom_item_id),
@@ -105,11 +119,12 @@ export class BomRepository {
     if (filters.projectItemId !== undefined || filters.fullCode?.trim() || filters.effectiveBatchRelativePath?.trim()) {
       const itemConditions: string[] = [];
       if (filters.projectItemId !== undefined) { itemConditions.push('item.project_item_id = ?'); values.push(filters.projectItemId); }
-      if (filters.fullCode?.trim()) { itemConditions.push('drawing.full_code like ?'); values.push(`%${filters.fullCode.trim()}%`); }
+      if (filters.fullCode?.trim()) { itemConditions.push('coalesce(drawing.full_code, historical.full_code) like ?'); values.push(`%${filters.fullCode.trim()}%`); }
       if (filters.effectiveBatchRelativePath?.trim()) {
         itemConditions.push('item.effective_batch_relative_path like ?'); values.push(`%${filters.effectiveBatchRelativePath.trim()}%`);
       }
-      conditions.push(`exists (select 1 from bom_items item join drawing_numbers drawing on drawing.id = item.drawing_id
+      conditions.push(`exists (select 1 from bom_items item left join drawing_numbers drawing on drawing.id = item.drawing_id
+        left join historical_drawing_numbers historical on historical.id = item.historical_drawing_id
         where item.bom_version_id = version.id and ${itemConditions.join(' and ')})`);
     }
     const where = conditions.length ? ` where ${conditions.join(' and ')}` : '';
@@ -125,18 +140,51 @@ export class BomRepository {
       join dictionary_items project_item on project_item.id = drawing.project_item_id where drawing.id = ?`).get(id) as BomDrawing | undefined;
   }
 
+  getHistoricalDrawing(id: number): BomHistoricalDrawing | undefined {
+    return this.db.prepare(`select id, full_code as fullCode, product_id as productId, color_code as colorCode,
+      main_category_code as mainCategoryCode, project_item_code as projectItemCode, status
+      from historical_drawing_numbers where id = ?`).get(id) as BomHistoricalDrawing | undefined;
+  }
+
+  getProjectCodes(id: number): { projectItemCode: string; mainCategoryCode: string } | undefined {
+    return this.db.prepare(`select item.code as projectItemCode, parent.code as mainCategoryCode
+      from dictionary_items item join dictionary_items parent on parent.id = item.parent_id
+      where item.id = ? and item.type = 'project_item' and parent.type = 'main_category'`).get(id) as
+      { projectItemCode: string; mainCategoryCode: string } | undefined;
+  }
+
   listCandidates(input: BomCandidateInput, whiteColorCode: string): BomCandidate[] {
     const whiteClause = input.usesWhiteMaterial ? 'and color.code = ?' : '';
     const values = input.usesWhiteMaterial
       ? [input.productId, input.projectItemId, whiteColorCode]
       : [input.productId, input.projectItemId];
-    return this.db.prepare(`select drawing.id, drawing.full_code as fullCode, drawing.display_name as displayName,
+    const planned = this.db.prepare(`select 'planned' as origin, drawing.id as drawingId,
+      drawing.full_code as fullCode, drawing.display_name as displayName,
       drawing.color_id as colorId, color.name as colorName, drawing.project_item_id as projectItemId,
       project_item.name as projectItemName, drawing.status
       from drawing_numbers drawing join dictionary_items color on color.id = drawing.color_id
       join dictionary_items project_item on project_item.id = drawing.project_item_id
       where drawing.product_id = ? and drawing.project_item_id = ? ${whiteClause}
         and drawing.status in ('reserved', 'active') order by drawing.sequence desc, drawing.id desc`).all(...values) as BomCandidate[];
+    if ((input.entryMode ?? 'current') !== 'historical') return planned;
+    const project = this.getProjectCodes(input.projectItemId);
+    if (!project) return planned;
+    const historicalWhiteClause = input.usesWhiteMaterial ? 'and historical.color_code = ?' : '';
+    const historicalValues = input.usesWhiteMaterial
+      ? [input.productId, project.mainCategoryCode, project.projectItemCode, whiteColorCode]
+      : [input.productId, project.mainCategoryCode, project.projectItemCode];
+    const historical = this.db.prepare(`select 'historical' as origin, historical.id as historicalDrawingId,
+      historical.full_code as fullCode, historical.full_code as displayName, color.id as colorId,
+      coalesce(color.name, historical.color_code) as colorName, ? as projectItemId, project_item.name as projectItemName,
+      historical.status
+      from historical_drawing_numbers historical
+      left join dictionary_items color on color.type = 'color' and color.code = historical.color_code
+      join dictionary_items project_item on project_item.id = ?
+      where historical.product_id = ? and historical.main_category_code = ? and historical.project_item_code = ?
+        ${historicalWhiteClause} and historical.status in ('active', 'inactive')
+      order by historical.sequence desc, historical.id desc`)
+      .all(input.projectItemId, input.projectItemId, ...historicalValues) as BomCandidate[];
+    return [...planned, ...historical];
   }
 
   insertVersion(productId: number, versionNumber: number, previousVersionId: number | null,
@@ -146,14 +194,16 @@ export class BomRepository {
       .run(productId, versionNumber, previousVersionId, businessChangeDate, notes, createdAt).lastInsertRowid);
   }
 
-  insertItem(versionId: number, item: { projectItemId: number; drawingId: number; effectiveBatchRelativePath: string | null;
+  insertItem(versionId: number, item: { projectItemId: number; drawingReference: BomDrawingReference; effectiveBatchRelativePath: string | null;
     effectiveBatchName: string | null; effectiveMaterialBatchId: number | null; material: string | null;
     dimensions: string | null; position: string | null; notes: string | null; usesWhiteMaterial: boolean }): number {
     return Number(this.db.prepare(`insert into bom_items
-      (bom_version_id, project_item_id, drawing_id, quantity, effective_batch_relative_path, effective_batch_name,
+      (bom_version_id, project_item_id, drawing_id, historical_drawing_id, quantity, effective_batch_relative_path, effective_batch_name,
         effective_material_batch_id, material, dimensions, position, notes, uses_white_material)
-      values (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(versionId, item.projectItemId, item.drawingId, item.effectiveBatchRelativePath, item.effectiveBatchName,
+      values (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(versionId, item.projectItemId, item.drawingReference.origin === 'planned' ? item.drawingReference.drawingId : null,
+        item.drawingReference.origin === 'historical' ? item.drawingReference.historicalDrawingId : null,
+        item.effectiveBatchRelativePath, item.effectiveBatchName,
         item.effectiveMaterialBatchId, item.material, item.dimensions, item.position, item.notes, item.usesWhiteMaterial ? 1 : 0).lastInsertRowid);
   }
 
