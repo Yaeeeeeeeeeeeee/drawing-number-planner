@@ -1,7 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
 import { DrawingRepository } from './drawing-repository.js';
-import type { DrawingDetailRecord, DrawingReferenceSummary, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
+import type { DrawingDeletionPreview, DrawingDetailRecord, DrawingReferenceSummary, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
 
 export class DrawingQueryError extends Error {
   constructor(public readonly code: 'NOT_FOUND' | 'INVALID_TRANSITION' | 'HISTORICAL_READ_ONLY' | 'PDF_NOT_AVAILABLE' | 'DRAWING_NOT_DELETABLE' | 'DRAWING_REFERENCED', message: string, public readonly referenceSummary?: DrawingReferenceSummary) { super(message); }
@@ -54,6 +54,13 @@ export class DrawingQueryService {
     if (drawing.origin !== 'historical') throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
     this.repository.updateHistoricalStatus(historicalId, status);
     return this.get(-historicalId);
+  }
+
+  getDeletionPreview(id: number): DrawingDeletionPreview {
+    if (id < 0) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '永久占号，不支持普通删除');
+    const preview = this.repository.getDeletionPreview(id);
+    if (!preview) throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
+    return preview;
   }
 
   deleteReservedDrawing(id: number, confirmed: boolean): { deleted: true } {

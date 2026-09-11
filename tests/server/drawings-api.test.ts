@@ -154,6 +154,34 @@ describe('drawing library API', () => {
     await app.close();
   });
 
+  it('rejects non-positive historical delete IDs without reaching a planned reservation', async () => {
+    const reserved = seedPlannedDrawing(db);
+    const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+
+    for (const id of [-reserved.id, 0]) {
+      const response = await app.inject({ method: 'DELETE', url: `/api/historical-drawings/${id}`, payload: { confirmed: true } });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: { code: 'INVALID_REQUEST', message: '历史图号编号无效' } });
+    }
+    expect((await app.inject({ method: 'GET', url: `/api/drawings/${reserved.id}` })).statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('returns a read-only deletion preview before confirming a reservation deletion', async () => {
+    const reserved = seedPlannedDrawing(db);
+    const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+
+    const preview = await app.inject({ method: 'GET', url: `/api/drawings/${reserved.id}/deletion-preview` });
+
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json()).toEqual({ deletable: true, referenceSummary: {
+      pdfCount: 0, bomCount: 0, previousDrawingCount: 0, successorCount: 0,
+      sourceDrawingCount: 0, sourceReferenceCount: 0,
+    } });
+    expect((await app.inject({ method: 'GET', url: `/api/drawings/${reserved.id}` })).statusCode).toBe(200);
+    await app.close();
+  });
+
   it('deletes only an explicitly confirmed, unused reservation and rejects permanent drawing numbers', async () => {
     const reserved = seedPlannedDrawing(db);
     const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));

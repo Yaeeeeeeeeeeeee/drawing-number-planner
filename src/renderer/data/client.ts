@@ -82,6 +82,9 @@ export interface DrawingReferenceSummaryView {
   pdfCount: number; bomCount: number; previousDrawingCount: number; successorCount: number;
   sourceDrawingCount: number; sourceReferenceCount: number;
 }
+export interface DrawingDeletionPreviewView {
+  deletable: boolean; referenceSummary: DrawingReferenceSummaryView;
+}
 
 export interface ProductReferenceSummaryView {
   referenceProductCount: number; plannedDrawingCount: number; historicalDrawingCount: number;
@@ -169,6 +172,7 @@ export interface PlannerApi {
   getDrawing(id: number): Promise<DrawingDetailView>;
   activateDrawing(id: number): Promise<DrawingDetailView>;
   voidDrawing(id: number): Promise<DrawingDetailView>;
+  getDrawingDeletionPreview(id: number): Promise<DrawingDeletionPreviewView>;
   deleteReservedDrawing(id: number): Promise<{ deleted: true }>;
   activateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
   deactivateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
@@ -339,6 +343,7 @@ export const apiClient: PlannerApi = {
   getDrawing: (id) => request(`/api/drawings/${id}`),
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
+  getDrawingDeletionPreview: (id) => request(`/api/drawings/${id}/deletion-preview`),
   deleteReservedDrawing: (id) => request(`/api/drawings/${id}`, json('DELETE', { confirmed: true })),
   activateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/activate`, json('POST', { confirmed: true })),
   deactivateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/deactivate`, json('POST', { confirmed: true })),

@@ -204,22 +204,29 @@ export class DrawingRepository {
     this.db.prepare('update historical_drawing_numbers set status = ? where id = ?').run(status, id);
   }
 
+  getDeletionPreview(id: number): DrawingDeletionPreview | undefined {
+    const drawing = this.db.prepare('select id, full_code as fullCode, status from drawing_numbers where id = ?')
+      .get(id) as { id: number; fullCode: string; status: DrawingRecord['status'] } | undefined;
+    return drawing ? this.buildDeletionPreview(drawing) : undefined;
+  }
+
   deleteUnusedReservation(id: number): { kind: 'deleted' | 'not-found' | 'not-deletable' | 'referenced'; preview?: DrawingDeletionPreview } {
     return this.db.transaction(() => {
       const drawing = this.db.prepare('select id, full_code as fullCode, status from drawing_numbers where id = ?')
         .get(id) as { id: number; fullCode: string; status: DrawingRecord['status'] } | undefined;
       if (!drawing) return { kind: 'not-found' } as const;
-      const referenceSummary = this.getReferenceSummary(drawing.id, drawing.fullCode);
-      const preview: DrawingDeletionPreview = {
-        deletable: drawing.status === 'reserved' && this.hasNoReferences(referenceSummary),
-        referenceSummary,
-      };
+      const preview = this.buildDeletionPreview(drawing);
       if (drawing.status !== 'reserved') return { kind: 'not-deletable', preview } as const;
       if (!preview.deletable) return { kind: 'referenced', preview } as const;
 
       const deleted = this.db.prepare("delete from drawing_numbers where id = ? and status = 'reserved'").run(id);
       return deleted.changes === 1 ? { kind: 'deleted' } as const : { kind: 'not-found' } as const;
     }).immediate();
+  }
+
+  private buildDeletionPreview(drawing: { id: number; fullCode: string; status: DrawingRecord['status'] }): DrawingDeletionPreview {
+    const referenceSummary = this.getReferenceSummary(drawing.id, drawing.fullCode);
+    return { deletable: drawing.status === 'reserved' && this.hasNoReferences(referenceSummary), referenceSummary };
   }
 
   private getReferenceSummary(id: number, fullCode: string): DrawingReferenceSummary {

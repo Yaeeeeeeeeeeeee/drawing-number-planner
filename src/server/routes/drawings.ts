@@ -23,6 +23,7 @@ const querySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 }).strict();
 const paramsSchema = z.object({ id: z.coerce.number().int().refine((value) => value !== 0) }).strict();
+const historicalParamsSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
 const confirmedSchema = z.object({ confirmed: z.literal(true) }).strict();
 const associationSchema = z.object({
   pdfIndexId: z.number().int().positive(), conversionType: z.enum(['source', 'outlined']),
@@ -73,6 +74,13 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
     catch (error) { return sendDrawingError(reply, error); }
   });
 
+  app.get('/api/drawings/:id/deletion-preview', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '图号编号无效' } });
+    try { return service.getDeletionPreview(params.data.id); }
+    catch (error) { return sendDrawingError(reply, error); }
+  });
+
   const historicalTransition = (target: 'active' | 'inactive', invalidMessage: string) => async (request: any, reply: FastifyReply) => {
     const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
     if (!params.success || !input.success) {
@@ -84,10 +92,9 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   app.post('/api/historical-drawings/:id/activate', historicalTransition('active', '历史图号启用确认请求无效'));
   app.post('/api/historical-drawings/:id/deactivate', historicalTransition('inactive', '历史图号停用确认请求无效'));
   app.delete('/api/historical-drawings/:id', async (request, reply) => {
-    const params = paramsSchema.safeParse(request.params);
+    const params = historicalParamsSchema.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '历史图号编号无效' } });
-    try { return service.deleteReservedDrawing(-params.data.id, true); }
-    catch (error) { return sendDrawingError(reply, error); }
+    return reply.code(409).send({ error: { code: 'HISTORICAL_READ_ONLY', message: '永久占号，不支持普通删除' } });
   });
 
   app.post('/api/drawings/:id/associate-pdf', async (request, reply) => {

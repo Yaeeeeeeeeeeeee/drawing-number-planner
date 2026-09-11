@@ -110,24 +110,23 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   };
   const deleteReservation = async () => {
     if (!selected) return;
-    if (!window.confirm('仅能删除从未使用的预留图号。是否继续？')) return;
-    if (!window.confirm(`最后确认删除 ${selected.fullCode}？删除后该号码会重新参与推荐。`)) return;
     setMaintaining(true); setError('');
     try {
+      const preview = await api.getDrawingDeletionPreview(selected.id);
+      if (!preview.deletable) {
+        setError(`该预留图号当前不可删除${deletionReferenceDetails(preview.referenceSummary)}`);
+        return;
+      }
+      if (!window.confirm('仅能删除从未使用的预留图号。是否继续？')) return;
+      if (!window.confirm(`最后确认删除 ${selected.fullCode}？删除后该号码会重新参与推荐。`)) return;
       await api.deleteReservedDrawing(selected.id);
       setSelected(null);
       await search(filters, 1, pageSize);
     } catch (reason) {
       const summary = typeof reason === 'object' && reason !== null && 'referenceSummary' in reason
         ? (reason as { referenceSummary?: Record<string, unknown> }).referenceSummary : undefined;
-      const labels: Array<[string, string]> = [
-        ['pdfCount', 'PDF 关联'], ['bomCount', 'BOM 使用'], ['previousDrawingCount', '关联前版'],
-        ['successorCount', '后续版本'], ['sourceDrawingCount', '引用源图号'], ['sourceReferenceCount', '被引用为源图号'],
-      ];
-      const details = summary ? labels.flatMap(([key, label]) => typeof summary[key] === 'number' && summary[key] > 0
-        ? [`${label}（${summary[key]}）`] : []).join('、') : '';
       const message = reason instanceof Error ? reason.message : '删除预留图号失败';
-      setError(details ? `${message}：${details}` : message);
+      setError(`${message}${deletionReferenceDetails(summary)}`);
     } finally { setMaintaining(false); }
   };
   const associatePdf = async (conversionType: 'source' | 'outlined') => {
@@ -217,6 +216,17 @@ const statusLabel = (origin: DrawingView['origin'], status: DrawingView['status'
 };
 const usageLabel = (status: 'current' | 'historical' | 'unbatched' | 'indeterminate') =>
   status === 'current' ? '当前使用' : status === 'historical' ? '历史使用' : status === 'indeterminate' ? '待确认' : '未归入批次';
+
+function deletionReferenceDetails(summary: unknown): string {
+  const labels: Array<[string, string]> = [
+    ['pdfCount', 'PDF 关联'], ['bomCount', 'BOM 使用'], ['previousDrawingCount', '关联前版'],
+    ['successorCount', '后续版本'], ['sourceDrawingCount', '引用源图号'], ['sourceReferenceCount', '被引用为源图号'],
+  ];
+  const values = typeof summary === 'object' && summary !== null ? summary as Record<string, unknown> : undefined;
+  const details = values ? labels.flatMap(([key, label]) => typeof values[key] === 'number' && values[key] > 0
+    ? [`${label}（${values[key]}）`] : []).join('、') : '';
+  return details ? `：${details}` : '';
+}
 
 function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
   setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus, onDeleteReservation, onError }: {
