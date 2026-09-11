@@ -187,7 +187,7 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .bom-asset-paths { display: grid; min-width: 0; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bom-asset-paths li { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .bom-asset-paths li > span { display: grid; min-width: 0; gap: 3px; }
-.bom-asset-path { overflow-wrap: anywhere; word-break: break-word; color: var(--muted); font-size: 11px; }
+.bom-asset-path { overflow-wrap: anywhere; word-break: break-word; white-space: normal; color: var(--muted); font-size: 11px; }
 .bom-asset-paths .text-button { flex: 0 0 auto; white-space: nowrap; }
 .muted-text { color: var(--muted); }
 .secondary-button { min-height: 40px; padding: 0 17px; color: #244566; border: 1px solid #bfccdc; border-radius: 5px; background: #fff; font-weight: 600; }

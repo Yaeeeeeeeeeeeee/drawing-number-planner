@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import { z } from 'zod';
 
 import { BomError } from '../../core/bom/bom-errors.js';
+import type { BomItemInput, SaveBomInput } from '../../core/bom/bom-types.js';
 import { FileError } from '../../core/files/file-errors.js';
 import type { BomService } from '../../core/bom/bom-service.js';
 import { ensureMultipart } from '../multipart.js';
@@ -117,6 +118,10 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
   app.post('/api/boms/versions', async (request, reply) => {
     const input = saveSchema.safeParse(request.body);
     if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 数据不完整或格式无效' } });
-    try { return reply.code(201).send(service.saveVersion(input.data)); } catch (error) { return sendBomError(reply, error); }
+    const normalized: SaveBomInput = { ...input.data, items: input.data.items.map((item): BomItemInput => {
+      const { drawingReference, drawingId, ...fields } = item;
+      return drawingReference ? { ...fields, drawingReference } : { ...fields, drawingId: drawingId! };
+    }) };
+    try { return reply.code(201).send(service.saveVersion(normalized)); } catch (error) { return sendBomError(reply, error); }
   });
 }

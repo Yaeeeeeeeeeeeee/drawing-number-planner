@@ -12,6 +12,25 @@ describe('desktop open-file handler', () => {
     expect(resolveBomAssetPath).toHaveBeenCalledWith(31);
     expect(showItemInFolder).toHaveBeenCalledWith('C:\\library\\_图号规划器\\BOM附件\\image.png');
   });
+  it.each([0, -1, 1.2, '2', undefined])('rejects invalid BOM asset IDs before resolving: %s', async (id) => {
+    const resolveBomAssetPath = vi.fn(); const showItemInFolder = vi.fn();
+    const handler = createShowBomAssetInFolderHandler({ resolveBomAssetPath, showItemInFolder });
+
+    await expect(handler({}, id)).resolves.toEqual({ ok: false,
+      error: { code: 'INVALID_BOM_ASSET_ID', message: 'BOM 附件索引无效' } });
+    expect(resolveBomAssetPath).not.toHaveBeenCalled(); expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+  it('does not open Explorer when the BOM asset resolver reports a missing file', async () => {
+    const error = Object.assign(new Error('BOM 附件当前不可用'), { code: 'BOM_ASSET_UNAVAILABLE' });
+    const showItemInFolder = vi.fn();
+    const handler = createShowBomAssetInFolderHandler({
+      resolveBomAssetPath: vi.fn(() => { throw error; }), showItemInFolder,
+    });
+
+    await expect(handler({}, 31)).resolves.toEqual({ ok: false,
+      error: { code: 'BOM_ASSET_UNAVAILABLE', message: 'BOM 附件当前不可用' } });
+    expect(showItemInFolder).not.toHaveBeenCalled();
+  });
   it('passes only the PDF index ID to the resolver and invokes the shell after successful validation', async () => {
     const resolvePdfFilePath = vi.fn().mockReturnValue('C:\\library\\inside.pdf');
     const showItemInFolder = vi.fn();

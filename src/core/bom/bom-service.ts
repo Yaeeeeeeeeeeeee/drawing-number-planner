@@ -133,9 +133,12 @@ export class BomService {
   private validateItem(item: BomItemInput, productId: number, projectIds: Set<number>, entryMode: 'current' | 'historical') {
     if (projectIds.has(item.projectItemId)) throw new BomError('DUPLICATE_PROJECT', '同一 BOM 不能重复添加项目');
     projectIds.add(item.projectItemId);
-    const drawingReference = item.drawingReference ?? (item.drawingId === undefined ? undefined
-      : { origin: 'planned' as const, drawingId: item.drawingId });
-    if (!drawingReference) throw new BomError('DRAWING_NOT_FOUND', '图号不存在');
+    const hasDrawingReference = item.drawingReference !== undefined;
+    const hasLegacyDrawingId = item.drawingId !== undefined;
+    if (hasDrawingReference === hasLegacyDrawingId) {
+      throw new BomError('DRAWING_REFERENCE_INVALID', 'BOM 项目必须且只能提供一种图号引用');
+    }
+    const drawingReference = item.drawingReference ?? { origin: 'planned' as const, drawingId: item.drawingId! };
     let colorCode: string;
     if (drawingReference.origin === 'planned') {
       const drawing = this.repository.getDrawing(drawingReference.drawingId);

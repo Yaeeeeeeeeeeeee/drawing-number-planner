@@ -11,11 +11,8 @@ export interface BomItemAssetRecord {
 }
 export interface BomQrCodeRecord { id: number; name: string; status: 'active' | 'inactive'; purposeDisplayName: string }
 
-export interface BomItemInput {
+interface BomItemInputFields {
   projectItemId: number;
-  drawingReference?: BomDrawingReference;
-  /** Deprecated request compatibility. New clients use drawingReference. */
-  drawingId?: number;
   /** Compatibility-only. New BOM records always persist quantity as 1. */
   quantity?: number;
   effectiveBatchRelativePath?: string;
@@ -29,6 +26,11 @@ export interface BomItemInput {
   notes?: string;
   usesWhiteMaterial: boolean;
 }
+export type BomItemInput = BomItemInputFields & (
+  | { drawingReference: BomDrawingReference; drawingId?: never }
+  /** Deprecated request compatibility. New clients use drawingReference. */
+  | { drawingReference?: never; drawingId: number }
+);
 
 export interface SaveBomInput {
   productId: number;

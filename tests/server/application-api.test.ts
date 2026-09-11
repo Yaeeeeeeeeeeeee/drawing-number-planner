@@ -63,4 +63,21 @@ describe('real application API', () => {
     const moved = `${paths.database}.released`;
     expect(() => renameSync(paths.database, moved)).not.toThrow();
   });
+
+  it('rejects invalid or missing BOM attachment paths in the server-owned resolver', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'drawing-planner-bom-resolver-'));
+    const dataDir = join(root, 'data'); const workspaceRoot = join(root, 'workspace');
+    mkdirSync(workspaceRoot); const paths = resolveAppPaths(dataDir);
+    const server = await startServer({ port: 0, dataDir });
+    writeFileSync(paths.settings, `${JSON.stringify({ workspaceRoot })}\n`);
+    const database = openDatabase(paths.database);
+    const assetId = Number(database.prepare(`insert into bom_assets
+      (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at)
+      values ('missing.png', 'missing.png', 'image/png', 0, 'missing', '2026-09-11T00:00:00Z')`).run().lastInsertRowid);
+    database.close();
+
+    expect(() => server.resolveBomAssetPath(0)).toThrow(expect.objectContaining({ code: 'INVALID_BOM_ASSET_ID' }));
+    expect(() => server.resolveBomAssetPath(assetId)).toThrow(expect.objectContaining({ code: 'BOM_ASSET_UNAVAILABLE' }));
+    await server.close();
+  });
 });

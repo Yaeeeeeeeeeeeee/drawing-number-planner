@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { BomPage, localBusinessDateToday } from '../../src/renderer/pages/BomPage';
+import { openBomAssetLocation } from '../../src/renderer/desktop-files';
 
 const product = { id: 1, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
   defaultAppearanceId: 3, defaultAppearanceName: '一号外观', model: 'ZC100', productCategory: '冰柜',
@@ -213,5 +216,29 @@ describe('BomPage product-level BOM', () => {
     fireEvent.click(screen.getByRole('button', { name: '打开附件位置 客户示意图.png' }));
     await waitFor(() => expect(desktopAction).toHaveBeenCalledWith(31));
     delete window.plannerDesktop;
+  });
+
+  it('overrides the global table nowrap rule for long BOM attachment paths', () => {
+    const style = document.createElement('style');
+    style.textContent = readFileSync('src/renderer/styles.css', 'utf8');
+    document.head.append(style);
+    const table = document.createElement('table');
+    table.innerHTML = '<tbody><tr><td><small class="bom-asset-path">very/long/path/file.png</small></td></tr></tbody>';
+    document.body.append(table);
+
+    expect(getComputedStyle(table.querySelector('.bom-asset-path')!).whiteSpace).toBe('normal');
+
+    table.remove(); style.remove();
+  });
+
+  it('reports browser-only BOM attachment actions without issuing a network request', async () => {
+    delete window.plannerDesktop;
+    const fetchRequest = vi.spyOn(globalThis, 'fetch');
+
+    await expect(openBomAssetLocation(31)).resolves.toEqual({ ok: false,
+      error: { code: 'DESKTOP_ONLY', message: '请在 Windows 桌面版打开文件位置' } });
+    expect(fetchRequest).not.toHaveBeenCalled();
+
+    fetchRequest.mockRestore();
   });
 });
