@@ -8,6 +8,7 @@ import {
   schemaVersionSeven,
   schemaVersionEight,
   schemaVersionNine,
+  schemaVersionTen,
   schemaVersionThree,
   schemaVersionTwo,
 } from './schema.sql.js';
@@ -234,6 +235,109 @@ function countRows(database: PlannerDatabase, table: string): number {
   return (database.prepare(`select count(*) as count from ${table}`).get() as { count: number }).count;
 }
 
+interface V9MaintenanceSnapshot {
+  tableCounts: Record<string, number>;
+  paths: Record<'pdfFiles' | 'materialBatches' | 'qrCodeFiles' | 'bomAssets', Array<{ id: number; relative_path: string }>>;
+  bomVersions: Array<Record<string, unknown>>;
+  bomItems: Array<Record<string, unknown>>;
+  bomCurrent: Array<Record<string, unknown>>;
+}
+
+function v9TableCounts(database: PlannerDatabase): Record<string, number> {
+  const tables = database.prepare(`select name from sqlite_master
+    where type = 'table' and name not like 'sqlite_%' and name <> 'schema_migrations'
+    order by name`).all() as Array<{ name: string }>;
+  return Object.fromEntries(tables.map(({ name }) => [name, countRows(database, `"${name}"`)]));
+}
+
+function v9MaintenanceSnapshot(database: PlannerDatabase): V9MaintenanceSnapshot {
+  function paths(table: string): Array<{ id: number; relative_path: string }> {
+    return database.prepare(`select id, relative_path from ${table} order by id`).all() as unknown as Array<{ id: number; relative_path: string }>;
+  }
+  return {
+    tableCounts: v9TableCounts(database),
+    paths: {
+      pdfFiles: paths('pdf_files'),
+      materialBatches: paths('material_batches'),
+      qrCodeFiles: paths('qr_code_files'),
+      bomAssets: paths('bom_assets'),
+    },
+    bomVersions: database.prepare(`select id, product_id, version_number, previous_version_id,
+      business_change_date, legacy_color_id, notes, created_at from bom_versions order by id`).all() as Array<Record<string, unknown>>,
+    bomItems: database.prepare(`select id, bom_version_id, project_item_id, drawing_id, quantity,
+      effective_batch_relative_path, effective_batch_name, effective_material_batch_id,
+      material, dimensions, position, notes, uses_white_material from bom_items order by id`).all() as Array<Record<string, unknown>>,
+    bomCurrent: database.prepare('select product_id, version_id, updated_at from bom_current order by product_id').all() as Array<Record<string, unknown>>,
+  };
+}
+
+function validateMaintenanceMigration(database: PlannerDatabase, before: V9MaintenanceSnapshot): void {
+  const paths = (table: string) => database.prepare(`select id, relative_path from ${table} order by id`).all();
+  const afterPaths = {
+    pdfFiles: paths('pdf_files'),
+    materialBatches: paths('material_batches'),
+    qrCodeFiles: paths('qr_code_files'),
+    bomAssets: paths('bom_assets'),
+  };
+  const copiedVersions = database.prepare(`select id, product_id, version_number, previous_version_id,
+    business_change_date, legacy_color_id, notes, created_at, deleted_at, deleted_reason
+    from bom_versions order by id`).all();
+  const expectedVersions = before.bomVersions.map((version) => ({
+    ...version, deleted_at: null, deleted_reason: null,
+  }));
+  const copiedItems = database.prepare(`select id, bom_version_id, project_item_id, drawing_id,
+    historical_drawing_id, quantity, effective_batch_relative_path, effective_batch_name,
+    effective_material_batch_id, material, dimensions, position, notes, uses_white_material
+    from bom_items order by id`).all();
+  const expectedItems = before.bomItems.map((item) => ({
+    id: item.id,
+    bom_version_id: item.bom_version_id,
+    project_item_id: item.project_item_id,
+    drawing_id: item.drawing_id,
+    historical_drawing_id: null,
+    quantity: item.quantity,
+    effective_batch_relative_path: item.effective_batch_relative_path,
+    effective_batch_name: item.effective_batch_name,
+    effective_material_batch_id: item.effective_material_batch_id,
+    material: item.material,
+    dimensions: item.dimensions,
+    position: item.position,
+    notes: item.notes,
+    uses_white_material: item.uses_white_material,
+  }));
+  const copiedCurrent = database.prepare('select product_id, version_id, updated_at from bom_current order by product_id').all();
+  const invalidReferences = (database.prepare(`select count(*) as count from bom_items
+    where (drawing_id is not null) = (historical_drawing_id is not null)`).get() as { count: number }).count;
+  const initializedDeletionFields = (database.prepare(`select count(*) as count from bom_versions
+    where deleted_at is not null or deleted_reason is not null`).get() as { count: number }).count;
+  const initializedIdentifiers = (database.prepare(`select count(*) as count from qr_code_files
+    where detected_identifier is not null`).get() as { count: number }).count;
+  const hasHistoricalIndex = (database.pragma('index_list(bom_items)') as Array<{ name: string }>)
+    .some(({ name }) => name === 'bom_items_historical_drawing_idx');
+  const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
+  if (foreignKeyErrors.length > 0) throw new Error('BOM v10 外键校验失败，数据库未升级');
+  if (JSON.stringify(v9TableCounts(database)) !== JSON.stringify(before.tableCounts)
+    || JSON.stringify(afterPaths) !== JSON.stringify(before.paths)
+    || JSON.stringify(copiedVersions) !== JSON.stringify(expectedVersions)
+    || JSON.stringify(copiedItems) !== JSON.stringify(expectedItems)
+    || JSON.stringify(copiedCurrent) !== JSON.stringify(before.bomCurrent)
+    || invalidReferences > 0 || initializedDeletionFields > 0 || initializedIdentifiers > 0
+    || !hasHistoricalIndex) {
+    throw new Error('BOM 维护数据校验失败，数据库未升级');
+  }
+}
+
+function preserveBomItemTriggersDuringRebuild(database: PlannerDatabase, rebuild: () => void): void {
+  const triggers = database.prepare(`select name, sql from sqlite_master
+    where type = 'trigger' and instr(lower(sql), 'bom_items') > 0
+    order by name`).all() as Array<{ name: string; sql: string }>;
+  for (const trigger of triggers) {
+    database.exec(`drop trigger "${trigger.name.replaceAll('"', '""')}"`);
+  }
+  rebuild();
+  for (const trigger of triggers) database.exec(trigger.sql);
+}
+
 function validateQrMigration(database: PlannerDatabase, before: V7RowCounts): void {
   const after = v7RowCounts(database);
   const expectedQrCodes = (database.prepare(`select count(*) as count
@@ -330,8 +434,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 9) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 9`);
-  if (from >= 9) {
+  if (from > 10) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 10`);
+  if (from >= 10) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -400,7 +504,7 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (7, ?)').run(new Date().toISOString());
       validateScanHistoryMigration(database, before);
     }
-    if (from === 7 && !hasBatchPathIndex(database)) ensureBatchPathIndex(database);
+    if (from >= 7 && !hasBatchPathIndex(database)) ensureBatchPathIndex(database);
     if (from < 8) {
       const before = v7RowCounts(database);
       database.exec(schemaVersionEight);
@@ -414,6 +518,12 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (9, ?)').run(new Date().toISOString());
       validateBomMigration(database, before);
     }
+    if (from < 10) {
+      const before = v9MaintenanceSnapshot(database);
+      preserveBomItemTriggersDuringRebuild(database, () => database.exec(schemaVersionTen));
+      database.prepare('insert into schema_migrations (version, applied_at) values (10, ?)').run(new Date().toISOString());
+      validateMaintenanceMigration(database, before);
+    }
   })();
-  return { from, to: 9 };
+  return { from, to: 10 };
 }

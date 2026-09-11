@@ -816,3 +816,66 @@ export const schemaVersionNine = `
     SELECT RAISE(ABORT, 'BOM 前序版本必须属于同产品且不能形成循环');
   END;
 `;
+
+export const schemaVersionTen = `
+  ALTER TABLE bom_versions ADD COLUMN deleted_at TEXT;
+  ALTER TABLE bom_versions ADD COLUMN deleted_reason TEXT;
+  ALTER TABLE qr_code_files ADD COLUMN detected_identifier TEXT;
+
+  PRAGMA defer_foreign_keys = ON;
+
+  CREATE TEMP TABLE bom_item_assets_v10_backup AS
+  SELECT id, bom_item_id, asset_id, role, inherited_from_bom_item_asset_id
+  FROM bom_item_assets;
+
+  CREATE TEMP TABLE bom_item_qr_codes_v10_backup AS
+  SELECT bom_item_id, qr_code_id
+  FROM bom_item_qr_codes;
+
+  CREATE TABLE bom_items_v10 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bom_version_id INTEGER NOT NULL REFERENCES bom_versions(id),
+    project_item_id INTEGER NOT NULL REFERENCES dictionary_items(id),
+    drawing_id INTEGER REFERENCES drawing_numbers(id),
+    historical_drawing_id INTEGER REFERENCES historical_drawing_numbers(id),
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    effective_batch_relative_path TEXT,
+    effective_batch_name TEXT,
+    effective_material_batch_id INTEGER REFERENCES material_batches(id) ON DELETE SET NULL,
+    material TEXT,
+    dimensions TEXT,
+    position TEXT,
+    notes TEXT,
+    uses_white_material INTEGER NOT NULL DEFAULT 0 CHECK (uses_white_material IN (0, 1)),
+    UNIQUE (bom_version_id, project_item_id),
+    CHECK ((drawing_id IS NOT NULL) <> (historical_drawing_id IS NOT NULL))
+  );
+
+  INSERT INTO bom_items_v10 (
+    id, bom_version_id, project_item_id, drawing_id, historical_drawing_id, quantity,
+    effective_batch_relative_path, effective_batch_name, effective_material_batch_id,
+    material, dimensions, position, notes, uses_white_material
+  )
+  SELECT id, bom_version_id, project_item_id, drawing_id, NULL, quantity,
+    effective_batch_relative_path, effective_batch_name, effective_material_batch_id,
+    material, dimensions, position, notes, uses_white_material
+  FROM bom_items;
+
+  DROP TABLE bom_items;
+  ALTER TABLE bom_items_v10 RENAME TO bom_items;
+
+  INSERT INTO bom_item_assets (id, bom_item_id, asset_id, role, inherited_from_bom_item_asset_id)
+  SELECT id, bom_item_id, asset_id, role, inherited_from_bom_item_asset_id
+  FROM bom_item_assets_v10_backup
+  ORDER BY id;
+
+  INSERT INTO bom_item_qr_codes (bom_item_id, qr_code_id)
+  SELECT bom_item_id, qr_code_id
+  FROM bom_item_qr_codes_v10_backup;
+
+  DROP TABLE bom_item_assets_v10_backup;
+  DROP TABLE bom_item_qr_codes_v10_backup;
+
+  CREATE INDEX bom_items_effective_material_batch_idx ON bom_items(effective_material_batch_id);
+  CREATE INDEX bom_items_historical_drawing_idx ON bom_items(historical_drawing_id);
+`;
