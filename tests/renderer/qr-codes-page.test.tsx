@@ -64,6 +64,16 @@ describe('QrCodesPage', () => {
     expect(screen.getByText('待人工确认')).toBeVisible();
   });
 
+  it('shows partially missing when associated files include both present and missing instances', async () => {
+    const mixed = { ...manual, files: [...manual.files, { ...manual.files[0], id: 83, isPresent: false }] };
+    const api = { listQrCodes: vi.fn().mockResolvedValue({ items: [mixed] }), getQrCode: vi.fn().mockResolvedValue(mixed),
+      updateQrCode: vi.fn(), activateQrCode: vi.fn(), deactivateQrCode: vi.fn(), associateQrFile: vi.fn() };
+
+    render(<QrCodesPage api={api as never} initialQrCodeId={mixed.id} />);
+
+    expect(await screen.findByText('部分缺失')).toBeVisible();
+  });
+
   it('groups QR purposes under one product row and keeps filter choices after narrowing results', async () => {
     const warranty = { ...manual, id: 12, purposeId: 2, key: 'warranty', displayName: '售后二维码', name: 'Q100 售后服务' };
     const fryer = { ...manual, id: 21, productId: 4, sku: 'SKU-A1', model: 'A100', productCategory: '空气炸锅', purposeId: 3, key: 'recipe', displayName: '菜谱二维码', name: 'A100 菜谱' };

@@ -1,4 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { matchesQrFilePurpose } from './qr-file-classifier.js';
 import type { CreateProductQrCodeInput, CreateQrPurposeInput, ProductQrCode, ProductQrCodeFilters, QrFileReference,
   QrFileMatchStatus, QrPurpose, QrReferenceSummary, QrStatus, UpdateProductQrCodeInput } from './qr-types.js';
 
@@ -131,12 +132,12 @@ export class QrRepository {
 
   private pendingFilesFor(code: QrRow): QrFileReference[] {
     const expectedDirectory = `${code.sku ?? ''}-${code.model}`;
-    const expectedName = `${code.model}-${code.english_name}`;
     if (!code.sku) return [];
     return (this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id, detected_identifier
       from qr_code_files where qr_code_id is null and match_status = 'pending'
-        and lower(replace(relative_path, char(92), '/')) like lower(@directory) and lower(file_name) like lower(@name)
-      order by relative_path collate nocase`).all({ directory: `%/${expectedDirectory}/%`, name: `${expectedName}%` }) as QrFileRow[]).map(toFile);
+        and lower(replace(relative_path, char(92), '/')) like lower(@directory)
+      order by relative_path collate nocase`).all({ directory: `%/${expectedDirectory}/%` }) as QrFileRow[])
+      .filter((file) => matchesQrFilePurpose(file.file_name, code.model, code.english_name)).map(toFile);
   }
 
   pendingFilesForProductPurpose(productId: number, purposeId: number): QrFileReference[] {
@@ -145,11 +146,11 @@ export class QrRepository {
       .get(productId, purposeId) as { sku: string | null; model: string; englishName: string } | undefined;
     if (!context?.sku) return [];
     const directory = `${context.sku}-${context.model}`;
-    const name = `${context.model}-${context.englishName}`;
     return (this.db.prepare(`select id, relative_path, file_name, mime_type, is_present, match_status, qr_code_id, detected_identifier
       from qr_code_files where qr_code_id is null and match_status = 'pending' and is_present = 1
-        and lower(replace(relative_path, char(92), '/')) like lower(@directory) and lower(file_name) like lower(@name)
-      order by relative_path collate nocase`).all({ directory: `%/${directory}/%`, name: `${name}%` }) as QrFileRow[]).map(toFile);
+        and lower(replace(relative_path, char(92), '/')) like lower(@directory)
+      order by relative_path collate nocase`).all({ directory: `%/${directory}/%` }) as QrFileRow[])
+      .filter((file) => matchesQrFilePurpose(file.file_name, context.model, context.englishName)).map(toFile);
   }
 
   associatePendingFile(qrCodeId: number, qrFileId: number): ProductQrCode | null {
@@ -162,12 +163,12 @@ export class QrRepository {
     if (file.match_status !== 'pending') throw new Error('QR_FILE_NOT_PENDING');
     if (!file.is_present) throw new Error('QR_FILE_MISSING');
     const directory = `${code.sku ?? ''}-${code.model}`.toLocaleLowerCase('en-US');
-    const name = `${code.model}-${code.englishName}`.toLocaleLowerCase('en-US');
     const segments = file.relative_path.split(/[\\/]+/).map((value) => value.toLocaleLowerCase('en-US'));
-    if (!code.sku || !segments.includes(directory) || !file.file_name.toLocaleLowerCase('en-US').startsWith(name)) {
+    if (!code.sku || !segments.includes(directory) || !matchesQrFilePurpose(file.file_name, code.model, code.englishName)) {
       throw new Error('QR_FILE_INCOMPATIBLE');
     }
-    this.db.prepare(`update qr_code_files set qr_code_id = ?, match_status = 'matched', classification_warning = null where id = ?`)
+    this.db.prepare(`update qr_code_files set qr_code_id = ?, match_status = 'matched',
+      classification_warning = 'qr-manually-confirmed' where id = ?`)
       .run(qrCodeId, qrFileId);
     return this.get(qrCodeId);
   }

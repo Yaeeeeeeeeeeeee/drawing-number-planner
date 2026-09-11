@@ -10,6 +10,7 @@ import { parseMaterialBatch } from '../../src/core/files/material-batch-parser';
 import { parseDrawingCode } from '../../src/core/drawings/drawing-code';
 import { PlanningService } from '../../src/core/planning/planning-service';
 import { ProductService } from '../../src/core/products/product-service';
+import { QrService } from '../../src/core/qr/qr-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 
@@ -205,6 +206,33 @@ describe('FileRepository', () => {
     expect(repository.scanChanges(2)?.changes.missing).toEqual([
       expect.objectContaining({ relativePath: qr.relativePath, indexKind: 'qr', type: 'missing' }),
     ]);
+  });
+
+  it('preserves a manually confirmed QR association when an uncertain rescan sees the same file', () => {
+    drawingFixture();
+    const qrService = new QrService(db);
+    const code = qrService.list({ search: 'ZC100' }).items.find((item) => item.key === 'user_manual')!;
+    const qr: QrFileScanRecord = {
+      relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\待确认\\ZC100-User Manual（abc）.pdf',
+      fileName: 'ZC100-User Manual（abc）.pdf', mimeType: 'application/pdf', sizeBytes: 120,
+      modifiedAt: '2026-08-25T01:00:00.000Z', qrCodeId: null, matchStatus: 'pending',
+      classificationWarning: 'qr-nested-directory', detectedIdentifier: 'abc',
+    };
+    repository.replaceScan([], [], '2026-08-25T04:00:00.000Z', [qr]);
+    const fileId = (db.prepare('select id from qr_code_files').get() as { id: number }).id;
+    qrService.associateFile(code.id, fileId);
+
+    repository.replaceScan([], [], '2026-08-26T04:00:00.000Z', [{ ...qr, modifiedAt: '2026-08-26T01:00:00.000Z' }]);
+
+    expect(db.prepare(`select qr_code_id as qrCodeId, match_status as matchStatus,
+      classification_warning as classificationWarning from qr_code_files where id = ?`).get(fileId))
+      .toEqual({ qrCodeId: code.id, matchStatus: 'matched', classificationWarning: 'qr-manually-confirmed' });
+
+    repository.replaceScan([], [], '2026-08-27T04:00:00.000Z', [{ ...qr, qrCodeId: code.id,
+      matchStatus: 'matched', classificationWarning: null, modifiedAt: '2026-08-27T01:00:00.000Z' }]);
+    expect(db.prepare(`select qr_code_id as qrCodeId, match_status as matchStatus,
+      classification_warning as classificationWarning from qr_code_files where id = ?`).get(fileId))
+      .toEqual({ qrCodeId: code.id, matchStatus: 'matched', classificationWarning: null });
   });
 
   it('records a uniquely hash-matched move against the current file index identity', () => {

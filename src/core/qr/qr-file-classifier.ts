@@ -26,11 +26,10 @@ const QR_NAME = /^(?<name>.+)（(?<identifier>[^（）]*)）\.[^.]+$/u;
 const normalizePurpose = (value: string) => value.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
 const normalizeCategory = (value: string) => normalizePurpose(value).replace(/^\d+[.．、\s-]*/u, '');
 
-function purposeMatches(fileName: string, product: QrClassifierProduct, purpose: QrClassifierPurpose): boolean {
-  const prefix = `${product.model}-`;
-  if (!normalizePurpose(fileName).startsWith(normalizePurpose(prefix))) return false;
-  const value = fileName.slice(prefix.length);
-  return normalizePurpose(value) === normalizePurpose(purpose.englishName);
+export function matchesQrFilePurpose(fileName: string, model: string, englishName: string): boolean {
+  const parsed = QR_NAME.exec(fileName);
+  if (!parsed?.groups || !parsed.groups.identifier.trim()) return false;
+  return normalizePurpose(parsed.groups.name) === normalizePurpose(`${model}-${englishName}`);
 }
 
 export function classifyQrFile(input: {
@@ -66,7 +65,7 @@ export function classifyQrFile(input: {
       classificationWarning: activeProducts.length > 1 ? 'qr-product-ambiguous' : 'qr-product-unresolved' };
   }
   const product = activeProducts[0];
-  const purposes = activePurposes.filter((purpose) => purposeMatches(parsed.groups!.name, product, purpose));
+  const purposes = activePurposes.filter((purpose) => matchesQrFilePurpose(input.fileName, product.model, purpose.englishName));
   if (purposes.length === 1) {
     return { matchStatus: 'matched', productId: product.id, purposeId: purposes[0].id, model: product.model,
       detectedIdentifier, classificationWarning: null };

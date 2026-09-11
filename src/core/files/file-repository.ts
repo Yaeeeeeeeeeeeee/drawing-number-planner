@@ -224,8 +224,22 @@ export class FileRepository {
           @matchStatus, @classificationWarning, @detectedIdentifier, 1, @scanRunId, @scannedAt, @scannedAt)
         on conflict(path_key) do update set relative_path = excluded.relative_path, file_name = excluded.file_name,
           mime_type = excluded.mime_type, size_bytes = excluded.size_bytes, modified_at = excluded.modified_at,
-          content_sha256 = coalesce(excluded.content_sha256, qr_code_files.content_sha256), qr_code_id = excluded.qr_code_id,
-          match_status = excluded.match_status, classification_warning = excluded.classification_warning,
+          content_sha256 = coalesce(excluded.content_sha256, qr_code_files.content_sha256),
+          qr_code_id = case
+            when excluded.match_status = 'matched' and excluded.qr_code_id is not null then excluded.qr_code_id
+            when qr_code_files.qr_code_id is not null and qr_code_files.classification_warning = 'qr-manually-confirmed'
+              then qr_code_files.qr_code_id
+            else excluded.qr_code_id end,
+          match_status = case
+            when excluded.match_status = 'matched' and excluded.qr_code_id is not null then 'matched'
+            when qr_code_files.qr_code_id is not null and qr_code_files.classification_warning = 'qr-manually-confirmed'
+              then 'matched'
+            else excluded.match_status end,
+          classification_warning = case
+            when excluded.match_status = 'matched' and excluded.qr_code_id is not null then excluded.classification_warning
+            when qr_code_files.qr_code_id is not null and qr_code_files.classification_warning = 'qr-manually-confirmed'
+              then qr_code_files.classification_warning
+            else excluded.classification_warning end,
           detected_identifier = excluded.detected_identifier, is_present = 1,
           last_seen_scan_run_id = excluded.last_seen_scan_run_id, last_seen_at = excluded.last_seen_at`);
       for (const record of qrRecords) upsertQr.run({ relativePath: record.relativePath, pathKey: record.pathKey,

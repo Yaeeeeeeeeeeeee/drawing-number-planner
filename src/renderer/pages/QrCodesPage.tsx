@@ -7,8 +7,12 @@ import { useDesktopQrFile } from '../desktop-qr-files';
 
 const purposeLabels: Record<string, string> = { user_manual: '说明书', warranty: '售后', recipe: '菜谱' };
 const businessLabel = (status: 'active' | 'inactive') => status === 'active' ? '启用中' : '已停用';
-const fileLabel = (files: QrFileView[]) => files.length === 0 ? '未关联文件'
-  : files.some((file) => file.isPresent) ? '文件可用' : '文件已缺失';
+const fileLabel = (files: QrFileView[]) => {
+  if (files.length === 0) return '未关联文件';
+  const present = files.filter((file) => file.isPresent).length;
+  if (present === 0) return '文件已缺失';
+  return present === files.length ? '文件可用' : '部分缺失';
+};
 const formatTime = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
 interface QrProductGroup { id: number; sku: string | null; model: string; productCategory: string; codes: ProductQrCodeView[] }
 

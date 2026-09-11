@@ -202,4 +202,23 @@ describe('QrService', () => {
     expect(() => (service as unknown as { associateFile(qrCodeId: number, qrFileId: number): unknown })
       .associateFile(code.id, Number(pending.lastInsertRowid))).toThrowError(expect.objectContaining({ code: 'QR_FILE_ALREADY_LINKED' }));
   });
+
+  it('requires an exact QR purpose boundary when offering or manually associating pending files', () => {
+    const product = products.create(productInput('冰柜', 'SKUBOUND', 'BOUND100'));
+    const service = new QrService(db);
+    const code = service.list({ productId: product.id }).items.find((item) => item.key === 'user_manual')!;
+    const exact = db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜/SKUBOUND-BOUND100/历史/BOUND100-User Manual（abc）.pdf', 'exact-boundary',
+        'BOUND100-User Manual（abc）.pdf', 'application/pdf', 1, '2026-09-01', 'pending', 1, '2026-09-01', '2026-09-01')`).run();
+    const extra = db.prepare(`insert into qr_code_files
+      (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
+      values ('冰柜/SKUBOUND-BOUND100/历史/BOUND100-User Manual Extra（abc）.pdf', 'extra-boundary',
+        'BOUND100-User Manual Extra（abc）.pdf', 'application/pdf', 1, '2026-09-01', 'pending', 1, '2026-09-01', '2026-09-01')`).run();
+
+    expect(service.listPendingFiles(product.id, code.purposeId).items.map((file) => file.id))
+      .toEqual([Number(exact.lastInsertRowid)]);
+    expect(() => service.associateFile(code.id, Number(extra.lastInsertRowid)))
+      .toThrowError(expect.objectContaining({ code: 'QR_FILE_INCOMPATIBLE' }));
+  });
 });
