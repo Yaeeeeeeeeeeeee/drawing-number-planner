@@ -7,6 +7,7 @@ import {
   schemaVersionSix,
   schemaVersionSeven,
   schemaVersionEight,
+  schemaVersionEleven,
   schemaVersionNine,
   schemaVersionTen,
   schemaVersionThree,
@@ -374,6 +375,100 @@ function preserveBomItemTriggersDuringRebuild(database: PlannerDatabase, rebuild
   for (const trigger of triggers) database.exec(trigger.sql);
 }
 
+interface V10OutboundSnapshot {
+  tables: string[];
+  rows: Record<string, unknown[]>;
+}
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`;
+}
+
+function v10OutboundSnapshot(database: PlannerDatabase): V10OutboundSnapshot {
+  const tables = (database.prepare(`select name from sqlite_master
+    where type = 'table' and name not like 'sqlite_%' and name <> 'schema_migrations'
+      and name not like 'outbound_%'
+    order by name`).all() as Array<{ name: string }>).map(({ name }) => name);
+  return {
+    tables,
+    rows: Object.fromEntries(tables.map((table) => [
+      table,
+      database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all(),
+    ])),
+  };
+}
+
+function validateOutboundMigration(database: PlannerDatabase, before: V10OutboundSnapshot): void {
+  const afterTables = (database.prepare(`select name from sqlite_master
+    where type = 'table' and name not like 'sqlite_%' and name <> 'schema_migrations'
+      and name not like 'outbound_%'
+    order by name`).all() as Array<{ name: string }>).map(({ name }) => name);
+  const afterRows = Object.fromEntries(afterTables.map((table) => [
+    table,
+    database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all(),
+  ]));
+  const outboundTables = database.prepare(`select name from sqlite_master
+    where type = 'table' and name like 'outbound_%' order by name`).all();
+  const expectedOutboundTables = [
+    { name: 'outbound_contacts' },
+    { name: 'outbound_email_drafts' },
+    { name: 'outbound_email_templates' },
+    { name: 'outbound_package_items' },
+    { name: 'outbound_packages' },
+    { name: 'outbound_signatures' },
+    { name: 'outbound_template_blocks' },
+  ];
+  const templates = database.prepare(`select key, material_type, subject_template, body_template, status
+    from outbound_email_templates order by material_type`).all() as Array<{
+      key: string;
+      material_type: string;
+      subject_template: string;
+      body_template: string;
+      status: string;
+    }>;
+  const signatures = database.prepare(`select name, content, is_default, status
+    from outbound_signatures`).all() as Array<{
+      name: string;
+      content: string;
+      is_default: number;
+      status: string;
+    }>;
+  const emptyTables = ['outbound_contacts', 'outbound_template_blocks', 'outbound_packages',
+    'outbound_package_items', 'outbound_email_drafts'];
+  const nonEmptyUnexpected = emptyTables.some((table) => countRows(database, table) !== 0);
+  const indexes = new Set((database.prepare(`select name from sqlite_master
+    where type = 'index' and name like 'outbound_%'`).all() as Array<{ name: string }>).map(({ name }) => name));
+  const requiredIndexes = [
+    'outbound_signatures_one_default', 'outbound_contacts_status_idx',
+    'outbound_email_templates_material_type_idx', 'outbound_template_blocks_template_idx',
+    'outbound_packages_product_created_idx', 'outbound_packages_batch_idx',
+    'outbound_package_items_project_idx', 'outbound_package_items_drawing_idx',
+    'outbound_package_items_historical_drawing_idx', 'outbound_package_items_batch_idx',
+    'outbound_email_drafts_package_idx',
+  ];
+  const templatesValid = templates.length === 2
+    && templates.every((template) => template.status === 'active'
+      && template.subject_template === '{{package_name}}')
+    && templates.some((template) => template.key === 'initial_default' && template.material_type === 'initial'
+      && template.body_template.includes('{{company_name}}') && template.body_template.includes('{{signature}}'))
+    && templates.some((template) => template.key === 'update_default' && template.material_type === 'update'
+      && template.body_template.includes('{{change_description}}') && template.body_template.includes('{{file_list}}'));
+  const signatureValid = signatures.length === 1 && signatures[0].name === '默认签名'
+    && signatures[0].content === '顺祝商祺\n田嘉滨     Yae\nTEL: 135 4423 5202\nEmail: tianjiabin@dd-industrial.net'
+    && signatures[0].is_default === 1 && signatures[0].status === 'active';
+  const foreignKeyErrors = database.pragma('foreign_key_check') as Array<unknown>;
+  const integrity = database.pragma('integrity_check', { simple: true });
+
+  if (JSON.stringify(afterTables) !== JSON.stringify(before.tables)
+    || JSON.stringify(afterRows) !== JSON.stringify(before.rows)
+    || JSON.stringify(outboundTables) !== JSON.stringify(expectedOutboundTables)
+    || nonEmptyUnexpected || !templatesValid || !signatureValid
+    || requiredIndexes.some((index) => !indexes.has(index))
+    || foreignKeyErrors.length > 0 || integrity !== 'ok') {
+    throw new Error('外发资料迁移校验失败，数据库未升级');
+  }
+}
+
 function validateQrMigration(database: PlannerDatabase, before: V7RowCounts): void {
   const after = v7RowCounts(database);
   const expectedQrCodes = (database.prepare(`select count(*) as count
@@ -470,8 +565,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 10) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 10`);
-  if (from >= 10) {
+  if (from > 11) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 11`);
+  if (from >= 11) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -561,6 +656,12 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (10, ?)').run(new Date().toISOString());
       validateMaintenanceMigration(database, before);
     }
+    if (from < 11) {
+      const before = v10OutboundSnapshot(database);
+      database.exec(schemaVersionEleven);
+      database.prepare('insert into schema_migrations (version, applied_at) values (11, ?)').run(new Date().toISOString());
+      validateOutboundMigration(database, before);
+    }
   })();
-  return { from, to: 10 };
+  return { from, to: 11 };
 }

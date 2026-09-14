@@ -879,3 +879,131 @@ export const schemaVersionTen = `
   CREATE INDEX bom_items_effective_material_batch_idx ON bom_items(effective_material_batch_id);
   CREATE INDEX bom_items_historical_drawing_idx ON bom_items(historical_drawing_id);
 `;
+
+export const schemaVersionEleven = `
+  CREATE TABLE outbound_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company TEXT NOT NULL CHECK (length(trim(company)) > 0),
+    contact_name TEXT NOT NULL CHECK (length(trim(contact_name)) > 0),
+    email TEXT NOT NULL COLLATE NOCASE UNIQUE CHECK (length(trim(email)) > 0),
+    default_recipient_type TEXT NOT NULL CHECK (default_recipient_type IN ('to', 'cc')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE outbound_email_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE CHECK (length(trim(key)) > 0),
+    name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+    material_type TEXT NOT NULL CHECK (material_type IN ('initial', 'update')),
+    subject_template TEXT NOT NULL CHECK (length(trim(subject_template)) > 0),
+    body_template TEXT NOT NULL CHECK (length(trim(body_template)) > 0),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE outbound_template_blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id INTEGER NOT NULL REFERENCES outbound_email_templates(id) ON DELETE CASCADE,
+    key TEXT NOT NULL CHECK (length(trim(key)) > 0),
+    name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+    body_template TEXT NOT NULL CHECK (length(trim(body_template)) > 0),
+    display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (template_id, key)
+  );
+
+  CREATE TABLE outbound_signatures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+    content TEXT NOT NULL CHECK (length(trim(content)) > 0),
+    is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX outbound_signatures_one_default
+    ON outbound_signatures(is_default) WHERE is_default = 1;
+
+  CREATE TABLE outbound_packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    material_type TEXT NOT NULL CHECK (material_type IN ('initial', 'update')),
+    package_mode TEXT NOT NULL CHECK (package_mode IN ('change_only', 'current_complete')),
+    selected_material_batch_id INTEGER REFERENCES material_batches(id) ON DELETE RESTRICT,
+    package_name TEXT NOT NULL CHECK (length(trim(package_name)) > 0),
+    zip_relative_path TEXT NOT NULL CHECK (
+      length(trim(zip_relative_path)) > 0
+      AND substr(zip_relative_path, 1, 1) NOT IN ('/', '\\')
+      AND zip_relative_path NOT GLOB '[A-Za-z]:*'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '../%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/../%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/..'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE './%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%//%'
+    ),
+    status TEXT NOT NULL CHECK (status IN ('completed', 'cancelled', 'failed')),
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE outbound_package_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL REFERENCES outbound_packages(id) ON DELETE CASCADE,
+    project_item_id INTEGER NOT NULL REFERENCES dictionary_items(id) ON DELETE RESTRICT,
+    drawing_id INTEGER REFERENCES drawing_numbers(id) ON DELETE RESTRICT,
+    historical_drawing_id INTEGER REFERENCES historical_drawing_numbers(id) ON DELETE RESTRICT,
+    pdf_file_id INTEGER NOT NULL REFERENCES pdf_files(id) ON DELETE RESTRICT,
+    source_material_batch_id INTEGER NOT NULL REFERENCES material_batches(id) ON DELETE RESTRICT,
+    project_item_name_snapshot TEXT NOT NULL CHECK (length(trim(project_item_name_snapshot)) > 0),
+    drawing_code_snapshot TEXT NOT NULL CHECK (length(trim(drawing_code_snapshot)) > 0),
+    file_name_snapshot TEXT NOT NULL CHECK (length(trim(file_name_snapshot)) > 0),
+    relative_path_snapshot TEXT NOT NULL CHECK (length(trim(relative_path_snapshot)) > 0),
+    source_batch_name_snapshot TEXT NOT NULL CHECK (length(trim(source_batch_name_snapshot)) > 0),
+    CHECK ((drawing_id IS NOT NULL) <> (historical_drawing_id IS NOT NULL)),
+    UNIQUE (package_id, pdf_file_id)
+  );
+
+  CREATE TABLE outbound_email_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL REFERENCES outbound_packages(id) ON DELETE RESTRICT,
+    template_id INTEGER REFERENCES outbound_email_templates(id) ON DELETE SET NULL,
+    signature_id INTEGER REFERENCES outbound_signatures(id) ON DELETE SET NULL,
+    recipients_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(recipients_json) AND json_type(recipients_json) = 'array'),
+    cc_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(cc_json) AND json_type(cc_json) = 'array'),
+    subject TEXT NOT NULL CHECK (length(trim(subject)) > 0),
+    body TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX outbound_contacts_status_idx ON outbound_contacts(status);
+  CREATE INDEX outbound_email_templates_material_type_idx ON outbound_email_templates(material_type, status);
+  CREATE INDEX outbound_template_blocks_template_idx ON outbound_template_blocks(template_id, display_order);
+  CREATE INDEX outbound_packages_product_created_idx ON outbound_packages(product_id, created_at DESC);
+  CREATE INDEX outbound_packages_batch_idx ON outbound_packages(selected_material_batch_id);
+  CREATE INDEX outbound_package_items_project_idx ON outbound_package_items(project_item_id);
+  CREATE INDEX outbound_package_items_drawing_idx ON outbound_package_items(drawing_id);
+  CREATE INDEX outbound_package_items_historical_drawing_idx ON outbound_package_items(historical_drawing_id);
+  CREATE INDEX outbound_package_items_batch_idx ON outbound_package_items(source_material_batch_id);
+  CREATE INDEX outbound_email_drafts_package_idx ON outbound_email_drafts(package_id, updated_at DESC);
+
+  INSERT INTO outbound_email_templates (
+    key, name, material_type, subject_template, body_template, status, created_at, updated_at
+  ) VALUES
+    ('initial_default', '首批包材资料', 'initial', '{{package_name}}',
+      '{{company_name}}：\n\n{{contact_salutation}}，您好！\n\n附件为 {{model}}{{product_category}} 的包材资料，请注意查收。\n\n{{optional_blocks}}\n\n文件如有异常或任何不明之处，请及时与我联系，感谢！\n\n【收到请回复，感谢】\n\n{{signature}}',
+      'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    ('update_default', '更新包材资料', 'update', '{{package_name}}',
+      '{{company_name}}：\n\n{{contact_salutation}}，您好！\n\n附件为 {{model}}{{product_category}} 的更新包材资料。\n\n本次修改内容：\n{{change_description}}\n\n更新文件：\n{{file_list}}\n\n{{optional_blocks}}\n\n请更新资料并回传确认件。如有异常或任何不明之处，请及时与我联系，感谢！\n\n【收到请回复，感谢】\n\n{{signature}}',
+      'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+
+  INSERT INTO outbound_signatures (name, content, is_default, status, created_at, updated_at)
+  VALUES ('默认签名', '顺祝商祺\n田嘉滨     Yae\nTEL: 135 4423 5202\nEmail: tianjiabin@dd-industrial.net', 1, 'active',
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+`;
