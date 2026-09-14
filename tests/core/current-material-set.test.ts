@@ -150,6 +150,32 @@ describe('CurrentMaterialSetService', () => {
     ]);
   });
 
+  it('requires confirmation when a present same-code file follows a missing predecessor with no content evidence', () => {
+    const first = insertBatch('00.首批大货');
+    const update = insertBatch('01.20241210');
+    insertOutlined(first, logoWhite1, { present: false, hash: null, suffix: 'missing-first' });
+    const restoredFileId = insertOutlined(update, logoWhite1, { hash: 'later-content', suffix: 'later' });
+
+    expect(service.buildCurrentMaterialSet(productId, update)).toEqual([
+      expect.objectContaining({ fullCode: logoWhite1, sourceBatchId: update, pdfIndexId: restoredFileId,
+        status: 'needs_confirmation', change: 'same_code_changed' }),
+    ]);
+  });
+
+  it('keeps same-code content uncertainty after that uncertain content is copied again', () => {
+    const first = insertBatch('00.首批大货');
+    const changed = insertBatch('01.20241210');
+    const copied = insertBatch('02.20250304');
+    insertOutlined(first, logoWhite1, { hash: 'content-a', suffix: 'a' });
+    const changedFileId = insertOutlined(changed, logoWhite1, { hash: 'content-b', suffix: 'b' });
+    insertOutlined(copied, logoWhite1, { hash: 'content-b', suffix: 'b-copy' });
+
+    expect(service.buildCurrentMaterialSet(productId, copied)).toEqual([
+      expect.objectContaining({ fullCode: logoWhite1, sourceBatchId: changed, pdfIndexId: changedFileId,
+        status: 'needs_confirmation', change: 'same_code_changed' }),
+    ]);
+  });
+
   it('does not silently choose between same-code files with different content inside one batch', () => {
     const first = insertBatch('00.首批大货');
     insertOutlined(first, logoWhite1, { hash: 'content-a', suffix: 'one' });
@@ -179,6 +205,17 @@ describe('CurrentMaterialSetService', () => {
     expect(service.buildCurrentMaterialSet(productId, first)).toEqual([
       expect.objectContaining({ slotKey: '02.0209.010.0401', fullCode: null, status: 'conflict', change: 'conflict',
         conflictFullCodes: [logoWhite1, logoWhite2] }),
+    ]);
+  });
+
+  it('ignores a stale missing drawing when the same batch has a present replacement in that slot', () => {
+    const first = insertBatch('00.首批大货');
+    insertOutlined(first, logoWhite1, { present: false, suffix: 'stale-missing' });
+    const replacementFileId = insertOutlined(first, logoWhite2, { suffix: 'current' });
+
+    expect(service.buildCurrentMaterialSet(productId, first)).toEqual([
+      expect.objectContaining({ fullCode: logoWhite2, pdfIndexId: replacementFileId,
+        status: 'normal', change: 'new', conflictFullCodes: [] }),
     ]);
   });
 

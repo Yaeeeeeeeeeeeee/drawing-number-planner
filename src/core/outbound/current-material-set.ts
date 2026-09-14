@@ -83,7 +83,11 @@ export function resolveCurrentMaterialSet(batches: MaterialSetBatchInput[]): Out
     const touched = new Set<string>();
     for (const [slotKey, codes] of grouped) {
       touched.add(slotKey);
-      const fullCodes = [...codes.keys()].sort();
+      const hasPresentFile = [...codes.values()].some((files) => files.some((file) => file.isPresent));
+      const relevantCodes = hasPresentFile
+        ? [...codes.entries()].filter(([, files]) => files.some((file) => file.isPresent))
+        : [...codes.entries()];
+      const fullCodes = relevantCodes.map(([fullCode]) => fullCode).sort();
       if (fullCodes.length > 1) {
         current.set(slotKey, {
           slotKey,
@@ -120,6 +124,19 @@ export function resolveCurrentMaterialSet(batches: MaterialSetBatchInput[]): Out
       }
       if (!previous || previous.fullCode !== fullCode) {
         current.set(slotKey, selectionFrom(slotKey, fullCode, batch, file, previous ? 'replaced' : 'new'));
+        continue;
+      }
+
+      if (previous.status === 'needs_confirmation') {
+        current.set(slotKey, previous);
+        continue;
+      }
+
+      if (previous.status === 'missing' && file !== null) {
+        current.set(slotKey, {
+          ...selectionFrom(slotKey, fullCode, batch, file, 'same_code_changed'),
+          status: 'needs_confirmation',
+        });
         continue;
       }
 
