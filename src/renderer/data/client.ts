@@ -311,7 +311,8 @@ export interface PlannerApi {
 
 export class ApiError extends Error {
   constructor(public readonly code: string, message: string,
-    public readonly referenceSummary?: ProductReferenceSummaryView | DrawingReferenceSummaryView | Record<string, number>) { super(message); }
+    public readonly referenceSummary?: ProductReferenceSummaryView | DrawingReferenceSummaryView | Record<string, number>,
+    public readonly variableNames?: string[]) { super(message); }
 }
 
 type ResponseBody =
@@ -352,7 +353,8 @@ function responseError(response: Response, body: ResponseBody): ApiError {
   const value = body.kind === 'json' ? body.value : undefined;
   const backendError = value && typeof value === 'object' ? value.error : undefined;
   if (backendError?.code || backendError?.message) {
-    return new ApiError(backendError.code ?? 'REQUEST_FAILED', backendError.message ?? '请求失败', backendError.referenceSummary);
+    return new ApiError(backendError.code ?? 'REQUEST_FAILED', backendError.message ?? '请求失败',
+      backendError.referenceSummary, Array.isArray(backendError.variableNames) ? backendError.variableNames : undefined);
   }
   const jsonMessage = value && typeof value === 'object' && typeof value.message === 'string'
     ? value.message

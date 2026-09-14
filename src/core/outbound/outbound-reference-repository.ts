@@ -218,8 +218,9 @@ export class OutboundReferenceRepository {
     return this.db.transaction(() => {
       if (!this.getSignature(id)) return null;
       if (input.isDefault) this.db.prepare('update outbound_signatures set is_default = 0 where is_default = 1').run();
-      this.db.prepare(`update outbound_signatures set name = ?, content = ?, is_default = ?, updated_at = ? where id = ?`)
-        .run(input.name, input.content, input.isDefault ? 1 : 0, new Date().toISOString(), id);
+      this.db.prepare(`update outbound_signatures set name = ?, content = ?, is_default = ?,
+        status = case when ? = 1 then 'active' else status end, updated_at = ? where id = ?`)
+        .run(input.name, input.content, input.isDefault ? 1 : 0, input.isDefault ? 1 : 0, new Date().toISOString(), id);
       return this.getSignature(id);
     }).immediate();
   }
@@ -249,4 +250,3 @@ export class OutboundReferenceRepository {
     return (this.db.prepare(sql).get(id) as { count: number }).count;
   }
 }
-

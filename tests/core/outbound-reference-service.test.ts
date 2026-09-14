@@ -142,6 +142,20 @@ describe('OutboundReferenceService signatures', () => {
     expect(service.activateSignature(created.id).status).toBe('active');
   });
 
+  it('atomically activates an inactive signature when making it the only default', () => {
+    const original = service.listSignatures().find((signature) => signature.isDefault)!;
+    const candidate = service.createSignature({ name: '备用签名', content: 'Backup', isDefault: false });
+    service.deactivateSignature(candidate.id);
+
+    const updated = service.updateSignature(candidate.id, { name: '备用签名', content: 'Backup', isDefault: true });
+
+    expect(updated).toEqual(expect.objectContaining({ status: 'active', isDefault: true }));
+    expect(service.listSignatures('active').filter((signature) => signature.isDefault)).toEqual([
+      expect.objectContaining({ id: candidate.id }),
+    ]);
+    expect(service.getSignature(original.id).isDefault).toBe(false);
+  });
+
   it('protects a signature referenced by a draft while allowing edits without changing the draft body', () => {
     const signature = service.createSignature({ name: '受保护签名', content: 'Old signature', isDefault: false });
     const draftId = insertDraft(insertPackage(), null, signature.id);

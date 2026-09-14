@@ -84,13 +84,13 @@ describe('outbound reference API', () => {
     const id = created.json().id as number;
     expect((await app.inject({ method: 'POST', url: `/api/outbound-reference/signatures/${id}/deactivate` })).json().status)
       .toBe('inactive');
-    expect((await app.inject({ method: 'POST', url: `/api/outbound-reference/signatures/${id}/activate` })).json().status)
-      .toBe('active');
-    expect((await app.inject({ method: 'PUT', url: `/api/outbound-reference/signatures/${id}`,
-      payload: { name: '销售签名 2', content: 'Sales Team 2', isDefault: true } })).json())
-      .toEqual(expect.objectContaining({ isDefault: true, content: 'Sales Team 2' }));
-    expect((await app.inject({ method: 'GET', url: '/api/outbound-reference/signatures?status=all' })).json())
-      .toEqual({ items: expect.arrayContaining([expect.objectContaining({ id })]) });
+    const madeDefault = await app.inject({ method: 'PUT', url: `/api/outbound-reference/signatures/${id}`,
+      payload: { name: '销售签名 2', content: 'Sales Team 2', isDefault: true } });
+    expect(madeDefault.json())
+      .toEqual(expect.objectContaining({ isDefault: true, status: 'active', content: 'Sales Team 2' }));
+    const active = (await app.inject({ method: 'GET', url: '/api/outbound-reference/signatures?status=active' })).json();
+    expect(active.items.filter((signature: { isDefault: boolean }) => signature.isDefault))
+      .toEqual([expect.objectContaining({ id })]);
     expect((await app.inject({ method: 'DELETE', url: `/api/outbound-reference/signatures/${id}` })).json())
       .toEqual({ deleted: true });
   });
@@ -103,4 +103,3 @@ describe('outbound reference API', () => {
     expect(response.json()).toEqual({ error: { code: 'INVALID_REQUEST', message: '外发联系人数据不完整' } });
   });
 });
-

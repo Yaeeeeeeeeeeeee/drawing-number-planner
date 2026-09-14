@@ -346,6 +346,17 @@ describe('renderer API client', () => {
     } satisfies Partial<InstanceType<typeof ApiError>>);
   });
 
+  it('preserves structured template variable errors from the backend', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: {
+      code: 'MISSING_TEMPLATE_VARIABLE', message: '邮件模板缺少变量：model, signature',
+      referenceSummary: { drafts: 1 }, variableNames: ['model', 'signature'],
+    } }), { status: 400, headers: { 'content-type': 'application/json' } })));
+
+    await expect(apiClient.searchDrawings()).rejects.toMatchObject({
+      code: 'MISSING_TEMPLATE_VARIABLE', referenceSummary: { drafts: 1 }, variableNames: ['model', 'signature'],
+    } satisfies Partial<InstanceType<typeof ApiError>>);
+  });
+
   it('rejects a non-JSON success response as an invalid service response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not-json', {
       status: 200, headers: { 'content-type': 'text/plain' },
