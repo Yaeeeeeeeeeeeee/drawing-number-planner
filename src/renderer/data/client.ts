@@ -159,6 +159,36 @@ export interface ProductQrCodeFilters {
   productId?: number; purposeId?: number; status?: QrBusinessStatus | 'all'; search?: string;
   productCategory?: string; fileStatus?: QrFileStatus;
 }
+export type OutboundReferenceStatusView = 'active' | 'inactive';
+export type OutboundRecipientTypeView = 'to' | 'cc';
+export type OutboundMaterialTypeView = 'initial' | 'update';
+export interface OutboundContactView {
+  id: number; company: string; contactName: string; email: string; defaultRecipientType: OutboundRecipientTypeView;
+  status: OutboundReferenceStatusView; notes: string | null; createdAt: string; updatedAt: string;
+}
+export interface OutboundContactInputView {
+  company: string; contactName: string; email: string; defaultRecipientType: OutboundRecipientTypeView; notes?: string | null;
+}
+export interface OutboundTemplateBlockView {
+  id: number; templateId: number; key: string; name: string; bodyTemplate: string; displayOrder: number;
+  status: OutboundReferenceStatusView; createdAt: string; updatedAt: string;
+}
+export interface OutboundEmailTemplateView {
+  id: number; key: string; name: string; materialType: OutboundMaterialTypeView;
+  subjectTemplate: string; bodyTemplate: string; status: OutboundReferenceStatusView;
+  createdAt: string; updatedAt: string; blocks: OutboundTemplateBlockView[];
+}
+export interface OutboundEmailTemplateInputView {
+  key: string; name: string; materialType: OutboundMaterialTypeView; subjectTemplate: string; bodyTemplate: string;
+}
+export interface OutboundTemplateBlockInputView {
+  key: string; name: string; bodyTemplate: string; displayOrder: number;
+}
+export interface OutboundSignatureView {
+  id: number; name: string; content: string; isDefault: boolean; status: OutboundReferenceStatusView;
+  createdAt: string; updatedAt: string;
+}
+export interface OutboundSignatureInputView { name: string; content: string; isDefault: boolean }
 export interface MaterialBatchLogicalMaterialView {
   fullCode: string | null; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
 }
@@ -220,6 +250,33 @@ export interface PlannerApi {
   deactivateQrCode(id: number): Promise<ProductQrCodeView>;
   deleteQrCode(id: number): Promise<{ deleted: true }>;
   associateQrFile(id: number, qrFileId: number): Promise<ProductQrCodeView>;
+  listOutboundContacts(status?: OutboundReferenceStatusView | 'all'): Promise<OutboundContactView[]>;
+  getOutboundContact(id: number): Promise<OutboundContactView>;
+  createOutboundContact(input: OutboundContactInputView): Promise<OutboundContactView>;
+  updateOutboundContact(id: number, input: OutboundContactInputView): Promise<OutboundContactView>;
+  activateOutboundContact(id: number): Promise<OutboundContactView>;
+  deactivateOutboundContact(id: number): Promise<OutboundContactView>;
+  deleteOutboundContact(id: number): Promise<{ deleted: true }>;
+  listOutboundTemplates(status?: OutboundReferenceStatusView | 'all'): Promise<OutboundEmailTemplateView[]>;
+  getOutboundTemplate(id: number): Promise<OutboundEmailTemplateView>;
+  createOutboundTemplate(input: OutboundEmailTemplateInputView): Promise<OutboundEmailTemplateView>;
+  updateOutboundTemplate(id: number, input: OutboundEmailTemplateInputView): Promise<OutboundEmailTemplateView>;
+  activateOutboundTemplate(id: number): Promise<OutboundEmailTemplateView>;
+  deactivateOutboundTemplate(id: number): Promise<OutboundEmailTemplateView>;
+  deleteOutboundTemplate(id: number): Promise<{ deleted: true }>;
+  renderOutboundTemplate(id: number, variables: Record<string, string>): Promise<{ subject: string; body: string }>;
+  createOutboundTemplateBlock(templateId: number, input: OutboundTemplateBlockInputView): Promise<OutboundTemplateBlockView>;
+  updateOutboundTemplateBlock(id: number, input: Omit<OutboundTemplateBlockInputView, 'key'>): Promise<OutboundTemplateBlockView>;
+  activateOutboundTemplateBlock(id: number): Promise<OutboundTemplateBlockView>;
+  deactivateOutboundTemplateBlock(id: number): Promise<OutboundTemplateBlockView>;
+  deleteOutboundTemplateBlock(id: number): Promise<{ deleted: true }>;
+  listOutboundSignatures(status?: OutboundReferenceStatusView | 'all'): Promise<OutboundSignatureView[]>;
+  getOutboundSignature(id: number): Promise<OutboundSignatureView>;
+  createOutboundSignature(input: OutboundSignatureInputView): Promise<OutboundSignatureView>;
+  updateOutboundSignature(id: number, input: OutboundSignatureInputView): Promise<OutboundSignatureView>;
+  activateOutboundSignature(id: number): Promise<OutboundSignatureView>;
+  deactivateOutboundSignature(id: number): Promise<OutboundSignatureView>;
+  deleteOutboundSignature(id: number): Promise<{ deleted: true }>;
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
   confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
@@ -253,7 +310,8 @@ export interface PlannerApi {
 }
 
 export class ApiError extends Error {
-  constructor(public readonly code: string, message: string, public readonly referenceSummary?: ProductReferenceSummaryView | DrawingReferenceSummaryView) { super(message); }
+  constructor(public readonly code: string, message: string,
+    public readonly referenceSummary?: ProductReferenceSummaryView | DrawingReferenceSummaryView | Record<string, number>) { super(message); }
 }
 
 type ResponseBody =
@@ -406,6 +464,36 @@ export const apiClient: PlannerApi = {
   deactivateQrCode: (id) => request(`/api/qr-codes/${id}/deactivate`, json('POST')),
   deleteQrCode: (id) => request(`/api/qr-codes/${id}`, { method: 'DELETE' }),
   associateQrFile: (id, qrFileId) => request(`/api/qr-codes/${id}/associate-file`, json('POST', { qrFileId })),
+  listOutboundContacts: async (status = 'all') => (await request<{ items: OutboundContactView[] }>(
+    `/api/outbound-reference/contacts${queryString({ status })}`)).items,
+  getOutboundContact: (id) => request(`/api/outbound-reference/contacts/${id}`),
+  createOutboundContact: (input) => request('/api/outbound-reference/contacts', json('POST', input)),
+  updateOutboundContact: (id, input) => request(`/api/outbound-reference/contacts/${id}`, json('PUT', input)),
+  activateOutboundContact: (id) => request(`/api/outbound-reference/contacts/${id}/activate`, json('POST')),
+  deactivateOutboundContact: (id) => request(`/api/outbound-reference/contacts/${id}/deactivate`, json('POST')),
+  deleteOutboundContact: (id) => request(`/api/outbound-reference/contacts/${id}`, { method: 'DELETE' }),
+  listOutboundTemplates: async (status = 'all') => (await request<{ items: OutboundEmailTemplateView[] }>(
+    `/api/outbound-reference/templates${queryString({ status })}`)).items,
+  getOutboundTemplate: (id) => request(`/api/outbound-reference/templates/${id}`),
+  createOutboundTemplate: (input) => request('/api/outbound-reference/templates', json('POST', input)),
+  updateOutboundTemplate: (id, input) => request(`/api/outbound-reference/templates/${id}`, json('PUT', input)),
+  activateOutboundTemplate: (id) => request(`/api/outbound-reference/templates/${id}/activate`, json('POST')),
+  deactivateOutboundTemplate: (id) => request(`/api/outbound-reference/templates/${id}/deactivate`, json('POST')),
+  deleteOutboundTemplate: (id) => request(`/api/outbound-reference/templates/${id}`, { method: 'DELETE' }),
+  renderOutboundTemplate: (id, variables) => request(`/api/outbound-reference/templates/${id}/render`, json('POST', { variables })),
+  createOutboundTemplateBlock: (templateId, input) => request(`/api/outbound-reference/templates/${templateId}/blocks`, json('POST', input)),
+  updateOutboundTemplateBlock: (id, input) => request(`/api/outbound-reference/blocks/${id}`, json('PUT', input)),
+  activateOutboundTemplateBlock: (id) => request(`/api/outbound-reference/blocks/${id}/activate`, json('POST')),
+  deactivateOutboundTemplateBlock: (id) => request(`/api/outbound-reference/blocks/${id}/deactivate`, json('POST')),
+  deleteOutboundTemplateBlock: (id) => request(`/api/outbound-reference/blocks/${id}`, { method: 'DELETE' }),
+  listOutboundSignatures: async (status = 'all') => (await request<{ items: OutboundSignatureView[] }>(
+    `/api/outbound-reference/signatures${queryString({ status })}`)).items,
+  getOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`),
+  createOutboundSignature: (input) => request('/api/outbound-reference/signatures', json('POST', input)),
+  updateOutboundSignature: (id, input) => request(`/api/outbound-reference/signatures/${id}`, json('PUT', input)),
+  activateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/activate`, json('POST')),
+  deactivateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/deactivate`, json('POST')),
+  deleteOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`, { method: 'DELETE' }),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(
     '/api/products/historical-candidates')).items,
   confirmHistoricalProductCandidate: (input) => request('/api/products/historical-candidates/confirm', json('POST', input)),

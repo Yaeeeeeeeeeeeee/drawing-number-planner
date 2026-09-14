@@ -12,6 +12,7 @@ import { DrawingQueryService } from '../core/drawings/drawing-query-service.js';
 import { FileRepository } from '../core/files/file-repository.js';
 import { FileService } from '../core/files/file-service.js';
 import { MaterialBatchService } from '../core/files/material-batch-service.js';
+import { OutboundReferenceService } from '../core/outbound/outbound-reference-service.js';
 import { IndexedPdfResolver } from '../core/files/indexed-pdf-resolver.js';
 import { resolveWorkspacePath } from '../core/files/workspace-paths.js';
 import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
@@ -28,6 +29,7 @@ import { registerDrawingRoutes } from './routes/drawings.js';
 import { registerFileRoutes } from './routes/files.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMaterialBatchRoutes } from './routes/material-batches.js';
+import { registerOutboundReferenceRoutes } from './routes/outbound-reference.js';
 import { registerProductRoutes } from './routes/products.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 import { registerQrCodeRoutes } from './routes/qr-codes.js';
@@ -92,6 +94,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerDrawingRoutes(server, new DrawingQueryService(database));
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings));
     registerMaterialBatchRoutes(server, new MaterialBatchService(database));
+    registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));
     registerPlanningRoutes(server, new PlanningService(database));
     registerBomRoutes(server, new BomService(database, () => workspaceSettings.get().workspaceRoot));
     await registerImportRoutes(server, database, () => {
