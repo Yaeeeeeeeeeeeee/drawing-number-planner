@@ -32,3 +32,48 @@ export interface OutboundMaterialSelection {
   change: OutboundMaterialChange;
   conflictFullCodes: string[];
 }
+
+export type OutboundPackageMode = 'change_only' | 'current_complete';
+export type OutboundPackageMaterialType = 'initial' | 'update';
+
+export interface OutboundPackageRequest {
+  productId: number;
+  selectedMaterialBatchId: number;
+  materialType: OutboundPackageMaterialType;
+  packageMode: OutboundPackageMode;
+}
+
+export interface OutboundPackagePreviewItem {
+  slotKey: string;
+  fullCode: string | null;
+  projectItemId: number | null;
+  projectItemName: string;
+  pdfFileId: number | null;
+  fileName: string | null;
+  relativePath: string | null;
+  sourceBatchId: number;
+  sourceBatchName: string;
+  status: OutboundMaterialStatus;
+  change: OutboundMaterialChange;
+  selectable: boolean;
+  conflictFullCodes: string[];
+}
+
+export interface OutboundPackagePreview {
+  previewToken: string;
+  packageName: string;
+  items: OutboundPackagePreviewItem[];
+}
+
+export interface CreateOutboundPackageInput extends OutboundPackageRequest {
+  previewToken: string;
+  selectedPdfFileIds: number[];
+}
+
+export interface CreatedOutboundPackage {
+  id: number;
+  packageName: string;
+  zipRelativePath: string;
+  fileCount: number;
+  createdAt: string;
+}

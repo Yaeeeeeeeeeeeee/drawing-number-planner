@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,6 +8,17 @@ import { FileError } from '../../src/core/files/file-errors';
 import { WorkspaceSettingsStore } from '../../src/core/files/workspace-settings';
 
 describe('WorkspaceSettingsStore', () => {
+  it('stores an independently configurable outbound output root without losing the workspace root', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'planner-settings-outbound-'));
+    const workspace = join(dataDir, 'workspace'); const output = join(dataDir, 'outbound');
+    mkdirSync(workspace); mkdirSync(output);
+    const path = join(dataDir, 'settings.json'); const store = new WorkspaceSettingsStore(path);
+    store.setWorkspaceRoot(workspace);
+    expect(store.setOutboundOutputRoot(output)).toBe(realpathSync.native(output));
+    expect(store.get()).toEqual({ workspaceRoot: realpathSync.native(workspace) });
+    expect(store.getOutboundOutputRoot()).toBe(realpathSync.native(output));
+    rmSync(dataDir, { recursive: true, force: true });
+  });
   it('starts unconfigured and persists a normalized existing directory across instances', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'planner-settings-'));
     const workspace = join(dataDir, 'pdf-library'); mkdirSync(workspace);

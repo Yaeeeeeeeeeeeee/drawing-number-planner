@@ -13,6 +13,7 @@ import { FileRepository } from '../core/files/file-repository.js';
 import { FileService } from '../core/files/file-service.js';
 import { MaterialBatchService } from '../core/files/material-batch-service.js';
 import { OutboundReferenceService } from '../core/outbound/outbound-reference-service.js';
+import { OutboundPackageService } from '../core/outbound/outbound-package-service.js';
 import { IndexedPdfResolver } from '../core/files/indexed-pdf-resolver.js';
 import { resolveWorkspacePath } from '../core/files/workspace-paths.js';
 import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
@@ -30,6 +31,7 @@ import { registerFileRoutes } from './routes/files.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMaterialBatchRoutes } from './routes/material-batches.js';
 import { registerOutboundReferenceRoutes } from './routes/outbound-reference.js';
+import { registerOutboundPackageRoutes } from './routes/outbound-packages.js';
 import { registerProductRoutes } from './routes/products.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 import { registerQrCodeRoutes } from './routes/qr-codes.js';
@@ -64,6 +66,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   const token = options.token ?? crypto.randomUUID();
   const paths = resolveAppPaths(options.dataDir ?? join(process.cwd(), 'work', 'runtime-data'));
   mkdirSync(paths.baseDir, { recursive: true });
+  mkdirSync(paths.exports, { recursive: true });
   const databaseExists = existsSync(paths.database);
   const database = openDatabase(paths.database);
   let server: ReturnType<typeof Fastify> | undefined;
@@ -95,6 +98,10 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings));
     registerMaterialBatchRoutes(server, new MaterialBatchService(database));
     registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));
+    registerOutboundPackageRoutes(server, new OutboundPackageService(database, {
+      workspaceRoot: () => workspaceSettings.get().workspaceRoot,
+      outputRoot: () => workspaceSettings.getOutboundOutputRoot() ?? paths.exports,
+    }));
     registerPlanningRoutes(server, new PlanningService(database));
     registerBomRoutes(server, new BomService(database, () => workspaceSettings.get().workspaceRoot));
     await registerImportRoutes(server, database, () => {
