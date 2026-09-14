@@ -443,8 +443,9 @@ function validateOutboundMigration(database: PlannerDatabase, before: V10Outboun
     'outbound_email_templates_material_type_idx', 'outbound_template_blocks_template_idx',
     'outbound_packages_product_created_idx', 'outbound_packages_batch_idx',
     'outbound_package_items_project_idx', 'outbound_package_items_drawing_idx',
-    'outbound_package_items_historical_drawing_idx', 'outbound_package_items_batch_idx',
-    'outbound_email_drafts_package_idx',
+    'outbound_package_items_historical_drawing_idx', 'outbound_package_items_pdf_idx',
+    'outbound_package_items_batch_idx', 'outbound_email_drafts_package_idx',
+    'outbound_email_drafts_template_idx', 'outbound_email_drafts_signature_idx',
   ];
   const templatesValid = templates.length === 2
     && templates.every((template) => template.status === 'active'

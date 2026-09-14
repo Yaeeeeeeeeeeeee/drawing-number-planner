@@ -942,10 +942,13 @@ export const schemaVersionEleven = `
       length(trim(zip_relative_path)) > 0
       AND substr(zip_relative_path, 1, 1) NOT IN ('/', '\\')
       AND zip_relative_path NOT GLOB '[A-Za-z]:*'
+      AND replace(zip_relative_path, '\\', '/') NOT IN ('.', '..')
       AND replace(zip_relative_path, '\\', '/') NOT LIKE '../%'
       AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/../%'
       AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/..'
       AND replace(zip_relative_path, '\\', '/') NOT LIKE './%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/./%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/.'
       AND replace(zip_relative_path, '\\', '/') NOT LIKE '%//%'
     ),
     status TEXT NOT NULL CHECK (status IN ('completed', 'cancelled', 'failed')),
@@ -990,8 +993,11 @@ export const schemaVersionEleven = `
   CREATE INDEX outbound_package_items_project_idx ON outbound_package_items(project_item_id);
   CREATE INDEX outbound_package_items_drawing_idx ON outbound_package_items(drawing_id);
   CREATE INDEX outbound_package_items_historical_drawing_idx ON outbound_package_items(historical_drawing_id);
+  CREATE INDEX outbound_package_items_pdf_idx ON outbound_package_items(pdf_file_id);
   CREATE INDEX outbound_package_items_batch_idx ON outbound_package_items(source_material_batch_id);
   CREATE INDEX outbound_email_drafts_package_idx ON outbound_email_drafts(package_id, updated_at DESC);
+  CREATE INDEX outbound_email_drafts_template_idx ON outbound_email_drafts(template_id);
+  CREATE INDEX outbound_email_drafts_signature_idx ON outbound_email_drafts(signature_id);
 
   INSERT INTO outbound_email_templates (
     key, name, material_type, subject_template, body_template, status, created_at, updated_at

@@ -256,6 +256,13 @@ describe('database migrations', () => {
     expect((database.pragma('table_info(outbound_email_drafts)') as Array<{ name: string }>).map(({ name }) => name))
       .toEqual(['id', 'package_id', 'template_id', 'signature_id', 'recipients_json', 'cc_json', 'subject', 'body',
         'created_at', 'updated_at']);
+    expect(database.prepare(`select name from sqlite_master where type = 'index' and name in (
+      'outbound_package_items_pdf_idx', 'outbound_email_drafts_template_idx', 'outbound_email_drafts_signature_idx'
+    ) order by name`).all()).toEqual([
+      { name: 'outbound_email_drafts_signature_idx' },
+      { name: 'outbound_email_drafts_template_idx' },
+      { name: 'outbound_package_items_pdf_idx' },
+    ]);
     expect(database.prepare(`select material_type, subject_template, body_template, status
       from outbound_email_templates order by material_type`).all()).toEqual([
       {
@@ -355,11 +362,12 @@ describe('database migrations', () => {
       values (?, 'initial', 'current_complete', '测试包', ?, 'completed', ?)`);
     const now = '2026-09-10T00:00:00.000Z';
 
-    for (const invalid of ['', 'C:\\exports\\pack.zip', 'C:pack.zip', '\\\\server\\share\\pack.zip',
-      '\\rooted\\pack.zip', '/rooted/pack.zip', '..\\pack.zip', 'folder\\..\\pack.zip', 'folder/../pack.zip']) {
+    for (const invalid of ['', '.', '..', 'C:\\exports\\pack.zip', 'C:pack.zip', '\\\\server\\share\\pack.zip',
+      '\\rooted\\pack.zip', '/rooted/pack.zip', '..\\pack.zip', 'folder\\..\\pack.zip', 'folder/../pack.zip',
+      '.\\pack.zip', './pack.zip', 'folder\\.\\pack.zip', 'folder/./pack.zip']) {
       expect(() => insert.run(products.refrigerator, invalid, now), invalid).toThrow();
     }
-    expect(insert.run(products.refrigerator, 'SAMKYO\\测试包.zip', now).changes).toBe(1);
+    expect(insert.run(products.refrigerator, 'SAMKYO\\子目录\\测试包.zip', now).changes).toBe(1);
   });
 
   it('preserves every v9 row, path, and planned BOM reference while adding the v10 maintenance fields', () => {
