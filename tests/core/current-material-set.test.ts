@@ -176,6 +176,20 @@ describe('CurrentMaterialSetService', () => {
     ]);
   });
 
+  it('advances the pending candidate to the latest different same-code content without clearing uncertainty', () => {
+    const first = insertBatch('00.首批大货');
+    const changed = insertBatch('01.20241210');
+    const changedAgain = insertBatch('02.20250304');
+    insertOutlined(first, logoWhite1, { hash: 'content-a', suffix: 'a' });
+    insertOutlined(changed, logoWhite1, { hash: 'content-b', suffix: 'b' });
+    const latestFileId = insertOutlined(changedAgain, logoWhite1, { hash: 'content-c', suffix: 'c' });
+
+    expect(service.buildCurrentMaterialSet(productId, changedAgain)).toEqual([
+      expect.objectContaining({ fullCode: logoWhite1, sourceBatchId: changedAgain, pdfIndexId: latestFileId,
+        contentSha256: 'content-c', status: 'needs_confirmation', change: 'same_code_changed' }),
+    ]);
+  });
+
   it('does not silently choose between same-code files with different content inside one batch', () => {
     const first = insertBatch('00.首批大货');
     insertOutlined(first, logoWhite1, { hash: 'content-a', suffix: 'one' });

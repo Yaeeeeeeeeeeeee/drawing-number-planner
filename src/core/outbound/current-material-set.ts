@@ -128,7 +128,13 @@ export function resolveCurrentMaterialSet(batches: MaterialSetBatchInput[]): Out
       }
 
       if (previous.status === 'needs_confirmation') {
-        current.set(slotKey, previous);
+        const repeatsPendingCandidate = file !== null
+          && file.contentSha256 !== null
+          && previous.contentSha256 !== null
+          && file.contentSha256 === previous.contentSha256;
+        current.set(slotKey, file !== null && !repeatsPendingCandidate
+          ? { ...selectionFrom(slotKey, fullCode, batch, file, 'same_code_changed'), status: 'needs_confirmation' }
+          : previous);
         continue;
       }
 
