@@ -121,11 +121,41 @@ describe('OutboundPage', () => {
     fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('铭牌（转曲）.pdf');
+    fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    await screen.findByText('压缩包已生成');
     fireEvent.click(screen.getByRole('tab', { name: '邮件撰写' }));
     fireEvent.change(await screen.findByLabelText('本次变更内容'), { target: { value: '铭牌文字修正' } });
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
     await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalledWith(2, expect.objectContaining({
       change_description: '铭牌文字修正', file_list: '铭牌：铭牌（转曲）.pdf（来源：06.20260910）', model: 'F60', product_category: '空气炸锅',
+    })));
+  });
+
+  it('keeps the email package name, product and files atomic after previewing a different package', async () => {
+    const api = apiFixture();
+    const previewA = { ...preview, packageName: 'A包', items: [{ ...preview.items[0], fileName: 'A铭牌.pdf', sourceBatchName: 'A批次' }] };
+    const previewB = { ...preview, packageName: 'B包', items: [{ ...preview.items[0], pdfFileId: 42, fileName: 'B说明书.pdf', projectItemName: '说明书', sourceBatchName: 'B批次' }] };
+    api.previewOutboundPackage.mockResolvedValueOnce(previewA).mockResolvedValueOnce(previewB);
+    api.createOutboundPackage.mockResolvedValue({ id: 93, packageName: 'A包', zipRelativePath: 'A包.zip', fileCount: 1, createdAt: '' });
+    window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true, path: 'D:\\temp' }), showOutboundPackageInFolder: vi.fn() } as never;
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByLabelText('更新资料'));
+    fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
+    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+    await screen.findByText('A铭牌.pdf');
+    fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    await screen.findByText('压缩包已生成');
+
+    fireEvent.click(screen.getByLabelText('当前完整包材资料'));
+    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+    await screen.findByText('B说明书.pdf');
+    fireEvent.click(screen.getByRole('tab', { name: '邮件撰写' }));
+    expect(await screen.findByLabelText('主题')).toHaveValue('A包');
+    fireEvent.click(await screen.findByRole('button', { name: '生成邮件内容' }));
+    await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalledWith(2, expect.objectContaining({
+      package_name: 'A包', model: 'F60', product_category: '空气炸锅',
+      file_list: '铭牌：A铭牌.pdf（来源：A批次）',
     })));
   });
 

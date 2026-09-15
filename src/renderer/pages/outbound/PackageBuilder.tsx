@@ -24,11 +24,10 @@ export interface OutboundMailContext {
 
 interface PackageBuilderProps {
   api: PlannerApi;
-  onPackage(value: CreatedOutboundPackageView, product: ProductView): void;
-  onMailContext(value: OutboundMailContext): void;
+  onPackage(value: CreatedOutboundPackageView, context: OutboundMailContext): void;
 }
 
-export function PackageBuilder({ api, onPackage, onMailContext }: PackageBuilderProps) {
+export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
   const [products, setProducts] = useState<ProductView[]>([]);
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
   const [brands, setBrands] = useState<DictionaryItemView[]>([]);
@@ -73,20 +72,6 @@ export function PackageBuilder({ api, onPackage, onMailContext }: PackageBuilder
     [preview],
   );
 
-  useEffect(() => {
-    if (!preview || !chosenProduct) return;
-    onMailContext({
-      packageName: preview.packageName,
-      product: chosenProduct,
-      materialType,
-      items: preview.items.flatMap((item) => (
-        item.pdfFileId && item.fileName && selected.includes(item.pdfFileId)
-          ? [{ projectItemName: item.projectItemName, fileName: item.fileName, sourceBatchName: item.sourceBatchName, pdfFileId: item.pdfFileId }]
-          : []
-      )),
-    });
-  }, [chosenProduct, materialType, onMailContext, preview, selected]);
-
   const request = () => ({
     productId: Number(productId), selectedMaterialBatchId: Number(batchId), materialType, packageMode: mode,
   });
@@ -122,7 +107,18 @@ export function PackageBuilder({ api, onPackage, onMailContext }: PackageBuilder
       }
       const value = await api.createOutboundPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: selected });
       setCreated(value);
-      if (chosenProduct) onPackage(value, chosenProduct);
+      if (chosenProduct) {
+        onPackage(value, {
+          packageName: value.packageName,
+          product: chosenProduct,
+          materialType,
+          items: preview.items.flatMap((item) => (
+            item.pdfFileId && item.fileName && selected.includes(item.pdfFileId)
+              ? [{ projectItemName: item.projectItemName, fileName: item.fileName, sourceBatchName: item.sourceBatchName, pdfFileId: item.pdfFileId }]
+              : []
+          )),
+        });
+      }
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : '生成压缩包失败');
     } finally {

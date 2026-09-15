@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CreatedOutboundPackageView, PlannerApi, ProductView } from '../data/client';
+import type { PlannerApi } from '../data/client';
 import { ContactsManager } from './outbound/ContactsManager';
 import { EmailComposer } from './outbound/EmailComposer';
 import { PackageBuilder, type OutboundMailContext } from './outbound/PackageBuilder';
@@ -8,8 +8,6 @@ import { TemplateSettings } from './outbound/TemplateSettings';
 type Tab = 'package' | 'email' | 'contacts';
 export function OutboundPage({ api }: { api: PlannerApi }) {
   const [tab, setTab] = useState<Tab>('package');
-  const [latestPackage, setLatestPackage] = useState<CreatedOutboundPackageView | null>(null);
-  const [packageProduct, setPackageProduct] = useState<ProductView | null>(null);
   const [mailContext, setMailContext] = useState<OutboundMailContext | null>(null);
   const [settings, setSettings] = useState(false);
 
@@ -32,11 +30,7 @@ export function OutboundPage({ api }: { api: PlannerApi }) {
       {tab === 'package' && (
         <PackageBuilder
           api={api}
-          onMailContext={setMailContext}
-          onPackage={(value, product) => {
-            setLatestPackage(value);
-            setPackageProduct(product);
-          }}
+          onPackage={(_value, context) => setMailContext(context)}
         />
       )}
       {tab === 'email' && (
@@ -49,7 +43,7 @@ export function OutboundPage({ api }: { api: PlannerApi }) {
           {settings ? (
             <TemplateSettings api={api} />
           ) : (
-            <EmailComposer api={api} latestPackage={latestPackage} product={packageProduct} mailContext={mailContext} />
+            <EmailComposer api={api} mailContext={mailContext} />
           )}
         </>
       )}

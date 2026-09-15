@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type {
-  CreatedOutboundPackageView,
   OutboundContactView,
   OutboundEmailTemplateView,
   OutboundMaterialTypeView,
   OutboundSignatureView,
   PlannerApi,
-  ProductView,
 } from '../../data/client';
 import type { OutboundMailContext } from './PackageBuilder';
 
@@ -21,12 +19,10 @@ async function copy(text: string, setMessage: (text: string) => void) {
 
 interface EmailComposerProps {
   api: PlannerApi;
-  latestPackage: CreatedOutboundPackageView | null;
-  product: ProductView | null;
   mailContext: OutboundMailContext | null;
 }
 
-export function EmailComposer({ api, latestPackage, product, mailContext }: EmailComposerProps) {
+export function EmailComposer({ api, mailContext }: EmailComposerProps) {
   const [contacts, setContacts] = useState<OutboundContactView[]>([]);
   const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
   const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
@@ -35,7 +31,7 @@ export function EmailComposer({ api, latestPackage, product, mailContext }: Emai
   const [templateId, setTemplateId] = useState('');
   const [signatureId, setSignatureId] = useState('');
   const [blocks, setBlocks] = useState<number[]>([]);
-  const [subject, setSubject] = useState(latestPackage?.packageName ?? mailContext?.packageName ?? '');
+  const [subject, setSubject] = useState(mailContext?.packageName ?? '');
   const [body, setBody] = useState('');
   const [materialType, setMaterialType] = useState<OutboundMaterialTypeView>(mailContext?.materialType ?? 'update');
   const [changeDescription, setChangeDescription] = useState('');
@@ -62,13 +58,11 @@ export function EmailComposer({ api, latestPackage, product, mailContext }: Emai
   }, [api, mailContext?.materialType]);
 
   useEffect(() => {
-    const packageName = latestPackage?.packageName ?? mailContext?.packageName;
-    if (packageName) setSubject(packageName);
-  }, [latestPackage, mailContext?.packageName]);
+    if (mailContext?.packageName) setSubject(mailContext.packageName);
+  }, [mailContext]);
 
   const template = templates.find((item) => item.id === Number(templateId));
   const signature = signatures.find((item) => item.id === Number(signatureId));
-  const effectiveProduct = mailContext?.product ?? product;
   const toText = contacts.filter((item) => to.includes(item.id)).map((item) => item.email).join('; ');
   const ccText = contacts.filter((item) => cc.includes(item.id)).map((item) => item.email).join('; ');
   const selectedContacts = contacts.filter((item) => to.includes(item.id));
@@ -87,11 +81,11 @@ export function EmailComposer({ api, latestPackage, product, mailContext }: Emai
     const primary = selectedContacts[0];
     try {
       const rendered = await api.renderOutboundTemplate(template.id, {
-        package_name: latestPackage?.packageName ?? mailContext?.packageName ?? subject,
+        package_name: mailContext?.packageName ?? subject,
         company_name: primary?.company ?? '',
         contact_salutation: primary?.contactName ?? '',
-        model: effectiveProduct?.model ?? '',
-        product_category: effectiveProduct?.productCategory ?? '',
+        model: mailContext?.product.model ?? '',
+        product_category: mailContext?.product.productCategory ?? '',
         change_description: changeDescription,
         file_list: fileList,
         optional_blocks: optionalText,
