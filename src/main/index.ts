@@ -3,22 +3,27 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { startServer, type RunningServer } from '../server/start-server.js';
+import { LocalServiceController } from './local-service-controller.js';
 import { createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
 import { createChooseOutboundDirectoryHandler, createShowOutboundPackageHandler } from './outbound-file-actions.js';
 
-let runningServer: RunningServer | undefined;
+let localService: LocalServiceController | undefined;
 let mainWindow: BrowserWindow | undefined;
+let quitting = false;
 process.on('uncaughtException', (error) => console.error('[main] uncaught', error));
 
 async function createWindow() {
   const devArgument = process.argv.find((argument) => argument.startsWith('--dev-server-url='));
   const devServerUrl = devArgument?.slice('--dev-server-url='.length);
-  runningServer ??= await startServer({
-    dataDir: app.getPath('userData'),
-    ...(devServerUrl ? { allowedOrigins: [new URL(devServerUrl).origin] } : {}),
-    ...(devServerUrl ? {} : { rendererDir: join(app.getAppPath(), 'dist', 'renderer') }),
+  localService ??= new LocalServiceController({
+    entryPath: fileURLToPath(new URL('../service/entry.js', import.meta.url)),
+    config: {
+      dataDir: app.getPath('userData'),
+      ...(devServerUrl ? { allowedOrigins: [new URL(devServerUrl).origin] } : {}),
+      ...(devServerUrl ? {} : { rendererDir: join(app.getAppPath(), 'dist', 'renderer') }),
+    },
   });
+  const connection = await localService.start();
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -36,28 +41,28 @@ async function createWindow() {
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.once('closed', () => { mainWindow = undefined; });
-  await mainWindow.loadURL(devServerUrl ?? runningServer.url);
+  await mainWindow.loadURL(devServerUrl ?? connection.url);
 }
 
 app.whenReady().then(() => {
   ipcMain.handle('planner:show-file-in-folder', createShowFileInFolderHandler({
     resolvePdfFilePath: (id) => {
-      if (!runningServer) throw new Error('本机文件服务尚未启动');
-      return runningServer.resolvePdfFilePath(id);
+      if (!localService) throw new Error('本机文件服务尚未启动');
+      return localService.resolvePdfFilePath(id);
     },
     showItemInFolder: (path) => shell.showItemInFolder(path),
   }));
   ipcMain.handle('planner:show-bom-asset-in-folder', createShowBomAssetInFolderHandler({
     resolveBomAssetPath: (id) => {
-      if (!runningServer) throw new Error('本机文件服务尚未启动');
-      return runningServer.resolveBomAssetPath(id);
+      if (!localService) throw new Error('本机文件服务尚未启动');
+      return localService.resolveBomAssetPath(id);
     },
     showItemInFolder: (path) => shell.showItemInFolder(path),
   }));
   ipcMain.handle('planner:qr-file-action', createQrFileActionHandler({
     resolveQrFilePath: (relativePath) => {
-      if (!runningServer) throw new Error('本机文件服务尚未启动');
-      return runningServer.resolveQrFilePath(relativePath);
+      if (!localService) throw new Error('本机文件服务尚未启动');
+      return localService.resolveQrFilePath(relativePath);
     },
     openPath: (path) => shell.openPath(path),
     showItemInFolder: (path) => shell.showItemInFolder(path),
@@ -65,10 +70,10 @@ app.whenReady().then(() => {
   }));
   ipcMain.handle('planner:choose-outbound-directory', createChooseOutboundDirectoryHandler({
     chooseDirectory: async () => dialog.showOpenDialog(mainWindow!, { title: '选择外发压缩包保存目录', properties: ['openDirectory', 'createDirectory'] }),
-    setOutputRoot: (path) => { if (!runningServer) throw new Error('本机文件服务尚未启动'); return runningServer.setOutboundOutputRoot(path); },
+    setOutputRoot: (path) => { if (!localService) throw new Error('本机文件服务尚未启动'); return localService.setOutboundOutputRoot(path); },
   }));
   ipcMain.handle('planner:show-outbound-package-in-folder', createShowOutboundPackageHandler({
-    resolvePackagePath: (id) => { if (!runningServer) throw new Error('本机文件服务尚未启动'); return runningServer.resolveOutboundPackagePath(id); },
+    resolvePackagePath: (id) => { if (!localService) throw new Error('本机文件服务尚未启动'); return localService.resolveOutboundPackagePath(id); },
     showItemInFolder: (path) => shell.showItemInFolder(path),
   }));
   return createWindow();
@@ -78,4 +83,8 @@ app.whenReady().then(() => {
   app.quit();
 });
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => void runningServer?.close());
+app.on('before-quit', (event) => {
+  if (quitting || !localService) return;
+  event.preventDefault(); quitting = true;
+  void localService.stop().finally(() => app.quit());
+});

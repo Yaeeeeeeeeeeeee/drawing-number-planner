@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "build": "vite build && tsc -p tsconfig.main.json",
     "dev:web": "concurrently -k \"tsx watch src/server/dev.ts\" \"vite --host 127.0.0.1\"",
-    "dev:desktop": "concurrently -k \"vite --host 127.0.0.1\" \"tsc -p tsconfig.main.json --watch\" \"wait-on http://127.0.0.1:5173 dist/main/index.js && electron . --dev-server-url=http://127.0.0.1:5173\""
+    "dev:desktop": "concurrently -k \"vite --host 127.0.0.1\" \"tsc -p tsconfig.main.json --watch\" \"wait-on http://127.0.0.1:5173 dist/main/index.js dist/service/entry.js && electron . --dev-server-url=http://127.0.0.1:5173\""
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

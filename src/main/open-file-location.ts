@@ -4,12 +4,12 @@ export interface DesktopFileResult {
 }
 
 interface Dependencies {
-  resolvePdfFilePath(id: unknown): string;
+  resolvePdfFilePath(id: unknown): string | Promise<string>;
   showItemInFolder(path: string): void;
 }
 
 interface BomAssetDependencies {
-  resolveBomAssetPath(id: unknown): string;
+  resolveBomAssetPath(id: unknown): string | Promise<string>;
   showItemInFolder(path: string): void;
 }
 
@@ -19,7 +19,7 @@ export function createShowFileInFolderHandler(dependencies: Dependencies) {
       return { ok: false, error: { code: 'INVALID_PDF_FILE_ID', message: 'PDF 文件索引无效' } };
     }
     try {
-      const validatedPath = dependencies.resolvePdfFilePath(pdfFileId);
+      const validatedPath = await dependencies.resolvePdfFilePath(pdfFileId);
       dependencies.showItemInFolder(validatedPath);
       return { ok: true };
     } catch (error) {
@@ -37,7 +37,7 @@ export function createShowBomAssetInFolderHandler(dependencies: BomAssetDependen
       return { ok: false, error: { code: 'INVALID_BOM_ASSET_ID', message: 'BOM 附件索引无效' } };
     }
     try {
-      dependencies.showItemInFolder(dependencies.resolveBomAssetPath(assetId));
+      dependencies.showItemInFolder(await dependencies.resolveBomAssetPath(assetId));
       return { ok: true };
     } catch (error) {
       return { ok: false, error: {
@@ -51,7 +51,7 @@ export function createShowBomAssetInFolderHandler(dependencies: BomAssetDependen
 export type QrFileAction = 'open' | 'show' | 'preview';
 export interface QrDesktopFileResult extends DesktopFileResult { previewDataUrl?: string }
 interface QrFileDependencies {
-  resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
+  resolveQrFilePath(relativePath: string): { path: string; mimeType: string } | Promise<{ path: string; mimeType: string }>;
   openPath(path: string): Promise<string>;
   showItemInFolder(path: string): void;
   readFile(path: string): Buffer;
@@ -70,7 +70,7 @@ export function createQrFileActionHandler(dependencies: QrFileDependencies) {
     }
     try {
       validateWorkspaceRelativePath(relativePath);
-      const file = dependencies.resolveQrFilePath(relativePath);
+      const file = await dependencies.resolveQrFilePath(relativePath);
       if (action === 'show') { dependencies.showItemInFolder(file.path); return { ok: true }; }
       if (action === 'preview' && imageMimeTypes.has(file.mimeType)) {
         return { ok: true, previewDataUrl: `data:${file.mimeType};base64,${dependencies.readFile(file.path).toString('base64')}` };

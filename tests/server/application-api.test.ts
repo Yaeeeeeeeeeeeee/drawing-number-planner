@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -78,6 +78,21 @@ describe('real application API', () => {
 
     expect(() => server.resolveBomAssetPath(0)).toThrow(expect.objectContaining({ code: 'INVALID_BOM_ASSET_ID' }));
     expect(() => server.resolveBomAssetPath(assetId)).toThrow(expect.objectContaining({ code: 'BOM_ASSET_UNAVAILABLE' }));
+    await server.close();
+  });
+
+  it('conservatively preserves unproven outbound claim, temporary and final files on startup', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'drawing-planner-recovery-boundary-'));
+    const dataDir = join(root, 'data'); const paths = resolveAppPaths(dataDir);
+    mkdirSync(paths.exports, { recursive: true });
+    const claim = join(paths.exports, '.unknown.claim');
+    const temporary = join(paths.exports, '.unknown.tmp');
+    const completed = join(paths.exports, 'completed.zip');
+    writeFileSync(claim, ''); writeFileSync(temporary, ''); writeFileSync(completed, 'zip');
+
+    const server = await startServer({ port: 0, dataDir });
+
+    expect([claim, temporary, completed].map(existsSync)).toEqual([true, true, true]);
     await server.close();
   });
 });
