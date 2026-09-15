@@ -28,6 +28,35 @@ function apiFixture() {
 afterEach(() => { delete window.plannerDesktop; vi.restoreAllMocks(); });
 
 describe('OutboundPage', () => {
+  for (const [label, materialType] of [['首批资料', 'initial'], ['更新资料', 'update']] as const) {
+    it(`completes the desktop package flow for ${label}`, async () => {
+      const api = apiFixture();
+      api.previewOutboundPackage.mockResolvedValue({ ...preview, items: [preview.items[0]] });
+      const packageResult = { id: materialType === 'initial' ? 91 : 92,
+        packageName: `D&D - SAMKYO F60空气炸锅 【${materialType === 'initial' ? '包材资料' : '更新包材资料'}-2026年9月15日】`,
+        zipRelativePath: `${materialType}.zip`, fileCount: 1, createdAt: '' };
+      api.createOutboundPackage.mockResolvedValue(packageResult);
+      const chooseOutboundDirectory = vi.fn().mockResolvedValue({ ok: true, path: 'D:\\temp-outbound' });
+      const showOutboundPackageInFolder = vi.fn().mockResolvedValue({ ok: true });
+      window.plannerDesktop = { chooseOutboundDirectory, showOutboundPackageInFolder } as never;
+      render(<OutboundPage api={api as never} />);
+      fireEvent.click(await screen.findByLabelText(label));
+      fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
+      fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+      fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+      await screen.findByText('铭牌（转曲）.pdf');
+      fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+      await waitFor(() => expect(api.createOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({
+        materialType, previewToken: 'preview-1', selectedPdfFileIds: [41],
+      })));
+      expect(await screen.findByText(`${packageResult.packageName}.zip`)).toBeVisible();
+      expect(screen.getByText(`保存位置：${materialType}.zip`)).toBeVisible();
+      expect(screen.getByText('文件数量：1')).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: '打开位置' }));
+      await waitFor(() => expect(showOutboundPackageInFolder).toHaveBeenCalledWith(packageResult.id));
+    });
+  }
+
   it('uses the brand dictionary before product and keeps product identity authoritative', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     const brand = await screen.findByLabelText('品牌');
@@ -83,6 +112,47 @@ describe('OutboundPage', () => {
     expect(screen.queryByRole('button', { name: /发送/ })).not.toBeInTheDocument();
   });
 
+  it('passes editable update description and selected preview files into the update template', async () => {
+    const api = apiFixture(); api.previewOutboundPackage.mockResolvedValue({ ...preview, items: [preview.items[0]] });
+    window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true, path: 'D:\\temp' }), showOutboundPackageInFolder: vi.fn() } as never;
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByLabelText('更新资料'));
+    fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
+    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+    await screen.findByText('铭牌（转曲）.pdf');
+    fireEvent.click(screen.getByRole('tab', { name: '邮件撰写' }));
+    fireEvent.change(await screen.findByLabelText('本次变更内容'), { target: { value: '铭牌文字修正' } });
+    fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
+    await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalledWith(2, expect.objectContaining({
+      change_description: '铭牌文字修正', file_list: '铭牌：铭牌（转曲）.pdf（来源：06.20260910）', model: 'F60', product_category: '空气炸锅',
+    })));
+  });
+
+  it('keeps email input and shows a local error when rendering fails', async () => {
+    const api = apiFixture(); api.renderOutboundTemplate.mockRejectedValue(new Error('模板变量缺失'));
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '邮件撰写' }));
+    fireEvent.change(await screen.findByLabelText('本次变更内容'), { target: { value: '保留此内容' } });
+    fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
+    expect(await screen.findByText('模板变量缺失')).toBeVisible();
+    expect(screen.getByLabelText('本次变更内容')).toHaveValue('保留此内容');
+  });
+
+  it('does not require a change description for an initial-material email', async () => {
+    const api = apiFixture();
+    api.listOutboundTemplates.mockResolvedValue([
+      { ...template, id: 3, key: 'initial_default', name: '首批资料', materialType: 'initial', blocks: [] },
+      template,
+    ]);
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '邮件撰写' }));
+    fireEvent.change(await screen.findByLabelText('邮件资料类型'), { target: { value: 'initial' } });
+    expect(screen.queryByLabelText('本次变更内容')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
+    await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalledWith(3, expect.objectContaining({ change_description: '' })));
+  });
+
   it('creates and toggles contacts nearby', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     fireEvent.click(await screen.findByRole('tab', { name: '联系人' }));
@@ -97,6 +167,17 @@ describe('OutboundPage', () => {
     await waitFor(() => expect(api.deactivateOutboundContact).toHaveBeenCalledWith(1));
   });
 
+  it('shows a nearby contact status error without discarding the open edit form', async () => {
+    const api = apiFixture(); api.deactivateOutboundContact.mockRejectedValue(new Error('联系人已被引用'));
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '联系人' }));
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }));
+    fireEvent.change(screen.getByLabelText('备注'), { target: { value: '未保存备注' } });
+    fireEvent.click(screen.getByRole('button', { name: '停用 王经理' }));
+    expect(await screen.findByText('联系人已被引用')).toBeVisible();
+    expect(screen.getByLabelText('备注')).toHaveValue('未保存备注');
+  });
+
   it('keeps template blocks and signatures maintainable from the email settings area', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     fireEvent.click(await screen.findByRole('tab', { name: '邮件撰写' }));
@@ -104,11 +185,68 @@ describe('OutboundPage', () => {
     expect(await screen.findByRole('button', { name: '编辑模板 更新资料' })).toBeVisible();
     fireEvent.click(screen.getByText('附加段落'));
     expect(screen.getByRole('button', { name: '新增附加段落到 更新资料' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '新增邮件模板' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '新增邮件签名' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '编辑附加段落 METI 后更新' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '停用附加段落 METI 后更新' }));
     await waitFor(() => expect(api.deactivateOutboundTemplateBlock).toHaveBeenCalledWith(4));
     fireEvent.click(screen.getByRole('button', { name: '编辑签名 默认签名' }));
     fireEvent.change(screen.getByLabelText('签名内容'), { target: { value: '新版签名' } });
     fireEvent.click(screen.getByRole('button', { name: '保存签名' }));
     await waitFor(() => expect(api.updateOutboundSignature).toHaveBeenCalledWith(5, expect.objectContaining({ content: '新版签名', isDefault: true })));
+  });
+
+  it('keeps template editing open with its input when save fails', async () => {
+    const api = apiFixture(); api.updateOutboundTemplate.mockRejectedValue(new Error('模板编码冲突'));
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '邮件撰写' }));
+    fireEvent.click(screen.getByRole('button', { name: '模板与签名设置' }));
+    fireEvent.click(await screen.findByRole('button', { name: '编辑模板 更新资料' }));
+    fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '未保存模板名' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
+    expect(await screen.findByText('模板编码冲突')).toBeVisible();
+    expect(screen.getByLabelText('模板名称')).toHaveValue('未保存模板名');
+  });
+
+  it('creates templates and signatures and edits existing optional blocks', async () => {
+    const api = apiFixture();
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '邮件撰写' }));
+    fireEvent.click(screen.getByRole('button', { name: '模板与签名设置' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: '新增邮件模板' }));
+    fireEvent.change(screen.getByLabelText('模板编码'), { target: { value: 'initial_extra' } });
+    fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '首批补充模板' } });
+    fireEvent.change(screen.getByLabelText('主题模板'), { target: { value: '{{package_name}}' } });
+    fireEvent.change(screen.getByLabelText('正文模板'), { target: { value: '{{file_list}}' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
+    await waitFor(() => expect(api.createOutboundTemplate).toHaveBeenCalledWith(expect.objectContaining({ key: 'initial_extra', name: '首批补充模板' })));
+
+    fireEvent.click(screen.getByRole('button', { name: '新增邮件签名' }));
+    fireEvent.change(screen.getByLabelText('签名名称'), { target: { value: '供应商签名' } });
+    fireEvent.change(screen.getByLabelText('签名内容'), { target: { value: '顺祝商祺' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存签名' }));
+    await waitFor(() => expect(api.createOutboundSignature).toHaveBeenCalledWith(expect.objectContaining({ name: '供应商签名', content: '顺祝商祺' })));
+
+    fireEvent.click(screen.getByText('附加段落'));
+    fireEvent.click(screen.getByRole('button', { name: '编辑附加段落 METI 后更新' }));
+    fireEvent.change(screen.getByLabelText('段落内容'), { target: { value: 'METI 确认后另行更新。' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存附加段落' }));
+    await waitFor(() => expect(api.updateOutboundTemplateBlock).toHaveBeenCalledWith(4, expect.objectContaining({ bodyTemplate: 'METI 确认后另行更新。' })));
+  });
+
+  it('keeps a new signature form open when its write fails', async () => {
+    const api = apiFixture();
+    api.createOutboundSignature.mockRejectedValue(new Error('签名名称已存在'));
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '邮件撰写' }));
+    fireEvent.click(screen.getByRole('button', { name: '模板与签名设置' }));
+    fireEvent.click(await screen.findByRole('button', { name: '新增邮件签名' }));
+    fireEvent.change(screen.getByLabelText('签名名称'), { target: { value: '保留的新签名' } });
+    fireEvent.change(screen.getByLabelText('签名内容'), { target: { value: '未保存内容' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存签名' }));
+    expect(await screen.findByText('签名名称已存在')).toBeVisible();
+    expect(screen.getByLabelText('签名名称')).toHaveValue('保留的新签名');
+    expect(screen.getByLabelText('签名内容')).toHaveValue('未保存内容');
   });
 });

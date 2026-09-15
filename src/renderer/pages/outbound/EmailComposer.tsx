@@ -1,29 +1,182 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CreatedOutboundPackageView, OutboundContactView, OutboundEmailTemplateView, OutboundMaterialTypeView, OutboundSignatureView, PlannerApi, ProductView } from '../../data/client';
+import type {
+  CreatedOutboundPackageView,
+  OutboundContactView,
+  OutboundEmailTemplateView,
+  OutboundMaterialTypeView,
+  OutboundSignatureView,
+  PlannerApi,
+  ProductView,
+} from '../../data/client';
+import type { OutboundMailContext } from './PackageBuilder';
 
-async function copy(text: string, setMessage: (text: string) => void) { try { await navigator.clipboard.writeText(text); setMessage('已复制'); } catch { setMessage('复制失败，请手动选择文本'); } }
+async function copy(text: string, setMessage: (text: string) => void) {
+  try {
+    await navigator.clipboard.writeText(text);
+    setMessage('已复制');
+  } catch {
+    setMessage('复制失败，请手动选择文本');
+  }
+}
 
-export function EmailComposer({ api, latestPackage, product }: { api: PlannerApi; latestPackage: CreatedOutboundPackageView | null; product: ProductView | null }) {
-  const [contacts, setContacts] = useState<OutboundContactView[]>([]); const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]); const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
-  const [to, setTo] = useState<number[]>([]); const [cc, setCc] = useState<number[]>([]); const [templateId, setTemplateId] = useState(''); const [signatureId, setSignatureId] = useState(''); const [blocks, setBlocks] = useState<number[]>([]);
-  const [subject, setSubject] = useState(latestPackage?.packageName ?? ''); const [body, setBody] = useState(''); const [materialType, setMaterialType] = useState<OutboundMaterialTypeView>('update'); const [message, setMessage] = useState('');
-  useEffect(() => { void Promise.all([api.listOutboundContacts('active'), api.listOutboundTemplates('active'), api.listOutboundSignatures('active')]).then(([c, t, s]) => { setContacts(c); setTemplates(t); setSignatures(s); const preferred = t.find((x) => x.materialType === 'update') ?? t[0]; if (preferred) { setTemplateId(String(preferred.id)); setMaterialType(preferred.materialType); } const sig = s.find((x) => x.isDefault) ?? s[0]; if (sig) setSignatureId(String(sig.id)); }).catch((e) => setMessage(e instanceof Error ? e.message : '邮件资料加载失败')); }, [api]);
-  useEffect(() => { if (latestPackage) setSubject(latestPackage.packageName); }, [latestPackage]);
-  const template = templates.find((x) => x.id === Number(templateId)); const signature = signatures.find((x) => x.id === Number(signatureId));
-  const toText = contacts.filter((x) => to.includes(x.id)).map((x) => x.email).join('; '); const ccText = contacts.filter((x) => cc.includes(x.id)).map((x) => x.email).join('; ');
-  const selectedContacts = contacts.filter((x) => to.includes(x.id));
-  const optionalText = useMemo(() => template?.blocks.filter((x) => blocks.includes(x.id)).map((x) => x.bodyTemplate).join('\n') ?? '', [template, blocks]);
-  const generate = async () => { if (!template) return; const primary = selectedContacts[0]; const rendered = await api.renderOutboundTemplate(template.id, { package_name: latestPackage?.packageName ?? subject, company_name: primary?.company ?? '', contact_salutation: primary?.contactName ?? '', model: product?.model ?? '', product_category: product?.productCategory ?? '', change_description: '', file_list: '', optional_blocks: optionalText, signature: signature?.content ?? '' }); setSubject(rendered.subject); setBody(rendered.body); };
-  const toggle = (list: number[], id: number, setter: (v: number[]) => void) => setter(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-  return <section className="outbound-panel email-composer"><div className="email-settings-row"><label><span>资料类型</span><select aria-label="邮件资料类型" value={materialType} onChange={(e) => { const value = e.target.value as OutboundMaterialTypeView; setMaterialType(value); const next = templates.find((x) => x.materialType === value); if (next) { setTemplateId(String(next.id)); setBlocks([]); } }}><option value="initial">首批资料</option><option value="update">更新资料</option></select></label><label><span>邮件模板</span><select aria-label="邮件模板" value={templateId} onChange={(e) => { setTemplateId(e.target.value); setBlocks([]); }}><option value="">请选择</option>{templates.filter((x) => x.materialType === materialType).map((x) => <option value={x.id} key={x.id}>{x.name}</option>)}</select></label><label><span>签名</span><select aria-label="邮件签名" value={signatureId} onChange={(e) => setSignatureId(e.target.value)}><option value="">不使用</option>{signatures.map((x) => <option value={x.id} key={x.id}>{x.name}</option>)}</select></label></div>
-    <fieldset><legend>收件人</legend>{contacts.map((x) => <label key={`to-${x.id}`}><input type="checkbox" aria-label={`收件人 ${x.contactName}`} checked={to.includes(x.id)} onChange={() => toggle(to, x.id, setTo)} />{x.company} · {x.contactName} · {x.email}</label>)}</fieldset>
-    <fieldset><legend>抄送</legend>{contacts.map((x) => <label key={`cc-${x.id}`}><input type="checkbox" aria-label={`抄送 ${x.contactName}`} checked={cc.includes(x.id)} onChange={() => toggle(cc, x.id, setCc)} />{x.company} · {x.contactName} · {x.email}</label>)}</fieldset>
-    {template?.blocks.length ? <fieldset><legend>可选附加段落</legend>{template.blocks.filter((x) => x.status === 'active').map((x) => <label key={x.id}><input type="checkbox" aria-label={`附加段落 ${x.name}`} checked={blocks.includes(x.id)} onChange={() => toggle(blocks, x.id, setBlocks)} />{x.name}</label>)}</fieldset> : null}
-    <button className="secondary-button" type="button" disabled={!templateId} onClick={() => void generate()}>生成邮件内容</button>
-    <label><span>收件人</span><input aria-label="收件人文本" readOnly value={toText} /></label><button className="text-button" type="button" onClick={() => void copy(toText, setMessage)}>复制收件人</button>
-    <label><span>抄送</span><input aria-label="抄送文本" readOnly value={ccText} /></label><button className="text-button" type="button" onClick={() => void copy(ccText, setMessage)}>复制抄送</button>
-    <label><span>主题</span><input aria-label="主题" value={subject} onChange={(e) => setSubject(e.target.value)} /></label><button className="text-button" type="button" onClick={() => void copy(subject, setMessage)}>复制主题</button>
-    <label><span>正文</span><textarea aria-label="正文" rows={14} value={body} onChange={(e) => setBody(e.target.value)} /></label><button className="text-button" type="button" onClick={() => void copy(body, setMessage)}>复制正文</button>
-    <button className="primary-button" type="button" onClick={() => void copy(`收件人：${toText}\n抄送：${ccText}\n主题：${subject}\n正文：\n${body}`, setMessage)}>全部复制</button>{message && <p className="muted-text">{message}</p>}
-  </section>;
+interface EmailComposerProps {
+  api: PlannerApi;
+  latestPackage: CreatedOutboundPackageView | null;
+  product: ProductView | null;
+  mailContext: OutboundMailContext | null;
+}
+
+export function EmailComposer({ api, latestPackage, product, mailContext }: EmailComposerProps) {
+  const [contacts, setContacts] = useState<OutboundContactView[]>([]);
+  const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
+  const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
+  const [to, setTo] = useState<number[]>([]);
+  const [cc, setCc] = useState<number[]>([]);
+  const [templateId, setTemplateId] = useState('');
+  const [signatureId, setSignatureId] = useState('');
+  const [blocks, setBlocks] = useState<number[]>([]);
+  const [subject, setSubject] = useState(latestPackage?.packageName ?? mailContext?.packageName ?? '');
+  const [body, setBody] = useState('');
+  const [materialType, setMaterialType] = useState<OutboundMaterialTypeView>(mailContext?.materialType ?? 'update');
+  const [changeDescription, setChangeDescription] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    void Promise.all([
+      api.listOutboundContacts('active'),
+      api.listOutboundTemplates('active'),
+      api.listOutboundSignatures('active'),
+    ]).then(([nextContacts, nextTemplates, nextSignatures]) => {
+      setContacts(nextContacts);
+      setTemplates(nextTemplates);
+      setSignatures(nextSignatures);
+      const desiredType = mailContext?.materialType ?? 'update';
+      const preferred = nextTemplates.find((item) => item.materialType === desiredType) ?? nextTemplates[0];
+      if (preferred) {
+        setTemplateId(String(preferred.id));
+        setMaterialType(preferred.materialType);
+      }
+      const preferredSignature = nextSignatures.find((item) => item.isDefault) ?? nextSignatures[0];
+      if (preferredSignature) setSignatureId(String(preferredSignature.id));
+    }).catch((error) => setMessage(error instanceof Error ? error.message : '邮件资料加载失败'));
+  }, [api, mailContext?.materialType]);
+
+  useEffect(() => {
+    const packageName = latestPackage?.packageName ?? mailContext?.packageName;
+    if (packageName) setSubject(packageName);
+  }, [latestPackage, mailContext?.packageName]);
+
+  const template = templates.find((item) => item.id === Number(templateId));
+  const signature = signatures.find((item) => item.id === Number(signatureId));
+  const effectiveProduct = mailContext?.product ?? product;
+  const toText = contacts.filter((item) => to.includes(item.id)).map((item) => item.email).join('; ');
+  const ccText = contacts.filter((item) => cc.includes(item.id)).map((item) => item.email).join('; ');
+  const selectedContacts = contacts.filter((item) => to.includes(item.id));
+  const optionalText = useMemo(
+    () => template?.blocks.filter((item) => blocks.includes(item.id)).map((item) => item.bodyTemplate).join('\n') ?? '',
+    [template, blocks],
+  );
+  const fileList = useMemo(
+    () => mailContext?.items.map((item) => `${item.projectItemName}：${item.fileName}（来源：${item.sourceBatchName}）`).join('\n') ?? '',
+    [mailContext],
+  );
+
+  const generate = async () => {
+    if (!template) return;
+    setMessage('');
+    const primary = selectedContacts[0];
+    try {
+      const rendered = await api.renderOutboundTemplate(template.id, {
+        package_name: latestPackage?.packageName ?? mailContext?.packageName ?? subject,
+        company_name: primary?.company ?? '',
+        contact_salutation: primary?.contactName ?? '',
+        model: effectiveProduct?.model ?? '',
+        product_category: effectiveProduct?.productCategory ?? '',
+        change_description: changeDescription,
+        file_list: fileList,
+        optional_blocks: optionalText,
+        signature: signature?.content ?? '',
+      });
+      setSubject(rendered.subject);
+      setBody(rendered.body);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '邮件内容生成失败');
+    }
+  };
+
+  const toggle = (list: number[], id: number, setter: (value: number[]) => void) => {
+    setter(list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
+  };
+
+  return (
+    <section className="outbound-panel email-composer">
+      <div className="email-settings-row">
+        <label>
+          <span>资料类型</span>
+          <select
+            aria-label="邮件资料类型"
+            value={materialType}
+            onChange={(event) => {
+              const value = event.target.value as OutboundMaterialTypeView;
+              setMaterialType(value);
+              const next = templates.find((item) => item.materialType === value);
+              if (next) {
+                setTemplateId(String(next.id));
+                setBlocks([]);
+              }
+            }}
+          >
+            <option value="initial">首批资料</option>
+            <option value="update">更新资料</option>
+          </select>
+        </label>
+        <label>
+          <span>邮件模板</span>
+          <select aria-label="邮件模板" value={templateId} onChange={(event) => { setTemplateId(event.target.value); setBlocks([]); }}>
+            <option value="">请选择</option>
+            {templates.filter((item) => item.materialType === materialType).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>签名</span>
+          <select aria-label="邮件签名" value={signatureId} onChange={(event) => setSignatureId(event.target.value)}>
+            <option value="">不使用</option>
+            {signatures.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+          </select>
+        </label>
+      </div>
+      {materialType === 'update' && (
+        <label>
+          <span>本次变更内容</span>
+          <textarea aria-label="本次变更内容" rows={3} value={changeDescription} onChange={(event) => setChangeDescription(event.target.value)} />
+        </label>
+      )}
+      {fileList && <p className="muted-text">邮件文件清单将使用当前打包预览中已勾选的文件。</p>}
+      <fieldset>
+        <legend>收件人</legend>
+        {contacts.map((item) => <label key={`to-${item.id}`}><input type="checkbox" aria-label={`收件人 ${item.contactName}`} checked={to.includes(item.id)} onChange={() => toggle(to, item.id, setTo)} />{item.company} · {item.contactName} · {item.email}</label>)}
+      </fieldset>
+      <fieldset>
+        <legend>抄送</legend>
+        {contacts.map((item) => <label key={`cc-${item.id}`}><input type="checkbox" aria-label={`抄送 ${item.contactName}`} checked={cc.includes(item.id)} onChange={() => toggle(cc, item.id, setCc)} />{item.company} · {item.contactName} · {item.email}</label>)}
+      </fieldset>
+      {template?.blocks.length ? (
+        <fieldset>
+          <legend>可选附加段落</legend>
+          {template.blocks.filter((item) => item.status === 'active').map((item) => <label key={item.id}><input type="checkbox" aria-label={`附加段落 ${item.name}`} checked={blocks.includes(item.id)} onChange={() => toggle(blocks, item.id, setBlocks)} />{item.name}</label>)}
+        </fieldset>
+      ) : null}
+      <button className="secondary-button" type="button" disabled={!templateId} onClick={() => void generate()}>生成邮件内容</button>
+      <label><span>收件人</span><input aria-label="收件人文本" readOnly value={toText} /></label>
+      <button className="text-button" type="button" onClick={() => void copy(toText, setMessage)}>复制收件人</button>
+      <label><span>抄送</span><input aria-label="抄送文本" readOnly value={ccText} /></label>
+      <button className="text-button" type="button" onClick={() => void copy(ccText, setMessage)}>复制抄送</button>
+      <label><span>主题</span><input aria-label="主题" value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
+      <button className="text-button" type="button" onClick={() => void copy(subject, setMessage)}>复制主题</button>
+      <label><span>正文</span><textarea aria-label="正文" rows={14} value={body} onChange={(event) => setBody(event.target.value)} /></label>
+      <button className="text-button" type="button" onClick={() => void copy(body, setMessage)}>复制正文</button>
+      <button className="primary-button" type="button" onClick={() => void copy(`收件人：${toText}\n抄送：${ccText}\n主题：${subject}\n正文：\n${body}`, setMessage)}>全部复制</button>
+      {message && <p className={message === '已复制' ? 'muted-text' : 'error-banner'}>{message}</p>}
+    </section>
+  );
 }

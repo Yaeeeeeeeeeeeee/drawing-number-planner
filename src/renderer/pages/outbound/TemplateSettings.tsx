@@ -1,17 +1,181 @@
 import { useEffect, useState } from 'react';
-import type { OutboundEmailTemplateView, OutboundSignatureView, PlannerApi } from '../../data/client';
+import type {
+  OutboundEmailTemplateInputView,
+  OutboundEmailTemplateView,
+  OutboundSignatureInputView,
+  OutboundSignatureView,
+  OutboundTemplateBlockInputView,
+  OutboundTemplateBlockView,
+  PlannerApi,
+} from '../../data/client';
+
+const blankTemplate: OutboundEmailTemplateInputView = {
+  key: '', name: '', materialType: 'initial', subjectTemplate: '', bodyTemplate: '',
+};
+const blankBlock: OutboundTemplateBlockInputView = { key: '', name: '', bodyTemplate: '', displayOrder: 0 };
+const blankSignature: OutboundSignatureInputView = { name: '', content: '', isDefault: false };
 
 export function TemplateSettings({ api }: { api: PlannerApi }) {
-  const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]); const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]); const [message, setMessage] = useState('');
-  const [editTemplate, setEditTemplate] = useState<OutboundEmailTemplateView | null>(null); const [newBlockFor, setNewBlockFor] = useState<number | null>(null);
-  const [blockForm, setBlockForm] = useState({ key: '', name: '', bodyTemplate: '', displayOrder: 0 }); const [editSignature, setEditSignature] = useState<OutboundSignatureView | null>(null);
-  const load = () => Promise.all([api.listOutboundTemplates('all'), api.listOutboundSignatures('all')]).then(([t, s]) => { setTemplates(t); setSignatures(s); });
-  useEffect(() => { void load().catch((e) => setMessage(e instanceof Error ? e.message : '模板设置加载失败')); }, [api]);
-  const run = async (operation: () => Promise<unknown>) => { setMessage(''); try { await operation(); await load(); } catch (e) { setMessage(e instanceof Error ? e.message : '操作失败'); } };
-  return <section className="template-settings"><h3>邮件模板与签名</h3><p className="muted-text">模板中的可变字段由系统校验，特殊说明使用附加段落管理。</p>{message && <p className="error-banner">{message}</p>}
-    <div className="settings-columns"><section><h4>邮件模板</h4>{templates.map((item) => <article key={item.id}><strong>{item.name}</strong><small>{item.materialType === 'initial' ? '首批资料' : '更新资料'} · {item.status === 'active' ? '启用中' : '已停用'}</small><div><button className="text-button" type="button" aria-label={`编辑模板 ${item.name}`} onClick={() => setEditTemplate({ ...item })}>编辑</button><button className="text-button" type="button" onClick={() => void run(() => item.status === 'active' ? api.deactivateOutboundTemplate(item.id) : api.activateOutboundTemplate(item.id))}>{item.status === 'active' ? '停用' : '启用'}</button><button className="text-button danger" type="button" onClick={() => window.confirm(`确认删除模板 ${item.name}？`) && void run(() => api.deleteOutboundTemplate(item.id))}>删除</button></div>
-      {editTemplate?.id === item.id && <form aria-label="邮件模板编辑" onSubmit={(e) => { e.preventDefault(); void run(() => api.updateOutboundTemplate(item.id, { key: editTemplate.key, name: editTemplate.name, materialType: editTemplate.materialType, subjectTemplate: editTemplate.subjectTemplate, bodyTemplate: editTemplate.bodyTemplate })).then(() => setEditTemplate(null)); }}><label><span>模板名称</span><input value={editTemplate.name} onChange={(e) => setEditTemplate({ ...editTemplate, name: e.target.value })} /></label><label><span>主题模板</span><input value={editTemplate.subjectTemplate} onChange={(e) => setEditTemplate({ ...editTemplate, subjectTemplate: e.target.value })} /></label><label><span>正文模板</span><textarea rows={6} value={editTemplate.bodyTemplate} onChange={(e) => setEditTemplate({ ...editTemplate, bodyTemplate: e.target.value })} /></label><button className="primary-button" type="submit">保存模板</button><button className="text-button" type="button" onClick={() => setEditTemplate(null)}>取消</button></form>}
-      <details><summary>附加段落</summary>{item.blocks.map((block) => <div key={block.id}><span>{block.name} · {block.status === 'active' ? '启用中' : '已停用'}</span><button className="text-button" aria-label={`${block.status === 'active' ? '停用' : '启用'}附加段落 ${block.name}`} type="button" onClick={() => void run(() => block.status === 'active' ? api.deactivateOutboundTemplateBlock(block.id) : api.activateOutboundTemplateBlock(block.id))}>{block.status === 'active' ? '停用' : '启用'}</button><button className="text-button danger" type="button" onClick={() => window.confirm(`确认删除附加段落 ${block.name}？`) && void run(() => api.deleteOutboundTemplateBlock(block.id))}>删除</button></div>)}<button className="text-button" type="button" aria-label={`新增附加段落到 ${item.name}`} onClick={() => { setNewBlockFor(item.id); setBlockForm({ key: '', name: '', bodyTemplate: '', displayOrder: item.blocks.length }); }}>新增附加段落</button>{newBlockFor === item.id && <form aria-label="附加段落编辑" onSubmit={(e) => { e.preventDefault(); void run(() => api.createOutboundTemplateBlock(item.id, blockForm)).then(() => setNewBlockFor(null)); }}><input aria-label="段落编码" required value={blockForm.key} onChange={(e) => setBlockForm({ ...blockForm, key: e.target.value })} /><input aria-label="段落名称" required value={blockForm.name} onChange={(e) => setBlockForm({ ...blockForm, name: e.target.value })} /><textarea aria-label="段落内容" required value={blockForm.bodyTemplate} onChange={(e) => setBlockForm({ ...blockForm, bodyTemplate: e.target.value })} /><button type="submit">保存附加段落</button></form>}</details></article>)}</section>
-      <section><h4>邮件签名</h4>{signatures.map((item) => <article key={item.id}><strong>{item.name}{item.isDefault ? ' · 默认' : ''}</strong><pre>{item.content}</pre><div><button className="text-button" type="button" aria-label={`编辑签名 ${item.name}`} onClick={() => setEditSignature({ ...item })}>编辑</button><button className="text-button" type="button" onClick={() => void run(() => item.status === 'active' ? api.deactivateOutboundSignature(item.id) : api.activateOutboundSignature(item.id))}>{item.status === 'active' ? '停用' : '启用'}</button><button className="text-button danger" type="button" onClick={() => window.confirm(`确认删除签名 ${item.name}？`) && void run(() => api.deleteOutboundSignature(item.id))}>删除</button></div>{editSignature?.id === item.id && <form aria-label="签名编辑" onSubmit={(e) => { e.preventDefault(); void run(() => api.updateOutboundSignature(item.id, { name: editSignature.name, content: editSignature.content, isDefault: editSignature.isDefault })).then(() => setEditSignature(null)); }}><label><span>签名名称</span><input aria-label="签名名称" value={editSignature.name} onChange={(e) => setEditSignature({ ...editSignature, name: e.target.value })} /></label><label><span>签名内容</span><textarea aria-label="签名内容" value={editSignature.content} onChange={(e) => setEditSignature({ ...editSignature, content: e.target.value })} /></label><label><input type="checkbox" checked={editSignature.isDefault} onChange={(e) => setEditSignature({ ...editSignature, isDefault: e.target.checked })} />设为默认</label><button className="primary-button" type="submit">保存签名</button></form>}</article>)}</section></div>
-  </section>;
+  const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
+  const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
+  const [message, setMessage] = useState('');
+  const [editTemplate, setEditTemplate] = useState<OutboundEmailTemplateInputView & { id?: number } | null>(null);
+  const [blockEditor, setBlockEditor] = useState<{ templateId: number; id?: number; form: OutboundTemplateBlockInputView } | null>(null);
+  const [editSignature, setEditSignature] = useState<OutboundSignatureInputView & { id?: number } | null>(null);
+
+  const load = async () => {
+    const [nextTemplates, nextSignatures] = await Promise.all([
+      api.listOutboundTemplates('all'),
+      api.listOutboundSignatures('all'),
+    ]);
+    setTemplates(nextTemplates);
+    setSignatures(nextSignatures);
+  };
+
+  useEffect(() => {
+    void load().catch((error) => setMessage(error instanceof Error ? error.message : '模板设置加载失败'));
+  }, [api]);
+
+  const run = async (operation: () => Promise<unknown>): Promise<boolean> => {
+    setMessage('');
+    try {
+      await operation();
+      await load();
+      return true;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '操作失败');
+      return false;
+    }
+  };
+
+  const templateForm = (value: OutboundEmailTemplateInputView & { id?: number }) => (
+    <form
+      aria-label="邮件模板编辑"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void (async () => {
+          const input = { key: value.key, name: value.name, materialType: value.materialType, subjectTemplate: value.subjectTemplate, bodyTemplate: value.bodyTemplate };
+          const ok = await run(() => value.id ? api.updateOutboundTemplate(value.id, input) : api.createOutboundTemplate(input));
+          if (ok) setEditTemplate(null);
+        })();
+      }}
+    >
+      <label><span>模板编码</span><input aria-label="模板编码" required value={value.key} onChange={(event) => setEditTemplate({ ...value, key: event.target.value })} /></label>
+      <label><span>模板名称</span><input aria-label="模板名称" required value={value.name} onChange={(event) => setEditTemplate({ ...value, name: event.target.value })} /></label>
+      <label>
+        <span>资料类型</span>
+        <select aria-label="模板资料类型" value={value.materialType} onChange={(event) => setEditTemplate({ ...value, materialType: event.target.value as 'initial' | 'update' })}>
+          <option value="initial">首批资料</option><option value="update">更新资料</option>
+        </select>
+      </label>
+      <label><span>主题模板</span><input aria-label="主题模板" required value={value.subjectTemplate} onChange={(event) => setEditTemplate({ ...value, subjectTemplate: event.target.value })} /></label>
+      <label><span>正文模板</span><textarea aria-label="正文模板" rows={6} required value={value.bodyTemplate} onChange={(event) => setEditTemplate({ ...value, bodyTemplate: event.target.value })} /></label>
+      <button className="primary-button" type="submit">保存模板</button>
+      <button className="text-button" type="button" onClick={() => setEditTemplate(null)}>取消</button>
+    </form>
+  );
+
+  const blockForm = (editor: NonNullable<typeof blockEditor>) => (
+    <form
+      aria-label="附加段落编辑"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void (async () => {
+          const ok = await run(() => editor.id
+            ? api.updateOutboundTemplateBlock(editor.id, { name: editor.form.name, bodyTemplate: editor.form.bodyTemplate, displayOrder: editor.form.displayOrder })
+            : api.createOutboundTemplateBlock(editor.templateId, editor.form));
+          if (ok) setBlockEditor(null);
+        })();
+      }}
+    >
+      {!editor.id && <input aria-label="段落编码" required value={editor.form.key} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, key: event.target.value } })} />}
+      <input aria-label="段落名称" required value={editor.form.name} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, name: event.target.value } })} />
+      <textarea aria-label="段落内容" required value={editor.form.bodyTemplate} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, bodyTemplate: event.target.value } })} />
+      <input aria-label="显示顺序" type="number" value={editor.form.displayOrder} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, displayOrder: Number(event.target.value) } })} />
+      <button type="submit">保存附加段落</button>
+      <button className="text-button" type="button" onClick={() => setBlockEditor(null)}>取消</button>
+    </form>
+  );
+
+  const signatureForm = (value: OutboundSignatureInputView & { id?: number }) => (
+    <form
+      aria-label="签名编辑"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void (async () => {
+          const input = { name: value.name, content: value.content, isDefault: value.isDefault };
+          const ok = await run(() => value.id ? api.updateOutboundSignature(value.id, input) : api.createOutboundSignature(input));
+          if (ok) setEditSignature(null);
+        })();
+      }}
+    >
+      <label><span>签名名称</span><input aria-label="签名名称" required value={value.name} onChange={(event) => setEditSignature({ ...value, name: event.target.value })} /></label>
+      <label><span>签名内容</span><textarea aria-label="签名内容" required value={value.content} onChange={(event) => setEditSignature({ ...value, content: event.target.value })} /></label>
+      <label><input type="checkbox" checked={value.isDefault} onChange={(event) => setEditSignature({ ...value, isDefault: event.target.checked })} />设为默认</label>
+      <button className="primary-button" type="submit">保存签名</button>
+      <button className="text-button" type="button" onClick={() => setEditSignature(null)}>取消</button>
+    </form>
+  );
+
+  const beginBlockEdit = (templateId: number, block: OutboundTemplateBlockView) => {
+    setBlockEditor({ templateId, id: block.id, form: { key: block.key, name: block.name, bodyTemplate: block.bodyTemplate, displayOrder: block.displayOrder } });
+  };
+
+  return (
+    <section className="template-settings">
+      <h3>邮件模板与签名</h3>
+      <p className="muted-text">模板中的可变字段由系统校验，特殊说明使用附加段落管理。</p>
+      {message && <p className="error-banner">{message}</p>}
+      <div className="settings-columns">
+        <section>
+          <h4>邮件模板</h4>
+          <button className="primary-button" type="button" onClick={() => setEditTemplate({ ...blankTemplate })}>新增邮件模板</button>
+          {editTemplate && !editTemplate.id && templateForm(editTemplate)}
+          {templates.map((item) => (
+            <article key={item.id}>
+              <strong>{item.name}</strong>
+              <small>{item.materialType === 'initial' ? '首批资料' : '更新资料'} · {item.status === 'active' ? '启用中' : '已停用'}</small>
+              <div>
+                <button className="text-button" type="button" aria-label={`编辑模板 ${item.name}`} onClick={() => setEditTemplate({ id: item.id, key: item.key, name: item.name, materialType: item.materialType, subjectTemplate: item.subjectTemplate, bodyTemplate: item.bodyTemplate })}>编辑</button>
+                <button className="text-button" type="button" onClick={() => void run(() => item.status === 'active' ? api.deactivateOutboundTemplate(item.id) : api.activateOutboundTemplate(item.id))}>{item.status === 'active' ? '停用' : '启用'}</button>
+                <button className="text-button danger" type="button" onClick={() => window.confirm(`确认删除模板 ${item.name}？`) && void run(() => api.deleteOutboundTemplate(item.id))}>删除</button>
+              </div>
+              {editTemplate?.id === item.id && templateForm(editTemplate)}
+              <details>
+                <summary>附加段落</summary>
+                {item.blocks.map((block) => (
+                  <div key={block.id}>
+                    <span>{block.name} · {block.status === 'active' ? '启用中' : '已停用'}</span>
+                    <button className="text-button" type="button" aria-label={`编辑附加段落 ${block.name}`} onClick={() => beginBlockEdit(item.id, block)}>编辑</button>
+                    <button className="text-button" type="button" aria-label={`${block.status === 'active' ? '停用' : '启用'}附加段落 ${block.name}`} onClick={() => void run(() => block.status === 'active' ? api.deactivateOutboundTemplateBlock(block.id) : api.activateOutboundTemplateBlock(block.id))}>{block.status === 'active' ? '停用' : '启用'}</button>
+                    <button className="text-button danger" type="button" onClick={() => window.confirm(`确认删除附加段落 ${block.name}？`) && void run(() => api.deleteOutboundTemplateBlock(block.id))}>删除</button>
+                    {blockEditor?.id === block.id && blockForm(blockEditor)}
+                  </div>
+                ))}
+                <button className="text-button" type="button" aria-label={`新增附加段落到 ${item.name}`} onClick={() => setBlockEditor({ templateId: item.id, form: { ...blankBlock, displayOrder: item.blocks.length } })}>新增附加段落</button>
+                {blockEditor?.templateId === item.id && !blockEditor.id && blockForm(blockEditor)}
+              </details>
+            </article>
+          ))}
+        </section>
+        <section>
+          <h4>邮件签名</h4>
+          <button className="primary-button" type="button" onClick={() => setEditSignature({ ...blankSignature })}>新增邮件签名</button>
+          {editSignature && !editSignature.id && signatureForm(editSignature)}
+          {signatures.map((item) => (
+            <article key={item.id}>
+              <strong>{item.name}{item.isDefault ? ' · 默认' : ''}</strong>
+              <pre>{item.content}</pre>
+              <div>
+                <button className="text-button" type="button" aria-label={`编辑签名 ${item.name}`} onClick={() => setEditSignature({ id: item.id, name: item.name, content: item.content, isDefault: item.isDefault })}>编辑</button>
+                <button className="text-button" type="button" onClick={() => void run(() => item.status === 'active' ? api.deactivateOutboundSignature(item.id) : api.activateOutboundSignature(item.id))}>{item.status === 'active' ? '停用' : '启用'}</button>
+                <button className="text-button danger" type="button" onClick={() => window.confirm(`确认删除签名 ${item.name}？`) && void run(() => api.deleteOutboundSignature(item.id))}>删除</button>
+              </div>
+              {editSignature?.id === item.id && signatureForm(editSignature)}
+            </article>
+          ))}
+        </section>
+      </div>
+    </section>
+  );
 }
