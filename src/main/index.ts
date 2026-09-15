@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { LocalServiceController } from './local-service-controller.js';
+import { loadDesktopSurface } from './desktop-startup.js';
 import { createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
 import { createChooseOutboundDirectoryHandler, createShowOutboundPackageHandler } from './outbound-file-actions.js';
 
@@ -23,7 +24,6 @@ async function createWindow() {
       ...(devServerUrl ? {} : { rendererDir: join(app.getAppPath(), 'dist', 'renderer') }),
     },
   });
-  const connection = await localService.start();
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -41,7 +41,13 @@ async function createWindow() {
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.once('closed', () => { mainWindow = undefined; });
-  await mainWindow.loadURL(devServerUrl ?? connection.url);
+  const result = await loadDesktopSurface({
+    startService: () => localService!.start(),
+    loadURL: (url) => mainWindow!.loadURL(url),
+    businessUrl: (connection) => devServerUrl ?? connection.url,
+    quit: () => app.quit(),
+  });
+  if (result.status === 'unavailable') console.error('[main] local service unavailable', result.error);
 }
 
 app.whenReady().then(() => {

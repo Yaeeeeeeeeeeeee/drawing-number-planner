@@ -115,10 +115,10 @@ export class LocalServiceController {
   setOutboundOutputRoot(path: string): Promise<string> { return this.request('setOutboundOutputRoot', [path]); }
   resolveOutboundPackagePath(id: unknown): Promise<string> { return this.request('resolveOutboundPackagePath', [id]); }
 
-  private spawnService(resetAttempts: boolean): Promise<LocalServiceConnection> {
+  private spawnService(resetAttempts: boolean, scheduled?: Deferred<LocalServiceConnection>): Promise<LocalServiceConnection> {
     if (resetAttempts) this.state = { status: 'starting', restartAttempts: 0 };
     else this.state = { status: 'starting', restartAttempts: this.state.restartAttempts };
-    const starting = deferred<LocalServiceConnection>(); this.startup = starting;
+    const starting = scheduled ?? deferred<LocalServiceConnection>(); this.startup = starting;
     const spawn = this.options.spawn ?? ((entryPath: string) => fork(entryPath, [], {
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
@@ -201,9 +201,12 @@ export class LocalServiceController {
     }
     const nextAttempt = attempts + 1;
     this.state = { status: 'starting', restartAttempts: nextAttempt };
+    const scheduled = deferred<LocalServiceConnection>();
+    this.startup = scheduled;
+    void scheduled.promise.catch(() => undefined);
     this.restartTimer = setTimeout(() => {
       this.restartTimer = undefined;
-      void this.spawnService(false).catch(() => undefined);
+      void this.spawnService(false, scheduled).catch(() => undefined);
     }, this.options.restartBackoffMs * nextAttempt);
   }
 

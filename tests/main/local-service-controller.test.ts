@@ -83,6 +83,26 @@ describe('LocalServiceController', () => {
     expect(controller.health()).toEqual({ status: 'failed', restartAttempts: 2, error: '本地服务异常退出，自动恢复次数已用尽' });
   });
 
+  it('shares one pending generation when start is called during automatic-restart backoff', async () => {
+    vi.useFakeTimers();
+    const first = new FakeChild(); const recovered = new FakeChild();
+    const spawn = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(recovered);
+    const controller = new LocalServiceController({ entryPath: 'entry.js', config, spawn,
+      maxAutoRestarts: 2, restartBackoffMs: 50 });
+    const initial = controller.start(); first.emit('message', { type: 'ready', url: 'http://127.0.0.1:4317', token: 'a' }); await initial;
+
+    first.emit('exit', 1, null);
+    const waitingOne = controller.start(); const waitingTwo = controller.start();
+    expect(waitingOne).toBe(waitingTwo);
+    await vi.advanceTimersByTimeAsync(49); expect(spawn).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1); expect(spawn).toHaveBeenCalledTimes(2);
+    recovered.emit('message', { type: 'ready', url: 'http://127.0.0.1:4317', token: 'b' });
+    await expect(waitingOne).resolves.toMatchObject({ token: 'b' });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(controller.health()).toMatchObject({ status: 'running', restartAttempts: 1 });
+  });
+
   it('does not turn a failed startup into an automatic restart loop when the child exits', async () => {
     vi.useFakeTimers();
     const child = new FakeChild(); const spawn = vi.fn(() => child);
