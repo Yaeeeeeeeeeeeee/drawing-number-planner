@@ -52,6 +52,8 @@ export interface RunningServer {
   resolvePdfFilePath(id: unknown): string;
   resolveBomAssetPath(id: unknown): string;
   resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
+  setOutboundOutputRoot(path: string): string;
+  resolveOutboundPackagePath(id: unknown): string;
   close(): Promise<void>;
 }
 
@@ -147,6 +149,17 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
           if (error instanceof QrFileResolverError) throw error;
           throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
         }
+      },
+      setOutboundOutputRoot: (path) => workspaceSettings.setOutboundOutputRoot(path),
+      resolveOutboundPackagePath: (id) => {
+        if (!Number.isInteger(id) || Number(id) <= 0) throw new Error('外发压缩包编号无效');
+        const row = database.prepare("select zip_relative_path as relativePath from outbound_packages where id = ? and status = 'completed'")
+          .get(id) as { relativePath: string | null } | undefined;
+        if (!row?.relativePath) throw new Error('未找到已完成的外发压缩包');
+        const outputRoot = workspaceSettings.getOutboundOutputRoot() ?? paths.exports;
+        const resolved = resolveWorkspacePath(outputRoot, row.relativePath, { requireExistingParent: true });
+        try { const canonical = realpathSync.native(resolved); if (!statSync(canonical).isFile()) throw new Error(); return canonical; }
+        catch { throw new Error('压缩包当前不可用'); }
       },
       close: async () => {
         server!.server.closeAllConnections();

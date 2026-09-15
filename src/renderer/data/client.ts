@@ -189,6 +189,19 @@ export interface OutboundSignatureView {
   createdAt: string; updatedAt: string;
 }
 export interface OutboundSignatureInputView { name: string; content: string; isDefault: boolean }
+export type OutboundPackageModeView = 'change_only' | 'current_complete';
+export interface OutboundPackageRequestView {
+  productId: number; selectedMaterialBatchId: number; materialType: OutboundMaterialTypeView; packageMode: OutboundPackageModeView;
+}
+export interface OutboundPackagePreviewItemView {
+  slotKey: string; fullCode: string | null; projectItemId: number | null; projectItemName: string;
+  pdfFileId: number | null; fileName: string | null; relativePath: string | null; sourceBatchId: number;
+  sourceBatchName: string; status: 'normal' | 'carried_forward' | 'needs_confirmation' | 'conflict' | 'missing';
+  change: 'new' | 'replaced' | 'copied' | 'carried_forward' | 'same_code_changed' | 'conflict';
+  selectable: boolean; conflictFullCodes: string[];
+}
+export interface OutboundPackagePreviewView { previewToken: string; packageName: string; items: OutboundPackagePreviewItemView[] }
+export interface CreatedOutboundPackageView { id: number; packageName: string; zipRelativePath: string; fileCount: number; createdAt: string }
 export interface MaterialBatchLogicalMaterialView {
   fullCode: string | null; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
 }
@@ -277,6 +290,8 @@ export interface PlannerApi {
   activateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deactivateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deleteOutboundSignature(id: number): Promise<{ deleted: true }>;
+  previewOutboundPackage(input: OutboundPackageRequestView): Promise<OutboundPackagePreviewView>;
+  createOutboundPackage(input: OutboundPackageRequestView & { previewToken: string; selectedPdfFileIds: number[] }): Promise<CreatedOutboundPackageView>;
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
   confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
@@ -496,6 +511,8 @@ export const apiClient: PlannerApi = {
   activateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/activate`, json('POST')),
   deactivateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/deactivate`, json('POST')),
   deleteOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`, { method: 'DELETE' }),
+  previewOutboundPackage: (input) => request('/api/outbound-packages/preview', json('POST', input)),
+  createOutboundPackage: (input) => request('/api/outbound-packages', json('POST', input)),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(
     '/api/products/historical-candidates')).items,
   confirmHistoricalProductCandidate: (input) => request('/api/products/historical-candidates/confirm', json('POST', input)),

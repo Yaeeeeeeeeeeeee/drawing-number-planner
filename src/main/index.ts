@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { startServer, type RunningServer } from '../server/start-server.js';
 import { createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
+import { createChooseOutboundDirectoryHandler, createShowOutboundPackageHandler } from './outbound-file-actions.js';
 
 let runningServer: RunningServer | undefined;
 let mainWindow: BrowserWindow | undefined;
@@ -61,6 +62,14 @@ app.whenReady().then(() => {
     openPath: (path) => shell.openPath(path),
     showItemInFolder: (path) => shell.showItemInFolder(path),
     readFile: (path) => readFileSync(path),
+  }));
+  ipcMain.handle('planner:choose-outbound-directory', createChooseOutboundDirectoryHandler({
+    chooseDirectory: async () => dialog.showOpenDialog(mainWindow!, { title: '选择外发压缩包保存目录', properties: ['openDirectory', 'createDirectory'] }),
+    setOutputRoot: (path) => { if (!runningServer) throw new Error('本机文件服务尚未启动'); return runningServer.setOutboundOutputRoot(path); },
+  }));
+  ipcMain.handle('planner:show-outbound-package-in-folder', createShowOutboundPackageHandler({
+    resolvePackagePath: (id) => { if (!runningServer) throw new Error('本机文件服务尚未启动'); return runningServer.resolveOutboundPackagePath(id); },
+    showItemInFolder: (path) => shell.showItemInFolder(path),
   }));
   return createWindow();
 }).catch((error) => {
