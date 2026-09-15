@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createWriteStream, existsSync, linkSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { closeSync, createWriteStream, existsSync, openSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, win32 } from 'node:path';
 
 import type { Archiver } from 'archiver';
@@ -17,7 +17,8 @@ import type { CreateOutboundPackageInput, CreatedOutboundPackage, OutboundPackag
 
 export type OutboundPackageErrorCode = 'PRODUCT_NOT_FOUND' | 'PACKAGE_EMPTY' | 'PACKAGE_HAS_BLOCKERS'
   | 'INVALID_SELECTION' | 'PREVIEW_STALE' | 'DUPLICATE_ACTUAL_PATH' | 'OUTPUT_NOT_CONFIGURED'
-  | 'OUTPUT_ALREADY_EXISTS' | 'ARCHIVE_NAME_CONFLICT' | 'OUTPUT_INSIDE_WORKSPACE' | 'UNSAFE_ARCHIVE_ENTRY';
+  | 'OUTPUT_ALREADY_EXISTS' | 'ARCHIVE_NAME_CONFLICT' | 'OUTPUT_INSIDE_WORKSPACE' | 'UNSAFE_ARCHIVE_ENTRY'
+  | 'PACKAGE_PUBLISH_FAILED' | 'UNSAFE_PACKAGE_NAME';
 
 export class OutboundPackageError extends Error {
   constructor(readonly code: OutboundPackageErrorCode, message: string) { super(message); this.name = 'OutboundPackageError'; }
@@ -63,6 +64,8 @@ interface ServiceOptions {
   outputRoot(): string | null;
   now?: () => Date;
   archiveWriter?: OutboundArchiveWriter;
+  previewTokenTtlMs?: number;
+  maxPreviewTokens?: number;
 }
 
 interface ResolvedPreview {
@@ -77,23 +80,36 @@ export class OutboundPackageService {
   private readonly materialSets: CurrentMaterialSetService;
   private readonly now: () => Date;
   private readonly writer: OutboundArchiveWriter;
-  private readonly tokens = new Map<string, { requestKey: string; fingerprint: string }>();
+  private readonly tokens = new Map<string, { requestKey: string; fingerprint: string; createdAtMs: number }>();
+  private readonly previewTokenTtlMs: number;
+  private readonly maxPreviewTokens: number;
 
   constructor(private readonly db: PlannerDatabase, private readonly options: ServiceOptions) {
     this.repository = new OutboundPackageRepository(db);
     this.materialSets = new CurrentMaterialSetService(new MaterialBatchService(db));
     this.now = options.now ?? (() => new Date());
     this.writer = options.archiveWriter ?? new ArchiverOutboundArchiveWriter();
+    this.previewTokenTtlMs = this.positiveInteger(options.previewTokenTtlMs, 15 * 60 * 1_000);
+    this.maxPreviewTokens = this.positiveInteger(options.maxPreviewTokens, 1_000);
   }
 
   previewPackage(input: OutboundPackageRequest): OutboundPackagePreview {
     const resolved = this.resolvePreview(input);
+    const nowMs = this.now().getTime();
+    this.pruneTokens(nowMs);
+    while (this.tokens.size >= this.maxPreviewTokens) {
+      const oldest = this.tokens.keys().next().value as string | undefined;
+      if (!oldest) break;
+      this.tokens.delete(oldest);
+    }
     const previewToken = randomUUID();
-    this.tokens.set(previewToken, { requestKey: this.requestKey(input), fingerprint: resolved.fingerprint });
+    this.tokens.set(previewToken, { requestKey: this.requestKey(input), fingerprint: resolved.fingerprint,
+      createdAtMs: nowMs });
     return { previewToken, packageName: resolved.packageName, items: resolved.items };
   }
 
   async createPackage(input: CreateOutboundPackageInput, options: { signal?: AbortSignal } = {}): Promise<CreatedOutboundPackage> {
+    this.pruneTokens(this.now().getTime());
     const token = this.tokens.get(input.previewToken);
     if (!token || token.requestKey !== this.requestKey(input)) throw this.error('PREVIEW_STALE');
     let preview: ResolvedPreview;
@@ -123,19 +139,30 @@ export class OutboundPackageService {
     }
     const zipRelativePath = `${preview.packageName}.zip`;
     const finalPath = resolveWorkspacePath(outputRoot, zipRelativePath, { requireExistingParent: true });
-    if (existsSync(finalPath)) throw this.error('OUTPUT_ALREADY_EXISTS');
     const temporaryPath = join(outputRoot, `.${randomUUID()}.tmp`);
+    const claimKey = createHash('sha256').update(zipRelativePath.toLocaleLowerCase('en-US')).digest('hex');
+    const claimPath = join(outputRoot, `.${claimKey}.claim`);
     const entries = selected.map((item) => ({ sourcePath: preview.liveFiles.get(item.pdfFileId!)!.absolutePath,
       archiveName: item.fileName! }));
-    let published = false;
+    let published = false; let claimed = false;
     try {
+      let claimDescriptor: number;
+      try {
+        claimDescriptor = openSync(claimPath, 'wx');
+        claimed = true;
+        closeSync(claimDescriptor);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw this.error('OUTPUT_ALREADY_EXISTS');
+        throw this.error('PACKAGE_PUBLISH_FAILED');
+      }
+      if (existsSync(finalPath)) throw this.error('OUTPUT_ALREADY_EXISTS');
       options.signal?.throwIfAborted();
       const written = await this.writer.write({ temporaryPath, entries, signal: options.signal });
       if (written !== entries.length) throw new Error('ZIP 文件条目数与预览不一致');
       options.signal?.throwIfAborted();
-      linkSync(temporaryPath, finalPath);
+      try { renameSync(temporaryPath, finalPath); }
+      catch { throw this.error('PACKAGE_PUBLISH_FAILED'); }
       published = true;
-      rmSync(temporaryPath, { force: true });
       const createdAt = this.now().toISOString();
       const snapshots = selected.map((item) => {
         const indexed = preview.liveFiles.get(item.pdfFileId!)!.indexed;
@@ -150,6 +177,8 @@ export class OutboundPackageService {
       rmSync(temporaryPath, { force: true });
       if (published) rmSync(finalPath, { force: true });
       throw error;
+    } finally {
+      if (claimed) rmSync(claimPath, { force: true });
     }
   }
 
@@ -168,6 +197,7 @@ export class OutboundPackageService {
     const canonicalPaths = new Set<string>();
     for (const indexed of this.repository.listPresentOutlinedFiles(input.productId, input.selectedMaterialBatchId)) {
       const absolute = this.resolveExistingFile(workspaceRoot, indexed);
+      if (!absolute) continue;
       const key = process.platform === 'win32' ? absolute.toLocaleLowerCase('en-US') : absolute;
       if (canonicalPaths.has(key)) throw this.error('DUPLICATE_ACTUAL_PATH');
       canonicalPaths.add(key);
@@ -184,14 +214,20 @@ export class OutboundPackageService {
       let project = selection.fullCode ? this.repository.getProjectItemByCode(selection.fullCode) : null;
       if (indexed?.projectItemId && indexed.projectItemName) project = { id: indexed.projectItemId, name: indexed.projectItemName };
       let selectable = selection.status === 'normal' || selection.status === 'carried_forward';
+      let physicalFileMissing = false;
       if (indexed) {
         if (!indexed.isPresent || indexed.conversionType !== 'outlined' || indexed.matchStatus !== 'matched'
           || indexed.fullCode !== selection.fullCode || indexed.sourceBatchId !== selection.sourceBatchId) selectable = false;
         if (selectable) {
           const absolutePath = this.resolveExistingFile(workspaceRoot, indexed);
-          const stats = statSync(absolutePath);
-          liveFiles.set(indexed.id, { indexed, absolutePath });
-          fileFacts.push({ id: indexed.id, path: absolutePath, size: stats.size, mtimeMs: stats.mtimeMs });
+          if (!absolutePath) {
+            selectable = false;
+            physicalFileMissing = true;
+          } else {
+            const stats = statSync(absolutePath);
+            liveFiles.set(indexed.id, { indexed, absolutePath });
+            fileFacts.push({ id: indexed.id, path: absolutePath, size: stats.size, mtimeMs: stats.mtimeMs });
+          }
         }
       } else selectable = false;
       if (!project) selectable = false;
@@ -199,25 +235,54 @@ export class OutboundPackageService {
         projectItemName: project?.name ?? '项目待确认', pdfFileId: indexed?.id ?? null,
         fileName: indexed?.fileName ?? selection.fileName, relativePath: indexed?.relativePath ?? selection.relativePath,
         sourceBatchId: selection.sourceBatchId, sourceBatchName: selection.sourceBatchName,
-        status: selectable ? selection.status : (selection.status === 'conflict' ? 'conflict' : selection.status === 'missing' ? 'missing' : 'needs_confirmation'),
+        status: selectable ? selection.status : (selection.status === 'conflict' ? 'conflict'
+          : physicalFileMissing || selection.status === 'missing' ? 'missing' : 'needs_confirmation'),
         change: selection.change, selectable, conflictFullCodes: selection.conflictFullCodes };
     });
     const packageName = buildOutboundPackageName({ brand: product.brand, model: product.model,
       productCategory: product.productCategory, materialType: input.materialType, createdAt: this.now() });
+    if (![product.brand, product.model, product.productCategory].every((value) => this.isSafeWindowsNameComponent(value))
+      || `${packageName}.zip`.length > 255) throw this.error('UNSAFE_PACKAGE_NAME');
     const fingerprint = createHash('sha256').update(JSON.stringify({ input: this.requestKey(input), packageName, items, fileFacts })).digest('hex');
     return { packageName, items, fingerprint, liveFiles };
   }
 
-  private resolveExistingFile(workspaceRoot: string, indexed: OutboundIndexedFile): string {
+  private resolveExistingFile(workspaceRoot: string, indexed: OutboundIndexedFile): string | null {
     const candidate = resolveWorkspacePath(workspaceRoot, indexed.relativePath, { requireExistingParent: true });
-    const canonical = realpathSync.native(candidate);
+    if (!existsSync(candidate)) return null;
+    let canonical: string;
+    try { canonical = realpathSync.native(candidate); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
     toWorkspaceRelativePath(workspaceRoot, canonical);
-    if (!statSync(canonical).isFile()) throw new FileError('PDF_FILE_UNAVAILABLE', '外发文件当前不可用');
+    try {
+      if (!statSync(canonical).isFile()) throw new FileError('PDF_FILE_UNAVAILABLE', '外发文件当前不可用');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
     return canonical;
   }
 
   private requestKey(input: OutboundPackageRequest): string {
     return `${input.productId}:${input.selectedMaterialBatchId}:${input.materialType}:${input.packageMode}`;
+  }
+
+  private pruneTokens(nowMs: number): void {
+    for (const [key, token] of this.tokens) {
+      if (nowMs - token.createdAtMs > this.previewTokenTtlMs) this.tokens.delete(key);
+    }
+  }
+
+  private positiveInteger(value: number | undefined, fallback: number): number {
+    return value !== undefined && Number.isSafeInteger(value) && value > 0 ? value : fallback;
+  }
+
+  private isSafeWindowsNameComponent(value: string): boolean {
+    if (!value || /[<>:"/\\|?*\u0000-\u001f]/u.test(value) || /[. ]$/u.test(value)) return false;
+    return !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(value);
   }
 
   private error(code: OutboundPackageErrorCode): OutboundPackageError {
@@ -230,6 +295,8 @@ export class OutboundPackageService {
       ARCHIVE_NAME_CONFLICT: '打包文件存在同名冲突，请先确认',
       OUTPUT_INSIDE_WORKSPACE: '外发输出目录必须位于只读资料根目录之外',
       UNSAFE_ARCHIVE_ENTRY: '外发文件名不安全，请重新扫描或确认文件索引',
+      PACKAGE_PUBLISH_FAILED: '压缩包发布失败，未保留不完整文件',
+      UNSAFE_PACKAGE_NAME: '压缩包名称包含 Windows 不允许的字符或名称，请检查品牌、型号和产品类别',
     };
     return new OutboundPackageError(code, messages[code]);
   }

@@ -44,6 +44,14 @@ function addOutlined(options: { relativePath?: string; conversionType?: 'source'
       options.present === false ? 0 : 1).lastInsertRowid);
 }
 
+function addBatch(name: string, sequence: number): number {
+  return Number(db.prepare(`insert into material_batches
+    (relative_path, product_directory, product_id, name, sequence_number, business_date,
+     recognition_status, is_present, first_seen_at, last_seen_at)
+    values (?, '01.洗碗机\\SKDWT040JP-T40', ?, ?, ?, null, 'recognized', 1, ?, ?)`)
+    .run(`01.洗碗机\\SKDWT040JP-T40\\03.量产后的变更文件\\${name}`, productId, name, sequence, now, now).lastInsertRowid);
+}
+
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'outbound-package-'));
   workspace = join(root, 'workspace'); output = join(root, 'exports');
@@ -111,6 +119,24 @@ describe('OutboundPackageService', () => {
       selectedPdfFileIds: [] })).rejects.toThrowError(expect.objectContaining({ code: 'PACKAGE_HAS_BLOCKERS' }));
   });
 
+  it('turns a physically deleted current file into a structured missing preview item', () => {
+    const indexed = db.prepare('select relative_path as path from pdf_files where id = ?').get(pdfId) as { path: string };
+    rmSync(join(workspace, indexed.path));
+    expect(service.previewPackage(request()).items).toEqual([expect.objectContaining({
+      pdfFileId: pdfId, status: 'missing', selectable: false,
+    })]);
+  });
+
+  it('does not fail a current preview because an unrelated superseded historical file disappeared', () => {
+    const old = db.prepare('select relative_path as path from pdf_files where id = ?').get(pdfId) as { path: string };
+    rmSync(join(workspace, old.path));
+    const nextBatch = addBatch('01.20260910', 1);
+    const replacementId = addOutlined({ batch: nextBatch, fullCode: '02.0209.010.0401002',
+      relativePath: '01.洗碗机\\SKDWT040JP-T40\\03.量产后的变更文件\\01.20260910\\manual-v2（转曲）.pdf' });
+    expect(service.previewPackage({ ...request(), selectedMaterialBatchId: nextBatch }).items)
+      .toEqual([expect.objectContaining({ pdfFileId: replacementId, status: 'normal', selectable: true })]);
+  });
+
   it('shows a same-slot drawing conflict and refuses to hide it by deselection', async () => {
     addOutlined({ fullCode: '02.0209.010.0401002',
       relativePath: '01.洗碗机\\SKDWT040JP-T40\\03.量产后的变更文件\\00.首批大货\\manual-v2（转曲）.pdf' });
@@ -152,6 +178,37 @@ describe('OutboundPackageService', () => {
     expect(readdirSync(output)).toEqual([]);
   });
 
+  it('rejects creation as stale when the physical file disappears after preview', async () => {
+    const preview = service.previewPackage(request());
+    const indexed = db.prepare('select relative_path as path from pdf_files where id = ?').get(pdfId) as { path: string };
+    rmSync(join(workspace, indexed.path));
+    await expect(service.createPackage({ ...request(), previewToken: preview.previewToken,
+      selectedPdfFileIds: [pdfId] })).rejects.toThrowError(expect.objectContaining({ code: 'PREVIEW_STALE' }));
+    expect(readdirSync(output)).toEqual([]);
+  });
+
+  it('expires preview tokens after the configured TTL', async () => {
+    let clock = new Date(2026, 8, 10, 9, 30);
+    const expiring = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output,
+      now: () => clock, previewTokenTtlMs: 1_000 });
+    const preview = expiring.previewPackage(request());
+    clock = new Date(clock.getTime() + 1_001);
+    await expect(expiring.createPackage({ ...request(), previewToken: preview.previewToken,
+      selectedPdfFileIds: [pdfId] })).rejects.toThrowError(expect.objectContaining({ code: 'PREVIEW_STALE' }));
+  });
+
+  it('evicts the oldest token when the bounded preview cache is full', async () => {
+    const bounded = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output,
+      now: fixedNow, maxPreviewTokens: 2 });
+    const oldest = bounded.previewPackage(request());
+    bounded.previewPackage(request());
+    const newest = bounded.previewPackage(request());
+    await expect(bounded.createPackage({ ...request(), previewToken: oldest.previewToken,
+      selectedPdfFileIds: [pdfId] })).rejects.toThrowError(expect.objectContaining({ code: 'PREVIEW_STALE' }));
+    await expect(bounded.createPackage({ ...request(), previewToken: newest.previewToken,
+      selectedPdfFileIds: [pdfId] })).resolves.toEqual(expect.objectContaining({ fileCount: 1 }));
+  });
+
   it('never writes an outbound archive inside the read-only source workspace', async () => {
     const unsafe = new OutboundPackageService(db, { workspaceRoot: () => workspace,
       outputRoot: () => workspace, now: fixedNow });
@@ -178,6 +235,52 @@ describe('OutboundPackageService', () => {
       pdf_file_id: pdfId, source_batch_name_snapshot: '00.首批大货',
       relative_path_snapshot: (db.prepare('select relative_path as path from pdf_files where id = ?').get(pdfId) as { path: string }).path,
     });
+  });
+
+  it('allows only one same-name concurrent publisher and leaves no claim or temporary files', async () => {
+    const firstPreview = service.previewPackage(request());
+    const secondPreview = service.previewPackage(request());
+    const results = await Promise.allSettled([
+      service.createPackage({ ...request(), previewToken: firstPreview.previewToken, selectedPdfFileIds: [pdfId] }),
+      service.createPackage({ ...request(), previewToken: secondPreview.previewToken, selectedPdfFileIds: [pdfId] }),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected').map((result) => (result as PromiseRejectedResult).reason))
+      .toEqual([expect.objectContaining({ code: 'OUTPUT_ALREADY_EXISTS' })]);
+    expect(readdirSync(output).filter((name) => name.endsWith('.tmp') || name.endsWith('.claim'))).toEqual([]);
+    expect(readdirSync(output).filter((name) => name.endsWith('.zip'))).toHaveLength(1);
+  });
+
+  it('cleans the closed temporary archive and claim when atomic rename fails', async () => {
+    const writer: OutboundArchiveWriter = { write: async ({ temporaryPath, entries }) => {
+      writeFileSync(temporaryPath, 'complete but removed before publish');
+      rmSync(temporaryPath);
+      return entries.length;
+    } };
+    const failing = new OutboundPackageService(db, { workspaceRoot: () => workspace,
+      outputRoot: () => output, now: fixedNow, archiveWriter: writer });
+    const preview = failing.previewPackage(request());
+    await expect(failing.createPackage({ ...request(), previewToken: preview.previewToken,
+      selectedPdfFileIds: [pdfId] })).rejects.toThrowError(expect.objectContaining({ code: 'PACKAGE_PUBLISH_FAILED' }));
+    expect(readdirSync(output)).toEqual([]);
+  });
+
+  it.each([
+    ['SAM/KYO', 'T40', '洗碗机'],
+    ['SAMKYO', 'T40.', '洗碗机'],
+    ['SAMKYO', 'T40', 'CON'],
+  ])('rejects unsafe Windows package-name component %s / %s / %s', (brand, model, category) => {
+    db.prepare('update dictionary_items set name = ? where id = (select brand_id from products where id = ?)')
+      .run(brand, productId);
+    db.prepare('update products set model = ?, product_category = ? where id = ?').run(model, category, productId);
+    expect(() => service.previewPackage(request())).toThrowError(expect.objectContaining({ code: 'UNSAFE_PACKAGE_NAME' }));
+  });
+
+  it('consumes a preview token after successful generation', async () => {
+    const preview = service.previewPackage(request());
+    await service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] });
+    await expect(service.createPackage({ ...request(), previewToken: preview.previewToken,
+      selectedPdfFileIds: [pdfId] })).rejects.toThrowError(expect.objectContaining({ code: 'PREVIEW_STALE' }));
   });
 
   it('leaves no final or temporary archive when cancellation interrupts a partial write', async () => {
