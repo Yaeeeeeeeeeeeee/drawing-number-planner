@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { win32 } from 'node:path';
 
+import { isSafeWindowsNameComponent } from './windows-safe-name.js';
+
 export interface OutboundClaimMetadata {
   version: 1;
   taskId: string | null;
@@ -16,10 +18,8 @@ function safeBaseName(value: unknown): value is string {
 }
 
 function safeWindowsZip(value: unknown): value is string {
-  if (!safeBaseName(value) || !value.toLocaleLowerCase('en-US').endsWith('.zip')
-    || /[<>:"/\\|?*\u0000-\u001f]/u.test(value) || /[. ]$/u.test(value)) return false;
-  const stem = value.slice(0, -4);
-  return !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/iu.test(stem);
+  return safeBaseName(value) && value.toLocaleLowerCase('en-US').endsWith('.zip')
+    && isSafeWindowsNameComponent(value);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;

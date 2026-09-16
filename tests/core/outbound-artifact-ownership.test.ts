@@ -23,6 +23,8 @@ describe('outbound temporary artifact ownership', () => {
     ['ordinary temporary file', claim.replace(temporaryFile, 'customer.pdf'), claimFile],
     ['final file is not ZIP', claim.replace(finalFile, 'customer.pdf'), expectedOutboundClaimFileName('customer.pdf')],
     ['reserved Windows final ZIP', claim.replace(finalFile, 'CON.zip'), expectedOutboundClaimFileName('CON.zip')],
+    ['reserved Windows stem with extra extension', claim.replace(finalFile, 'CON.txt.zip'), expectedOutboundClaimFileName('CON.txt.zip')],
+    ['reserved Windows numbered stem with extra extension', claim.replace(finalFile, 'LPT1.foo.zip'), expectedOutboundClaimFileName('LPT1.foo.zip')],
     ['invalid Windows final ZIP', claim.replace(finalFile, 'bad?.zip'), expectedOutboundClaimFileName('bad?.zip')],
     ['claim hash does not bind final file', claim, '.wrong.claim'],
   ])('rejects %s as cleanup authority', (_label, text, fileName) => {

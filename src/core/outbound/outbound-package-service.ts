@@ -13,6 +13,7 @@ import { CurrentMaterialSetService } from './current-material-set.js';
 import { OutboundPackageRepository, type OutboundIndexedFile } from './outbound-package-repository.js';
 import { buildOutboundPackageName } from './package-naming.js';
 import { expectedOutboundClaimFileName } from './outbound-artifact-ownership.js';
+import { isSafeWindowsNameComponent } from './windows-safe-name.js';
 import type { CreateOutboundPackageInput, CreatedOutboundPackage, OutboundPackagePreview,
   OutboundPackagePreviewItem, OutboundPackageRequest } from './outbound-types.js';
 
@@ -292,7 +293,7 @@ export class OutboundPackageService {
     });
     const packageName = buildOutboundPackageName({ brand: product.brand, model: product.model,
       productCategory: product.productCategory, materialType: input.materialType, createdAt: this.now() });
-    if (![product.brand, product.model, product.productCategory].every((value) => this.isSafeWindowsNameComponent(value))
+    if (![product.brand, product.model, product.productCategory].every(isSafeWindowsNameComponent)
       || `${packageName}.zip`.length > 255) throw this.error('UNSAFE_PACKAGE_NAME');
     const fingerprint = createHash('sha256').update(JSON.stringify({ input: this.requestKey(input), packageName, items, fileFacts })).digest('hex');
     return { packageName, items, fingerprint, liveFiles };
@@ -329,11 +330,6 @@ export class OutboundPackageService {
 
   private positiveInteger(value: number | undefined, fallback: number): number {
     return value !== undefined && Number.isSafeInteger(value) && value > 0 ? value : fallback;
-  }
-
-  private isSafeWindowsNameComponent(value: string): boolean {
-    if (!value || /[<>:"/\\|?*\u0000-\u001f]/u.test(value) || /[. ]$/u.test(value)) return false;
-    return !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(value);
   }
 
   private error(code: OutboundPackageErrorCode, cause?: unknown): OutboundPackageError {
