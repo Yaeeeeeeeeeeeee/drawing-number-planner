@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { OutboundPackageService, OutboundPackageError, type OutboundArchiveWriter } from '../../src/core/outbound/outbound-package-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
+import { TaskRegistry } from '../../src/core/tasks/task-registry';
 
 let db: PlannerDatabase;
 let root: string;
@@ -297,6 +298,33 @@ describe('OutboundPackageService', () => {
       selectedPdfFileIds: [pdfId] }, { signal: controller.signal });
     controller.abort(new Error('cancelled'));
     await expect(operation).rejects.toThrow();
+    expect(readdirSync(output)).toEqual([]);
+    expect(db.prepare('select count(*) as count from outbound_packages').get()).toEqual({ count: 0 });
+  });
+
+  it('runs as a cancellable registered task and writes owned claim metadata only while active', async () => {
+    let release!: () => void;
+    let claimText = '';
+    const writer: OutboundArchiveWriter = { write: async ({ temporaryPath, signal }) => {
+      writeFileSync(temporaryPath, 'partial');
+      const claim = readdirSync(output).find((name) => name.endsWith('.claim'))!;
+      claimText = readFileSync(join(output, claim), 'utf8');
+      await new Promise<void>((resolve) => { release = resolve; });
+      signal?.throwIfAborted();
+      return 1;
+    } };
+    const cancellable = new OutboundPackageService(db, { workspaceRoot: () => workspace,
+      outputRoot: () => output, now: fixedNow, archiveWriter: writer });
+    const preview = cancellable.previewPackage(request());
+    const registry = new TaskRegistry();
+    registry.register('outbound_package', (_payload, context) => cancellable.createPackage({ ...request(),
+      previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] }, {
+      signal: context.signal, taskId: context.id, onFinalizing: () => context.beginFinalizing(),
+    }));
+    const task = registry.create('outbound_package', {}); await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(JSON.parse(claimText)).toMatchObject({ taskId: task.id, lifecycle: 'active' });
+    registry.cancel(task.id); release(); await registry.wait(task.id);
+    expect(registry.get(task.id)?.status).toBe('cancelled');
     expect(readdirSync(output)).toEqual([]);
     expect(db.prepare('select count(*) as count from outbound_packages').get()).toEqual({ count: 0 });
   });

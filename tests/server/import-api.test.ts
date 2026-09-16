@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import { registerImportRoutes } from '../../src/server/routes/import';
+import { registerTaskRoutes } from '../../src/server/routes/tasks';
+import { TaskRegistry } from '../../src/core/tasks/task-registry';
 
 type Cell = string | null;
 let db: PlannerDatabase;
@@ -36,6 +38,33 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('Excel import API', () => {
+  it('runs confirmed historical import through the task registry and commits only in finalizing', async () => {
+    const app = Fastify(); const tasks = new TaskRegistry();
+    await registerImportRoutes(app, db, () => undefined, tasks); registerTaskRoutes(app, tasks);
+    const auditResponse = await app.inject({ method: 'POST', url: '/api/import/excel/audit',
+      ...multipartFile(await workbook(), '规划.xlsx') });
+    const auditId = auditResponse.json().auditId;
+    const started = await app.inject({ method: 'POST', url: '/api/tasks/excel_import',
+      payload: { auditId, selections: ['brand:F22'] } });
+    expect(started.statusCode).toBe(202); await tasks.wait(started.json().id);
+    expect(tasks.get(started.json().id)).toMatchObject({ status: 'completed', result: { imported: 1, skipped: 3 } });
+    expect(db.prepare("select name from dictionary_items where type = 'brand'").get()).toEqual({ name: 'SAMKYO' });
+    await app.close();
+  });
+
+  it('cancels a confirmed import before finalizing without backing up or writing rows', async () => {
+    const app = Fastify(); const tasks = new TaskRegistry(); let backups = 0;
+    await registerImportRoutes(app, db, () => { backups += 1; }, tasks); registerTaskRoutes(app, tasks);
+    const audit = (await app.inject({ method: 'POST', url: '/api/import/excel/audit',
+      ...multipartFile(await workbook(), '规划.xlsx') })).json();
+    const started = await app.inject({ method: 'POST', url: '/api/tasks/excel_import',
+      payload: { auditId: audit.auditId, selections: ['brand:F22'] } });
+    tasks.cancel(started.json().id); await tasks.wait(started.json().id);
+    expect(tasks.get(started.json().id)?.status).toBe('cancelled');
+    expect(backups).toBe(0);
+    expect(db.prepare("select count(*) as count from dictionary_items where type = 'brand'").get()).toEqual({ count: 0 });
+    await app.close();
+  });
   it('audits an uploaded workbook then imports only confirmed candidates', async () => {
     const app = Fastify();
     let backups = 0;

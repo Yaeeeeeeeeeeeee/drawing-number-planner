@@ -21,6 +21,47 @@ const writeHeaders = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'file
 const actionHeaders = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'files-token' };
 
 describe('PDF file API', () => {
+  it('exposes scan and index-clear work through cancellable task endpoints', async () => {
+    const { server, workspace } = await serverFixture();
+    await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
+      body: JSON.stringify({ workspaceRoot: workspace }) });
+    writeFileSync(join(workspace, 'task.pdf'), '%PDF-1.4');
+    const started = await fetch(`${server.url}/api/tasks/workspace_scan`, { method: 'POST', headers: writeHeaders,
+      body: '{}' });
+    expect(started.status).toBe(202); const task = await started.json() as { id: string };
+    let view: { status: string; progress: { processed: number } };
+    do { await new Promise((resolve) => setTimeout(resolve, 10));
+      view = await (await fetch(`${server.url}/api/tasks/${task.id}`)).json();
+    } while (!['completed', 'failed', 'cancelled'].includes(view.status));
+    expect(view).toMatchObject({ status: 'completed', progress: { processed: 1 } });
+
+    const clear = await fetch(`${server.url}/api/tasks/index_clear`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ confirmation: '清空资料库索引' }) });
+    const clearTask = await clear.json() as { id: string };
+    do { await new Promise((resolve) => setTimeout(resolve, 10));
+      view = await (await fetch(`${server.url}/api/tasks/${clearTask.id}`)).json();
+    } while (!['completed', 'failed', 'cancelled'].includes(view.status));
+    expect(view.status).toBe('completed');
+    expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(0);
+  });
+
+  it('cancels index clearing before finalizing without changing the existing index', async () => {
+    const { server, workspace } = await serverFixture();
+    await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
+      body: JSON.stringify({ workspaceRoot: workspace }) });
+    writeFileSync(join(workspace, 'kept.pdf'), '%PDF-1.4');
+    await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
+    const started = await fetch(`${server.url}/api/tasks/index_clear`, { method: 'POST', headers: writeHeaders,
+      body: JSON.stringify({ confirmation: '清空资料库索引' }) });
+    const task = await started.json() as { id: string };
+    await fetch(`${server.url}/api/tasks/${task.id}/cancel`, { method: 'POST', headers: writeHeaders, body: '{}' });
+    let view: { status: string };
+    do { await new Promise((resolve) => setTimeout(resolve, 5));
+      view = await (await fetch(`${server.url}/api/tasks/${task.id}`)).json();
+    } while (!['completed', 'failed', 'cancelled'].includes(view.status));
+    expect(view.status).toBe('cancelled');
+    expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(1);
+  });
   it('returns current scan counts and grouped changes without treating old missing rows as newly deleted', async () => {
     const { server, workspace } = await serverFixture();
     const retained = join(workspace, 'retained.pdf');

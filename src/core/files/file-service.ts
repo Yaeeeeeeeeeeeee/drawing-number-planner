@@ -10,6 +10,8 @@ import { toWorkspacePathKey, validateWorkspaceRoot } from './workspace-paths.js'
 import { scanQrWorkspace } from '../qr/qr-file-scanner.js';
 import { classifyQrFile } from '../qr/qr-file-classifier.js';
 import type { QrFileScanRecord } from '../qr/qr-types.js';
+import type { TaskContext } from '../tasks/task-types.js';
+import type { WorkspaceScanOptions } from './pdf-scanner.js';
 
 export interface FileScanSummary {
   total: number; matched: number; pending: number; unmatched: number; conflict: number; historicalRegistered: number;
@@ -27,7 +29,7 @@ export interface FileIndexClearPreview {
 export class FileService {
   private scanning = false;
   constructor(private readonly repository: FileRepository, private readonly settings: WorkspaceSettingsStore,
-    private readonly scanner: (root: string) => Promise<ScannedPdfFile[]> = scanPdfWorkspace) {}
+    private readonly scanner: (root: string, options?: WorkspaceScanOptions) => Promise<ScannedPdfFile[]> = scanPdfWorkspace) {}
 
   getSettings(): { workspaceRoot: string | null; configured: boolean; available: boolean } {
     const current = this.settings.get();
@@ -71,29 +73,45 @@ export class FileService {
     return { workspaceRoot: this.settings.get().workspaceRoot, counts: this.repository.indexCounts() };
   }
 
-  async scan(): Promise<FileScanSummary> {
+  async scan(context?: TaskContext): Promise<FileScanSummary> {
     if (this.scanning) throw new FileError('SCAN_IN_PROGRESS', '资料库正在扫描，请等待当前扫描完成');
     const workspaceRoot = this.settings.get().workspaceRoot;
     if (!workspaceRoot) throw new FileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
     this.scanning = true;
     try {
-      const pdfScan = this.scanner(workspaceRoot);
-      const qrScan = scanQrWorkspace(workspaceRoot);
+      context?.report({ processed: 0, total: null, phase: 'scanning', message: '正在读取资料目录' });
+      const progress = (processed: number, total: number | null, relativePath: string) => {
+        context?.throwIfCancelled();
+        context?.report({ processed, total, phase: 'scanning', message: relativePath });
+      };
+      const pdfScan = this.scanner(workspaceRoot, { signal: context?.signal, onProgress: progress });
+      const qrScan = scanQrWorkspace(workspaceRoot, { signal: context?.signal });
       const [scannedPdfFiles, qrFiles] = await Promise.all([pdfScan, qrScan]);
+      context?.throwIfCancelled();
       const qrPathKeys = new Set(qrFiles.map((file) => toWorkspacePathKey(file.relativePath)));
       const files = scannedPdfFiles.filter((file) => !qrPathKeys.has(toWorkspacePathKey(file.relativePath)));
       const drawings = this.repository.listDrawingCodes();
       const priorFingerprints = this.repository.currentFingerprints(files.map((file) => toWorkspacePathKey(file.relativePath)));
+      let fingerprinted = 0; const fingerprintTotal = files.length + qrFiles.length;
+      context?.report({ processed: 0, total: fingerprintTotal, phase: 'fingerprinting', message: '正在校验文件内容' });
       const fingerprints = await mapWithConcurrency(files, FINGERPRINT_CONCURRENCY, async (file) => {
+        context?.throwIfCancelled();
         const pathKey = toWorkspacePathKey(file.relativePath);
         if (!file.absolutePath) throw new Error('扫描器未返回可只读计算指纹的文件路径');
-        return resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey, sizeBytes: file.sizeBytes,
+        const result = await resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey, sizeBytes: file.sizeBytes,
           modifiedAt: file.modifiedAt, existing: priorFingerprints.get(pathKey) ?? null });
+        fingerprinted += 1; context?.report({ processed: fingerprinted, total: fingerprintTotal,
+          phase: 'fingerprinting', message: file.relativePath }); return result;
       });
-      const qrFingerprints = await mapWithConcurrency(qrFiles, FINGERPRINT_CONCURRENCY, async (file) => (
-        resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey: toWorkspacePathKey(file.relativePath),
-          sizeBytes: file.sizeBytes, modifiedAt: file.modifiedAt, existing: null })
-      ));
+      const qrFingerprints = await mapWithConcurrency(qrFiles, FINGERPRINT_CONCURRENCY, async (file) => {
+        context?.throwIfCancelled();
+        const result = await resolveFileFingerprint({ absolutePath: file.absolutePath,
+          pathKey: toWorkspacePathKey(file.relativePath), sizeBytes: file.sizeBytes,
+          modifiedAt: file.modifiedAt, existing: null });
+        fingerprinted += 1; context?.report({ processed: fingerprinted, total: fingerprintTotal,
+          phase: 'fingerprinting', message: file.relativePath }); return result;
+      });
+      context?.throwIfCancelled();
       const qrProducts = this.repository.listQrClassifierProducts();
       const qrPurposes = this.repository.listQrClassifierPurposes();
       const qrRecords: QrFileScanRecord[] = qrFiles.map((file, index) => {
@@ -118,6 +136,7 @@ export class FileService {
           contentSha256: fingerprints[index].contentSha256 };
       });
       const scannedAt = new Date().toISOString();
+      context?.beginFinalizing();
       const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt, qrRecords);
       const completedScan = this.repository.latestScan();
       if (!completedScan) throw new Error('扫描完成后未找到扫描记录');

@@ -12,6 +12,11 @@ export interface ScannedQrFile {
   modifiedAt: string;
 }
 
+export interface QrWorkspaceScanOptions {
+  signal?: AbortSignal;
+  onProgress?(processed: number, total: number | null, relativePath: string): void;
+}
+
 const QR_FILE_NAME = /^(?!\d{2}\.\d{4}\.\d{3}\.\d{7}(?:-|（)).+?-.+?（[^（）]*）\.(?:png|jpe?g|webp|gif|pdf)$/iu;
 
 function mimeType(fileName: string): string {
@@ -19,12 +24,14 @@ function mimeType(fileName: string): string {
   return ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', pdf: 'application/pdf' } as Record<string, string>)[extension] ?? 'application/octet-stream';
 }
 
-export async function scanQrWorkspace(rootInput: string): Promise<ScannedQrFile[]> {
+export async function scanQrWorkspace(rootInput: string, options: QrWorkspaceScanOptions = {}): Promise<ScannedQrFile[]> {
   const root = validateWorkspaceRoot(rootInput); const files: ScannedQrFile[] = [];
   const walk = async (directory: string): Promise<void> => {
+    options.signal?.throwIfAborted();
     const entries = await readdir(directory, { withFileTypes: true });
     entries.sort((left, right) => left.name.localeCompare(right.name, 'en-US'));
     for (const entry of entries) {
+      options.signal?.throwIfAborted();
       if (entry.isSymbolicLink()) continue;
       const absolutePath = join(directory, entry.name);
       if (entry.isDirectory()) {
@@ -36,6 +43,7 @@ export async function scanQrWorkspace(rootInput: string): Promise<ScannedQrFile[
       const stats = await lstat(absolutePath);
       files.push({ absolutePath, relativePath: toWorkspaceRelativePath(root, absolutePath), fileName: basename(absolutePath),
         mimeType: mimeType(entry.name), sizeBytes: stats.size, modifiedAt: stats.mtime.toISOString() });
+      options.onProgress?.(files.length, null, files[files.length - 1].relativePath);
     }
   };
   await walk(root);

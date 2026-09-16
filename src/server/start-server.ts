@@ -35,6 +35,8 @@ import { registerOutboundPackageRoutes } from './routes/outbound-packages.js';
 import { registerProductRoutes } from './routes/products.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 import { registerQrCodeRoutes } from './routes/qr-codes.js';
+import { TaskRegistry } from '../core/tasks/task-registry.js';
+import { registerTaskRoutes } from './routes/tasks.js';
 import { assertLoopbackHost, registerLocalAccess } from './security/local-access.js';
 
 export interface ServerOptions {
@@ -93,22 +95,24 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     const workspaceSettings = new WorkspaceSettingsStore(paths.settings);
     const indexedPdfResolver = new IndexedPdfResolver(fileRepository, workspaceSettings);
     const qrRepository = new QrRepository(database);
+    const tasks = new TaskRegistry();
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database));
     registerQrCodeRoutes(server, new QrService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
-    registerFileRoutes(server, new FileService(fileRepository, workspaceSettings));
+    registerFileRoutes(server, new FileService(fileRepository, workspaceSettings), tasks);
     registerMaterialBatchRoutes(server, new MaterialBatchService(database));
     registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));
     registerOutboundPackageRoutes(server, new OutboundPackageService(database, {
       workspaceRoot: () => workspaceSettings.get().workspaceRoot,
       outputRoot: () => workspaceSettings.getOutboundOutputRoot() ?? paths.exports,
-    }));
+    }), tasks);
     registerPlanningRoutes(server, new PlanningService(database));
     registerBomRoutes(server, new BomService(database, () => workspaceSettings.get().workspaceRoot));
     await registerImportRoutes(server, database, () => {
       createDatabaseBackup(database, paths.database, paths.backups, 'import');
-    });
+    }, tasks);
+    registerTaskRoutes(server, tasks);
     if (options.rendererDir) await server.register(fastifyStatic, { root: options.rendererDir });
     const address = await server.listen({ host, port: options.port ?? 4317 });
     if (!options.allowedOrigins) localAccess.allowOrigin(address);

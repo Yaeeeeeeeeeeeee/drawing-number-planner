@@ -2,7 +2,8 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import { FileError } from '../../core/files/file-errors.js';
-import type { FileService } from '../../core/files/file-service.js';
+import { FILE_INDEX_CLEAR_CONFIRMATION, type FileService } from '../../core/files/file-service.js';
+import type { TaskRegistry } from '../../core/tasks/task-registry.js';
 
 const settingsSchema = z.object({ workspaceRoot: z.string().trim().min(1).max(2000) }).strict();
 const emptyBodySchema = z.object({}).strict();
@@ -29,7 +30,24 @@ function sendFileError(reply: FastifyReply, error: unknown) {
   return reply.code(status).send({ error: { code: error.code, message: error.message } });
 }
 
-export function registerFileRoutes(app: FastifyInstance, service: FileService): void {
+export function registerFileRoutes(app: FastifyInstance, service: FileService, tasks?: TaskRegistry): void {
+  tasks?.register('workspace_scan', (payload, context) => {
+    const input = emptyBodySchema.safeParse(payload ?? {});
+    if (!input.success) throw Object.assign(new Error('扫描请求不应包含额外参数'), { code: 'INVALID_REQUEST' });
+    return service.scan(context);
+  });
+  tasks?.register('index_clear', async (payload, context) => {
+    const input = clearIndexSchema.safeParse(payload);
+    if (!input.success) throw Object.assign(new Error('清空资料库索引请求无效'), { code: 'INVALID_REQUEST' });
+    if (input.data.confirmation !== FILE_INDEX_CLEAR_CONFIRMATION) {
+      throw new FileError('INVALID_CLEAR_INDEX_CONFIRMATION', '请准确输入“清空资料库索引”后再执行');
+    }
+    context.report({ processed: 0, total: 1, phase: 'preparing', message: '正在核对清理范围' });
+    // Yield a short cooperative window so a cancel request can arrive before the destructive transaction starts.
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    context.throwIfCancelled(); context.beginFinalizing();
+    return service.clearIndex(input.data.confirmation);
+  });
   app.get('/api/files/settings', async (_request, reply) => {
     try { return service.getSettings(); }
     catch (error) { return sendFileError(reply, error); }

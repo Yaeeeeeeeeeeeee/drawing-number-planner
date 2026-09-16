@@ -10,6 +10,8 @@ import { OutboundPackageService } from '../../src/core/outbound/outbound-package
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import { registerOutboundPackageRoutes } from '../../src/server/routes/outbound-packages';
+import { registerTaskRoutes } from '../../src/server/routes/tasks';
+import { TaskRegistry } from '../../src/core/tasks/task-registry';
 
 let db: PlannerDatabase; let app: FastifyInstance; let root: string;
 let productId: number; let batchId: number; let pdfId: number;
@@ -50,6 +52,22 @@ beforeEach(() => {
 afterEach(async () => { await app.close(); db.close(); rmSync(root, { recursive: true, force: true }); });
 
 describe('outbound package API', () => {
+  it('registers ZIP generation as a progress-reporting task', async () => {
+    await app.close();
+    const tasks = new TaskRegistry(); const workspace = join(root, 'workspace'); const output = join(root, 'exports');
+    const service = new OutboundPackageService(db, { workspaceRoot: () => workspace,
+      outputRoot: () => output, now: () => new Date(2026, 8, 10) });
+    app = Fastify(); registerOutboundPackageRoutes(app, service, tasks); registerTaskRoutes(app, tasks);
+    const payload = { productId, selectedMaterialBatchId: batchId, materialType: 'initial' as const,
+      packageMode: 'current_complete' as const };
+    const preview = service.previewPackage(payload);
+    const started = await app.inject({ method: 'POST', url: '/api/tasks/outbound_package', payload: {
+      ...payload, previewToken: preview.previewToken, selectedPdfFileIds: [pdfId],
+    } });
+    expect(started.statusCode).toBe(202); await tasks.wait(started.json().id);
+    expect(tasks.get(started.json().id)).toMatchObject({ status: 'completed',
+      progress: { processed: 1, total: 1, phase: 'completed' }, result: { fileCount: 1 } });
+  });
   it('previews then creates a verified package', async () => {
     const payload = { productId, selectedMaterialBatchId: batchId, materialType: 'initial', packageMode: 'current_complete' };
     const preview = await app.inject({ method: 'POST', url: '/api/outbound-packages/preview', payload });

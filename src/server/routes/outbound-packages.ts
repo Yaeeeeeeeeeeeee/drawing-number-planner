@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { OutboundPackageError, type OutboundPackageService } from '../../core/outbound/outbound-package-service.js';
 import { FileError } from '../../core/files/file-errors.js';
+import type { TaskRegistry } from '../../core/tasks/task-registry.js';
 
 const previewSchema = z.object({
   productId: z.number().int().positive(),
@@ -32,7 +33,14 @@ function sendError(error: unknown, reply: FastifyReply) {
   throw error;
 }
 
-export function registerOutboundPackageRoutes(app: FastifyInstance, service: OutboundPackageService): void {
+export function registerOutboundPackageRoutes(app: FastifyInstance, service: OutboundPackageService, tasks?: TaskRegistry): void {
+  tasks?.register('outbound_package', (payload, context) => {
+    const body = createSchema.safeParse(payload);
+    if (!body.success) throw new OutboundPackageError('INVALID_SELECTION', '外发打包条件不完整');
+    return service.createPackage(body.data, { signal: context.signal, taskId: context.id,
+      onProgress: (processed, total, message) => context.report({ processed, total, phase: 'archiving', message }),
+      onFinalizing: () => context.beginFinalizing() });
+  });
   app.post('/api/outbound-packages/preview', async (request, reply) => {
     const body = previewSchema.safeParse(request.body);
     if (!body.success) return invalid(reply);

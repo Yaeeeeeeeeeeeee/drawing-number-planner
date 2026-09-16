@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { closeSync, createWriteStream, existsSync, openSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative, win32 } from 'node:path';
+import { closeSync, createWriteStream, existsSync, openSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { basename, isAbsolute, join, relative, win32 } from 'node:path';
 
 import type { Archiver } from 'archiver';
 import * as archiverModule from 'archiver';
@@ -108,7 +108,10 @@ export class OutboundPackageService {
     return { previewToken, packageName: resolved.packageName, items: resolved.items };
   }
 
-  async createPackage(input: CreateOutboundPackageInput, options: { signal?: AbortSignal } = {}): Promise<CreatedOutboundPackage> {
+  async createPackage(input: CreateOutboundPackageInput, options: {
+    signal?: AbortSignal; taskId?: string; onProgress?(processed: number, total: number, message: string): void;
+    onFinalizing?(): void;
+  } = {}): Promise<CreatedOutboundPackage> {
     this.pruneTokens(this.now().getTime());
     const token = this.tokens.get(input.previewToken);
     if (!token || token.requestKey !== this.requestKey(input)) throw this.error('PREVIEW_STALE');
@@ -144,12 +147,15 @@ export class OutboundPackageService {
     const claimPath = join(outputRoot, `.${claimKey}.claim`);
     const entries = selected.map((item) => ({ sourcePath: preview.liveFiles.get(item.pdfFileId!)!.absolutePath,
       archiveName: item.fileName! }));
+    options.onProgress?.(0, entries.length, '正在生成压缩包');
     let published = false; let claimed = false;
     try {
       let claimDescriptor: number;
       try {
         claimDescriptor = openSync(claimPath, 'wx');
         claimed = true;
+        writeFileSync(claimDescriptor, JSON.stringify({ version: 1, taskId: options.taskId ?? null, lifecycle: 'active',
+          createdAt: this.now().toISOString(), temporaryFile: basename(temporaryPath), finalFile: basename(finalPath) }), 'utf8');
         closeSync(claimDescriptor);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw this.error('OUTPUT_ALREADY_EXISTS');
@@ -159,7 +165,9 @@ export class OutboundPackageService {
       options.signal?.throwIfAborted();
       const written = await this.writer.write({ temporaryPath, entries, signal: options.signal });
       if (written !== entries.length) throw new Error('ZIP 文件条目数与预览不一致');
+      options.onProgress?.(written, entries.length, '压缩包内容写入完成');
       options.signal?.throwIfAborted();
+      options.onFinalizing?.();
       try { renameSync(temporaryPath, finalPath); }
       catch { throw this.error('PACKAGE_PUBLISH_FAILED'); }
       published = true;

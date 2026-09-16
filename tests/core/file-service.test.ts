@@ -12,6 +12,7 @@ import { PlanningService } from '../../src/core/planning/planning-service';
 import { ProductService } from '../../src/core/products/product-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
+import { TaskRegistry } from '../../src/core/tasks/task-registry';
 
 let db: PlannerDatabase; let repository: FileRepository; let dataDir: string; let settings: WorkspaceSettingsStore;
 beforeEach(() => {
@@ -37,6 +38,25 @@ function createDrawing() {
 }
 
 describe('FileService', () => {
+  it('reports recursive scan progress and cancellation leaves the previous index unchanged', async () => {
+    let release!: () => void;
+    const scanner = async (_root: string, options?: { signal?: AbortSignal; onProgress?(processed: number, total: number | null, path: string): void }) => {
+      options?.onProgress?.(1, 2, 'one.pdf');
+      await new Promise<void>((resolve) => { release = resolve; });
+      options?.signal?.throwIfAborted();
+      return [];
+    };
+    settings.setWorkspaceRoot(dataDir);
+    const service = new FileService(repository, settings, scanner);
+    const registry = new TaskRegistry();
+    registry.register('workspace_scan', (_payload, context) => service.scan(context));
+    const task = registry.create('workspace_scan', {});
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(registry.get(task.id)?.progress).toMatchObject({ processed: 1, total: 2, phase: 'scanning' });
+    registry.cancel(task.id); release(); await registry.wait(task.id);
+    expect(registry.get(task.id)?.status).toBe('cancelled');
+    expect(repository.latestScan()).toBeNull();
+  });
   it('registers reliable history and leaves malformed or ambiguous codes pending', async () => {
     const workspace = join(dataDir, 'library');
     const source = join(workspace, '01.洗碗机', 'SKDWT040JP-T40', '02.未转曲源文件');
