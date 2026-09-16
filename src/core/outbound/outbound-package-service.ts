@@ -12,6 +12,7 @@ import { resolveWorkspacePath, toWorkspaceRelativePath, validateWorkspaceRoot } 
 import { CurrentMaterialSetService } from './current-material-set.js';
 import { OutboundPackageRepository, type OutboundIndexedFile } from './outbound-package-repository.js';
 import { buildOutboundPackageName } from './package-naming.js';
+import { expectedOutboundClaimFileName } from './outbound-artifact-ownership.js';
 import type { CreateOutboundPackageInput, CreatedOutboundPackage, OutboundPackagePreview,
   OutboundPackagePreviewItem, OutboundPackageRequest } from './outbound-types.js';
 
@@ -21,16 +22,34 @@ export type OutboundPackageErrorCode = 'PRODUCT_NOT_FOUND' | 'PACKAGE_EMPTY' | '
   | 'PACKAGE_PUBLISH_FAILED' | 'UNSAFE_PACKAGE_NAME';
 
 export class OutboundPackageError extends Error {
-  constructor(readonly code: OutboundPackageErrorCode, message: string) { super(message); this.name = 'OutboundPackageError'; }
+  constructor(readonly code: OutboundPackageErrorCode, message: string, options?: { cause?: unknown }) {
+    super(message, options); this.name = 'OutboundPackageError';
+  }
 }
 
 export interface OutboundArchiveEntry { sourcePath: string; archiveName: string }
 export interface OutboundArchiveWriter {
-  write(input: { temporaryPath: string; entries: OutboundArchiveEntry[]; signal?: AbortSignal }): Promise<number>;
+  write(input: { temporaryPath: string; entries: OutboundArchiveEntry[]; signal?: AbortSignal;
+    onProgress?(processed: number, total: number): void }): Promise<number>;
 }
 
+export interface OutboundClaimFileOperations {
+  openExclusive(path: string): number;
+  write(descriptor: number, content: string): void;
+  close(descriptor: number): void;
+  remove(path: string): void;
+}
+
+const defaultClaimFileOperations: OutboundClaimFileOperations = {
+  openExclusive: (path) => openSync(path, 'wx'),
+  write: (descriptor, content) => writeFileSync(descriptor, content, 'utf8'),
+  close: (descriptor) => closeSync(descriptor),
+  remove: (path) => rmSync(path, { force: true }),
+};
+
 export class ArchiverOutboundArchiveWriter implements OutboundArchiveWriter {
-  write(input: { temporaryPath: string; entries: OutboundArchiveEntry[]; signal?: AbortSignal }): Promise<number> {
+  write(input: { temporaryPath: string; entries: OutboundArchiveEntry[]; signal?: AbortSignal;
+    onProgress?(processed: number, total: number): void }): Promise<number> {
     return new Promise<number>((resolve, reject) => {
       const ZipArchive = (archiverModule as unknown as { ZipArchive: new(options: { zlib: { level: number } }) => Archiver }).ZipArchive;
       const archive = new ZipArchive({ zlib: { level: 9 } });
@@ -51,7 +70,7 @@ export class ArchiverOutboundArchiveWriter implements OutboundArchiveWriter {
       output.once('error', finish);
       archive.once('error', (error) => { archive.abort(); output.destroy(error); });
       archive.once('warning', (error) => { archive.abort(); output.destroy(error); });
-      archive.on('entry', () => { entryCount += 1; });
+      archive.on('entry', () => { entryCount += 1; input.onProgress?.(entryCount, input.entries.length); });
       archive.pipe(output);
       for (const entry of input.entries) archive.file(entry.sourcePath, { name: entry.archiveName });
       void archive.finalize().catch(finish);
@@ -66,6 +85,7 @@ interface ServiceOptions {
   archiveWriter?: OutboundArchiveWriter;
   previewTokenTtlMs?: number;
   maxPreviewTokens?: number;
+  claimFileOperations?: OutboundClaimFileOperations;
 }
 
 interface ResolvedPreview {
@@ -83,6 +103,7 @@ export class OutboundPackageService {
   private readonly tokens = new Map<string, { requestKey: string; fingerprint: string; createdAtMs: number }>();
   private readonly previewTokenTtlMs: number;
   private readonly maxPreviewTokens: number;
+  private readonly claimFiles: OutboundClaimFileOperations;
 
   constructor(private readonly db: PlannerDatabase, private readonly options: ServiceOptions) {
     this.repository = new OutboundPackageRepository(db);
@@ -91,6 +112,7 @@ export class OutboundPackageService {
     this.writer = options.archiveWriter ?? new ArchiverOutboundArchiveWriter();
     this.previewTokenTtlMs = this.positiveInteger(options.previewTokenTtlMs, 15 * 60 * 1_000);
     this.maxPreviewTokens = this.positiveInteger(options.maxPreviewTokens, 1_000);
+    this.claimFiles = options.claimFileOperations ?? defaultClaimFileOperations;
   }
 
   previewPackage(input: OutboundPackageRequest): OutboundPackagePreview {
@@ -143,29 +165,25 @@ export class OutboundPackageService {
     const zipRelativePath = `${preview.packageName}.zip`;
     const finalPath = resolveWorkspacePath(outputRoot, zipRelativePath, { requireExistingParent: true });
     const temporaryPath = join(outputRoot, `.${randomUUID()}.tmp`);
-    const claimKey = createHash('sha256').update(zipRelativePath.toLocaleLowerCase('en-US')).digest('hex');
-    const claimPath = join(outputRoot, `.${claimKey}.claim`);
+    const claimPath = join(outputRoot, expectedOutboundClaimFileName(basename(finalPath)));
     const entries = selected.map((item) => ({ sourcePath: preview.liveFiles.get(item.pdfFileId!)!.absolutePath,
       archiveName: item.fileName! }));
     options.onProgress?.(0, entries.length, '正在生成压缩包');
     let published = false; let claimed = false;
     try {
-      let claimDescriptor: number;
       try {
-        claimDescriptor = openSync(claimPath, 'wx');
+        this.acquireClaim(claimPath, JSON.stringify({ version: 1, taskId: options.taskId ?? null, lifecycle: 'active',
+          createdAt: this.now().toISOString(), temporaryFile: basename(temporaryPath), finalFile: basename(finalPath) }));
         claimed = true;
-        writeFileSync(claimDescriptor, JSON.stringify({ version: 1, taskId: options.taskId ?? null, lifecycle: 'active',
-          createdAt: this.now().toISOString(), temporaryFile: basename(temporaryPath), finalFile: basename(finalPath) }), 'utf8');
-        closeSync(claimDescriptor);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw this.error('OUTPUT_ALREADY_EXISTS');
-        throw this.error('PACKAGE_PUBLISH_FAILED');
+        throw this.error('PACKAGE_PUBLISH_FAILED', error);
       }
       if (existsSync(finalPath)) throw this.error('OUTPUT_ALREADY_EXISTS');
       options.signal?.throwIfAborted();
-      const written = await this.writer.write({ temporaryPath, entries, signal: options.signal });
+      const written = await this.writer.write({ temporaryPath, entries, signal: options.signal,
+        onProgress: (processed, total) => options.onProgress?.(processed, total, `正在写入第 ${processed}/${total} 个文件`) });
       if (written !== entries.length) throw new Error('ZIP 文件条目数与预览不一致');
-      options.onProgress?.(written, entries.length, '压缩包内容写入完成');
       options.signal?.throwIfAborted();
       options.onFinalizing?.();
       try { renameSync(temporaryPath, finalPath); }
@@ -182,13 +200,38 @@ export class OutboundPackageService {
       this.tokens.delete(input.previewToken);
       return result;
     } catch (error) {
-      rmSync(temporaryPath, { force: true });
-      if (published) rmSync(finalPath, { force: true });
+      this.safeRemove(temporaryPath);
+      if (published) this.safeRemove(finalPath);
       throw error;
     } finally {
-      if (claimed) rmSync(claimPath, { force: true });
+      if (claimed) this.safeRemoveClaim(claimPath);
     }
   }
+
+  private acquireClaim(path: string, content: string): void {
+    let descriptor: number | undefined; let failure: unknown;
+    try {
+      descriptor = this.claimFiles.openExclusive(path);
+      this.claimFiles.write(descriptor, content);
+    } catch (error) { failure = error; }
+    finally {
+      if (descriptor !== undefined) {
+        try { this.claimFiles.close(descriptor); }
+        catch (error) {
+          failure ??= error;
+          try { this.claimFiles.close(descriptor); } catch { /* leave an unknown live claim untouched */ }
+        }
+      }
+    }
+    if (failure !== undefined) {
+      if (descriptor !== undefined) this.safeRemoveClaim(path);
+      throw failure;
+    }
+  }
+
+  private safeRemove(path: string): void { try { rmSync(path, { force: true }); } catch { /* preserve primary failure */ } }
+
+  private safeRemoveClaim(path: string): void { try { this.claimFiles.remove(path); } catch { /* preserve primary failure */ } }
 
   private resolvePreview(input: OutboundPackageRequest): ResolvedPreview {
     const product = this.repository.getProduct(input.productId);
@@ -293,7 +336,7 @@ export class OutboundPackageService {
     return !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(value);
   }
 
-  private error(code: OutboundPackageErrorCode): OutboundPackageError {
+  private error(code: OutboundPackageErrorCode, cause?: unknown): OutboundPackageError {
     const messages: Record<OutboundPackageErrorCode, string> = {
       PRODUCT_NOT_FOUND: '未找到外发产品', PACKAGE_EMPTY: '所选资料没有可打包的转曲后文件',
       PACKAGE_HAS_BLOCKERS: '资料中存在缺失、冲突或待确认项目，暂不能生成压缩包',
@@ -306,6 +349,6 @@ export class OutboundPackageService {
       PACKAGE_PUBLISH_FAILED: '压缩包发布失败，未保留不完整文件',
       UNSAFE_PACKAGE_NAME: '压缩包名称包含 Windows 不允许的字符或名称，请检查品牌、型号和产品类别',
     };
-    return new OutboundPackageError(code, messages[code]);
+    return new OutboundPackageError(code, messages[code], cause === undefined ? undefined : { cause });
   }
 }

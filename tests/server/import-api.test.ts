@@ -65,6 +65,23 @@ describe('Excel import API', () => {
     expect(db.prepare("select count(*) as count from dictionary_items where type = 'brand'").get()).toEqual({ count: 0 });
     await app.close();
   });
+
+  it('rejects cancellation once import backup and transaction finalizing begins', async () => {
+    const app = Fastify(); const tasks = new TaskRegistry(); let taskId = ''; let cancellationCode = '';
+    await registerImportRoutes(app, db, () => {
+      try { tasks.cancel(taskId); }
+      catch (error) { cancellationCode = (error as { code: string }).code; }
+    }, tasks); registerTaskRoutes(app, tasks);
+    const audit = (await app.inject({ method: 'POST', url: '/api/import/excel/audit',
+      ...multipartFile(await workbook(), '规划.xlsx') })).json();
+    const started = await app.inject({ method: 'POST', url: '/api/tasks/excel_import',
+      payload: { auditId: audit.auditId, selections: ['brand:F22'] } });
+    taskId = started.json().id; await tasks.wait(taskId);
+    expect(cancellationCode).toBe('TASK_NOT_CANCELLABLE');
+    expect(tasks.get(taskId)?.status).toBe('completed');
+    expect(db.prepare("select name from dictionary_items where type = 'brand'").get()).toEqual({ name: 'SAMKYO' });
+    await app.close();
+  });
   it('audits an uploaded workbook then imports only confirmed candidates', async () => {
     const app = Fastify();
     let backups = 0;

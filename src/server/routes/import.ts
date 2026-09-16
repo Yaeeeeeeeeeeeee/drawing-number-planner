@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import { ExcelAuditError, auditWorkbook, includeDatabaseConflicts, type ImportAuditReport } from '../../core/import/excel-audit.js';
-import { ExcelImportError, importApprovedRows } from '../../core/import/excel-import.js';
+import { commitApprovedRows, ExcelImportError, importApprovedRows, prepareApprovedRows } from '../../core/import/excel-import.js';
 import { DictionaryError } from '../../core/dictionaries/dictionary-service.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { ensureMultipart } from '../multipart.js';
@@ -41,11 +41,21 @@ export async function registerImportRoutes(
       audits.delete(input.auditId);
       throw new ExcelImportError('IMPORT_CONFLICT', '迁移检查已失效，请重新上传');
     }
-    context?.report({ processed: 0, total: input.selections.length, phase: 'preparing', message: '正在准备导入' });
-    if (context) await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    context?.throwIfCancelled(); context?.beginFinalizing();
-    if (!backupAlreadyCreated) createPreImportBackup();
-    const result = importApprovedRows(audit.report, input.selections, database);
+    let result;
+    if (context) {
+      context.report({ processed: 0, total: input.selections.length, phase: 'preparing', message: '正在准备导入' });
+      const prepared = await prepareApprovedRows(audit.report, input.selections, database, {
+        signal: context.signal,
+        onProgress: (processed, total, candidate) => context.report({ processed, total,
+          phase: 'preparing', message: `正在核对 ${candidate.name}` }),
+      });
+      context.throwIfCancelled(); context.beginFinalizing();
+      if (!backupAlreadyCreated) createPreImportBackup();
+      result = commitApprovedRows(prepared, database);
+    } else {
+      if (!backupAlreadyCreated) createPreImportBackup();
+      result = importApprovedRows(audit.report, input.selections, database);
+    }
     audits.delete(input.auditId);
     return result;
   };

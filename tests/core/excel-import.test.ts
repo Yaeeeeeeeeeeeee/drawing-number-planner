@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { auditRows } from '../../src/core/import/excel-audit';
-import { importApprovedRows } from '../../src/core/import/excel-import';
+import { importApprovedRows, prepareApprovedRows } from '../../src/core/import/excel-import';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 
@@ -23,6 +23,26 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('approved Excel import', () => {
+  it('precomputes selected rows incrementally and can cancel in the middle without writing', async () => {
+    const report = auditRows(sourceRows()); const controller = new AbortController(); const progress: number[] = [];
+    const operation = prepareApprovedRows(report, ['brand:F22', 'main_category:H22', 'project_item:I22'], db, {
+      signal: controller.signal,
+      onProgress: (processed) => { progress.push(processed); if (processed === 2) controller.abort(new Error('cancelled')); },
+    });
+    await expect(operation).rejects.toThrow('cancelled');
+    expect(progress).toEqual([1, 2]);
+    expect(db.prepare('select count(*) as count from dictionary_items').get()).toEqual({ count: 0 });
+  });
+
+  it('reports every prepared row before returning a commit-ready plan', async () => {
+    const report = auditRows(sourceRows()); const progress: number[] = [];
+    const prepared = await prepareApprovedRows(report,
+      ['brand:F22', 'main_category:H22', 'project_item:I22'], db,
+      { onProgress: (processed) => progress.push(processed) });
+    expect(progress).toEqual([1, 2, 3]);
+    expect(prepared).toMatchObject({ imported: 3, skipped: report.candidates.length - 3 });
+    expect(db.prepare('select count(*) as count from dictionary_items').get()).toEqual({ count: 0 });
+  });
   it('imports only explicitly selected conflict-free rows and resolves project parents', () => {
     const report = auditRows(sourceRows());
 

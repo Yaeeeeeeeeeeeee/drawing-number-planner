@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { OutboundPackageService, OutboundPackageError, type OutboundArchiveWriter } from '../../src/core/outbound/outbound-package-service';
+import { ArchiverOutboundArchiveWriter, OutboundPackageService, OutboundPackageError, type OutboundArchiveWriter,
+  type OutboundClaimFileOperations } from '../../src/core/outbound/outbound-package-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import { TaskRegistry } from '../../src/core/tasks/task-registry';
@@ -84,6 +85,18 @@ const request = () => ({ productId, selectedMaterialBatchId: batchId, materialTy
   packageMode: 'current_complete' as const });
 
 describe('OutboundPackageService', () => {
+  it('reports ZIP progress after every archived entry', async () => {
+    const sources = ['one.pdf', 'two.pdf', 'three.pdf'];
+    for (const file of sources) writeFileSync(join(root, file), file);
+    const progress: number[] = [];
+    const written = await new ArchiverOutboundArchiveWriter().write({
+      temporaryPath: join(output, 'progress.tmp'),
+      entries: sources.map((file) => ({ sourcePath: join(root, file), archiveName: file })),
+      onProgress: (processed) => progress.push(processed),
+    });
+    expect(written).toBe(3);
+    expect(progress).toEqual([1, 2, 3]);
+  });
   it('previews current complete materials with database-derived identity and an opaque version token', () => {
     const preview = service.previewPackage(request());
     expect(preview.packageName).toBe('D&D - SAMKYO T40洗碗机 【包材资料-2026年9月10日】');
@@ -264,6 +277,37 @@ describe('OutboundPackageService', () => {
     await expect(failing.createPackage({ ...request(), previewToken: preview.previewToken,
       selectedPdfFileIds: [pdfId] })).rejects.toThrowError(expect.objectContaining({ code: 'PACKAGE_PUBLISH_FAILED' }));
     expect(readdirSync(output)).toEqual([]);
+  });
+
+  it.each(['write', 'close'] as const)('closes the claim descriptor and removes artifacts when claim %s fails', async (failure) => {
+    let closeCalls = 0; let closed = false; let removedAfterClose = false;
+    const operations: OutboundClaimFileOperations = {
+      openExclusive: (path) => openSync(path, 'wx'),
+      write: (descriptor, content) => {
+        if (failure === 'write') throw new Error('fixture claim write failure');
+        writeFileSync(descriptor, content, 'utf8');
+      },
+      close: (descriptor) => {
+        closeCalls += 1;
+        if (failure === 'close' && closeCalls === 1) throw new Error('fixture claim close failure');
+        closeSync(descriptor); closed = true;
+      },
+      remove: (path) => {
+        if (!closed) throw new Error('Windows would reject deletion of an open claim');
+        removedAfterClose = true; rmSync(path, { force: true });
+      },
+    };
+    const failing = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output,
+      now: fixedNow, claimFileOperations: operations });
+    const preview = failing.previewPackage(request());
+    const error = await failing.createPackage({ ...request(), previewToken: preview.previewToken,
+      selectedPdfFileIds: [pdfId] }).catch((caught) => caught as OutboundPackageError);
+    expect(error).toMatchObject({ code: 'PACKAGE_PUBLISH_FAILED',
+      cause: expect.objectContaining({ message: `fixture claim ${failure} failure` }) });
+    expect(closed).toBe(true);
+    expect(removedAfterClose).toBe(true);
+    expect(readdirSync(output)).toEqual([]);
+    expect(db.prepare('select count(*) as count from outbound_packages').get()).toEqual({ count: 0 });
   });
 
   it.each([

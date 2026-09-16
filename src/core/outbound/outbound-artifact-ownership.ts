@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { win32 } from 'node:path';
 
 export interface OutboundClaimMetadata {
@@ -14,15 +15,46 @@ function safeBaseName(value: unknown): value is string {
     && value !== '.' && value !== '..' && !value.includes('\0');
 }
 
-export function parseOutboundClaim(text: string): OutboundClaimMetadata | null {
+function safeWindowsZip(value: unknown): value is string {
+  if (!safeBaseName(value) || !value.toLocaleLowerCase('en-US').endsWith('.zip')
+    || /[<>:"/\\|?*\u0000-\u001f]/u.test(value) || /[. ]$/u.test(value)) return false;
+  const stem = value.slice(0, -4);
+  return !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/iu.test(stem);
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const TEMPORARY_FILE = /^\.[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
+
+export function expectedOutboundClaimFileName(finalFile: string): string {
+  const key = createHash('sha256').update(finalFile.toLocaleLowerCase('en-US')).digest('hex');
+  return `.${key}.claim`;
+}
+
+export function parseOutboundClaim(text: string, claimFileName: string): OutboundClaimMetadata | null {
   try {
     const value = JSON.parse(text) as Partial<OutboundClaimMetadata>;
     if (value.version !== 1 || value.lifecycle !== 'active'
-      || !(value.taskId === null || (typeof value.taskId === 'string' && value.taskId.length > 0))
+      || typeof value.taskId !== 'string' || !UUID.test(value.taskId)
       || typeof value.createdAt !== 'string' || !Number.isFinite(Date.parse(value.createdAt))
-      || !safeBaseName(value.temporaryFile) || !safeBaseName(value.finalFile)) return null;
+      || !safeBaseName(value.temporaryFile) || !TEMPORARY_FILE.test(value.temporaryFile)
+      || !safeWindowsZip(value.finalFile)
+      || claimFileName !== expectedOutboundClaimFileName(value.finalFile)) return null;
     return value as OutboundClaimMetadata;
   } catch { return null; }
+}
+
+export function resolveOwnedOutboundArtifacts(outputDirectory: string, claimPath: string,
+  claim: OutboundClaimMetadata): { claimPath: string; temporaryPath: string; finalPath: string } | null {
+  if (!win32.isAbsolute(outputDirectory) || !win32.isAbsolute(claimPath)) return null;
+  const directory = win32.resolve(outputDirectory);
+  const resolvedClaim = win32.resolve(claimPath);
+  if (win32.dirname(resolvedClaim).toLocaleLowerCase('en-US') !== directory.toLocaleLowerCase('en-US')
+    || win32.basename(resolvedClaim) !== expectedOutboundClaimFileName(claim.finalFile)) return null;
+  const temporaryPath = win32.resolve(directory, claim.temporaryFile);
+  const finalPath = win32.resolve(directory, claim.finalFile);
+  if ([temporaryPath, finalPath].some((path) => win32.dirname(path).toLocaleLowerCase('en-US')
+      !== directory.toLocaleLowerCase('en-US'))) return null;
+  return { claimPath: resolvedClaim, temporaryPath, finalPath };
 }
 
 export function mayCleanOutboundClaim(claim: OutboundClaimMetadata, options: {
