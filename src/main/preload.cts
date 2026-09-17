@@ -24,4 +24,15 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
     if (!Number.isInteger(packageId) || Number(packageId) <= 0) return Promise.resolve({ ok: false, error: { code: 'INVALID_PACKAGE_ID', message: '外发压缩包编号无效' } });
     return ipcRenderer.invoke('planner:show-outbound-package-in-folder', packageId);
   },
+  getRecoveryStatus() { return ipcRenderer.invoke('planner:recovery-status'); },
+  terminateTask() { return ipcRenderer.invoke('planner:recovery-terminate-task'); },
+  reloadRenderer() { return ipcRenderer.invoke('planner:recovery-reload-renderer'); },
+  restartService() { return ipcRenderer.invoke('planner:recovery-restart-service'); },
+  relaunchApp() { return ipcRenderer.invoke('planner:recovery-relaunch-app'); },
+  onServiceRestarted(callback: unknown) {
+    if (typeof callback !== 'function') return () => undefined;
+    const listener = () => callback();
+    ipcRenderer.on('planner:service-restarted', listener);
+    return () => ipcRenderer.removeListener('planner:service-restarted', listener);
+  },
 });

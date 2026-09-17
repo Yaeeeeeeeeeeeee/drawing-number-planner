@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let apiClient: typeof import('../../src/renderer/data/client').apiClient;
 let ApiError: typeof import('../../src/renderer/data/client').ApiError;
+let resetApiSession: typeof import('../../src/renderer/data/client').resetApiSession;
 
 beforeEach(async () => {
   vi.resetModules();
-  ({ apiClient, ApiError } = await import('../../src/renderer/data/client'));
+  ({ apiClient, ApiError, resetApiSession } = await import('../../src/renderer/data/client'));
 });
 
 afterEach(() => {
@@ -14,6 +15,27 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('fetches a fresh write token after the desktop service restarts', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'old-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 1, code: '01', name: '旧会话', status: 'active' }), { status: 201, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'new-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 2, code: '02', name: '新会话', status: 'active' }), { status: 201, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiClient.createDictionary('brand', { code: '01', name: '旧会话' });
+    resetApiSession();
+    await apiClient.createDictionary('brand', { code: '02', name: '新会话' });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/dictionaries/brand', expect.objectContaining({
+      headers: expect.objectContaining({ 'x-planner-token': 'old-token' }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/session', { method: 'POST' });
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/dictionaries/brand', expect.objectContaining({
+      headers: expect.objectContaining({ 'x-planner-token': 'new-token' }),
+    }));
+  });
+
   it('uses product-level BOM endpoints and sends browser uploads as multipart data', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'bom-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))

@@ -25,6 +25,7 @@ describe('application shell', () => {
     expect(screen.getByRole('button', { name: /PDF 文件中心/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /外发资料/ })).toBeEnabled();
     expect(screen.getByRole('heading', { name: '图号规划' })).toBeVisible();
-    expect(screen.getByText('Phase 4 · PDF 文件中心')).toBeVisible();
+    expect(screen.getByText('系统正常')).toBeVisible();
+    expect(screen.getByRole('button', { name: '安全恢复' })).toBeVisible();
   });
 });

@@ -10,6 +10,7 @@ import { BomPage } from '../pages/BomPage';
 import { FilesPage } from '../pages/FilesPage';
 import { QrCodesPage } from '../pages/QrCodesPage';
 import { OutboundPage } from '../pages/OutboundPage';
+import { SafeRecovery } from '../components/SafeRecovery';
 
 type Page = 'drawings' | 'dictionaries' | 'products' | 'import' | 'planning' | 'bom' | 'files' | 'qr' | 'exports';
 const navigation = [
@@ -35,7 +36,7 @@ export function AppShell({ api }: { api: PlannerApi }) {
     <nav aria-label="主导航">{navigation.map((group) => <section className="nav-group" key={group.label} aria-label={group.label}>
       <p className="nav-group-label">{group.label}</p>{group.items.map((item) => <button className={`nav-item ${page === item.key ? 'active' : ''}`} disabled={!item.enabled} onClick={() => item.enabled && setPage(item.key as Page)} key={item.key} type="button">
         <span className="nav-label"><i>{item.icon}</i>{item.label}</span></button>)}</section>)}</nav>
-    <div className="sidebar-footer"><span className="connection-dot" />本机资料库<div>Phase 4 · PDF 文件中心</div></div></aside>
+    <div className="sidebar-footer"><SafeRecovery api={api} /></div></aside>
     <main className="workspace">{page === 'drawings' && <DrawingLibraryPage api={api} />}{page === 'dictionaries' && <DictionariesPage api={api} />}
       {page === 'products' && <ProductsPage api={api} onOpenQr={(id) => { setSelectedQrCodeId(id); setPage('qr'); }} />}{page === 'import' && <ImportPage api={api} />}{page === 'planning' && <PlanningPage api={api} />}
       {page === 'bom' && <BomPage api={api} />}{page === 'exports' && <OutboundPage api={api} />}{page === 'files' && <FilesPage api={api} />}{page === 'qr' && <QrCodesPage api={api} initialQrCodeId={selectedQrCodeId} onOpened={() => setSelectedQrCodeId(null)} />}</main></div>;

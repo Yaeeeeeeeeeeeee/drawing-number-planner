@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,9 +7,11 @@ import { LocalServiceController } from './local-service-controller.js';
 import { loadDesktopSurface } from './desktop-startup.js';
 import { createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
 import { createChooseOutboundDirectoryHandler, createShowOutboundPackageHandler } from './outbound-file-actions.js';
+import { RecoveryController, createNativeRecoveryActions, parseRecoveryServiceResponse, type RecoverableTask } from './recovery-controller.js';
 
 let localService: LocalServiceController | undefined;
 let mainWindow: BrowserWindow | undefined;
+let recoveryController: RecoveryController | undefined;
 let quitting = false;
 process.on('uncaughtException', (error) => console.error('[main] uncaught', error));
 
@@ -41,6 +43,7 @@ async function createWindow() {
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.once('closed', () => { mainWindow = undefined; });
+  installRecoveryControls();
   const result = await loadDesktopSurface({
     startService: () => localService!.start(),
     loadURL: (url) => mainWindow!.loadURL(url),
@@ -48,6 +51,71 @@ async function createWindow() {
     quit: () => app.quit(),
   });
   if (result.status === 'unavailable') console.error('[main] local service unavailable', result.error);
+}
+
+async function serviceRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!localService) throw new Error('本机文件服务尚未启动');
+  const connection = await localService.start();
+  const response = await fetch(`${connection.url}${path}`, {
+    ...init,
+    headers: { origin: connection.url, ...(init.headers as Record<string, string> | undefined),
+      ...(['POST', 'PUT', 'PATCH', 'DELETE'].includes(init.method?.toUpperCase() ?? 'GET')
+        ? { 'x-planner-token': connection.token } : {}) },
+  });
+  const body = await response.text();
+  return parseRecoveryServiceResponse<T>(response, body);
+}
+
+function installRecoveryControls(): void {
+  if (!localService || !mainWindow) return;
+  recoveryController = new RecoveryController({
+    serviceHealth: () => localService!.health(),
+    restartService: () => localService!.restart(),
+    listTasks: async () => (await serviceRequest<{ tasks: RecoverableTask[] }>('/api/tasks')).tasks,
+    cancelTask: async (id) => { await serviceRequest(`/api/tasks/${id}/cancel`, { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: '{}' }); },
+    waitForTask: async (id, timeoutMs) => {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const task = await serviceRequest<RecoverableTask>(`/api/tasks/${id}`);
+        if (['completed', 'failed', 'cancelled'].includes(task.status)) return true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return false;
+    },
+    reloadRenderer: () => mainWindow?.webContents.reload(),
+    notifyServiceRestarted: (url) => {
+      if (!mainWindow?.isDestroyed()) mainWindow?.webContents.send('planner:service-restarted', { url });
+    },
+    relaunch: () => app.relaunch(),
+    exit: (code) => app.exit(code),
+  });
+  const actions = createNativeRecoveryActions(recoveryController);
+  const invoke = (action: keyof typeof actions) => void actions[action]().catch((error) => {
+    dialog.showErrorBox('安全恢复未完成', error instanceof Error ? error.message : '恢复操作失败');
+  });
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: '应用', submenu: [
+    { label: '安全恢复', submenu: [
+      { label: '终止当前任务', click: () => invoke('terminateTask') },
+      { label: '重新加载界面', click: () => invoke('reloadRenderer') },
+      { label: '重启本地服务', click: () => invoke('restartService') },
+      { type: 'separator' },
+      { label: '完整恢复应用', click: () => invoke('relaunchApp') },
+    ] },
+  ] }]));
+  const result = async (action: keyof typeof actions) => {
+    try { return await actions[action](); }
+    catch (error) { return { ok: false, error: { code: typeof error === 'object' && error && 'code' in error ? String(error.code) : 'RECOVERY_FAILED',
+      message: error instanceof Error ? error.message : '恢复操作失败' } }; }
+  };
+  ipcMain.removeHandler('planner:recovery-status');
+  ipcMain.removeHandler('planner:recovery-terminate-task'); ipcMain.removeHandler('planner:recovery-reload-renderer');
+  ipcMain.removeHandler('planner:recovery-restart-service'); ipcMain.removeHandler('planner:recovery-relaunch-app');
+  ipcMain.handle('planner:recovery-status', () => recoveryController!.status());
+  ipcMain.handle('planner:recovery-terminate-task', () => result('terminateTask'));
+  ipcMain.handle('planner:recovery-reload-renderer', () => result('reloadRenderer'));
+  ipcMain.handle('planner:recovery-restart-service', () => result('restartService'));
+  ipcMain.handle('planner:recovery-relaunch-app', () => result('relaunchApp'));
 }
 
 app.whenReady().then(() => {

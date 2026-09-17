@@ -21,8 +21,20 @@ nav { z-index: 1; display: grid; gap: 14px; }
 .nav-label i { display: grid; width: 24px; height: 24px; place-items: center; color: #9cc2ef; border: 1px solid rgba(165,203,245,.22); border-radius: 5px; font-size: 11px; font-style: normal; }
 .nav-item.active i { color: #fff; border-color: rgba(255,255,255,.35); } .nav-item small { font-size: 9px; }
 .sidebar-footer { margin-top: auto; padding: 16px 10px 0; color: #bfd2e9; border-top: 1px solid #244d79; font-size: 12px; line-height: 1.9; }
-.sidebar-footer div { color: #7f9dbf; font-size: 11px; }
+.sidebar-footer div { font-size: 11px; }
 .connection-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #39c792; box-shadow: 0 0 0 3px rgba(57,199,146,.12); }
+.safe-recovery { position: relative; display: grid; gap: 5px; }
+.system-status { color: #bfd2e9; }
+.system-status.busy { color: #f8d77d; } .system-status.busy .connection-dot { background: #f0b429; }
+.system-status.failed { color: #ffb4ad; } .system-status.failed .connection-dot { background: #ef665b; }
+.safe-recovery-trigger { width: max-content; padding: 0; color: #8fb5e3; border: 0; background: transparent; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+.safe-recovery-panel { position: absolute; z-index: 20; bottom: 50px; left: 0; display: grid; width: 214px; gap: 7px; padding: 13px; color: #1d2939; border: 1px solid #cfd8e5; border-radius: 7px; background: #fff; box-shadow: 0 12px 30px rgba(0,22,58,.28); line-height: 1.4; }
+.safe-recovery-panel > strong { font-size: 13px; }
+.safe-recovery-panel > button, .slow-recovery-warning button { min-height: 32px; color: #234; border: 1px solid #d7dee8; border-radius: 4px; background: #f8fafc; font-size: 11px; }
+.safe-recovery-panel > button:last-of-type { color: #9b2c25; }
+.desktop-only-note, .recovery-message, .slow-recovery-warning p { margin: 2px 0; color: #667085; font-size: 11px; }
+.slow-recovery-warning { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid #e4e7ec; }
+.slow-recovery-warning > div { display: flex; gap: 6px; }
 .workspace { min-width: 0; padding: 0 38px 38px; overflow: hidden; }
 .page-surface { position: relative; max-width: 1580px; min-height: 100vh; margin: 0 auto; padding-top: 31px; }
 .page-enter { animation: page-in .24s ease-out both; } @keyframes page-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }

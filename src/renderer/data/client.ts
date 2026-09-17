@@ -225,6 +225,13 @@ export interface PdfFileView {
   materialBatchStatus?: 'recognized' | 'pending' | null;
 }
 
+export type LocalTaskStatusView = 'queued' | 'running' | 'finalizing' | 'completed' | 'failed' | 'cancelled';
+export interface LocalTaskView {
+  id: string; kind: string; status: LocalTaskStatusView; cancelRequested: boolean; createdAt: string;
+  progress: { processed: number; total: number | null; phase: string; message: string };
+  startedAt?: string; finishedAt?: string; error?: { code: string; message: string };
+}
+
 export interface PlannerApi {
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingDetailView>;
@@ -322,6 +329,9 @@ export interface PlannerApi {
   searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
     items: PdfFileView[]; total: number; page: number; pageSize: number;
   }>;
+  checkServiceHealth(): Promise<{ status: 'ok' }>;
+  listLocalTasks(): Promise<LocalTaskView[]>;
+  cancelLocalTask(id: string): Promise<LocalTaskView>;
 }
 
 export class ApiError extends Error {
@@ -413,6 +423,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 let currentSessionToken: Promise<string> | undefined;
+export function resetApiSession(): void { currentSessionToken = undefined; }
 function sessionToken(): Promise<string> {
   if (currentSessionToken) return currentSessionToken;
   const pending = fetchLocal('/api/session', { method: 'POST' })
@@ -552,4 +563,7 @@ export const apiClient: PlannerApi = {
   getFileIndexClearPreview: () => request('/api/files/index/clear-preview'),
   clearFileIndex: (confirmation) => request('/api/files/index/clear', json('POST', { confirmation })),
   searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
+  checkServiceHealth: () => request('/api/health'),
+  listLocalTasks: async () => (await request<{ tasks: LocalTaskView[] }>('/api/tasks')).tasks,
+  cancelLocalTask: (id) => request(`/api/tasks/${id}/cancel`, json('POST')),
 };
