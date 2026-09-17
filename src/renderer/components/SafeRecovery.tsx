@@ -69,6 +69,17 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
     }
   };
 
+  const relaunchWhileSlow = async () => {
+    if (!desktop?.relaunchApp || !window.confirm('完整恢复将安全终止全部任务并重启应用，是否继续？')) return;
+    try {
+      const result = await desktop.relaunchApp();
+      if (!result.ok) throw new Error(result.error?.message ?? '完整恢复未能启动');
+      if (mounted.current) setMessage('已请求完整安全恢复');
+    } catch (error) {
+      if (mounted.current) setMessage(error instanceof Error ? error.message : '完整恢复未能启动');
+    }
+  };
+
   const serviceUnavailable = status.service === 'failed' || status.service === 'stopped';
   const statusText = serviceUnavailable
     ? '本地服务异常'
@@ -92,7 +103,8 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
       {slow && <div className="slow-recovery-warning" role="alert">
         <strong>当前操作响应较慢</strong><p>不会自动终止任务，请选择下一步。</p>
         <div><button type="button" onClick={() => setSlow(false)}>继续等待</button>
-          <button type="button" onClick={() => void terminateWhileSlow()}>终止任务</button></div>
+          <button type="button" onClick={() => void terminateWhileSlow()}>终止任务</button>
+          <button type="button" onClick={() => void relaunchWhileSlow()}>安全恢复应用</button></div>
       </div>}
     </section>}
   </div>;

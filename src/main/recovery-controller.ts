@@ -4,7 +4,7 @@ type RecoverableTaskStatus = 'queued' | 'running' | 'finalizing' | 'completed' |
 export interface RecoverableTask { id: string; status: RecoverableTaskStatus; createdAt: string; kind?: string; progress?: { message?: string } }
 
 export class RecoveryError extends Error {
-  constructor(readonly code: 'TASK_NOT_CANCELLABLE' | 'TASK_CANCEL_TIMEOUT' | 'RECOVERY_FAILED', message: string) {
+  constructor(readonly code: 'TASK_NOT_CANCELLABLE' | 'TASK_CANCEL_TIMEOUT' | 'RECOVERY_BUSY' | 'RECOVERY_FAILED', message: string) {
     super(message); this.name = 'RecoveryError';
   }
 }
@@ -38,7 +38,11 @@ export function parseRecoveryServiceResponse<T>(response: Pick<Response, 'ok' | 
 }
 
 function currentTask(tasks: RecoverableTask[]): RecoverableTask | null {
-  return tasks.find((task) => task.status === 'queued' || task.status === 'running' || task.status === 'finalizing') ?? null;
+  return activeTasks(tasks)[0] ?? null;
+}
+
+function activeTasks(tasks: RecoverableTask[]): RecoverableTask[] {
+  return tasks.filter((task) => task.status === 'queued' || task.status === 'running' || task.status === 'finalizing');
 }
 
 export class RecoveryController {
@@ -74,12 +78,15 @@ export class RecoveryController {
   }
 
   async relaunchApp(): Promise<{ ok: true }> {
-    const task = this.dependencies.serviceHealth().status === 'running'
-      ? currentTask(await this.dependencies.listTasks()) : null;
-    if (task) {
-      if (task.status !== 'finalizing') await this.dependencies.cancelTask(task.id);
-      const stopped = await this.dependencies.waitForTask(task.id, 5_000);
-      if (!stopped) throw new RecoveryError('TASK_CANCEL_TIMEOUT', '当前任务尚未安全停止，请继续等待后再恢复');
+    const tasks = this.dependencies.serviceHealth().status === 'running'
+      ? activeTasks(await this.dependencies.listTasks()) : [];
+    if (tasks.length > 0) {
+      await Promise.all(tasks.filter((task) => task.status !== 'finalizing')
+        .map((task) => this.dependencies.cancelTask(task.id)));
+      const stopped = await Promise.all(tasks.map((task) => this.dependencies.waitForTask(task.id, 5_000)));
+      if (stopped.some((done) => !done)) {
+        throw new RecoveryError('TASK_CANCEL_TIMEOUT', '仍有任务尚未安全停止，请继续等待后再恢复');
+      }
     }
     await this.restartService();
     this.dependencies.relaunch();
@@ -89,10 +96,23 @@ export class RecoveryController {
 }
 
 export function createNativeRecoveryActions(controller: RecoveryController) {
+  type ActionName = 'terminateTask' | 'reloadRenderer' | 'restartService' | 'relaunchApp';
+  let inFlight: { name: ActionName; promise: Promise<unknown> } | null = null;
+  const run = <T>(name: ActionName, action: () => Promise<T>): Promise<T> => {
+    if (inFlight) {
+      if (inFlight.name === name) return inFlight.promise as Promise<T>;
+      return Promise.reject(new RecoveryError('RECOVERY_BUSY', '另一项安全恢复操作正在进行，请等待完成后重试'));
+    }
+    const promise = action().finally(() => {
+      if (inFlight?.promise === promise) inFlight = null;
+    });
+    inFlight = { name, promise };
+    return promise;
+  };
   return {
-    terminateTask: () => controller.terminateTask(),
-    reloadRenderer: () => controller.reloadRenderer(),
-    restartService: () => controller.restartService(),
-    relaunchApp: () => controller.relaunchApp(),
+    terminateTask: () => run('terminateTask', () => controller.terminateTask()),
+    reloadRenderer: () => run('reloadRenderer', () => controller.reloadRenderer()),
+    restartService: () => run('restartService', () => controller.restartService()),
+    relaunchApp: () => run('relaunchApp', () => controller.relaunchApp()),
   };
 }

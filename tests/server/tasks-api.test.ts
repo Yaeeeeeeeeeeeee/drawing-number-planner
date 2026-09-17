@@ -42,6 +42,9 @@ describe('task API', () => {
       .toBe('TASK_NOT_FOUND');
     const started = await app.inject({ method: 'POST', url: '/api/tasks/workspace_scan', payload: {} });
     const id = started.json().id; await registry.wait(id);
+    expect((await app.inject({ method: 'GET', url: `/api/tasks/${id}` })).json()).toMatchObject({
+      id, status: 'completed', result: 'done',
+    });
     const cancelled = await app.inject({ method: 'POST', url: `/api/tasks/${id}/cancel`, payload: {} });
     expect(cancelled.statusCode).toBe(409);
     expect(cancelled.json().error.code).toBe('TASK_NOT_CANCELLABLE');

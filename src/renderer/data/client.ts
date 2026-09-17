@@ -229,7 +229,7 @@ export type LocalTaskStatusView = 'queued' | 'running' | 'finalizing' | 'complet
 export interface LocalTaskView {
   id: string; kind: string; status: LocalTaskStatusView; cancelRequested: boolean; createdAt: string;
   progress: { processed: number; total: number | null; phase: string; message: string };
-  startedAt?: string; finishedAt?: string; error?: { code: string; message: string };
+  startedAt?: string; finishedAt?: string; result?: unknown; error?: { code: string; message: string };
 }
 
 export interface PlannerApi {
@@ -449,6 +449,19 @@ const json = (method: string, body?: unknown): RequestInit => ({
   body: JSON.stringify(body ?? {}),
 });
 
+const taskInProgress = (status: LocalTaskStatusView) => ['queued', 'running', 'finalizing'].includes(status);
+
+async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_import' | 'outbound_package', payload: unknown): Promise<T> {
+  let task = await request<LocalTaskView>(`/api/tasks/${kind}`, json('POST', payload));
+  while (taskInProgress(task.status)) {
+    task = await request<LocalTaskView>(`/api/tasks/${task.id}`);
+    if (taskInProgress(task.status)) await new Promise((resolve) => window.setTimeout(resolve, 200));
+  }
+  if (task.status === 'completed') return task.result as T;
+  if (task.status === 'failed') throw new ApiError(task.error?.code ?? 'TASK_FAILED', task.error?.message ?? '任务执行失败');
+  throw new ApiError('TASK_CANCELLED', '任务已取消');
+}
+
 export const apiClient: PlannerApi = {
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),
   getDrawing: (id) => request(`/api/drawings/${id}`),
@@ -523,7 +536,7 @@ export const apiClient: PlannerApi = {
   deactivateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/deactivate`, json('POST')),
   deleteOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`, { method: 'DELETE' }),
   previewOutboundPackage: (input) => request('/api/outbound-packages/preview', json('POST', input)),
-  createOutboundPackage: (input) => request('/api/outbound-packages', json('POST', input)),
+  createOutboundPackage: (input) => runLocalTask('outbound_package', input),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(
     '/api/products/historical-candidates')).items,
   confirmHistoricalProductCandidate: (input) => request('/api/products/historical-candidates/confirm', json('POST', input)),
@@ -531,7 +544,7 @@ export const apiClient: PlannerApi = {
     const form = new FormData(); form.append('file', file);
     return request('/api/import/excel/audit', { method: 'POST', body: form });
   },
-  confirmImport: (auditId, selections) => request('/api/import/excel/confirm', json('POST', { auditId, selections })),
+  confirmImport: (auditId, selections) => runLocalTask('excel_import', { auditId, selections }),
   previewPlan: (input) => request('/api/planning/preview', json('POST', input)),
   reservePlan: async (input) => (await request<{ items: ReservedDrawingView[] }>('/api/planning/reserve', json('POST', input))).items,
   getCurrentBom: async (productId) => (await request<{ version: BomVersionView | null }>(
@@ -556,12 +569,12 @@ export const apiClient: PlannerApi = {
   saveBomVersion: (input) => request('/api/boms/versions', json('POST', input)),
   getWorkspaceSettings: () => request('/api/files/settings'),
   updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
-  scanPdfFiles: () => request('/api/files/scan', { method: 'POST' }),
+  scanPdfFiles: () => runLocalTask('workspace_scan', {}),
   getLatestFileScan: () => request('/api/files/scans/latest'),
   getFileScanChanges: (id) => request(`/api/files/scans/${id}/changes`),
   cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),
   getFileIndexClearPreview: () => request('/api/files/index/clear-preview'),
-  clearFileIndex: (confirmation) => request('/api/files/index/clear', json('POST', { confirmation })),
+  clearFileIndex: (confirmation) => runLocalTask('index_clear', { confirmation }),
   searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
   checkServiceHealth: () => request('/api/health'),
   listLocalTasks: async () => (await request<{ tasks: LocalTaskView[] }>('/api/tasks')).tasks,

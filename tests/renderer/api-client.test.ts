@@ -15,6 +15,55 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('runs every cancellable UI operation through the task registry and returns its completed result', async () => {
+    const completed = [
+      { imported: 3, skipped: 1 },
+      { total: 12, matched: 8 },
+      { clearedPdfFiles: 12 },
+      { id: 91, fileName: 'package.zip' },
+    ];
+    const ids = ['import-task', 'scan-task', 'clear-task', 'package-task'];
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'task-token' }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    for (let index = 0; index < ids.length; index += 1) {
+      fetchMock
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id: ids[index], status: 'queued' }), { status: 202, headers: { 'content-type': 'application/json' } }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id: ids[index], status: 'completed', result: completed[index] }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    }
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.confirmImport('d4e0b9de-7104-48a4-9d87-4a64bba426dc', ['brand:01']))
+      .resolves.toEqual(completed[0]);
+    await expect(apiClient.scanPdfFiles()).resolves.toEqual(completed[1]);
+    await expect(apiClient.clearFileIndex('清空资料库索引')).resolves.toEqual(completed[2]);
+    await expect(apiClient.createOutboundPackage({ productId: 7, selectedMaterialBatchId: 9,
+      materialType: 'update', packageMode: 'change_only', previewToken: 'preview', selectedPdfFileIds: [11] }))
+      .resolves.toEqual(completed[3]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/tasks/excel_import', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ auditId: 'd4e0b9de-7104-48a4-9d87-4a64bba426dc', selections: ['brand:01'] }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/tasks/workspace_scan', expect.objectContaining({ method: 'POST', body: '{}' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/tasks/index_clear', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ confirmation: '清空资料库索引' }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(8, '/api/tasks/outbound_package', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(9, '/api/tasks/package-task', { headers: {} });
+  });
+
+  it('surfaces a failed task result as the original structured API error', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'task-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'scan-task', status: 'queued' }), { status: 202, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'scan-task', status: 'failed',
+        error: { code: 'WORKSPACE_UNAVAILABLE', message: '资料根目录不可用' } }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.scanPdfFiles()).rejects.toMatchObject({
+      name: 'Error', code: 'WORKSPACE_UNAVAILABLE', message: '资料根目录不可用',
+    });
+  });
+
   it('fetches a fresh write token after the desktop service restarts', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'old-token' }), { status: 200, headers: { 'content-type': 'application/json' } }))
@@ -178,7 +227,8 @@ describe('renderer API client', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 1, code: '02', name: 'SAMKYO', status: 'active' }), { status: 201, headers: { 'content-type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ version: { id: 1, items: [] }, diff: [] }), { status: 201, headers: { 'content-type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ workspaceRoot: 'X:\\Library', configured: true, available: true }), { status: 200, headers: { 'content-type': 'application/json' } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ total: 0, matched: 0, unmatched: 0, conflict: 0, source: 0, outlined: 0, missing: 0, scannedAt: '2026-08-25T00:00:00Z' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'scan-task', status: 'queued' }), { status: 202, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'scan-task', status: 'completed', result: { total: 0, matched: 0, unmatched: 0, conflict: 0, source: 0, outlined: 0, missing: 0, scannedAt: '2026-08-25T00:00:00Z' } }), { status: 200, headers: { 'content-type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20 }), { status: 200, headers: { 'content-type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -201,11 +251,12 @@ describe('renderer API client', () => {
       method: 'PUT', headers: expect.objectContaining({ 'x-planner-token': 'fresh-launch-token' }),
       body: JSON.stringify({ workspaceRoot: 'X:\\Library' }),
     }));
-    expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/files/scan', expect.objectContaining({
-      method: 'POST', headers: expect.objectContaining({ 'x-planner-token': 'fresh-launch-token' }),
+    expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/tasks/workspace_scan', expect.objectContaining({
+      method: 'POST', headers: expect.objectContaining({ 'content-type': 'application/json', 'x-planner-token': 'fresh-launch-token' }),
+      body: '{}',
     }));
-    expect(fetchMock.mock.calls[4][1]?.headers).not.toHaveProperty('content-type');
-    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/files?keyword=%E8%BD%AC%E6%9B%B2&matchStatus=unmatched&materialBatchId=7&page=1&pageSize=20', {
+    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/tasks/scan-task', { headers: {} });
+    expect(fetchMock).toHaveBeenNthCalledWith(7, '/api/files?keyword=%E8%BD%AC%E6%9B%B2&matchStatus=unmatched&materialBatchId=7&page=1&pageSize=20', {
       headers: {},
     });
   });

@@ -74,9 +74,33 @@ describe('safe recovery surface', () => {
     expect(screen.getByText('当前操作响应较慢')).toBeVisible();
     expect(screen.getByRole('button', { name: '继续等待' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '终止任务' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '安全恢复应用' })).toBeEnabled();
     expect(terminateTask).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '终止任务' }));
     await act(async () => undefined);
     expect(terminateTask).toHaveBeenCalledOnce();
+  });
+
+  it('can request a full safe recovery from the slow-response warning while another action is busy', async () => {
+    vi.useFakeTimers();
+    const relaunchApp = vi.fn(async () => ({ ok: true }));
+    window.plannerDesktop = {
+      showFileInFolder: vi.fn(),
+      getRecoveryStatus: vi.fn(async () => ({ service: 'running' as const, activeTask: null })),
+      terminateTask: vi.fn(async () => ({ ok: true, cancelled: false })),
+      reloadRenderer: vi.fn(async () => ({ ok: true })),
+      restartService: vi.fn(() => new Promise<DesktopRecoveryResult>(() => undefined)),
+      relaunchApp,
+    };
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App api={api} />);
+    fireEvent.click(screen.getByRole('button', { name: '安全恢复' }));
+    fireEvent.click(screen.getByRole('button', { name: '重启本地服务' }));
+    await act(async () => { vi.advanceTimersByTime(10_000); });
+
+    fireEvent.click(screen.getByRole('button', { name: '安全恢复应用' }));
+    await act(async () => undefined);
+
+    expect(relaunchApp).toHaveBeenCalledOnce();
   });
 });

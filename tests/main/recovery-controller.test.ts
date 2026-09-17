@@ -113,6 +113,44 @@ describe('desktop recovery controller', () => {
     expect(dependencies.relaunch).not.toHaveBeenCalled();
   });
 
+  it('cancels every cancellable task and waits for every active task before a full recovery', async () => {
+    const tasks = [
+      { id: 'task-queued', status: 'queued' as const, createdAt: '2026-09-16T01:00:00Z' },
+      { id: 'task-running', status: 'running' as const, createdAt: '2026-09-16T01:01:00Z' },
+      { id: 'task-final', status: 'finalizing' as const, createdAt: '2026-09-16T01:02:00Z' },
+      { id: 'task-done', status: 'completed' as const, createdAt: '2026-09-16T00:59:00Z' },
+    ];
+    const { controller, dependencies, calls } = fixture({ listTasks: vi.fn(async () => tasks) });
+
+    await controller.relaunchApp();
+
+    expect(dependencies.cancelTask).toHaveBeenCalledTimes(2);
+    expect(dependencies.cancelTask).toHaveBeenCalledWith('task-queued');
+    expect(dependencies.cancelTask).toHaveBeenCalledWith('task-running');
+    expect(dependencies.cancelTask).not.toHaveBeenCalledWith('task-final');
+    expect(dependencies.waitForTask).toHaveBeenCalledTimes(3);
+    expect(dependencies.waitForTask).toHaveBeenCalledWith('task-final', 5_000);
+    expect(calls.slice(-4)).toEqual(['restart', 'notify', 'relaunch', 'exit']);
+  });
+
+  it('does not restart when any active task misses the shared recovery deadline', async () => {
+    const { controller, dependencies } = fixture({
+      listTasks: vi.fn(async () => [
+        { id: 'task-running', status: 'running', createdAt: '2026-09-16T01:00:00Z' },
+        { id: 'task-final', status: 'finalizing', createdAt: '2026-09-16T01:01:00Z' },
+      ]),
+      waitForTask: vi.fn(async (id: string) => id !== 'task-final'),
+    });
+
+    await expect(controller.relaunchApp()).rejects.toMatchObject({ code: 'TASK_CANCEL_TIMEOUT' } satisfies Partial<RecoveryError>);
+
+    expect(dependencies.cancelTask).toHaveBeenCalledWith('task-running');
+    expect(dependencies.cancelTask).not.toHaveBeenCalledWith('task-final');
+    expect(dependencies.restartService).not.toHaveBeenCalled();
+    expect(dependencies.relaunch).not.toHaveBeenCalled();
+    expect(dependencies.exit).not.toHaveBeenCalled();
+  });
+
   it('exposes native menu actions that call Main directly without a renderer callback', async () => {
     const { controller, dependencies } = fixture();
     const actions = createNativeRecoveryActions(controller);
@@ -122,5 +160,37 @@ describe('desktop recovery controller', () => {
 
     expect(dependencies.reloadRenderer).toHaveBeenCalledOnce();
     expect(dependencies.restartService).toHaveBeenCalledOnce();
+  });
+
+  it('shares one in-flight promise for duplicate native and IPC recovery actions', async () => {
+    let release!: () => void;
+    const restartService = vi.fn(() => new Promise<{ url: string; token: string }>((resolve) => {
+      release = () => resolve({ url: 'http://127.0.0.1:4317', token: 'fresh-token' });
+    }));
+    const { controller, dependencies } = fixture({ restartService });
+    const actions = createNativeRecoveryActions(controller);
+
+    const nativeRestart = actions.restartService();
+    const ipcRestart = actions.restartService();
+
+    expect(restartService).toHaveBeenCalledOnce();
+    release();
+    await expect(Promise.all([nativeRestart, ipcRestart])).resolves.toEqual([
+      { ok: true, url: 'http://127.0.0.1:4317' },
+      { ok: true, url: 'http://127.0.0.1:4317' },
+    ]);
+    expect(dependencies.notifyServiceRestarted).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a different recovery action while another one is in flight', async () => {
+    const restartService = vi.fn(() => new Promise<{ url: string; token: string }>(() => undefined));
+    const { controller, dependencies } = fixture({ restartService });
+    const actions = createNativeRecoveryActions(controller);
+
+    void actions.restartService();
+
+    await expect(actions.relaunchApp()).rejects.toMatchObject({ code: 'RECOVERY_BUSY' });
+    expect(dependencies.relaunch).not.toHaveBeenCalled();
+    expect(restartService).toHaveBeenCalledOnce();
   });
 });
