@@ -7,43 +7,68 @@ type SurfaceStatus = { service: 'stopped' | 'starting' | 'running' | 'failed'; a
 type RecoveryAction = 'terminateTask' | 'reloadRenderer' | 'restartService' | 'relaunchApp';
 
 const active = (tasks: LocalTaskView[]) => tasks.find((task) => ['queued', 'running', 'finalizing'].includes(task.status)) ?? null;
+const taskProgressSnapshot = (task: LocalTaskView) => [task.id, task.status, task.progress.processed,
+  task.progress.total ?? '', task.progress.phase, task.progress.message].join('|');
 
 export function SafeRecovery({ api }: { api: PlannerApi }) {
   const desktop = typeof window !== 'undefined' ? window.plannerDesktop : undefined;
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<SurfaceStatus>({ service: 'running', activeTask: null });
   const [busy, setBusy] = useState<RecoveryAction | null>(null);
-  const [slow, setSlow] = useState(false);
+  const [slowTask, setSlowTask] = useState(false);
   const [message, setMessage] = useState('');
   const mounted = useRef(true);
+  const slowTaskTimer = useRef<number | null>(null);
+  const lastTaskSnapshot = useRef<string | null>(null);
+
+  const clearSlowTaskTimer = useCallback(() => {
+    if (slowTaskTimer.current !== null) window.clearTimeout(slowTaskTimer.current);
+    slowTaskTimer.current = null;
+  }, []);
+
+  const observeTaskProgress = useCallback((task: LocalTaskView | null) => {
+    if (!desktop || !task) {
+      clearSlowTaskTimer(); lastTaskSnapshot.current = null;
+      if (mounted.current) setSlowTask(false);
+      return;
+    }
+    const snapshot = taskProgressSnapshot(task);
+    if (snapshot === lastTaskSnapshot.current) return;
+    lastTaskSnapshot.current = snapshot; clearSlowTaskTimer();
+    if (mounted.current) setSlowTask(false);
+    slowTaskTimer.current = window.setTimeout(() => {
+      slowTaskTimer.current = null;
+      if (mounted.current && lastTaskSnapshot.current === snapshot) setSlowTask(true);
+    }, 10_000);
+  }, [clearSlowTaskTimer, desktop]);
 
   const refresh = useCallback(async () => {
     try {
       if (desktop?.getRecoveryStatus) {
         const next = await desktop.getRecoveryStatus();
-        if (mounted.current) setStatus(next);
+        if (mounted.current) { setStatus(next); observeTaskProgress(next.activeTask); }
       } else {
         const [health, tasks] = await Promise.all([api.checkServiceHealth(), api.listLocalTasks()]);
-        if (mounted.current) setStatus({ service: health.status === 'ok' ? 'running' : 'failed', activeTask: active(tasks) });
+        const activeTask = active(tasks);
+        if (mounted.current) { setStatus({ service: health.status === 'ok' ? 'running' : 'failed', activeTask }); observeTaskProgress(activeTask); }
       }
     } catch {
       if (mounted.current) setStatus((current) => ({ ...current, service: 'failed' }));
     }
-  }, [api, desktop]);
+  }, [api, desktop, observeTaskProgress]);
 
   useEffect(() => {
     mounted.current = true; void refresh();
     const interval = window.setInterval(() => void refresh(), 3_000);
     const unsubscribe = desktop?.onServiceRestarted?.(() => { resetApiSession(); void refresh(); });
-    return () => { mounted.current = false; window.clearInterval(interval); unsubscribe?.(); };
-  }, [desktop, refresh]);
+    return () => { mounted.current = false; window.clearInterval(interval); clearSlowTaskTimer(); unsubscribe?.(); };
+  }, [clearSlowTaskTimer, desktop, refresh]);
 
   const run = async (action: RecoveryAction) => {
     const invoke = desktop?.[action];
     if (!invoke || busy) return;
     if (action === 'relaunchApp' && !window.confirm('完整恢复将安全终止当前任务并重启应用，是否继续？')) return;
-    setBusy(action); setSlow(false); setMessage('');
-    const timer = window.setTimeout(() => { if (mounted.current) setSlow(true); }, 10_000);
+    setBusy(action); setSlowTask(false); setMessage('');
     try {
       const result = await invoke.call(desktop);
       if (!result.ok) throw new Error(result.error?.message ?? '恢复操作失败');
@@ -53,31 +78,13 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
     } catch (error) {
       if (mounted.current) setMessage(error instanceof Error ? error.message : '恢复操作失败');
     } finally {
-      window.clearTimeout(timer);
-      if (mounted.current) { setBusy(null); setSlow(false); }
+      if (mounted.current) setBusy(null);
     }
   };
 
-  const terminateWhileSlow = async () => {
-    if (!desktop?.terminateTask) return;
-    try {
-      const result = await desktop.terminateTask();
-      if (!result.ok) throw new Error(result.error?.message ?? '终止任务失败');
-      if (mounted.current) setMessage(result.cancelled ? '已请求安全终止当前任务' : '当前没有可终止的任务');
-    } catch (error) {
-      if (mounted.current) setMessage(error instanceof Error ? error.message : '终止任务失败');
-    }
-  };
-
-  const relaunchWhileSlow = async () => {
-    if (!desktop?.relaunchApp || !window.confirm('完整恢复将安全终止全部任务并重启应用，是否继续？')) return;
-    try {
-      const result = await desktop.relaunchApp();
-      if (!result.ok) throw new Error(result.error?.message ?? '完整恢复未能启动');
-      if (mounted.current) setMessage('已请求完整安全恢复');
-    } catch (error) {
-      if (mounted.current) setMessage(error instanceof Error ? error.message : '完整恢复未能启动');
-    }
+  const continueWaiting = () => {
+    lastTaskSnapshot.current = null;
+    observeTaskProgress(status.activeTask);
   };
 
   const serviceUnavailable = status.service === 'failed' || status.service === 'stopped';
@@ -100,11 +107,11 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('restartService')}>重启本地服务</button>
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('relaunchApp')}>完整恢复应用</button>
       {message && <p className="recovery-message">{message}</p>}
-      {slow && <div className="slow-recovery-warning" role="alert">
-        <strong>当前操作响应较慢</strong><p>不会自动终止任务，请选择下一步。</p>
-        <div><button type="button" onClick={() => setSlow(false)}>继续等待</button>
-          <button type="button" onClick={() => void terminateWhileSlow()}>终止任务</button>
-          <button type="button" onClick={() => void relaunchWhileSlow()}>安全恢复应用</button></div>
+      {slowTask && !busy && <div className="slow-recovery-warning" role="alert">
+        <strong>当前操作响应较慢</strong><p>后台任务长时间没有进展。不会自动终止任务，请选择下一步。</p>
+        <div><button type="button" onClick={continueWaiting}>继续等待</button>
+          <button type="button" onClick={() => void run('terminateTask')}>终止任务</button>
+          <button type="button" onClick={() => void run('relaunchApp')}>安全恢复应用</button></div>
       </div>}
     </section>}
   </div>;

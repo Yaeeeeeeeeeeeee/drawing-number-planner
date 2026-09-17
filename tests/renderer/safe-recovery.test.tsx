@@ -9,6 +9,12 @@ const api = new Proxy({}, {
     : vi.fn(async () => []),
 }) as any;
 
+const runningTask = (processed = 1) => ({
+  id: 'task-1', kind: 'workspace_scan', status: 'running' as const, cancelRequested: false,
+  createdAt: '2026-09-17T01:00:00Z',
+  progress: { processed, total: 100, phase: 'scanning', message: '扫描资料' },
+});
+
 afterEach(() => {
   delete window.plannerDesktop;
   vi.useRealTimers();
@@ -54,20 +60,21 @@ describe('safe recovery surface', () => {
     expect(screen.getByRole('button', { name: '完整恢复应用' })).toBeEnabled();
   });
 
-  it('warns about a slow action without automatically terminating it', async () => {
+  it('warns when an active business task makes no progress without automatically terminating it', async () => {
     vi.useFakeTimers();
     const terminateTask = vi.fn(async () => ({ ok: true, cancelled: true }));
     window.plannerDesktop = {
       showFileInFolder: vi.fn(),
-      getRecoveryStatus: vi.fn(async () => ({ service: 'running' as const, activeTask: null })),
+      getRecoveryStatus: vi.fn(async () => ({ service: 'running' as const, activeTask: runningTask() })),
       terminateTask,
       reloadRenderer: vi.fn(async () => ({ ok: true })),
-      restartService: vi.fn(() => new Promise<DesktopRecoveryResult>(() => undefined)),
+      restartService: vi.fn(async () => ({ ok: true })),
       relaunchApp: vi.fn(async () => ({ ok: true })),
     };
     render(<App api={api} />);
     fireEvent.click(screen.getByRole('button', { name: '安全恢复' }));
-    fireEvent.click(screen.getByRole('button', { name: '重启本地服务' }));
+    await act(async () => undefined);
+    expect(screen.getByText('正在扫描资料…')).toBeVisible();
 
     await act(async () => { vi.advanceTimersByTime(10_000); });
 
@@ -81,26 +88,77 @@ describe('safe recovery surface', () => {
     expect(terminateTask).toHaveBeenCalledOnce();
   });
 
-  it('can request a full safe recovery from the slow-response warning while another action is busy', async () => {
+  it('does not describe a pending recovery action itself as a slow business task', async () => {
     vi.useFakeTimers();
-    const relaunchApp = vi.fn(async () => ({ ok: true }));
     window.plannerDesktop = {
       showFileInFolder: vi.fn(),
       getRecoveryStatus: vi.fn(async () => ({ service: 'running' as const, activeTask: null })),
       terminateTask: vi.fn(async () => ({ ok: true, cancelled: false })),
       reloadRenderer: vi.fn(async () => ({ ok: true })),
       restartService: vi.fn(() => new Promise<DesktopRecoveryResult>(() => undefined)),
+      relaunchApp: vi.fn(async () => ({ ok: true })),
+    };
+    render(<App api={api} />);
+    fireEvent.click(screen.getByRole('button', { name: '安全恢复' }));
+    fireEvent.click(screen.getByRole('button', { name: '重启本地服务' }));
+
+    await act(async () => { vi.advanceTimersByTime(30_000); });
+
+    expect(screen.queryByText('当前操作响应较慢')).not.toBeInTheDocument();
+  });
+
+  it('resets the slow-task threshold when progress changes and when the user continues waiting', async () => {
+    vi.useFakeTimers();
+    let processed = 1;
+    window.plannerDesktop = {
+      showFileInFolder: vi.fn(),
+      getRecoveryStatus: vi.fn(async () => ({ service: 'running' as const, activeTask: runningTask(processed) })),
+      terminateTask: vi.fn(async () => ({ ok: true, cancelled: true })),
+      reloadRenderer: vi.fn(async () => ({ ok: true })),
+      restartService: vi.fn(async () => ({ ok: true })),
+      relaunchApp: vi.fn(async () => ({ ok: true })),
+    };
+    render(<App api={api} />);
+    fireEvent.click(screen.getByRole('button', { name: '安全恢复' }));
+    await act(async () => { vi.advanceTimersByTime(6_000); });
+    processed = 2;
+    await act(async () => { vi.advanceTimersByTime(3_000); });
+    await act(async () => { vi.advanceTimersByTime(9_999); });
+    expect(screen.queryByText('当前操作响应较慢')).not.toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(screen.getByText('当前操作响应较慢')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '继续等待' }));
+    expect(screen.queryByText('当前操作响应较慢')).not.toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(9_999); });
+    expect(screen.queryByText('当前操作响应较慢')).not.toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(screen.getByText('当前操作响应较慢')).toBeVisible();
+  });
+
+  it('can request a full recovery from a stalled business task without a recovery action holding the lock', async () => {
+    vi.useFakeTimers();
+    const relaunchApp = vi.fn(async () => ({ ok: true }));
+    const restartService = vi.fn(async () => ({ ok: true }));
+    window.plannerDesktop = {
+      showFileInFolder: vi.fn(),
+      getRecoveryStatus: vi.fn(async () => ({ service: 'running' as const, activeTask: runningTask() })),
+      terminateTask: vi.fn(async () => ({ ok: true, cancelled: false })),
+      reloadRenderer: vi.fn(async () => ({ ok: true })),
+      restartService,
       relaunchApp,
     };
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<App api={api} />);
     fireEvent.click(screen.getByRole('button', { name: '安全恢复' }));
-    fireEvent.click(screen.getByRole('button', { name: '重启本地服务' }));
+    await act(async () => undefined);
+    expect(screen.getByText('正在扫描资料…')).toBeVisible();
     await act(async () => { vi.advanceTimersByTime(10_000); });
 
     fireEvent.click(screen.getByRole('button', { name: '安全恢复应用' }));
     await act(async () => undefined);
 
     expect(relaunchApp).toHaveBeenCalledOnce();
+    expect(restartService).not.toHaveBeenCalled();
   });
 });
