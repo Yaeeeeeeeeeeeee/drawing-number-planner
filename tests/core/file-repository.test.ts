@@ -431,6 +431,83 @@ describe('FileRepository', () => {
     expect(db.prepare('pragma foreign_key_check').all()).toEqual([]);
   });
 
+  it('clears the live scan index without deleting completed outbound history', () => {
+    const drawing = drawingFixture();
+    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
+    const relativePath = `${batchPath}\\${drawing.fullCode}-LOGO.pdf`;
+    repository.replaceScan([{ ...records(drawing.id)[0], relativePath,
+      fileName: `${drawing.fullCode}-LOGO.pdf`, conversionType: 'outlined', materialBatch: parseMaterialBatch(relativePath)! }],
+    [], '2026-08-25T04:00:00.000Z');
+    const file = db.prepare(`select file.id, file.material_batch_id as batchId, drawing.product_id as productId,
+      drawing.project_item_id as projectItemId from pdf_files file
+      join drawing_numbers drawing on drawing.id = file.drawing_id`).get() as {
+        id: number; batchId: number; productId: number; projectItemId: number;
+      };
+    const packageId = Number(db.prepare(`insert into outbound_packages
+      (product_id, material_type, package_mode, selected_material_batch_id, package_name,
+       zip_relative_path, status, created_at) values (?, 'update', 'change_only', ?, '历史包',
+       '历史包.zip', 'completed', '2026-08-25T04:00:00.000Z')`)
+      .run(file.productId, file.batchId).lastInsertRowid);
+    db.prepare(`insert into outbound_package_items
+      (package_id, project_item_id, drawing_id, pdf_file_id, source_material_batch_id,
+       project_item_name_snapshot, drawing_code_snapshot, file_name_snapshot, relative_path_snapshot,
+       source_batch_name_snapshot) values (?, ?, ?, ?, ?, 'LOGO', ?, ?, ?, '01.20241210')`)
+      .run(packageId, file.projectItemId, drawing.id, file.id, file.batchId,
+        drawing.fullCode, `${drawing.fullCode}-LOGO.pdf`, relativePath);
+
+    expect(repository.clearIndex()).toMatchObject({ pdfFiles: 1, materialBatches: 1 });
+    expect(db.prepare(`select pdf_file_id as pdfFileId, source_material_batch_id as sourceBatchId,
+      drawing_code_snapshot as drawingCode, relative_path_snapshot as relativePath
+      from outbound_package_items where package_id = ?`).get(packageId)).toEqual({
+      pdfFileId: null, sourceBatchId: null, drawingCode: drawing.fullCode, relativePath,
+    });
+    expect(db.prepare('select selected_material_batch_id as selectedBatchId from outbound_packages where id = ?')
+      .get(packageId)).toEqual({ selectedBatchId: null });
+
+    repository.replaceScan([{ ...records(drawing.id)[0], relativePath,
+      fileName: `${drawing.fullCode}-LOGO.pdf`, conversionType: 'outlined', materialBatch: parseMaterialBatch(relativePath)! }],
+    [], '2026-08-26T04:00:00.000Z');
+    expect(db.prepare(`select pdf_file_id as pdfFileId, source_material_batch_id as sourceBatchId,
+      drawing_code_snapshot as drawingCode, file_name_snapshot as fileName,
+      relative_path_snapshot as relativePath, source_batch_name_snapshot as sourceBatch
+      from outbound_package_items where package_id = ?`).get(packageId)).toEqual({
+      pdfFileId: null, sourceBatchId: null, drawingCode: drawing.fullCode,
+      fileName: `${drawing.fullCode}-LOGO.pdf`, relativePath, sourceBatch: '01.20241210',
+    });
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  it('cleans a missing PDF while retaining its completed outbound item snapshot', () => {
+    const drawing = drawingFixture();
+    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
+    const relativePath = `${batchPath}\\missing-outbound.pdf`;
+    const missing = { ...records(drawing.id)[0], relativePath, fileName: 'missing-outbound.pdf',
+      materialBatch: parseMaterialBatch(relativePath)! };
+    repository.replaceScan([missing], [], '2026-08-25T04:00:00.000Z');
+    const fileId = repository.search().items[0].id;
+    const batchId = (db.prepare('select material_batch_id as batchId from pdf_files where id = ?')
+      .get(fileId) as { batchId: number }).batchId;
+    repository.replaceScan([], [], '2026-08-26T04:00:00.000Z');
+    const drawingRow = db.prepare('select product_id as productId, project_item_id as projectItemId from drawing_numbers where id = ?')
+      .get(drawing.id) as { productId: number; projectItemId: number };
+    const packageId = Number(db.prepare(`insert into outbound_packages
+      (product_id, material_type, package_mode, package_name, zip_relative_path, status, created_at)
+      values (?, 'initial', 'current_complete', '历史包', '历史包.zip', 'completed', '2026-08-25T04:00:00.000Z')`)
+      .run(drawingRow.productId).lastInsertRowid);
+    db.prepare(`insert into outbound_package_items
+      (package_id, project_item_id, drawing_id, pdf_file_id, source_material_batch_id,
+       project_item_name_snapshot, drawing_code_snapshot, file_name_snapshot, relative_path_snapshot,
+       source_batch_name_snapshot) values (?, ?, ?, ?, ?, 'LOGO', ?, 'missing-outbound.pdf',
+       ?, '01.20241210')`)
+      .run(packageId, drawingRow.projectItemId, drawing.id, fileId, batchId, drawing.fullCode, relativePath);
+
+    expect(repository.cleanupMissing([fileId])).toEqual({ cleaned: 1 });
+    expect(db.prepare(`select pdf_file_id as pdfFileId, file_name_snapshot as fileName,
+      relative_path_snapshot as relativePath from outbound_package_items where package_id = ?`)
+      .get(packageId)).toEqual({ pdfFileId: null, fileName: 'missing-outbound.pdf', relativePath });
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
+
   it('rolls index clearing back completely if a dependent batch cannot be removed', () => {
     const batchPath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件\\01.20241210';
     const path = `${batchPath}\\kept.pdf`;

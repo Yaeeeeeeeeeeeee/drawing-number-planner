@@ -11,6 +11,7 @@ import {
   schemaVersionNine,
   schemaVersionTen,
   schemaVersionThree,
+  schemaVersionTwelve,
   schemaVersionTwo,
 } from './schema.sql.js';
 
@@ -470,6 +471,78 @@ function validateOutboundMigration(database: PlannerDatabase, before: V10Outboun
   }
 }
 
+interface V11OutboundHistorySnapshot {
+  rows: Record<string, Array<Record<string, unknown>>>;
+  sequences: Record<string, number | null>;
+  indexes: Array<{ name: string; sql: string }>;
+}
+
+const rebuiltOutboundTables = ['outbound_packages', 'outbound_package_items', 'outbound_email_drafts'] as const;
+
+function v11OutboundHistorySnapshot(database: PlannerDatabase): V11OutboundHistorySnapshot {
+  return {
+    rows: Object.fromEntries(rebuiltOutboundTables.map((table) => [table,
+      database.prepare(`select * from ${table} order by id`).all()])) as V11OutboundHistorySnapshot['rows'],
+    sequences: Object.fromEntries(rebuiltOutboundTables.map((table) => [table,
+      (database.prepare('select seq from sqlite_sequence where name = ?').get(table) as
+        { seq: number } | undefined)?.seq ?? null])),
+    indexes: database.prepare(`select name, sql from sqlite_master where type = 'index' and sql is not null
+      and tbl_name in ('outbound_packages', 'outbound_package_items', 'outbound_email_drafts')
+      order by name`).all() as Array<{ name: string; sql: string }>,
+  };
+}
+
+function preserveOutboundHistorySchemaObjectsDuringRebuild(
+  database: PlannerDatabase,
+  indexes: V11OutboundHistorySnapshot['indexes'],
+  rebuild: () => void,
+): void {
+  const triggers = database.prepare(`select name, sql from sqlite_master where type = 'trigger'
+    and (instr(lower(sql), 'outbound_packages') > 0 or instr(lower(sql), 'outbound_package_items') > 0
+      or instr(lower(sql), 'outbound_email_drafts') > 0) order by name`).all() as Array<{ name: string; sql: string }>;
+  for (const trigger of triggers) database.exec(`drop trigger ${quoteIdentifier(trigger.name)}`);
+  rebuild();
+  for (const index of indexes) database.exec(index.sql);
+  for (const trigger of triggers) database.exec(trigger.sql);
+}
+
+function validateOutboundItemDetachmentMigration(database: PlannerDatabase, before: V11OutboundHistorySnapshot): void {
+  const after = Object.fromEntries(rebuiltOutboundTables.map((table) => [table,
+    database.prepare(`select * from ${table} order by id`).all()]));
+  const itemColumns = database.pragma('table_info(outbound_package_items)') as Array<{ name: string; notnull: number }>;
+  const itemForeignKeys = database.pragma('foreign_key_list(outbound_package_items)') as Array<{
+    from: string; table: string; on_delete: string;
+  }>;
+  const packageForeignKeys = database.pragma('foreign_key_list(outbound_packages)') as Array<{
+    from: string; table: string; on_delete: string;
+  }>;
+  const nullable = ['pdf_file_id', 'source_material_batch_id'].every((name) =>
+    itemColumns.find((column) => column.name === name)?.notnull === 0);
+  const detachable = [
+    { from: 'pdf_file_id', table: 'pdf_files' },
+    { from: 'source_material_batch_id', table: 'material_batches' },
+  ].every((expected) => itemForeignKeys.some((foreignKey) => foreignKey.from === expected.from
+    && foreignKey.table === expected.table && foreignKey.on_delete.toUpperCase() === 'SET NULL'));
+  const packageBatchDetachable = packageForeignKeys.some((foreignKey) => foreignKey.from === 'selected_material_batch_id'
+    && foreignKey.table === 'material_batches' && foreignKey.on_delete.toUpperCase() === 'SET NULL');
+  const indexes = database.prepare(`select name, sql from sqlite_master where type = 'index' and sql is not null
+    and tbl_name in ('outbound_packages', 'outbound_package_items', 'outbound_email_drafts')
+    order by name`).all();
+  const sequencesPreserved = rebuiltOutboundTables.every((table) => {
+    const beforeSequence = before.sequences[table];
+    const afterSequence = (database.prepare('select seq from sqlite_sequence where name = ?').get(table) as
+      { seq: number } | undefined)?.seq ?? null;
+    return beforeSequence === null || (afterSequence !== null && afterSequence >= beforeSequence);
+  });
+  if (JSON.stringify(after) !== JSON.stringify(before.rows) || !nullable || !detachable || !packageBatchDetachable
+    || JSON.stringify(indexes) !== JSON.stringify(before.indexes)
+    || !sequencesPreserved
+    || (database.pragma('foreign_key_check') as Array<unknown>).length > 0
+    || database.pragma('integrity_check', { simple: true }) !== 'ok') {
+    throw new Error('外发历史索引解耦迁移校验失败，数据库未升级');
+  }
+}
+
 function validateQrMigration(database: PlannerDatabase, before: V7RowCounts): void {
   const after = v7RowCounts(database);
   const expectedQrCodes = (database.prepare(`select count(*) as count
@@ -566,8 +639,8 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 11) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 11`);
-  if (from >= 11) {
+  if (from > 12) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 12`);
+  if (from >= 12) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -663,6 +736,13 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (11, ?)').run(new Date().toISOString());
       validateOutboundMigration(database, before);
     }
+    if (from < 12) {
+      const before = v11OutboundHistorySnapshot(database);
+      preserveOutboundHistorySchemaObjectsDuringRebuild(database, before.indexes, () => database.exec(schemaVersionTwelve));
+      for (const table of rebuiltOutboundTables) restoreAutoincrementHighWater(database, table, before.sequences[table]);
+      database.prepare('insert into schema_migrations (version, applied_at) values (12, ?)').run(new Date().toISOString());
+      validateOutboundItemDetachmentMigration(database, before);
+    }
   })();
-  return { from, to: 11 };
+  return { from, to: 12 };
 }

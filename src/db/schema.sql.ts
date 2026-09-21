@@ -1013,3 +1013,83 @@ export const schemaVersionEleven = `
   VALUES ('默认签名', '顺祝商祺\n田嘉滨     Yae\nTEL: 135 4423 5202\nEmail: tianjiabin@dd-industrial.net', 1, 'active',
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 `;
+
+export const schemaVersionTwelve = `
+  CREATE TABLE outbound_packages_v12 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    material_type TEXT NOT NULL CHECK (material_type IN ('initial', 'update')),
+    package_mode TEXT NOT NULL CHECK (package_mode IN ('change_only', 'current_complete')),
+    selected_material_batch_id INTEGER REFERENCES material_batches(id) ON DELETE SET NULL,
+    package_name TEXT NOT NULL CHECK (length(trim(package_name)) > 0),
+    zip_relative_path TEXT NOT NULL CHECK (
+      length(trim(zip_relative_path)) > 0
+      AND substr(zip_relative_path, 1, 1) NOT IN ('/', '\\')
+      AND zip_relative_path NOT GLOB '[A-Za-z]:*'
+      AND replace(zip_relative_path, '\\', '/') NOT IN ('.', '..')
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '../%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/../%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/..'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE './%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/./%'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%/.'
+      AND replace(zip_relative_path, '\\', '/') NOT LIKE '%//%'
+    ),
+    status TEXT NOT NULL CHECK (status IN ('completed', 'cancelled', 'failed')),
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE outbound_package_items_v12 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL REFERENCES outbound_packages_v12(id) ON DELETE CASCADE,
+    project_item_id INTEGER NOT NULL REFERENCES dictionary_items(id) ON DELETE RESTRICT,
+    drawing_id INTEGER REFERENCES drawing_numbers(id) ON DELETE RESTRICT,
+    historical_drawing_id INTEGER REFERENCES historical_drawing_numbers(id) ON DELETE RESTRICT,
+    pdf_file_id INTEGER REFERENCES pdf_files(id) ON DELETE SET NULL,
+    source_material_batch_id INTEGER REFERENCES material_batches(id) ON DELETE SET NULL,
+    project_item_name_snapshot TEXT NOT NULL CHECK (length(trim(project_item_name_snapshot)) > 0),
+    drawing_code_snapshot TEXT NOT NULL CHECK (length(trim(drawing_code_snapshot)) > 0),
+    file_name_snapshot TEXT NOT NULL CHECK (length(trim(file_name_snapshot)) > 0),
+    relative_path_snapshot TEXT NOT NULL CHECK (length(trim(relative_path_snapshot)) > 0),
+    source_batch_name_snapshot TEXT NOT NULL CHECK (length(trim(source_batch_name_snapshot)) > 0),
+    CHECK ((drawing_id IS NOT NULL) <> (historical_drawing_id IS NOT NULL)),
+    UNIQUE (package_id, pdf_file_id)
+  );
+
+  CREATE TABLE outbound_email_drafts_v12 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL REFERENCES outbound_packages_v12(id) ON DELETE RESTRICT,
+    template_id INTEGER REFERENCES outbound_email_templates(id) ON DELETE SET NULL,
+    signature_id INTEGER REFERENCES outbound_signatures(id) ON DELETE SET NULL,
+    recipients_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(recipients_json) AND json_type(recipients_json) = 'array'),
+    cc_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(cc_json) AND json_type(cc_json) = 'array'),
+    subject TEXT NOT NULL CHECK (length(trim(subject)) > 0),
+    body TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  INSERT INTO outbound_packages_v12
+    SELECT * FROM outbound_packages;
+
+  INSERT INTO outbound_package_items_v12 (
+    id, package_id, project_item_id, drawing_id, historical_drawing_id, pdf_file_id,
+    source_material_batch_id, project_item_name_snapshot, drawing_code_snapshot,
+    file_name_snapshot, relative_path_snapshot, source_batch_name_snapshot
+  ) SELECT
+    id, package_id, project_item_id, drawing_id, historical_drawing_id, pdf_file_id,
+    source_material_batch_id, project_item_name_snapshot, drawing_code_snapshot,
+    file_name_snapshot, relative_path_snapshot, source_batch_name_snapshot
+  FROM outbound_package_items;
+
+  INSERT INTO outbound_email_drafts_v12
+    SELECT * FROM outbound_email_drafts;
+
+  DROP TABLE outbound_email_drafts;
+  DROP TABLE outbound_package_items;
+  DROP TABLE outbound_packages;
+  ALTER TABLE outbound_packages_v12 RENAME TO outbound_packages;
+  ALTER TABLE outbound_package_items_v12 RENAME TO outbound_package_items;
+  ALTER TABLE outbound_email_drafts_v12 RENAME TO outbound_email_drafts;
+
+`;

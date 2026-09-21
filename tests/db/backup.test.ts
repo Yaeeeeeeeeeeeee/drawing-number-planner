@@ -60,7 +60,7 @@ describe('createDatabaseBackup', () => {
         backups.push(path);
         return path;
       },
-    })).toEqual({ from: 10, to: 11 });
+    })).toEqual({ from: 10, to: 12 });
 
     expect(backups).toHaveLength(1);
     const backup = new Database(backups[0], { readonly: true }); opened.push(backup);
@@ -97,7 +97,7 @@ describe('createDatabaseBackup', () => {
         backups.push(path);
         return path;
       },
-    })).toEqual({ from: 9, to: 11 });
+    })).toEqual({ from: 9, to: 12 });
 
     expect(backups).toHaveLength(1);
     const backup = new Database(backups[0], { readonly: true }); opened.push(backup);
@@ -132,7 +132,7 @@ describe('createDatabaseBackup', () => {
         backups.push(path);
         return path;
       },
-    })).toEqual({ from: 8, to: 11 });
+    })).toEqual({ from: 8, to: 12 });
 
     expect(backups).toHaveLength(1);
     const backup = new Database(backups[0], { readonly: true }); opened.push(backup);
@@ -172,16 +172,16 @@ describe('createDatabaseBackup', () => {
     expect([migration, daily, secondDaily].every(existsSync)).toBe(true);
   });
 
-  it('preserves committed schema v11 metadata in a readable SQLite backup', () => {
+  it('preserves committed schema v12 metadata in a readable SQLite backup', () => {
     const dir = mkdtempSync(join(tmpdir(), 'drawing-planner-v7-backup-'));
     const source = join(dir, 'planner.db');
     const database = openDatabase(source); opened.push(database);
-    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 0, to: 11 });
+    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 0, to: 12 });
 
     const result = createDatabaseBackup(database, source, join(dir, 'backups'), 'migration', new Date('2026-08-31T08:30:00.123Z'));
 
     const backup = new Database(result, { readonly: true }); opened.push(backup);
-    expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 11 });
+    expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 12 });
     expect(backup.prepare(`select name from sqlite_master where type = 'table' and name in
       ('bom_assets', 'bom_item_assets', 'bom_item_qr_codes') order by name`).all()).toEqual([
       { name: 'bom_assets' }, { name: 'bom_item_assets' }, { name: 'bom_item_qr_codes' },
