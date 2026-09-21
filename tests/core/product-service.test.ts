@@ -108,6 +108,17 @@ describe('ProductService', () => {
     expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual({ count: 0 });
   });
 
+  it('deletes v8-migrated English-name default QR placeholders for an unreferenced product', () => {
+    const refs = validReferences();
+    const product = products.create({ ...refs, sku: 'SKU-V8-QR', model: 'ZC221', productCategory: '冰柜' });
+    db.prepare(`update product_qr_codes set name = (
+      select purpose.english_name from qr_purposes purpose where purpose.id = product_qr_codes.purpose_id
+    ) where product_id = ?`).run(product.id);
+
+    expect(products.delete(product.id)).toEqual({ deleted: true });
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual({ count: 0 });
+  });
+
   it('preserves a renamed inactive QR record instead of treating it as a blank default placeholder', () => {
     const refs = validReferences();
     const product = products.create({ ...refs, sku: 'SKU-RENAMED-QR', model: 'ZC220', productCategory: '冰柜' });

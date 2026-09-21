@@ -34,7 +34,8 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   await expect(page.getByLabel('业务变更日期')).toBeVisible(); await expect(page.getByLabel('BOM 颜色')).toHaveCount(0);
   await page.getByLabel('业务变更日期').fill('2026-09-02');
   await page.getByRole('button', { name: '添加 BOM 项目' }).click();
-  await page.getByLabel('第 1 行项目').selectOption(String(logoId));
+  await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
+  await page.getByLabel('第 1 行项目明细').selectOption(String(logoId));
   await selectDrawing(page, '第 1 行图号', fullCode);
   await expect(page.getByLabel('第 1 行数量')).toHaveCount(0);
   await page.getByRole('button', { name: '保存当前 BOM' }).click();
@@ -44,7 +45,8 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   await page.getByLabel('查询 BOM 业务日期').fill('2026-09-02');
   const queryButton = page.getByRole('button', { name: '查询', exact: true });
   await expect(queryButton).toBeEnabled(); await queryButton.click();
-  await expect(page.getByRole('cell', { name: '2026-09-02', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /^查看 BOM / }).click();
+  const bomRow = page.getByRole('row').filter({ hasText: '2026-09-02' }).filter({ hasText: 'ZC100' });
+  await expect(bomRow).toHaveCount(1);
+  await bomRow.getByRole('button', { name: /^查看 BOM / }).click();
   await expect(page.getByRole('region', { name: 'BOM 历史明细' })).toContainText(fullCode);
 });

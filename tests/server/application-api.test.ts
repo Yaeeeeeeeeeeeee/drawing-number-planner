@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { startServer } from '../../src/server/start-server';
 import { resolveAppPaths } from '../../src/core/config/app-paths';
+import { expectedOutboundClaimFileName } from '../../src/core/outbound/outbound-artifact-ownership';
 import { openDatabase } from '../../src/db/database';
 
 describe('real application API', () => {
@@ -93,6 +94,36 @@ describe('real application API', () => {
     const server = await startServer({ port: 0, dataDir });
 
     expect([claim, temporary, completed].map(existsSync)).toEqual([true, true, true]);
+    await server.close();
+  });
+
+  it('removes only stale task-owned outbound claim and temporary files after restart', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'drawing-planner-stale-outbound-'));
+    const dataDir = join(root, 'data'); const paths = resolveAppPaths(dataDir);
+    const configuredOutput = join(root, 'configured-exports'); const workspaceRoot = join(root, 'workspace');
+    mkdirSync(paths.exports, { recursive: true }); mkdirSync(configuredOutput); mkdirSync(workspaceRoot);
+    writeFileSync(paths.settings, JSON.stringify({ workspaceRoot, outboundOutputRoot: configuredOutput }));
+    const taskId = '6fc3f8a7-e1d0-4d61-9235-13d98350f091';
+    const temporaryFile = '.17b40f41-2eed-4912-9db7-cd998a8bd444.tmp';
+    const finalFile = 'completed.zip';
+    const claimFile = expectedOutboundClaimFileName(finalFile);
+    const claim = join(paths.exports, claimFile); const temporary = join(paths.exports, temporaryFile);
+    const completed = join(paths.exports, finalFile);
+    writeFileSync(claim, JSON.stringify({ version: 1, taskId, lifecycle: 'active',
+      createdAt: '2020-01-01T00:00:00.000Z', temporaryFile, finalFile }));
+    writeFileSync(temporary, 'partial'); writeFileSync(completed, 'published');
+    const configuredTemporaryFile = '.27b40f41-2eed-4912-9db7-cd998a8bd444.tmp';
+    const configuredFinalFile = 'configured.zip';
+    const configuredClaim = join(configuredOutput, expectedOutboundClaimFileName(configuredFinalFile));
+    const configuredTemporary = join(configuredOutput, configuredTemporaryFile);
+    writeFileSync(configuredClaim, JSON.stringify({ version: 1, taskId, lifecycle: 'active',
+      createdAt: '2020-01-01T00:00:00.000Z', temporaryFile: configuredTemporaryFile, finalFile: configuredFinalFile }));
+    writeFileSync(configuredTemporary, 'partial');
+
+    const server = await startServer({ port: 0, dataDir });
+
+    expect([claim, temporary, completed, configuredClaim, configuredTemporary].map(existsSync))
+      .toEqual([false, false, true, false, false]);
     await server.close();
   });
 });

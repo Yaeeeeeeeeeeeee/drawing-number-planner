@@ -55,7 +55,10 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await page.getByRole('button', { name: /图号库/ }).click();
   await page.getByLabel('完整图号').fill('02.0404.010.0401007');
   await page.getByRole('button', { name: '检索', exact: true }).click();
-  await expect(page.getByRole('cell', { name: '历史扫描', exact: true })).toBeVisible();
+  const historicalResult = page.getByRole('row').filter({
+    has: page.getByRole('button', { name: '02.0404.010.0401007', exact: true }),
+  });
+  await expect(historicalResult.getByRole('cell', { name: '历史扫描', exact: true })).toBeVisible();
   await expect(page.getByText(/源文件已有.*转曲后已有/)).toBeVisible();
 
   await page.getByRole('button', { name: /图号规划/ }).click();

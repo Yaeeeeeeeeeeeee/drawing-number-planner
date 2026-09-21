@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { win32 } from 'node:path';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { join, win32 } from 'node:path';
 
 import { isSafeWindowsNameComponent } from './windows-safe-name.js';
 
@@ -66,4 +67,33 @@ export function mayCleanOutboundClaim(claim: OutboundClaimMetadata, options: {
   if (claim.taskId === null || options.activeTaskIds.has(claim.taskId)) return false;
   const createdAt = Date.parse(claim.createdAt);
   return Number.isFinite(createdAt) && options.nowMs - createdAt >= options.minimumAgeMs;
+}
+
+export function cleanupStaleOutboundArtifacts(outputDirectory: string, options: {
+  activeTaskIds: ReadonlySet<string>;
+  nowMs: number;
+  minimumAgeMs: number;
+}): { claimsRemoved: number; temporaryFilesRemoved: number } {
+  let entries;
+  try { entries = readdirSync(outputDirectory, { withFileTypes: true }); }
+  catch { return { claimsRemoved: 0, temporaryFilesRemoved: 0 }; }
+  let claimsRemoved = 0; let temporaryFilesRemoved = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.claim')) continue;
+    const claimPath = join(outputDirectory, entry.name);
+    try {
+      if (statSync(claimPath).size > 16 * 1024) continue;
+      const claim = parseOutboundClaim(readFileSync(claimPath, 'utf8'), entry.name);
+      if (!claim || !mayCleanOutboundClaim(claim, options)) continue;
+      const owned = resolveOwnedOutboundArtifacts(outputDirectory, claimPath, claim);
+      if (!owned) continue;
+      if (existsSync(owned.temporaryPath)) {
+        rmSync(owned.temporaryPath, { force: true });
+        temporaryFilesRemoved += 1;
+      }
+      rmSync(owned.claimPath, { force: true });
+      claimsRemoved += 1;
+    } catch { /* preserve anything that cannot be proven and removed safely */ }
+  }
+  return { claimsRemoved, temporaryFilesRemoved };
 }

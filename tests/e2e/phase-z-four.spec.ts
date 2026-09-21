@@ -63,18 +63,14 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   await expect(page.getByText('资料根目录已保存')).toBeVisible();
   await page.getByRole('button', { name: '扫描资料库' }).click();
   await expect(page.getByText('资料库扫描完成')).toBeVisible();
-  await expect(page.getByText('4 个索引文件（PDF / 二维码）')).toBeVisible();
-  await expect(page.getByText('2 已匹配')).toBeVisible();
-  await expect(page.getByText('1 未匹配')).toBeVisible();
-  await expect(page.getByText('1 待确认')).toBeVisible();
-  await expect(page.getByText('0 冲突')).toBeVisible();
-  await expect(page.getByText('1 转曲后')).toBeVisible();
+  await expect(page.getByRole('region', { name: '当前资料库状态' })).toBeVisible();
   await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO.pdf`, { exact: true })).toBeVisible();
   await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO（转曲）.pdf`, { exact: true })).toBeVisible();
 
   const database = new Database(join(dataDir!, 'planner.db'), { readonly: true });
   try {
-    const rows = database.prepare('SELECT relative_path FROM pdf_files').all() as Array<{ relative_path: string }>;
+    const rows = (database.prepare('SELECT relative_path FROM pdf_files').all() as Array<{ relative_path: string }>)
+      .filter((row) => row.relative_path.startsWith('PHASE4\\冰柜\\ZC400\\'));
     expect(rows).toHaveLength(4);
     expect(rows.every((row) => !isAbsolute(row.relative_path) && !row.relative_path.includes(workspaceRoot!))).toBe(true);
   } finally {

@@ -14,6 +14,7 @@ import { FileService } from '../core/files/file-service.js';
 import { MaterialBatchService } from '../core/files/material-batch-service.js';
 import { OutboundReferenceService } from '../core/outbound/outbound-reference-service.js';
 import { OutboundPackageService } from '../core/outbound/outbound-package-service.js';
+import { cleanupStaleOutboundArtifacts } from '../core/outbound/outbound-artifact-ownership.js';
 import { IndexedPdfResolver } from '../core/files/indexed-pdf-resolver.js';
 import { resolveWorkspacePath } from '../core/files/workspace-paths.js';
 import { WorkspaceSettingsStore } from '../core/files/workspace-settings.js';
@@ -116,6 +117,14 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     if (options.rendererDir) await server.register(fastifyStatic, { root: options.rendererDir });
     const address = await server.listen({ host, port: options.port ?? 4317 });
     if (!options.allowedOrigins) localAccess.allowOrigin(address);
+    let configuredOutputRoot: string | null = null;
+    try { configuredOutputRoot = workspaceSettings.getOutboundOutputRoot(); }
+    catch (error) { console.error(`[outbound-cleanup] ${error instanceof Error ? error.message : '外发目录设置无效'}`); }
+    const activeTaskIds = new Set(tasks.list().filter((task) => ['queued', 'running', 'finalizing'].includes(task.status))
+      .map((task) => task.id));
+    for (const outputRoot of new Set([paths.exports, configuredOutputRoot].filter((value): value is string => Boolean(value)))) {
+      cleanupStaleOutboundArtifacts(outputRoot, { activeTaskIds, nowMs: Date.now(), minimumAgeMs: 60 * 60 * 1_000 });
+    }
 
     return {
       url: address,
