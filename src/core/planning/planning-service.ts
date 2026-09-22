@@ -21,7 +21,7 @@ export class PlanningService {
   preview(input: PlanningInput): PlanningPreview {
     this.validateInput(input);
     const context = this.repository.resolveContext(input);
-    const nextByPrefix = new Map<string, number>();
+    const allocationByPrefix = new Map<string, { released: number[]; releasedIndex: number; nextNew: number }>();
     const rows: PlannedRow[] = context.rows.map((row) => {
       const parts = {
         brandCode: context.brandCode, productSizeCode: context.productSizeCode,
@@ -29,13 +29,24 @@ export class PlanningService {
         mainCategoryCode: row.mainCategoryCode, projectItemCode: row.projectItemCode,
       };
       const prefix = composeDrawingPrefix(parts);
-      const sequence = nextByPrefix.get(prefix) ?? this.repository.findMaxSequence(prefix) + 1;
+      let allocation = allocationByPrefix.get(prefix);
+      if (!allocation) {
+        allocation = {
+          released: this.repository.listReleasedSequences(prefix),
+          releasedIndex: 0,
+          nextNew: this.repository.findMaxSequence(prefix) + 1,
+        };
+        allocationByPrefix.set(prefix, allocation);
+      }
+      const sequence = allocation.released[allocation.releasedIndex]
+        ?? allocation.nextNew;
+      if (allocation.releasedIndex < allocation.released.length) allocation.releasedIndex += 1;
+      else allocation.nextNew += 1;
       if (sequence > 999) throw new PlanningError('SEQUENCE_EXHAUSTED', `编码前缀 ${prefix} 的流水号已用完`);
       const fullCode = composeDrawingCode(parts, sequence);
       if (this.repository.hasFullCode(fullCode)) {
         throw new PlanningError('DRAWING_CODE_CONFLICT', `图号 ${fullCode} 已存在`);
       }
-      nextByPrefix.set(prefix, sequence + 1);
       return {
         clientId: row.clientId, fullCode, prefix, sequence, available: true,
         displayName: formatDisplayName({ brandName: context.brandName, model: context.model,

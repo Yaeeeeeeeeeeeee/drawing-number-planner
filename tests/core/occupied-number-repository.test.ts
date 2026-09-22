@@ -56,4 +56,24 @@ describe('OccupiedNumberRepository', () => {
     expect(repository.hasFullCode('02.0404.010.0401008')).toBe(true);
     expect(repository.findMaxSequence('02.0404.010.0401')).toBe(8);
   });
+
+  it('occupies normal and retained records but exposes only explicitly released sequences', () => {
+    insertHistorical(1);
+    const releasedTwo = insertHistorical(2);
+    const releasedSeven = insertHistorical(7);
+    const retainedEight = insertHistorical(8);
+    database.prepare(`update historical_drawing_numbers set deleted_at = '2026-09-22',
+      deletion_mode = 'release', deleted_full_code = full_code, deleted_previous_status = status,
+      full_code = '__deleted__:historical:' || id where id in (?, ?)`).run(releasedTwo, releasedSeven);
+    database.prepare(`update historical_drawing_numbers set deleted_at = '2026-09-22',
+      deletion_mode = 'retain_occupied', deleted_full_code = full_code, deleted_previous_status = status
+      where id = ?`).run(retainedEight);
+
+    expect(repository.hasFullCode('02.0404.010.0401001')).toBe(true);
+    expect(repository.hasFullCode('02.0404.010.0401002')).toBe(false);
+    expect(repository.hasFullCode('02.0404.010.0401007')).toBe(false);
+    expect(repository.hasFullCode('02.0404.010.0401008')).toBe(true);
+    expect(repository.listReleasedSequences('02.0404.010.0401')).toEqual([2, 7]);
+    expect(repository.findMaxSequence('02.0404.010.0401')).toBe(8);
+  });
 });

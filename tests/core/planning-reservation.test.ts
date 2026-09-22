@@ -38,6 +38,28 @@ function batch(refs: ReturnType<typeof fixture>) {
 }
 
 describe('PlanningService reservation', () => {
+  it('reuses each explicitly released sequence once before continuing above the occupied maximum', () => {
+    const refs = fixture();
+    const insert = db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, created_at, deleted_at, deletion_mode, deleted_full_code, deleted_previous_status)
+      values (?, 'existing', ?, ?, ?, ?, ?, '02', '0404', '01', '0', '04', '01', ?, 'voided',
+        '2026-09-01', ?, ?, ?, ?)`);
+    insert.run('02.0404.010.0401001', refs.product.id, refs.appearance.id, refs.white.id, refs.main.id, refs.logo.id,
+      1, null, null, null, null);
+    insert.run('__deleted__:planned:2', refs.product.id, refs.appearance.id, refs.white.id, refs.main.id, refs.logo.id,
+      2, '2026-09-22', 'release', '02.0404.010.0401002', 'voided');
+    insert.run('02.0404.010.0401007', refs.product.id, refs.appearance.id, refs.white.id, refs.main.id, refs.logo.id,
+      7, null, null, null, null);
+    const rows = [
+      { ...batch(refs).rows[0], clientId: 'first' },
+      { ...batch(refs).rows[0], clientId: 'second' },
+    ];
+
+    expect(service.preview({ productId: refs.product.id, rows }).rows.map(({ sequence }) => sequence)).toEqual([2, 8]);
+  });
+
   it('stores an entire valid batch as immutable reserved snapshots', () => {
     const refs = fixture(); const input = batch(refs); const preview = service.preview(input);
     const reserved = service.reserve({ ...input, rows: input.rows.map((row, index) => ({

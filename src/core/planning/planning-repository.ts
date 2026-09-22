@@ -78,6 +78,10 @@ export class PlanningRepository {
     return this.occupied.hasFullCode(fullCode);
   }
 
+  listReleasedSequences(prefix: string): number[] {
+    return this.occupied.listReleasedSequences(prefix);
+  }
+
   insertReserved(context: PlanningContext, row: ResolvedPlanningRow, planned: PlannedRow): ReservedDrawing {
     const result = this.db.prepare(`insert into drawing_numbers
       (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
