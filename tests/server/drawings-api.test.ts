@@ -48,6 +48,25 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('drawing library API', () => {
+  it('requires batch confirmation and returns per-item failures without undoing a valid deletion', async () => {
+    const planned = seedPlannedDrawing(db); const historical = seedHistoricalDrawing(db);
+    const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+    try {
+      const items = [{ signedId: planned.id, confirmedCode: 'wrong-code', mode: 'release' },
+        { signedId: -historical, confirmedCode: '02.0209.010.0401007', mode: 'retain_occupied' }];
+      const denied = await app.inject({ method: 'POST', url: '/api/drawings/batch-delete', payload: { confirmed: false, items } });
+      expect(denied.statusCode).toBe(400);
+      expect(db.prepare('select deleted_at from historical_drawing_numbers where id = ?').get(historical)).toEqual({ deleted_at: null });
+      const result = await app.inject({ method: 'POST', url: '/api/drawings/batch-delete', payload: { confirmed: true, items } });
+      expect(result.statusCode).toBe(200);
+      expect(result.json().items).toEqual([
+        expect.objectContaining({ signedId: planned.id, status: 'skipped', code: 'DRAWING_CONFIRMATION_MISMATCH' }),
+        expect.objectContaining({ signedId: -historical, status: 'deleted' }),
+      ]);
+      expect(db.prepare('select deleted_at from drawing_numbers where id = ?').get(planned.id)).toEqual({ deleted_at: null });
+      expect(db.prepare('select deletion_mode from historical_drawing_numbers where id = ?').get(historical)).toEqual({ deletion_mode: 'retain_occupied' });
+    } finally { await app.close(); }
+  });
   it('returns an accurate empty paged result', async () => {
     const app = Fastify();
     registerDrawingRoutes(app, new DrawingQueryService(db));
