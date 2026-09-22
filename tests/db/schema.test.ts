@@ -53,7 +53,7 @@ describe('schema migrations', () => {
     const seeded = seedProduct(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 12 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 13 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select id, sku from products').get()).toEqual({ id: seeded.product, sku: null });
@@ -75,6 +75,15 @@ describe('schema migrations', () => {
       ]);
     expect((database.pragma('table_info(qr_code_files)') as Array<{ name: string }>).map((column) => column.name))
       .toContain('detected_identifier');
+    for (const table of ['drawing_numbers', 'historical_drawing_numbers']) {
+      expect((database.pragma(`table_info(${table})`) as Array<{ name: string }>).map((column) => column.name))
+        .toEqual(expect.arrayContaining([
+          'deleted_at', 'deletion_mode', 'deleted_full_code', 'deleted_previous_status',
+          'deleted_reason', 'scan_resolution',
+        ]));
+    }
+    expect(database.prepare("select name from sqlite_master where type = 'table' and name = 'drawing_deletion_events'").get())
+      .toEqual({ name: 'drawing_deletion_events' });
     expect(database.prepare(`select name from sqlite_master where type = 'table' and name in
       ('bom_assets', 'bom_item_assets', 'bom_item_qr_codes') order by name`).all()).toEqual([
       { name: 'bom_assets' }, { name: 'bom_item_assets' }, { name: 'bom_item_qr_codes' },

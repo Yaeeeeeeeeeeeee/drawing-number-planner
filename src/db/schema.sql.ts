@@ -1093,3 +1093,41 @@ export const schemaVersionTwelve = `
   ALTER TABLE outbound_email_drafts_v12 RENAME TO outbound_email_drafts;
 
 `;
+
+export const schemaVersionThirteen = `
+  ALTER TABLE drawing_numbers ADD COLUMN deleted_at TEXT;
+  ALTER TABLE drawing_numbers ADD COLUMN deletion_mode TEXT
+    CHECK (deletion_mode IN ('retain_occupied', 'release'));
+  ALTER TABLE drawing_numbers ADD COLUMN deleted_full_code TEXT;
+  ALTER TABLE drawing_numbers ADD COLUMN deleted_previous_status TEXT;
+  ALTER TABLE drawing_numbers ADD COLUMN deleted_reason TEXT;
+  ALTER TABLE drawing_numbers ADD COLUMN scan_resolution TEXT
+    CHECK (scan_resolution IN ('pending', 'ignore'));
+
+  ALTER TABLE historical_drawing_numbers ADD COLUMN deleted_at TEXT;
+  ALTER TABLE historical_drawing_numbers ADD COLUMN deletion_mode TEXT
+    CHECK (deletion_mode IN ('retain_occupied', 'release'));
+  ALTER TABLE historical_drawing_numbers ADD COLUMN deleted_full_code TEXT;
+  ALTER TABLE historical_drawing_numbers ADD COLUMN deleted_previous_status TEXT;
+  ALTER TABLE historical_drawing_numbers ADD COLUMN deleted_reason TEXT;
+  ALTER TABLE historical_drawing_numbers ADD COLUMN scan_resolution TEXT
+    CHECK (scan_resolution IN ('pending', 'ignore'));
+
+  CREATE TABLE drawing_deletion_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    origin TEXT NOT NULL CHECK (origin IN ('planned', 'historical')),
+    record_id INTEGER NOT NULL,
+    full_code TEXT NOT NULL,
+    deletion_mode TEXT NOT NULL CHECK (deletion_mode IN ('retain_occupied', 'release')),
+    previous_status TEXT NOT NULL,
+    reason TEXT,
+    reference_summary_json TEXT NOT NULL CHECK (json_valid(reference_summary_json)),
+    deleted_at TEXT NOT NULL,
+    restored_at TEXT
+  );
+
+  CREATE INDEX drawing_deletion_events_record_idx
+    ON drawing_deletion_events(origin, record_id, deleted_at DESC);
+  CREATE INDEX drawing_deletion_events_code_idx
+    ON drawing_deletion_events(full_code, deleted_at DESC);
+`;

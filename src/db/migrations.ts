@@ -637,10 +637,95 @@ function validateLegacyDrawingRows(database: PlannerDatabase): void {
   if (invalid.count > 0) throw new Error('旧图号编码段无法可靠回填，数据库未升级');
 }
 
+interface V12DeletionSnapshot {
+  tables: string[];
+  rows: Record<string, unknown[]>;
+}
+
+const deletionColumns = new Set([
+  'deleted_at', 'deletion_mode', 'deleted_full_code', 'deleted_previous_status', 'deleted_reason', 'scan_resolution',
+]);
+
+function v12DeletionSnapshot(database: PlannerDatabase): V12DeletionSnapshot {
+  const tables = (database.prepare(`select name from sqlite_master
+    where type = 'table' and name not like 'sqlite_%' and name <> 'schema_migrations'
+      and name <> 'drawing_deletion_events' order by name`).all() as Array<{ name: string }>).map(({ name }) => name);
+  return { tables, rows: Object.fromEntries(tables.map((table) => {
+    const rows = database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all() as Array<Record<string, unknown>>;
+    return [table, table === 'drawing_numbers' || table === 'historical_drawing_numbers'
+      ? rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !deletionColumns.has(key))))
+      : rows];
+  })) };
+}
+
+function validateDrawingDeletionMigration(database: PlannerDatabase, before: V12DeletionSnapshot): void {
+  const tables = (database.prepare(`select name from sqlite_master
+    where type = 'table' and name not like 'sqlite_%' and name <> 'schema_migrations'
+      and name <> 'drawing_deletion_events' order by name`).all() as Array<{ name: string }>).map(({ name }) => name);
+  if (JSON.stringify(tables) !== JSON.stringify(before.tables)) {
+    throw new Error('图号删除状态迁移校验失败，数据库未升级');
+  }
+  for (const table of before.tables) {
+    const rows = database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all() as Array<Record<string, unknown>>;
+    const comparable = table === 'drawing_numbers' || table === 'historical_drawing_numbers'
+      ? rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !deletionColumns.has(key))))
+      : rows;
+    if (JSON.stringify(comparable) !== JSON.stringify(before.rows[table])) {
+      throw new Error('图号删除状态迁移校验失败，数据库未升级');
+    }
+  }
+  const initialized = (database.prepare(`select
+      (select count(*) from drawing_numbers where deleted_at is not null or deletion_mode is not null
+        or deleted_full_code is not null or deleted_previous_status is not null or deleted_reason is not null
+        or scan_resolution is not null)
+      + (select count(*) from historical_drawing_numbers where deleted_at is not null or deletion_mode is not null
+        or deleted_full_code is not null or deleted_previous_status is not null or deleted_reason is not null
+        or scan_resolution is not null) as count`).get() as { count: number }).count;
+  if (initialized !== 0 || countRows(database, 'drawing_deletion_events') !== 0
+    || (database.pragma('foreign_key_check') as Array<unknown>).length > 0) {
+    throw new Error('图号删除状态迁移校验失败，数据库未升级');
+  }
+}
+
+function applyDrawingDeletionSchema(database: PlannerDatabase): void {
+  const definitions = [
+    ['deleted_at', 'TEXT'],
+    ['deletion_mode', "TEXT CHECK (deletion_mode IN ('retain_occupied', 'release'))"],
+    ['deleted_full_code', 'TEXT'],
+    ['deleted_previous_status', 'TEXT'],
+    ['deleted_reason', 'TEXT'],
+    ['scan_resolution', "TEXT CHECK (scan_resolution IN ('pending', 'ignore'))"],
+  ] as const;
+  for (const table of ['drawing_numbers', 'historical_drawing_numbers']) {
+    const columns = new Set((database.pragma(`table_info(${table})`) as Array<{ name: string }>).map(({ name }) => name));
+    for (const [name, definition] of definitions) {
+      if (!columns.has(name)) database.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+  }
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS drawing_deletion_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      origin TEXT NOT NULL CHECK (origin IN ('planned', 'historical')),
+      record_id INTEGER NOT NULL,
+      full_code TEXT NOT NULL,
+      deletion_mode TEXT NOT NULL CHECK (deletion_mode IN ('retain_occupied', 'release')),
+      previous_status TEXT NOT NULL,
+      reason TEXT,
+      reference_summary_json TEXT NOT NULL CHECK (json_valid(reference_summary_json)),
+      deleted_at TEXT NOT NULL,
+      restored_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS drawing_deletion_events_record_idx
+      ON drawing_deletion_events(origin, record_id, deleted_at DESC);
+    CREATE INDEX IF NOT EXISTS drawing_deletion_events_code_idx
+      ON drawing_deletion_events(full_code, deleted_at DESC);
+  `);
+}
+
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 12) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 12`);
-  if (from >= 12) {
+  if (from > 13) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 13`);
+  if (from >= 13) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -743,6 +828,12 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (12, ?)').run(new Date().toISOString());
       validateOutboundItemDetachmentMigration(database, before);
     }
+    if (from < 13) {
+      const before = v12DeletionSnapshot(database);
+      applyDrawingDeletionSchema(database);
+      database.prepare('insert into schema_migrations (version, applied_at) values (13, ?)').run(new Date().toISOString());
+      validateDrawingDeletionMigration(database, before);
+    }
   })();
-  return { from, to: 12 };
+  return { from, to: 13 };
 }
