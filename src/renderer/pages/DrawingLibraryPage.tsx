@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type {
   DictionaryItemView,
   DrawingDetailView,
+  DrawingDeletionPreviewView,
   DrawingFileView,
   DrawingView,
   MaterialBatchLogicalMaterialView,
@@ -14,7 +15,7 @@ import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 import { openIndexedPdfLocation } from '../desktop-files';
 
-const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', appearanceId: '', mainCategoryId: '', projectItemId: '', colorId: '', materialBatchId: '', status: '', exactDrawingNumber: false };
+const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', appearanceId: '', mainCategoryId: '', projectItemId: '', colorId: '', materialBatchId: '', status: '', deletionState: 'normal', exactDrawingNumber: false };
 
 export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [view, setView] = useState<'drawing' | 'batch'>('drawing');
@@ -28,6 +29,10 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [pdfCandidates, setPdfCandidates] = useState<PdfFileView[]>([]); const [pdfKeyword, setPdfKeyword] = useState('');
   const [selectedPdfId, setSelectedPdfId] = useState(''); const [maintaining, setMaintaining] = useState(false);
   const [moreFilters, setMoreFilters] = useState(false);
+  const [deletionPreview, setDeletionPreview] = useState<DrawingDeletionPreviewView | null>(null);
+  const [deletionMode, setDeletionMode] = useState<'retain_occupied' | 'release'>('retain_occupied');
+  const [deletionReason, setDeletionReason] = useState('');
+  const [deletionConfirmation, setDeletionConfirmation] = useState('');
   const [batchSearch, setBatchSearch] = useState('');
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<MaterialBatchView | null>(null);
@@ -76,6 +81,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const openDetail = async (item: DrawingView) => {
     try {
       setError(''); const detail = await api.getDrawing(item.id); setSelected(detail); setPdfKeyword(''); setSelectedPdfId('');
+      setDeletionPreview(null); setDeletionMode('retain_occupied'); setDeletionReason(''); setDeletionConfirmation('');
       if (!detail.readOnly) await loadPdfCandidates(); else setPdfCandidates([]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '详情加载失败'); }
   };
@@ -108,26 +114,40 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : '历史图号状态更新失败'); }
     finally { setMaintaining(false); }
   };
-  const deleteReservation = async () => {
+  const beginDrawingDeletion = async () => {
     if (!selected) return;
     setMaintaining(true); setError('');
+    try { setDeletionPreview(await api.getDrawingDeletionPreview(selected.id)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '删除引用检查失败'); }
+    finally { setMaintaining(false); }
+  };
+  const confirmDrawingDeletion = async () => {
+    if (!selected || !deletionPreview) return;
+    if (!deletionPreview.deletable) { setError(deletionPreview.blockers.map((item) => item.message).join('；')); return; }
+    if (deletionMode === 'release' && deletionConfirmation.trim() !== selected.fullCode) {
+      setError('彻底释放前，请完整输入当前图号进行确认'); return;
+    }
+    const warning = deletionMode === 'release'
+      ? `确认彻底删除并释放 ${selected.fullCode}？释放后该号码未来可能被重新规划使用。`
+      : `确认删除 ${selected.fullCode} 的正常记录并继续保留占号？`;
+    if (!window.confirm(warning)) return;
+    setMaintaining(true); setError('');
     try {
-      const preview = await api.getDrawingDeletionPreview(selected.id);
-      if (!preview.deletable) {
-        setError(`该预留图号当前不可删除${deletionReferenceDetails(preview.referenceSummary)}`);
-        return;
-      }
-      if (!window.confirm('仅能删除从未使用的预留图号。是否继续？')) return;
-      if (!window.confirm(`最后确认删除 ${selected.fullCode}？删除后该号码会重新参与推荐。`)) return;
-      await api.deleteReservedDrawing(selected.id);
-      setSelected(null);
-      await search(filters, 1, pageSize);
-    } catch (reason) {
-      const summary = typeof reason === 'object' && reason !== null && 'referenceSummary' in reason
-        ? (reason as { referenceSummary?: Record<string, unknown> }).referenceSummary : undefined;
-      const message = reason instanceof Error ? reason.message : '删除预留图号失败';
-      setError(`${message}${deletionReferenceDetails(summary)}`);
-    } finally { setMaintaining(false); }
+      const result = await api.deleteDrawing(selected.id, { mode: deletionMode, confirmedCode: selected.fullCode,
+        ...(deletionReason.trim() ? { reason: deletionReason.trim() } : {}) });
+      window.alert(result.outcome === 'deleted_retained'
+        ? '已删除图号记录，该号码继续保留占用。'
+        : '已彻底删除图号，该号码已释放，可重新规划使用。');
+      setSelected(null); setDeletionPreview(null); await search(filters, 1, pageSize);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '删除图号失败'); }
+    finally { setMaintaining(false); }
+  };
+  const restoreDrawing = async () => {
+    if (!selected || !window.confirm(`确认恢复图号 ${selected.fullCode}？`)) return;
+    setMaintaining(true); setError('');
+    try { await api.restoreDrawing(selected.id); setSelected(null); await search(filters, 1, pageSize); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '恢复图号失败'); }
+    finally { setMaintaining(false); }
   };
   const associatePdf = async (conversionType: 'source' | 'outlined') => {
     if (!selected || !selectedPdfId) return;
@@ -179,6 +199,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('主类别', 'mainCategoryId', 'main_category')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}{dictionarySelect('外观', 'appearanceId', 'appearance')}
         <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
         <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={(event) => set('status', event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
+        <label><span>删除状态</span><select aria-label="删除状态" value={filters.deletionState} onChange={(event) => set('deletionState', event.target.value)}><option value="normal">正常图号</option><option value="deleted-retained">已删除 / 保留占号</option><option value="deleted-released">已删除 / 已释放</option><option value="all">全部</option></select></label>
         <label><span>源文件</span><select aria-label="源文件" value={filters.sourcePresence} onChange={(event) => set('sourcePresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label>
         <label><span>转曲后文件</span><select aria-label="转曲后文件" value={filters.outlinedPresence} onChange={(event) => set('outlinedPresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label></>}
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
@@ -198,7 +219,11 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
         setSelectedPdfId={setSelectedPdfId} onClose={() => setSelected(null)} onStatus={changeStatus} onOpen={openLocation}
         onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus}
-        onDeleteReservation={deleteReservation} onError={setError} /> : null} />}
+        onBeginDelete={beginDrawingDeletion} deletionPreview={deletionPreview}
+        deletionMode={deletionMode} setDeletionMode={setDeletionMode} deletionReason={deletionReason}
+        setDeletionReason={setDeletionReason} deletionConfirmation={deletionConfirmation}
+        setDeletionConfirmation={setDeletionConfirmation} onConfirmDelete={confirmDrawingDeletion}
+        onCancelDelete={() => setDeletionPreview(null)} onRestore={restoreDrawing} onError={setError} /> : null} />}
     {!loading && total > 0 && <nav className="drawing-pagination" aria-label="图号分页"><span>共 {total} 条 · 第 {page} / {totalPages} 页</span>
       <button className="secondary-button" type="button" disabled={page <= 1} onClick={() => goToPage(page - 1)}>上一页</button>
       <span className="page-number-list">{visiblePages.map((value, index) => <span key={value}>{index > 0 && value - visiblePages[index - 1] > 1 && <i>…</i>}<button type="button" className={value === page ? 'current' : ''} aria-current={value === page ? 'page' : undefined} onClick={() => goToPage(value)}>{value}</button></span>)}</span>
@@ -217,25 +242,20 @@ const statusLabel = (origin: DrawingView['origin'], status: DrawingView['status'
 const usageLabel = (status: 'current' | 'historical' | 'unbatched' | 'indeterminate') =>
   status === 'current' ? '当前使用' : status === 'historical' ? '历史使用' : status === 'indeterminate' ? '待确认' : '未归入批次';
 
-function deletionReferenceDetails(summary: unknown): string {
-  const labels: Array<[string, string]> = [
-    ['pdfCount', 'PDF 关联'], ['bomCount', 'BOM 使用'], ['previousDrawingCount', '关联前版'],
-    ['successorCount', '后续版本'], ['sourceDrawingCount', '引用源图号'], ['sourceReferenceCount', '被引用为源图号'],
-  ];
-  const values = typeof summary === 'object' && summary !== null ? summary as Record<string, unknown> : undefined;
-  const details = values ? labels.flatMap(([key, label]) => typeof values[key] === 'number' && values[key] > 0
-    ? [`${label}（${values[key]}）`] : []).join('、') : '';
-  return details ? `：${details}` : '';
-}
-
 function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
-  setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus, onDeleteReservation, onError }: {
+  setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus,
+  onBeginDelete, deletionPreview, deletionMode, setDeletionMode, deletionReason, setDeletionReason,
+  deletionConfirmation, setDeletionConfirmation, onConfirmDelete, onCancelDelete, onRestore, onError }: {
   selected: DrawingDetailView; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
   pdfCandidates: PdfFileView[]; selectedPdfId: string; setSelectedPdfId(value: string): void; onClose(): void;
   onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
   onSearchPdf(keyword: string): Promise<void>; onAssociate(type: 'source' | 'outlined'): Promise<void>;
   onHistoricalStatus(target: 'active' | 'inactive'): Promise<void>;
-  onDeleteReservation(): Promise<void>;
+  onBeginDelete(): Promise<void>; deletionPreview: DrawingDeletionPreviewView | null;
+  deletionMode: 'retain_occupied' | 'release'; setDeletionMode(value: 'retain_occupied' | 'release'): void;
+  deletionReason: string; setDeletionReason(value: string): void;
+  deletionConfirmation: string; setDeletionConfirmation(value: string): void;
+  onConfirmDelete(): Promise<void>; onCancelDelete(): void; onRestore(): Promise<void>;
   onError(message: string): void;
 }) {
   return <aside className="drawing-maintenance inline-drawing-detail panel-enter" aria-label="图号详情"><button className="panel-close" onClick={onClose} type="button">关闭</button>
@@ -243,14 +263,15 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
     <dl><div><dt>产品身份</dt><dd>{selected.sku ?? '待补录'} · {selected.brandName} · {selected.model}</dd></div>
       <div><dt>类别 / 项目</dt><dd>{selected.productCategory} · {selected.mainCategoryName} · {selected.projectItemName}</dd></div>
       <div><dt>业务状态</dt><dd><span className={`status-text ${selected.status}`}>{statusLabel(selected.origin, selected.status)}</span></dd></div></dl>
-    {selected.origin === 'historical' ? <><p className="historical-read-only">{selected.readOnlyMessage}</p><div className="drawing-actions">
+    {selected.deletedAt ? <p className="historical-read-only">该图号已删除 · {selected.deletionMode === 'release' ? '号码已释放' : '号码继续占用'} · {selected.deletedAt}</p>
+      : selected.origin === 'historical' ? <><p className="historical-read-only">历史扫描来源；编码不可直接修改。</p><div className="drawing-actions">
       {selected.status === 'active'
         ? <button className="text-button danger" disabled={maintaining} onClick={() => void onHistoricalStatus('inactive')} type="button">停用</button>
         : <button className="primary-button" disabled={maintaining} onClick={() => void onHistoricalStatus('active')} type="button">启用</button>}
     </div><p className="muted-text">停用不释放号码</p></> : <div className="drawing-actions">
       {selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">正式使用</button>}
       {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}
-      {selected.status === 'reserved' && <button className="text-button danger" disabled={maintaining} onClick={() => void onDeleteReservation()} type="button">删除未使用预留</button>}</div>}
+      </div>}
     <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={onOpen} />
     <FileSection title="转曲后文件" present={selected.hasOutlinedFile} files={selected.outlinedFiles ?? []} onOpen={onOpen} />
     <section className="drawing-detail-section"><h3>资料批次</h3>{!selected.batchUsage || selected.batchUsage.occurrences.length === 0
@@ -258,7 +279,7 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
       : <ul>{selected.batchUsage.occurrences.map((occurrence) => <li key={occurrence.batchId}>{occurrence.batchName}{occurrence.usageState === 'current' ? ' · 当前' : ''}<small>{occurrence.productDirectory} · {occurrence.files.length} 个文件实例</small></li>)}</ul>}</section>
     <section className="drawing-detail-section"><h3>当前 BOM 使用</h3>{(selected.currentBomUsage ?? []).length === 0 ? <p className="muted-text">当前 BOM 未使用此图号</p>
       : <ul>{selected.currentBomUsage.map((usage) => <li key={`${usage.bomVersionId}-${usage.projectItemId}`}>{usage.model} · {usage.colorName} · BOM v{usage.versionNumber}<small>{usage.projectItemName} · 数量 {usage.quantity}{usage.usesWhiteMaterial ? ' · 引用白色物料' : ''}</small></li>)}</ul>}</section>
-    {!selected.readOnly && <section className="drawing-detail-section pdf-association"><h3>关联现有 PDF 索引</h3>
+    {!selected.readOnly && !selected.deletedAt && <section className="drawing-detail-section pdf-association"><h3>关联现有 PDF 索引</h3>
       <div className="pdf-search"><input aria-label="搜索现有 PDF" value={pdfKeyword} onChange={(event) => setPdfKeyword(event.target.value)} placeholder="文件名或相对路径" />
         <button className="secondary-button" onClick={() => void onSearchPdf(pdfKeyword).catch((reason) => onError(reason instanceof Error ? reason.message : 'PDF 搜索失败'))} type="button">搜索 PDF</button></div>
       <label><span>现有 PDF 索引</span><select aria-label="现有 PDF 索引" value={selectedPdfId} onChange={(event) => setSelectedPdfId(event.target.value)}><option value="">请选择当前存在的 PDF</option>
@@ -266,7 +287,38 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
       <div className="drawing-actions"><button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void onAssociate('source')} type="button">关联为源文件</button>
         <button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void onAssociate('outlined')} type="button">关联为转曲后文件</button></div>
       <p className="muted-text">仅更新当前资料库索引，不移动、复制、重命名或删除磁盘文件。</p></section>}
+    <section className="drawing-detail-section danger-zone"><h3>危险操作</h3>
+      {selected.deletedAt ? <><p>删除方式：{selected.deletionMode === 'release' ? '彻底删除并释放图号' : '删除记录并保留占号'}</p>
+        {selected.deletedReason && <p className="muted-text">原因：{selected.deletedReason}</p>}
+        <button className="secondary-button" disabled={maintaining} onClick={() => void onRestore()} type="button">恢复记录</button></>
+        : !deletionPreview ? <><p className="muted-text">删除只处理系统记录和当前关联，不会删除磁盘中的 PDF、AI 或其他文件。</p>
+          <button className="text-button danger" disabled={maintaining} onClick={() => void onBeginDelete()} type="button">删除图号</button></>
+          : <div className="drawing-delete-panel">
+            <p><strong>{deletionPreview.fullCode}</strong> · {deletionPreview.origin === 'planned' ? '正式规划' : '历史扫描'}</p>
+            <DeletionReferenceSummary preview={deletionPreview} />
+            {deletionPreview.blockers.length > 0 ? <div className="error-banner">{deletionPreview.blockers.map((item) => <p key={item.kind}>{item.message}</p>)}</div>
+              : <><label className="choice-row"><input type="radio" name="drawing-delete-mode" checked={deletionMode === 'retain_occupied'}
+                onChange={() => setDeletionMode('retain_occupied')} />删除记录并保留占号</label>
+                <label className="choice-row"><input type="radio" name="drawing-delete-mode" checked={deletionMode === 'release'}
+                  onChange={() => setDeletionMode('release')} />彻底删除并释放图号</label>
+                <label><span>删除原因（可选）</span><input value={deletionReason} onChange={(event) => setDeletionReason(event.target.value)} /></label>
+                {deletionMode === 'release' && <label><span>输入完整图号确认释放</span><input aria-label="输入完整图号确认释放"
+                  value={deletionConfirmation} onChange={(event) => setDeletionConfirmation(event.target.value)} /></label>}
+                {deletionMode === 'release' && <p className="error-banner">释放后，该号码未来可能被重新规划使用。</p>}
+                <div className="drawing-actions"><button className="text-button danger" disabled={maintaining}
+                  onClick={() => void onConfirmDelete()} type="button">确认删除</button>
+                  <button className="secondary-button" disabled={maintaining} onClick={onCancelDelete} type="button">取消</button></div></>}
+          </div>}
+    </section>
   </aside>;
+}
+
+function DeletionReferenceSummary({ preview }: { preview: DrawingDeletionPreviewView }) {
+  const labels: Array<[string, string]> = [
+    ['presentPdf', '当前 PDF'], ['missingPdf', '缺失 PDF'], ['currentBom', '当前 BOM'], ['historicalBom', '历史 BOM'],
+    ['currentMaterial', '当前资料'], ['historicalMaterial', '历史批次'], ['lineage', '图号关系'], ['outboundSnapshot', '历史外发'],
+  ];
+  return <ul className="deletion-reference-list">{labels.map(([key, label]) => <li key={key}>{label}：{preview.references[key] ?? 0}</li>)}</ul>;
 }
 
 function BatchBrowser({ search, setSearch, loading, batches, selected, materials, onSearch, onSelect, onOpen }: {

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import { DrawingQueryError, type DrawingQueryService } from '../../core/drawings/drawing-query-service.js';
+import { DrawingDeletionError } from '../../core/drawings/drawing-deletion-service.js';
 
 const querySchema = z.object({
   drawingNumber: z.string().optional(),
@@ -21,6 +22,7 @@ const querySchema = z.object({
   keyword: z.string().optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  deletionState: z.enum(['normal', 'deleted-retained', 'deleted-released', 'all']).optional(),
 }).strict();
 const paramsSchema = z.object({ id: z.coerce.number().int().refine((value) => value !== 0) }).strict();
 const historicalParamsSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
@@ -28,8 +30,17 @@ const confirmedSchema = z.object({ confirmed: z.literal(true) }).strict();
 const associationSchema = z.object({
   pdfIndexId: z.number().int().positive(), conversionType: z.enum(['source', 'outlined']),
 }).strict();
+const deleteDrawingSchema = z.object({
+  mode: z.enum(['retain_occupied', 'release']), confirmedCode: z.string().min(1), reason: z.string().max(500).optional(),
+}).strict();
+const scanResolutionSchema = z.object({ resolution: z.enum(['reimport', 'ignore']) }).strict();
 
 function sendDrawingError(reply: FastifyReply, error: unknown) {
+  if (error instanceof DrawingDeletionError) {
+    const status = error.code === 'DRAWING_NOT_FOUND' ? 404
+      : error.code === 'DRAWING_DELETE_BLOCKED' || error.code === 'DRAWING_RESTORE_CONFLICT' ? 409 : 422;
+    return reply.code(status).send({ error: { code: error.code, message: error.message, preview: error.preview } });
+  }
   if (!(error instanceof DrawingQueryError)) throw error;
   const status = error.code === 'NOT_FOUND' ? 404
     : error.code === 'INVALID_TRANSITION' || error.code === 'HISTORICAL_READ_ONLY' ? 409 : 422;
@@ -77,7 +88,34 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   app.get('/api/drawings/:id/deletion-preview', async (request, reply) => {
     const params = paramsSchema.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '图号编号无效' } });
-    try { return service.getDeletionPreview(params.data.id); }
+    try { return service.previewDeletion(params.data.id); }
+    catch (error) { return sendDrawingError(reply, error); }
+  });
+
+  app.post('/api/drawings/:id/delete', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params); const input = deleteDrawingSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '删除图号请求无效' } });
+    }
+    try { return service.deleteDrawing({ signedId: params.data.id, ...input.data }); }
+    catch (error) { return sendDrawingError(reply, error); }
+  });
+
+  app.post('/api/drawings/:id/restore', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '恢复图号请求无效' } });
+    }
+    try { return service.restoreDrawing(params.data.id); }
+    catch (error) { return sendDrawingError(reply, error); }
+  });
+
+  app.post('/api/drawings/:id/scan-resolution', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params); const input = scanResolutionSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '扫描处理请求无效' } });
+    }
+    try { return service.resolveDeletedScan(params.data.id, input.data.resolution); }
     catch (error) { return sendDrawingError(reply, error); }
   });
 

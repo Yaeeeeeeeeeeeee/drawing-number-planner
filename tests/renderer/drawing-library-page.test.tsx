@@ -287,7 +287,7 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getAllByText('作废').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('double-confirms reservation deletion and explains every blocking reference', async () => {
+  it('deletes a drawing from the danger zone with explicit lifecycle mode and reference preview', async () => {
     const reserved = { id: 10, fullCode: '02.0209.010.0401001', displayName: 'Drawing', sku: 'SKU', productId: 5,
       model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
       projectItemName: 'LOGO', status: 'reserved', origin: 'planned', hasSourceFile: false, hasOutlinedFile: false,
@@ -295,26 +295,27 @@ describe('DrawingLibraryPage', () => {
     const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [reserved], total: 1, page: 1, pageSize: 20 }),
       listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(reserved),
       searchPdfFiles: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 }),
-      getDrawingDeletionPreview: vi.fn().mockResolvedValue({ deletable: true, referenceSummary: {
-        pdfCount: 0, bomCount: 0, previousDrawingCount: 0, successorCount: 0,
-        sourceDrawingCount: 0, sourceReferenceCount: 0,
-      } }),
-      deleteReservedDrawing: vi.fn().mockRejectedValue(Object.assign(new Error('图号仍被文件、BOM 或版本关系引用，不能删除'), {
-        code: 'DRAWING_REFERENCED', referenceSummary: { pdfCount: 1, bomCount: 2, previousDrawingCount: 1,
-          successorCount: 3, sourceDrawingCount: 1, sourceReferenceCount: 2 },
-      })) };
+      getDrawingDeletionPreview: vi.fn().mockResolvedValue({ signedId: 10, origin: 'planned', fullCode: reserved.fullCode,
+        status: 'reserved', deletable: true, blockers: [], references: { presentPdf: 1, missingPdf: 0,
+          currentBom: 0, historicalBom: 2, currentMaterial: 0, historicalMaterial: 3, lineage: 0, outboundSnapshot: 1 } }),
+      deleteDrawing: vi.fn().mockResolvedValue({ outcome: 'deleted_retained', fullCode: reserved.fullCode, occupied: true }) };
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(window, 'alert').mockImplementation(() => undefined);
     confirm.mockClear();
 
     render(<DrawingLibraryPage api={api as never} />);
     fireEvent.click(await screen.findByText(reserved.fullCode));
-    fireEvent.click(await screen.findByRole('button', { name: '删除未使用预留' }));
+    fireEvent.click(await screen.findByRole('button', { name: '删除图号' }));
+    expect(await screen.findByText('当前 PDF：1')).toBeVisible();
+    expect(screen.getByText('历史 BOM：2')).toBeVisible();
+    expect(screen.getByText('历史批次：3')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
 
-    await waitFor(() => expect(api.deleteReservedDrawing).toHaveBeenCalledWith(10));
+    await waitFor(() => expect(api.deleteDrawing).toHaveBeenCalledWith(10, {
+      mode: 'retain_occupied', confirmedCode: reserved.fullCode,
+    }));
     expect(api.getDrawingDeletionPreview).toHaveBeenCalledWith(10);
-    expect(confirm).toHaveBeenNthCalledWith(1, '仅能删除从未使用的预留图号。是否继续？');
-    expect(confirm).toHaveBeenNthCalledWith(2, '最后确认删除 02.0209.010.0401001？删除后该号码会重新参与推荐。');
-    expect(await screen.findByText(/PDF 关联（1）、BOM 使用（2）、关联前版（1）、后续版本（3）、引用源图号（1）、被引用为源图号（2）/)).toBeVisible();
+    expect(confirm).toHaveBeenCalledWith('确认删除 02.0209.010.0401001 的正常记录并继续保留占号？');
   });
 
   it('associates a searched current PDF and refreshes detail and row while surfacing failures', async () => {
@@ -400,7 +401,7 @@ describe('DrawingLibraryPage', () => {
 
     await waitFor(() => expect(api.deactivateHistoricalDrawing).toHaveBeenCalledWith(-4));
     expect(confirm).toHaveBeenCalledWith('确认停用该历史图号？停用不释放号码，也不会改变文件完整性。');
-    expect(await screen.findByText('历史图号的编码和文件关联不可修改；停用不释放号码。')).toBeVisible();
+    expect(await screen.findByText('历史扫描来源；编码不可直接修改。')).toBeVisible();
     expect(screen.getAllByText('已停用').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/源文件缺失.*转曲后已有/)).toBeVisible();
     expect(screen.getByText('停用不释放号码')).toBeVisible();

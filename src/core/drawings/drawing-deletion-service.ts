@@ -1,7 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { OccupiedNumberRepository } from '../planning/occupied-number-repository.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
-import { DrawingQueryService } from './drawing-query-service.js';
+import { DrawingRepository } from './drawing-repository.js';
 import type { DeleteDrawingInput, DrawingDeletionBlocker, DrawingDeletionPreview,
   DrawingDeletionReferenceCounts, DrawingDeletionResult } from './drawing-deletion-types.js';
 import type { DrawingOrigin, DrawingStatus } from './drawing-types.js';
@@ -60,9 +60,9 @@ export class DrawingDeletionService {
         .run(input.mode === 'release' ? archiveCode : row.storedFullCode, now, input.mode, row.fullCode,
           row.status, input.reason?.trim() || null, row.id);
       this.detachPdfIndexes(row, input.mode);
-      return input.mode === 'release'
+      return (input.mode === 'release'
         ? { outcome: 'deleted_released', fullCode: row.fullCode, occupied: false }
-        : { outcome: 'deleted_retained', fullCode: row.fullCode, occupied: true };
+        : { outcome: 'deleted_retained', fullCode: row.fullCode, occupied: true }) as DrawingDeletionResult;
     }).immediate();
   }
 
@@ -89,7 +89,9 @@ export class DrawingDeletionService {
           select 1 from json_each(pdf_files.detected_codes_json) where json_each.value = ?
         )`).run(row.id, row.fullCode);
     }).immediate();
-    return new DrawingQueryService(this.db).get(signedId);
+    const drawing = new DrawingRepository(this.db).getDetail(signedId);
+    if (!drawing) throw new DrawingDeletionError('DRAWING_NOT_FOUND', '恢复后的图号记录不存在');
+    return { ...drawing, batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
   }
 
   resolveScan(signedId: number, resolution: 'reimport' | 'ignore') {

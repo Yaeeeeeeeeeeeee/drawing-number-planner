@@ -199,6 +199,12 @@ td { height: 46px; padding: 0 14px; border-bottom: 1px solid #edf0f4; white-spac
 .danger-zone { margin-top: 18px; padding: 14px; border: 1px solid #efc0ba; border-radius: 8px; background: #fff8f7; }
 .danger-zone h4 { margin: 0 0 6px; color: #8f271f; }
 .danger-zone label { display: inline-flex; gap: 8px; align-items: center; margin-right: 10px; }
+.danger-zone h3 { color: #8f271f; }
+.drawing-delete-panel { display: grid; gap: 12px; }
+.drawing-delete-panel > label:not(.choice-row) { display: grid; gap: 6px; margin: 0; }
+.drawing-delete-panel > label:not(.choice-row) input { width: 100%; }
+.deletion-reference-list { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.deletion-reference-list li { border: 1px solid #ead7d4; border-radius: 6px; background: #fff !important; }
 .primary-button.danger { background: #b42318; }
 .bom-asset-paths { display: grid; min-width: 0; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bom-asset-paths li { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; }

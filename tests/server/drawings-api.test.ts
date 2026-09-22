@@ -174,11 +174,32 @@ describe('drawing library API', () => {
     const preview = await app.inject({ method: 'GET', url: `/api/drawings/${reserved.id}/deletion-preview` });
 
     expect(preview.statusCode).toBe(200);
-    expect(preview.json()).toEqual({ deletable: true, referenceSummary: {
-      pdfCount: 0, bomCount: 0, previousDrawingCount: 0, successorCount: 0,
-      sourceDrawingCount: 0, sourceReferenceCount: 0,
-    } });
+    expect(preview.json()).toEqual(expect.objectContaining({ signedId: reserved.id, origin: 'planned',
+      fullCode: reserved.fullCode, deletable: true, blockers: [], references: expect.objectContaining({
+        presentPdf: 0, currentBom: 0, currentMaterial: 0,
+      }) }));
     expect((await app.inject({ method: 'GET', url: `/api/drawings/${reserved.id}` })).statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('deletes planned and historical drawings using either explicit lifecycle mode', async () => {
+    const reserved = seedPlannedDrawing(db); const historicalId = seedHistoricalDrawing(db);
+    const historicalCode = (db.prepare('select full_code as fullCode from historical_drawing_numbers where id = ?')
+      .get(historicalId) as { fullCode: string }).fullCode;
+    const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+
+    const retained = await app.inject({ method: 'POST', url: `/api/drawings/${reserved.id}/delete`,
+      payload: { mode: 'retain_occupied', confirmedCode: reserved.fullCode, reason: '验收' } });
+    expect(retained.statusCode).toBe(200);
+    expect(retained.json()).toEqual({ outcome: 'deleted_retained', fullCode: reserved.fullCode, occupied: true });
+    const released = await app.inject({ method: 'POST', url: `/api/drawings/${-historicalId}/delete`,
+      payload: { mode: 'release', confirmedCode: historicalCode } });
+    expect(released.statusCode).toBe(200);
+    expect(released.json()).toEqual({ outcome: 'deleted_released', fullCode: historicalCode, occupied: false });
+    expect((await app.inject({ method: 'GET', url: '/api/drawings?deletionState=deleted-retained' })).json())
+      .toEqual(expect.objectContaining({ total: 1, items: [expect.objectContaining({ fullCode: reserved.fullCode })] }));
+    expect((await app.inject({ method: 'POST', url: `/api/drawings/${reserved.id}/restore`, payload: { confirmed: true } })).statusCode)
+      .toBe(200);
     await app.close();
   });
 

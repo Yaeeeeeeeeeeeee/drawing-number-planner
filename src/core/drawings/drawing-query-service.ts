@@ -1,5 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
+import { DrawingDeletionService } from './drawing-deletion-service.js';
+import type { DeleteDrawingInput } from './drawing-deletion-types.js';
 import { DrawingRepository } from './drawing-repository.js';
 import type { DrawingDeletionPreview, DrawingDetailRecord, DrawingReferenceSummary, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
 
@@ -10,9 +12,11 @@ export class DrawingQueryError extends Error {
 export class DrawingQueryService {
   private readonly repository: DrawingRepository;
   private readonly batches: MaterialBatchService;
+  private readonly deletion: DrawingDeletionService;
   constructor(database: PlannerDatabase) {
     this.repository = new DrawingRepository(database);
     this.batches = new MaterialBatchService(database);
+    this.deletion = new DrawingDeletionService(database);
   }
 
   search(filters: DrawingSearchFilters = {}): PagedDrawingResult {
@@ -47,6 +51,16 @@ export class DrawingQueryService {
     }
     this.repository.updateStatus(id, target);
     return this.get(id);
+  }
+
+  previewDeletion(id: number) { return this.deletion.preview(id); }
+
+  deleteDrawing(input: DeleteDrawingInput) { return this.deletion.delete(input); }
+
+  restoreDrawing(id: number) { return this.deletion.restore(id); }
+
+  resolveDeletedScan(id: number, resolution: 'reimport' | 'ignore') {
+    return this.deletion.resolveScan(id, resolution);
   }
 
   updateHistoricalStatus(historicalId: number, status: HistoricalDrawingStatus): DrawingDetailRecord {

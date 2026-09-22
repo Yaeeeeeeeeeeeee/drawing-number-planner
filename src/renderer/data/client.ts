@@ -25,6 +25,8 @@ export interface DrawingView {
   colorName: string; mainCategoryName: string; projectItemName: string;
   status: 'reserved' | 'active' | 'voided' | 'inactive'; hasSourceFile: boolean; hasOutlinedFile: boolean;
   dictionaryMappingStatus: 'mapped' | 'unmapped'; batchUsage?: DrawingBatchUsageView; [key: string]: unknown;
+  deletedAt: string | null; deletionMode: 'retain_occupied' | 'release' | null;
+  deletedPreviousStatus: string | null; deletedReason: string | null; occupied: boolean;
 }
 export interface DrawingFileView {
   pdfIndexId: number; fileName: string; relativePath: string; isPresent: boolean; conversionType: 'source' | 'outlined';
@@ -86,7 +88,9 @@ export interface DrawingReferenceSummaryView {
   sourceDrawingCount: number; sourceReferenceCount: number;
 }
 export interface DrawingDeletionPreviewView {
-  deletable: boolean; referenceSummary: DrawingReferenceSummaryView;
+  signedId: number; origin: 'planned' | 'historical'; fullCode: string; status: DrawingView['status']; deletable: boolean;
+  references: Record<string, number>;
+  blockers: Array<{ kind: 'current_bom' | 'current_material' | 'lineage'; count: number; message: string }>;
 }
 
 export interface ProductReferenceSummaryView {
@@ -238,6 +242,10 @@ export interface PlannerApi {
   activateDrawing(id: number): Promise<DrawingDetailView>;
   voidDrawing(id: number): Promise<DrawingDetailView>;
   getDrawingDeletionPreview(id: number): Promise<DrawingDeletionPreviewView>;
+  deleteDrawing(id: number, input: { mode: 'retain_occupied' | 'release'; confirmedCode: string; reason?: string }):
+    Promise<{ outcome: 'deleted_retained' | 'deleted_released'; fullCode: string; occupied: boolean }>;
+  restoreDrawing(id: number): Promise<DrawingDetailView>;
+  resolveDeletedDrawingScan(id: number, resolution: 'reimport' | 'ignore'): Promise<unknown>;
   deleteReservedDrawing(id: number): Promise<{ deleted: true }>;
   activateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
   deactivateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
@@ -468,6 +476,9 @@ export const apiClient: PlannerApi = {
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
   getDrawingDeletionPreview: (id) => request(`/api/drawings/${id}/deletion-preview`),
+  deleteDrawing: (id, input) => request(`/api/drawings/${id}/delete`, json('POST', input)),
+  restoreDrawing: (id) => request(`/api/drawings/${id}/restore`, json('POST', { confirmed: true })),
+  resolveDeletedDrawingScan: (id, resolution) => request(`/api/drawings/${id}/scan-resolution`, json('POST', { resolution })),
   deleteReservedDrawing: (id) => request(`/api/drawings/${id}`, json('DELETE', { confirmed: true })),
   activateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/activate`, json('POST', { confirmed: true })),
   deactivateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/deactivate`, json('POST', { confirmed: true })),
