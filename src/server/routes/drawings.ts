@@ -44,7 +44,7 @@ function sendDrawingError(reply: FastifyReply, error: unknown) {
   if (!(error instanceof DrawingQueryError)) throw error;
   const status = error.code === 'NOT_FOUND' ? 404
     : error.code === 'INVALID_TRANSITION' || error.code === 'HISTORICAL_READ_ONLY' ? 409 : 422;
-  return reply.code(status).send({ error: { code: error.code, message: error.message, referenceSummary: error.referenceSummary } });
+  return reply.code(status).send({ error: { code: error.code, message: error.message } });
 }
 
 export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQueryService): void {
@@ -77,12 +77,8 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   app.post('/api/drawings/:id/void', transition('voided', '作废确认请求无效'));
 
   app.delete('/api/drawings/:id', async (request, reply) => {
-    const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
-    if (!params.success || !input.success) {
-      return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '删除预留图号确认请求无效' } });
-    }
-    try { return service.deleteReservedDrawing(params.data.id, input.data.confirmed); }
-    catch (error) { return sendDrawingError(reply, error); }
+    return reply.code(405).send({ error: { code: 'USE_DRAWING_DELETE_WORKFLOW',
+      message: '请使用统一图号删除流程，并明确选择保留占号或释放图号' } });
   });
 
   app.get('/api/drawings/:id/deletion-preview', async (request, reply) => {
@@ -132,7 +128,8 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   app.delete('/api/historical-drawings/:id', async (request, reply) => {
     const params = historicalParamsSchema.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '历史图号编号无效' } });
-    return reply.code(409).send({ error: { code: 'HISTORICAL_READ_ONLY', message: '永久占号，不支持普通删除' } });
+    return reply.code(405).send({ error: { code: 'USE_DRAWING_DELETE_WORKFLOW',
+      message: '请使用统一图号删除流程，并明确选择保留占号或释放图号' } });
   });
 
   app.post('/api/drawings/:id/associate-pdf', async (request, reply) => {

@@ -3,10 +3,10 @@ import { MaterialBatchService } from '../files/material-batch-service.js';
 import { DrawingDeletionService } from './drawing-deletion-service.js';
 import type { DeleteDrawingInput } from './drawing-deletion-types.js';
 import { DrawingRepository } from './drawing-repository.js';
-import type { DrawingDeletionPreview, DrawingDetailRecord, DrawingReferenceSummary, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
+import type { DrawingDetailRecord, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
 
 export class DrawingQueryError extends Error {
-  constructor(public readonly code: 'NOT_FOUND' | 'INVALID_TRANSITION' | 'HISTORICAL_READ_ONLY' | 'PDF_NOT_AVAILABLE' | 'DRAWING_NOT_DELETABLE' | 'DRAWING_REFERENCED', message: string, public readonly referenceSummary?: DrawingReferenceSummary) { super(message); }
+  constructor(public readonly code: 'NOT_FOUND' | 'INVALID_TRANSITION' | 'HISTORICAL_READ_ONLY' | 'PDF_NOT_AVAILABLE', message: string) { super(message); }
 }
 
 export class DrawingQueryService {
@@ -68,27 +68,6 @@ export class DrawingQueryService {
     if (drawing.origin !== 'historical') throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
     this.repository.updateHistoricalStatus(historicalId, status);
     return this.get(-historicalId);
-  }
-
-  getDeletionPreview(id: number): DrawingDeletionPreview {
-    if (id < 0) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '永久占号，不支持普通删除');
-    const preview = this.repository.getDeletionPreview(id);
-    if (!preview) throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
-    return preview;
-  }
-
-  deleteReservedDrawing(id: number, confirmed: boolean): { deleted: true } {
-    if (!confirmed) throw new DrawingQueryError('DRAWING_NOT_DELETABLE', '删除未使用预留图号需要明确确认');
-    if (id < 0) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '永久占号，不支持普通删除');
-    const result = this.repository.deleteUnusedReservation(id);
-    if (result.kind === 'not-found') throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
-    if (result.kind === 'not-deletable') {
-      throw new DrawingQueryError('DRAWING_NOT_DELETABLE', '仅允许删除从未使用的已占号图号', result.preview?.referenceSummary);
-    }
-    if (result.kind === 'referenced') {
-      throw new DrawingQueryError('DRAWING_REFERENCED', '图号仍被文件、BOM 或版本关系引用，不能删除', result.preview?.referenceSummary);
-    }
-    return { deleted: true };
   }
 
   associatePdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): DrawingDetailRecord {

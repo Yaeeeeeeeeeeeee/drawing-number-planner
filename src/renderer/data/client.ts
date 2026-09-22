@@ -246,7 +246,6 @@ export interface PlannerApi {
     Promise<{ outcome: 'deleted_retained' | 'deleted_released'; fullCode: string; occupied: boolean }>;
   restoreDrawing(id: number): Promise<DrawingDetailView>;
   resolveDeletedDrawingScan(id: number, resolution: 'reimport' | 'ignore'): Promise<unknown>;
-  deleteReservedDrawing(id: number): Promise<{ deleted: true }>;
   activateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
   deactivateHistoricalDrawing(id: number): Promise<DrawingDetailView>;
   associateDrawingPdf(id: number, pdfIndexId: number, conversionType: 'source' | 'outlined'): Promise<DrawingDetailView>;
@@ -479,7 +478,6 @@ export const apiClient: PlannerApi = {
   deleteDrawing: (id, input) => request(`/api/drawings/${id}/delete`, json('POST', input)),
   restoreDrawing: (id) => request(`/api/drawings/${id}/restore`, json('POST', { confirmed: true })),
   resolveDeletedDrawingScan: (id, resolution) => request(`/api/drawings/${id}/scan-resolution`, json('POST', { resolution })),
-  deleteReservedDrawing: (id) => request(`/api/drawings/${id}`, json('DELETE', { confirmed: true })),
   activateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/activate`, json('POST', { confirmed: true })),
   deactivateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/deactivate`, json('POST', { confirmed: true })),
   associateDrawingPdf: (id, pdfIndexId, conversionType) => request(`/api/drawings/${id}/associate-pdf`,

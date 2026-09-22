@@ -120,25 +120,24 @@ export class DrawingDeletionService {
   }
 
   private buildPreview(signedId: number, row: DeletionRow): DrawingDeletionPreview {
-    const plannedId = row.origin === 'planned' ? row.id : null;
-    const historicalId = row.origin === 'historical' ? row.id : null;
+    const referenceColumn = row.origin === 'planned' ? 'drawing_id' : 'historical_drawing_id';
     const pdf = this.db.prepare(`select
       sum(case when is_present = 1 then 1 else 0 end) as presentPdf,
       sum(case when is_present = 0 then 1 else 0 end) as missingPdf,
       sum(case when conversion_type = 'source' then 1 else 0 end) as sourcePdf,
       sum(case when conversion_type = 'outlined' then 1 else 0 end) as outlinedPdf
-      from pdf_files where drawing_id is ? or historical_drawing_id is ?`).get(plannedId, historicalId) as Record<string, number | null>;
+      from pdf_files where ${referenceColumn} = ?`).get(row.id) as Record<string, number | null>;
     const bom = this.db.prepare(`select
       sum(case when current.version_id = item.bom_version_id then 1 else 0 end) as currentBom,
       sum(case when current.version_id is null or current.version_id <> item.bom_version_id then 1 else 0 end) as historicalBom
       from bom_items item left join bom_current current on current.version_id = item.bom_version_id
-      where item.drawing_id is ? or item.historical_drawing_id is ?`).get(plannedId, historicalId) as Record<string, number | null>;
+      where item.${referenceColumn} = ?`).get(row.id) as Record<string, number | null>;
     const usage = this.batches.getDrawingUsage(row.fullCode, row.status);
     const lineage = row.origin === 'planned' ? (this.db.prepare(`select count(*) as count from drawing_numbers
       where deleted_at is null and id <> ? and (previous_drawing_id = ? or source_drawing_id = ?)`)
       .get(row.id, row.id, row.id) as { count: number }).count : 0;
     const outboundSnapshot = (this.db.prepare(`select count(*) as count from outbound_package_items
-      where drawing_id is ? or historical_drawing_id is ?`).get(plannedId, historicalId) as { count: number }).count;
+      where ${referenceColumn} = ?`).get(row.id) as { count: number }).count;
     const references: DrawingDeletionReferenceCounts = {
       presentPdf: pdf.presentPdf ?? 0, missingPdf: pdf.missingPdf ?? 0,
       sourcePdf: pdf.sourcePdf ?? 0, outlinedPdf: pdf.outlinedPdf ?? 0,
@@ -158,10 +157,9 @@ export class DrawingDeletionService {
   }
 
   private detachPdfIndexes(row: DeletionRow, mode: 'retain_occupied' | 'release'): void {
-    const plannedId = row.origin === 'planned' ? row.id : null;
-    const historicalId = row.origin === 'historical' ? row.id : null;
+    const referenceColumn = row.origin === 'planned' ? 'drawing_id' : 'historical_drawing_id';
     const files = this.db.prepare(`select id, detected_codes_json as detectedCodes from pdf_files
-      where drawing_id is ? or historical_drawing_id is ?`).all(plannedId, historicalId) as Array<{ id: number; detectedCodes: string }>;
+      where ${referenceColumn} = ?`).all(row.id) as Array<{ id: number; detectedCodes: string }>;
     const update = this.db.prepare(`update pdf_files set drawing_id = null, historical_drawing_id = null,
       match_status = 'pending', detected_codes_json = ?, classification_warning = ? where id = ?`);
     for (const file of files) {

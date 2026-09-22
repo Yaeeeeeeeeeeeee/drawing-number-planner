@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DrawingDeletionError, DrawingDeletionService } from '../../src/core/drawings/drawing-deletion-service';
 import { DrawingQueryService } from '../../src/core/drawings/drawing-query-service';
 import { OccupiedNumberRepository } from '../../src/core/planning/occupied-number-repository';
+import { PlanningService } from '../../src/core/planning/planning-service';
+import { BomRepository } from '../../src/core/bom/bom-repository';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 
@@ -53,6 +55,18 @@ afterEach(() => db.close());
 
 describe('DrawingDeletionService', () => {
   it('deletes either origin while retaining occupancy and audit history', () => {
+    const otherId = Number(db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, created_at)
+      select '02.0209.010.0401003', 'other', product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       3, 'active', created_at from drawing_numbers where id = ?`).run(plannedId).lastInsertRowid);
+    const otherFileId = Number(db.prepare(`insert into pdf_files
+      (relative_path, file_name, drawing_id, match_status, detected_codes_json, conversion_type,
+       size_bytes, modified_at, scanned_at, is_present)
+      values ('other.pdf', 'other.pdf', ?, 'matched', '["02.0209.010.0401003"]', 'outlined', 1, '2026-09-22', '2026-09-22', 1)`)
+      .run(otherId).lastInsertRowid);
     const result = service.delete({ signedId: plannedId, mode: 'retain_occupied', confirmedCode: plannedCode, reason: '不再展示' });
 
     expect(result).toEqual({ outcome: 'deleted_retained', fullCode: plannedCode, occupied: true });
@@ -62,6 +76,8 @@ describe('DrawingDeletionService', () => {
       .toEqual([expect.objectContaining({ fullCode: plannedCode, deletionMode: 'retain_occupied' })]);
     expect(db.prepare('select full_code, deletion_mode, reason from drawing_deletion_events').get())
       .toEqual({ full_code: plannedCode, deletion_mode: 'retain_occupied', reason: '不再展示' });
+    expect(db.prepare('select drawing_id, match_status from pdf_files where id = ?').get(otherFileId))
+      .toEqual({ drawing_id: otherId, match_status: 'matched' });
   });
 
   it('releases a historical number, detaches indexes without deleting them, and can restore it', () => {
@@ -134,5 +150,59 @@ describe('DrawingDeletionService', () => {
 
     expect(service.resolveScan(-historicalId, 'reimport')).toEqual({ resolution: 'reimport',
       drawing: expect.objectContaining({ fullCode: historicalCode, deletedAt: null }) });
+  });
+
+  it('allows a voided planned drawing to be explicitly released and recommended again', () => {
+    db.prepare("update drawing_numbers set status = 'voided' where id = ?").run(plannedId);
+    expect(service.delete({ signedId: plannedId, mode: 'release', confirmedCode: plannedCode }))
+      .toEqual({ outcome: 'deleted_released', fullCode: plannedCode, occupied: false });
+    const refs = db.prepare(`select product_id as productId, color_id as colorId, main_category_id as mainId,
+      project_item_id as projectId from drawing_numbers where id = ?`).get(plannedId) as Record<string, number>;
+    expect(new PlanningService(db).preview({ productId: refs.productId, rows: [{ clientId: 'reuse',
+      colorId: refs.colorId, mainCategoryId: refs.mainId, projectItemId: refs.projectId }] }).rows[0])
+      .toEqual(expect.objectContaining({ fullCode: plannedCode, sequence: 1 }));
+  });
+
+  it('preserves historical BOM and outbound snapshots while deleting the live drawing record', () => {
+    const refs = db.prepare(`select product_id as productId, project_item_id as projectId
+      from drawing_numbers where id = ?`).get(plannedId) as Record<string, number>;
+    const versionId = Number(db.prepare(`insert into bom_versions
+      (product_id, version_number, business_change_date, created_at) values (?, 1, '2026-09-21', '2026-09-22')`)
+      .run(refs.productId).lastInsertRowid);
+    db.prepare(`insert into bom_items
+      (bom_version_id, project_item_id, historical_drawing_id, quantity, uses_white_material)
+      values (?, ?, ?, 1, 0)`).run(versionId, refs.projectId, historicalId);
+    const packageId = Number(db.prepare(`insert into outbound_packages
+      (product_id, material_type, package_mode, package_name, zip_relative_path, status, created_at)
+      values (?, 'update', 'change_only', '历史外发', 'exports\\history.zip', 'completed', '2026-09-22')`)
+      .run(refs.productId).lastInsertRowid);
+    db.prepare(`insert into outbound_package_items
+      (package_id, project_item_id, historical_drawing_id, project_item_name_snapshot, drawing_code_snapshot,
+       file_name_snapshot, relative_path_snapshot, source_batch_name_snapshot)
+      values (?, ?, ?, 'LOGO', ?, 'history.pdf', 'history\\history.pdf', '00.首批大货')`)
+      .run(packageId, refs.projectId, historicalId, historicalCode);
+
+    expect(service.preview(-historicalId)).toEqual(expect.objectContaining({ deletable: true, references: expect.objectContaining({
+      currentBom: 0, historicalBom: 1, outboundSnapshot: 1,
+    }) }));
+    service.delete({ signedId: -historicalId, mode: 'release', confirmedCode: historicalCode });
+
+    expect(new BomRepository(db).getVersion(versionId)?.items[0]).toEqual(expect.objectContaining({ fullCode: historicalCode }));
+    expect(db.prepare(`select drawing_code_snapshot as code from outbound_package_items where package_id = ?`).get(packageId))
+      .toEqual({ code: historicalCode });
+  });
+
+  it('rechecks references inside the delete transaction after a clean preview', () => {
+    expect(service.preview(plannedId).deletable).toBe(true);
+    db.prepare(`insert into drawing_numbers
+      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       sequence, status, previous_drawing_id, created_at)
+      select '02.0209.010.0401003', 'successor', product_id, appearance_id, color_id, main_category_id, project_item_id,
+       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+       3, 'active', id, created_at from drawing_numbers where id = ?`).run(plannedId);
+
+    expect(() => service.delete({ signedId: plannedId, mode: 'release', confirmedCode: plannedCode }))
+      .toThrowError(expect.objectContaining({ code: 'DRAWING_DELETE_BLOCKED' }));
   });
 });

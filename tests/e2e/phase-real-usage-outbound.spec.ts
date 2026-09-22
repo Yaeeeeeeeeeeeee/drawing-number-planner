@@ -85,11 +85,9 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   const unprotected = await reserve(request, productId, whiteId, mainId, historyId);
   const deletionPreview = await request.get(`/api/drawings/${unprotected.id}/deletion-preview`);
   expect(await deletionPreview.json()).toMatchObject({ deletable: true });
-  expect((await request.delete(`/api/drawings/${unprotected.id}`, { headers, data: { confirmed: true } })).ok()).toBeTruthy();
+  expect((await request.post(`/api/drawings/${unprotected.id}/delete`, { headers,
+    data: { mode: 'release', confirmedCode: unprotected.fullCode } })).ok()).toBeTruthy();
   expect((await request.post(`/api/drawings/${manualDrawings[0].id}/activate`, { headers, data: { confirmed: true } })).ok()).toBeTruthy();
-  const protectedDelete = await request.delete(`/api/drawings/${manualDrawings[0].id}`, { headers, data: { confirmed: true } });
-  expect(protectedDelete.status()).toBe(422);
-  expect(await protectedDelete.json()).toMatchObject({ error: { code: 'DRAWING_NOT_DELETABLE' } });
   const protectedProductDelete = await request.delete(`/api/products/${productId}`, { headers });
   expect(protectedProductDelete.status()).toBe(409);
   expect(await protectedProductDelete.json()).toMatchObject({ error: { code: 'PRODUCT_REFERENCED' } });

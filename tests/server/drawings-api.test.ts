@@ -136,7 +136,7 @@ describe('drawing library API', () => {
     await app.close();
   });
 
-  it('toggles historical business status without exposing removal of its permanent occupancy', async () => {
+  it('toggles historical business status and directs legacy deletion to the unified workflow', async () => {
     const historicalId = seedHistoricalDrawing(db);
     const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
 
@@ -149,8 +149,9 @@ describe('drawing library API', () => {
     expect((await app.inject({ method: 'POST', url: `/api/historical-drawings/${historicalId}/activate`,
       payload: { confirmed: true } })).json()).toEqual(expect.objectContaining({ status: 'active' }));
     const deletion = await app.inject({ method: 'DELETE', url: `/api/historical-drawings/${historicalId}` });
-    expect(deletion.statusCode).toBe(409);
-    expect(deletion.json()).toEqual({ error: { code: 'HISTORICAL_READ_ONLY', message: '永久占号，不支持普通删除' } });
+    expect(deletion.statusCode).toBe(405);
+    expect(deletion.json()).toEqual({ error: { code: 'USE_DRAWING_DELETE_WORKFLOW',
+      message: '请使用统一图号删除流程，并明确选择保留占号或释放图号' } });
     await app.close();
   });
 
@@ -203,37 +204,18 @@ describe('drawing library API', () => {
     await app.close();
   });
 
-  it('deletes only an explicitly confirmed, unused reservation and rejects permanent drawing numbers', async () => {
+  it('rejects legacy delete endpoints so they cannot bypass deletion mode and audit checks', async () => {
     const reserved = seedPlannedDrawing(db);
     const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
 
-    expect((await app.inject({ method: 'DELETE', url: `/api/drawings/${reserved.id}`, payload: { confirmed: false } })).statusCode).toBe(400);
-    const deleted = await app.inject({ method: 'DELETE', url: `/api/drawings/${reserved.id}`, payload: { confirmed: true } });
-    expect(deleted.statusCode).toBe(200);
-    expect(deleted.json()).toEqual({ deleted: true });
-    expect((await app.inject({ method: 'GET', url: `/api/drawings/${reserved.id}` })).statusCode).toBe(404);
-
-    const activeId = Number(db.prepare(`insert into drawing_numbers
-      (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,
-       brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
-       sequence, status, created_at)
-      select '02.0209.010.0401002', 'Active drawing', product.id, appearance.id, color.id, mainCategory.id, project.id,
-        '02', '0209', '01', '0', '04', '01', 2, 'active', '2026-08-26T00:00:00.000Z'
-      from products product
-      join dictionary_items appearance on appearance.type = 'appearance' and appearance.code = '01'
-      join dictionary_items color on color.type = 'color' and color.code = '0'
-      join dictionary_items mainCategory on mainCategory.type = 'main_category' and mainCategory.code = '04'
-      join dictionary_items project on project.type = 'project_item' and project.code = '01' and project.parent_id = mainCategory.id
-      limit 1`).run().lastInsertRowid);
-    const active = { id: activeId };
-    expect((await app.inject({ method: 'DELETE', url: `/api/drawings/${active.id}`, payload: { confirmed: true } })).json())
-      .toEqual(expect.objectContaining({ error: expect.objectContaining({
-        code: 'DRAWING_NOT_DELETABLE', message: '仅允许删除从未使用的已占号图号',
-      }) }));
     const historicalId = seedHistoricalDrawing(db);
-    const historical = await app.inject({ method: 'DELETE', url: `/api/historical-drawings/${historicalId}`, payload: { confirmed: true } });
-    expect(historical.statusCode).toBe(409);
-    expect(historical.json()).toEqual({ error: { code: 'HISTORICAL_READ_ONLY', message: '永久占号，不支持普通删除' } });
+    for (const url of [`/api/drawings/${reserved.id}`, `/api/historical-drawings/${historicalId}`]) {
+      const response = await app.inject({ method: 'DELETE', url, payload: { confirmed: true } });
+      expect(response.statusCode).toBe(405);
+      expect(response.json()).toEqual({ error: { code: 'USE_DRAWING_DELETE_WORKFLOW',
+        message: '请使用统一图号删除流程，并明确选择保留占号或释放图号' } });
+    }
+    expect((await app.inject({ method: 'GET', url: `/api/drawings/${reserved.id}` })).statusCode).toBe(200);
     await app.close();
   });
 });

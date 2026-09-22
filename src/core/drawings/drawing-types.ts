@@ -75,20 +75,6 @@ export interface DrawingBomUsage {
   usesWhiteMaterial: boolean;
 }
 
-export interface DrawingReferenceSummary {
-  pdfCount: number;
-  bomCount: number;
-  previousDrawingCount: number;
-  successorCount: number;
-  sourceDrawingCount: number;
-  sourceReferenceCount: number;
-}
-
-export interface DrawingDeletionPreview {
-  deletable: boolean;
-  referenceSummary: DrawingReferenceSummary;
-}
-
 export interface DrawingDetailRecord extends DrawingRecord {
   sourceFiles: DrawingFileRecord[];
   outlinedFiles: DrawingFileRecord[];

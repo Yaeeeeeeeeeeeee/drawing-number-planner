@@ -236,66 +236,6 @@ describe('DrawingQueryService', () => {
     expect(new OccupiedNumberRepository(db).hasFullCode(before.fullCode)).toBe(true);
   });
 
-  it('deletes a never-used reservation and returns its sequence to the next planning recommendation', () => {
-    const fullCode = '02.0209.010.0401002';
-    db.prepare(`update drawing_numbers set full_code = ?, color_id = ?, project_item_id = ?, color_code = '0',
-      project_item_code = '01', sequence = 2 where id = ?`).run(fullCode, ids.white, ids.logo, ids.second);
-    const productId = (db.prepare('select product_id as productId from drawing_numbers where id = ?').get(ids.first) as { productId: number }).productId;
-
-    expect(drawings.deleteReservedDrawing(ids.second, true)).toEqual({ deleted: true });
-    expect(new OccupiedNumberRepository(db).hasFullCode(fullCode)).toBe(false);
-    expect(new PlanningService(db).preview({ productId, rows: [{
-      clientId: 'replacement', colorId: ids.white, mainCategoryId: ids.main, projectItemId: ids.logo,
-    }] }).rows).toEqual([expect.objectContaining({ fullCode, sequence: 2 })]);
-  });
-
-  it('rejects deletion when a reservation has file, BOM, or drawing-graph references', () => {
-    const now = '2026-09-10T00:00:00.000Z';
-    db.prepare(`insert into pdf_files
-      (relative_path, file_name, drawing_id, match_status, detected_codes_json, conversion_type,
-       size_bytes, modified_at, scanned_at, is_present)
-      values ('protected.pdf', 'protected.pdf', ?, 'matched', '[]', 'source', 1, ?, ?, 0)`)
-      .run(ids.second, now, now);
-    const versionId = Number(db.prepare(`insert into bom_versions
-      (product_id, version_number, previous_version_id, business_change_date, notes, created_at)
-      select product_id, 1, null, '2026-09-10', 'protect reservation', ? from drawing_numbers where id = ?`)
-      .run(now, ids.second).lastInsertRowid);
-    db.prepare(`insert into bom_items
-      (bom_version_id, project_item_id, drawing_id, quantity, notes, uses_white_material)
-      values (?, ?, ?, 1, 'protect reservation', 0)`).run(versionId, ids.manual, ids.second);
-    db.prepare('update drawing_numbers set previous_drawing_id = ?, source_drawing_id = ? where id = ?')
-      .run(ids.second, ids.second, ids.first);
-    db.prepare('update drawing_numbers set previous_drawing_id = ?, source_drawing_id = ? where id = ?')
-      .run(ids.first, ids.first, ids.second);
-
-    expect(() => drawings.deleteReservedDrawing(ids.second, true)).toThrowError(expect.objectContaining({
-      code: 'DRAWING_REFERENCED',
-      referenceSummary: {
-        pdfCount: 1, bomCount: 1, previousDrawingCount: 1, successorCount: 1,
-        sourceDrawingCount: 1, sourceReferenceCount: 1,
-      },
-    }));
-    expect(drawings.get(ids.second)).toEqual(expect.objectContaining({ status: 'reserved' }));
-  });
-
-  it('never deletes active, voided, or historical drawing numbers', () => {
-    expect(() => drawings.deleteReservedDrawing(ids.first, true))
-      .toThrowError(expect.objectContaining({ code: 'DRAWING_NOT_DELETABLE' }));
-    db.prepare("update drawing_numbers set status = 'voided' where id = ?").run(ids.second);
-    expect(() => drawings.deleteReservedDrawing(ids.second, true))
-      .toThrowError(expect.objectContaining({ code: 'DRAWING_NOT_DELETABLE' }));
-    const historicalId = Number(db.prepare(`insert into historical_drawing_numbers
-      (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
-       project_item_code, sequence, first_seen_at, last_seen_at)
-      values ('02.0209.010.0401007', '02', '0209', '01', '0', '04', '01', 7, ?, ?)`)
-      .run('2026-09-10T00:00:00.000Z', '2026-09-10T00:00:00.000Z').lastInsertRowid);
-
-    expect(() => drawings.deleteReservedDrawing(-historicalId, true)).toThrowError(expect.objectContaining({
-      code: 'HISTORICAL_READ_ONLY', message: '永久占号，不支持普通删除',
-    }));
-    expect(new OccupiedNumberRepository(db).hasFullCode('02.0209.010.0401007')).toBe(true);
-  });
-
   it('associates a present indexed PDF transactionally and rejects historical association changes', () => {
     const now = '2026-08-26T03:00:00.000Z';
     const historyId = Number(db.prepare(`insert into historical_drawing_numbers
