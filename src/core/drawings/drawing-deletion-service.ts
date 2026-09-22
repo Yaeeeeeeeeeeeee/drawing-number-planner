@@ -92,6 +92,22 @@ export class DrawingDeletionService {
     return new DrawingQueryService(this.db).get(signedId);
   }
 
+  resolveScan(signedId: number, resolution: 'reimport' | 'ignore') {
+    if (resolution === 'reimport') return { resolution, drawing: this.restore(signedId) } as const;
+    const row = this.getRow(signedId);
+    if (!row) throw new DrawingDeletionError('DRAWING_NOT_FOUND', '图号记录不存在');
+    if (!row.deletedAt) throw new DrawingDeletionError('DRAWING_NOT_DELETED', '图号记录未处于已删除状态');
+    const table = row.origin === 'planned' ? 'drawing_numbers' : 'historical_drawing_numbers';
+    this.db.transaction(() => {
+      this.db.prepare(`update ${table} set scan_resolution = 'ignore' where id = ?`).run(row.id);
+      this.db.prepare(`update pdf_files set classification_warning = 'drawing-released-ignored'
+        where drawing_id is null and historical_drawing_id is null and exists (
+          select 1 from json_each(pdf_files.detected_codes_json) where json_each.value = ?
+        )`).run(row.fullCode);
+    }).immediate();
+    return { resolution, fullCode: row.fullCode } as const;
+  }
+
   private getRow(signedId: number): DeletionRow | undefined {
     const origin: DrawingOrigin = signedId < 0 ? 'historical' : 'planned';
     const id = Math.abs(signedId);

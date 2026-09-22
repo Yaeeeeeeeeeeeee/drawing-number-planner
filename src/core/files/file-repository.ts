@@ -61,7 +61,8 @@ export class FileRepository {
   }
 
   listDrawingCodes(): DrawingCodeReference[] {
-    return this.db.prepare('select id, full_code as fullCode from drawing_numbers order by id').all() as DrawingCodeReference[];
+    return this.db.prepare('select id, full_code as fullCode from drawing_numbers where deleted_at is null order by id')
+      .all() as DrawingCodeReference[];
   }
 
   listQrClassifierProducts(): Array<{ id: number; sku: string | null; model: string; productCategory: string }> {
@@ -153,6 +154,28 @@ export class FileRepository {
         }
       }
       let historicalRegistered = 0;
+      const deletedRows = this.db.prepare(`select deleted_full_code as fullCode, deletion_mode as deletionMode,
+          scan_resolution as scanResolution from drawing_numbers where deleted_at is not null
+        union all
+        select deleted_full_code as fullCode, deletion_mode as deletionMode, scan_resolution as scanResolution
+          from historical_drawing_numbers where deleted_at is not null`).all() as Array<{
+            fullCode: string; deletionMode: 'retain_occupied' | 'release'; scanResolution: 'pending' | 'ignore' | null;
+          }>;
+      const activeCodes = new Set((this.db.prepare(`select full_code as fullCode from drawing_numbers where deleted_at is null
+        union select full_code as fullCode from historical_drawing_numbers where deleted_at is null`).all() as Array<{ fullCode: string }>)
+        .map((row) => row.fullCode));
+      const suppressedCodes = new Map(deletedRows.filter((row) => !activeCodes.has(row.fullCode))
+        .map((row) => [row.fullCode, row]));
+      for (const record of records) {
+        const suppressed = record.detectedCodes.map((code) => suppressedCodes.get(code)).find(Boolean);
+        if (!suppressed) continue;
+        record.drawingId = null;
+        record.historicalFullCode = null;
+        record.matchStatus = 'pending';
+        record.classificationWarning = suppressed.deletionMode === 'retain_occupied'
+          ? 'drawing-deleted-retained'
+          : suppressed.scanResolution === 'ignore' ? 'drawing-released-ignored' : 'drawing-released-pending';
+      }
       const upsertHistorical = this.db.prepare(`insert into historical_drawing_numbers
         (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
          project_item_code, sequence, product_id, detected_sku, detected_model, detected_product_category,
@@ -167,6 +190,7 @@ export class FileRepository {
           detected_product_category = coalesce(excluded.detected_product_category, historical_drawing_numbers.detected_product_category),
           last_seen_at = excluded.last_seen_at`);
       for (const code of new Map(historicalCodes.map((item) => [item.fullCode, item])).values()) {
+        if (suppressedCodes.has(code.fullCode)) continue;
         const context = code.directoryContext;
         const productRows = context ? this.db.prepare(`select id from products
           where sku = ? collate nocase and model = ?`).all(context.sku, context.model) as Array<{ id: number }> : [];
@@ -184,7 +208,7 @@ export class FileRepository {
           match_status, detected_codes_json, conversion_type, classification_warning,
           size_bytes, modified_at, scanned_at, is_present, content_sha256, last_seen_scan_run_id)
         values (@relativePath, @pathKey, @materialBatchId, @fileName, @drawingId,
-          (select id from historical_drawing_numbers where full_code = @historicalFullCode),
+          (select id from historical_drawing_numbers where full_code = @historicalFullCode and deleted_at is null),
           @matchStatus, @detectedCodesJson, @conversionType, @classificationWarning,
           @sizeBytes, @modifiedAt, @scannedAt, 1, @contentSha256, @scanRunId)
         on conflict(path_key) do update set

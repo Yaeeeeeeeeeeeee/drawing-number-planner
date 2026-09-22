@@ -125,4 +125,14 @@ describe('DrawingDeletionService', () => {
     expect(() => service.restore(-historicalId))
       .toThrowError(expect.objectContaining({ code: 'DRAWING_RESTORE_CONFLICT' } satisfies Partial<DrawingDeletionError>));
   });
+
+  it('supports explicit reimport and ignore decisions for deleted scan matches', () => {
+    service.delete({ signedId: -historicalId, mode: 'release', confirmedCode: historicalCode });
+    expect(service.resolveScan(-historicalId, 'ignore')).toEqual({ resolution: 'ignore', fullCode: historicalCode });
+    expect(db.prepare('select scan_resolution from historical_drawing_numbers where id = ?').get(historicalId))
+      .toEqual({ scan_resolution: 'ignore' });
+
+    expect(service.resolveScan(-historicalId, 'reimport')).toEqual({ resolution: 'reimport',
+      drawing: expect.objectContaining({ fullCode: historicalCode, deletedAt: null }) });
+  });
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { DrawingQueryService } from '../../src/core/drawings/drawing-query-service';
+import { DrawingDeletionService } from '../../src/core/drawings/drawing-deletion-service';
 import { FileRepository } from '../../src/core/files/file-repository';
 import { FileError } from '../../src/core/files/file-errors';
 import type { FileScanRecord } from '../../src/core/files/file-types';
@@ -186,6 +187,32 @@ describe('FileRepository', () => {
       .toEqual({ total_current: 3, added_count: 3, missing_count: 0, moved_count: 0, changed_count: 0, unchanged_count: 0 });
     expect(db.prepare("select index_kind, change_type, file_index_id from file_scan_changes order by id").all()).toHaveLength(3);
     expect(db.prepare('select count(*) as count from pdf_files where last_seen_scan_run_id is not null').get()).toEqual({ count: 3 });
+  });
+
+  it('does not silently recreate a manually deleted historical drawing during rescans', () => {
+    const historical = parseDrawingCode('02.0404.010.0501002')!;
+    const file = { ...records(0)[1], relativePath: '03.冰柜\\SKU-ZC100\\history.pdf', fileName: 'history.pdf',
+      matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
+      detectedCodes: [historical.fullCode], classificationWarning: null };
+    const history = [{ ...historical, directoryContext: null }];
+    repository.replaceScan([file], history, '2026-08-25T04:00:00.000Z');
+    const historicalId = (db.prepare('select id from historical_drawing_numbers where full_code = ?')
+      .get(historical.fullCode) as { id: number }).id;
+    new DrawingDeletionService(db).delete({ signedId: -historicalId, mode: 'release', confirmedCode: historical.fullCode });
+
+    repository.replaceScan([file], history, '2026-08-26T04:00:00.000Z');
+
+    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
+    expect(db.prepare(`select deleted_at is not null as deleted, deletion_mode, scan_resolution
+      from historical_drawing_numbers where id = ?`).get(historicalId))
+      .toEqual({ deleted: 1, deletion_mode: 'release', scan_resolution: 'pending' });
+    expect(repository.search().items).toEqual([expect.objectContaining({ historicalDrawingId: null,
+      matchStatus: 'pending', classificationWarning: 'drawing-released-pending' })]);
+
+    new DrawingDeletionService(db).resolveScan(-historicalId, 'ignore');
+    repository.replaceScan([file], history, '2026-08-27T04:00:00.000Z');
+    expect(repository.search().items).toEqual([expect.objectContaining({ historicalDrawingId: null,
+      matchStatus: 'pending', classificationWarning: 'drawing-released-ignored' })]);
   });
 
   it('exposes QR additions and missing files in scan history with their index kind', () => {
