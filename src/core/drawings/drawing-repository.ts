@@ -12,6 +12,8 @@ interface DrawingRow {
   source_product_id: number | null; source_product_model: string | null; source_drawing_id: number | null;
   source_drawing_full_code: string | null; notes: string | null; created_at: string;
   has_source_file: number; has_outlined_file: number; dictionary_mapping_status: DrawingRecord['dictionaryMappingStatus'];
+  deleted_at: string | null; deletion_mode: 'retain_occupied' | 'release' | null;
+  deleted_previous_status: string | null; deleted_reason: string | null;
 }
 
 interface DrawingBomUsageRow extends Omit<DrawingBomUsage, 'usesWhiteMaterial'> {
@@ -19,7 +21,7 @@ interface DrawingBomUsageRow extends Omit<DrawingBomUsage, 'usesWhiteMaterial'> 
 }
 
 const unifiedCte = `with drawing_records as (
-  select drawing.id, 'planned' as origin, product.sku, drawing.full_code, drawing.display_name,
+  select drawing.id, 'planned' as origin, product.sku, coalesce(drawing.deleted_full_code, drawing.full_code) as full_code, drawing.display_name,
     drawing.product_id, product.model, product.product_category, product.brand_id, brand.name as brand_name,
     drawing.appearance_id, appearance.name as appearance_name, drawing.color_id, color.name as color_name,
     drawing.main_category_id, main_category.name as main_category_name,
@@ -29,7 +31,8 @@ const unifiedCte = `with drawing_records as (
     drawing.previous_drawing_id, previous.full_code as previous_full_code, drawing.change_reason,
     drawing.source_product_id, source_product.model as source_product_model,
     drawing.source_drawing_id, source_drawing.full_code as source_drawing_full_code,
-    drawing.notes, drawing.created_at,
+    drawing.notes, drawing.created_at, drawing.deleted_at, drawing.deletion_mode,
+    drawing.deleted_previous_status, drawing.deleted_reason,
     exists(select 1 from pdf_files file left join historical_drawing_numbers file_history
       on file_history.id = file.historical_drawing_id
       where file.is_present = 1 and file.conversion_type = 'source'
@@ -53,7 +56,8 @@ const unifiedCte = `with drawing_records as (
   union all
 
   select -historical.id as id, 'historical' as origin, coalesce(product.sku, historical.detected_sku) as sku,
-    historical.full_code, historical.full_code as display_name, historical.product_id,
+    coalesce(historical.deleted_full_code, historical.full_code) as full_code,
+    coalesce(historical.deleted_full_code, historical.full_code) as display_name, historical.product_id,
     coalesce(product.model, historical.detected_model, '待识别') as model,
     coalesce(product.product_category, historical.detected_product_category, '待识别') as product_category,
     coalesce(product.brand_id, brand.id) as brand_id, coalesce(brand.name, historical.brand_code) as brand_name,
@@ -66,6 +70,7 @@ const unifiedCte = `with drawing_records as (
     null as previous_drawing_id, null as previous_full_code, null as change_reason,
     null as source_product_id, null as source_product_model, null as source_drawing_id,
     null as source_drawing_full_code, null as notes, historical.first_seen_at as created_at,
+    historical.deleted_at, historical.deletion_mode, historical.deleted_previous_status, historical.deleted_reason,
     exists(select 1 from pdf_files file where file.historical_drawing_id = historical.id
       and file.is_present = 1 and file.conversion_type = 'source') as has_source_file,
     exists(select 1 from pdf_files file where file.historical_drawing_id = historical.id
@@ -82,7 +87,8 @@ const unifiedCte = `with drawing_records as (
   left join dictionary_items main_category on main_category.type = 'main_category' and main_category.code = historical.main_category_code
   left join dictionary_items project_item on project_item.type = 'project_item'
     and project_item.code = historical.project_item_code and project_item.parent_id = main_category.id
-  where not exists(select 1 from drawing_numbers drawing where drawing.full_code = historical.full_code)
+  where historical.deleted_at is not null or not exists(select 1 from drawing_numbers drawing
+    where drawing.deleted_at is null and drawing.full_code = historical.full_code)
 )`;
 
 const mapRow = (row: DrawingRow): DrawingRecord => ({
@@ -100,10 +106,16 @@ const mapRow = (row: DrawingRow): DrawingRecord => ({
   sourceDrawingId: row.source_drawing_id, sourceDrawingFullCode: row.source_drawing_full_code,
   notes: row.notes, createdAt: row.created_at, hasSourceFile: row.has_source_file === 1,
   hasOutlinedFile: row.has_outlined_file === 1, dictionaryMappingStatus: row.dictionary_mapping_status,
+  deletedAt: row.deleted_at, deletionMode: row.deletion_mode, deletedPreviousStatus: row.deleted_previous_status,
+  deletedReason: row.deleted_reason, occupied: row.deleted_at === null || row.deletion_mode === 'retain_occupied',
 });
 
 function buildConditions(filters: DrawingSearchFilters): { sql: string; values: Array<string | number> } {
   const conditions: string[] = []; const values: Array<string | number> = [];
+  const deletionState = filters.deletionState ?? 'normal';
+  if (deletionState === 'normal') conditions.push('record.deleted_at is null');
+  else if (deletionState === 'deleted-retained') conditions.push("record.deleted_at is not null and record.deletion_mode = 'retain_occupied'");
+  else if (deletionState === 'deleted-released') conditions.push("record.deleted_at is not null and record.deletion_mode = 'release'");
   if (filters.drawingNumber?.trim()) {
     conditions.push(filters.exactDrawingNumber ? 'record.full_code = ?' : 'record.full_code like ?');
     values.push(filters.exactDrawingNumber ? filters.drawingNumber.trim() : `%${filters.drawingNumber.trim()}%`);
@@ -197,11 +209,11 @@ export class DrawingRepository {
   }
 
   updateStatus(id: number, status: 'active' | 'voided'): void {
-    this.db.prepare('update drawing_numbers set status = ? where id = ?').run(status, id);
+    this.db.prepare('update drawing_numbers set status = ? where id = ? and deleted_at is null').run(status, id);
   }
 
   updateHistoricalStatus(id: number, status: HistoricalDrawingStatus): void {
-    this.db.prepare('update historical_drawing_numbers set status = ? where id = ?').run(status, id);
+    this.db.prepare('update historical_drawing_numbers set status = ? where id = ? and deleted_at is null').run(status, id);
   }
 
   getDeletionPreview(id: number): DrawingDeletionPreview | undefined {

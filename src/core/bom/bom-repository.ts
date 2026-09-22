@@ -94,8 +94,8 @@ export class BomRepository {
     if (!row) return undefined;
     const items = this.db.prepare(`select item.id as bom_item_id, item.drawing_id, item.historical_drawing_id,
       case when item.drawing_id is not null then 'planned' else 'historical' end as origin,
-      coalesce(drawing.full_code, historical.full_code) as full_code,
-      coalesce(drawing.display_name, historical.full_code) as display_name,
+      coalesce(drawing.deleted_full_code, drawing.full_code, historical.deleted_full_code, historical.full_code) as full_code,
+      coalesce(drawing.display_name, historical.deleted_full_code, historical.full_code) as display_name,
       drawing.color_id, coalesce(drawing_color.name, historical_color.name, historical.color_code) as color_name,
       item.project_item_id, project_item.name as project_item_name,
       coalesce(drawing.status, historical.status) as status, item.quantity, item.effective_batch_relative_path,
@@ -126,7 +126,7 @@ export class BomRepository {
     if (filters.projectItemId !== undefined || filters.fullCode?.trim() || filters.effectiveBatchRelativePath?.trim()) {
       const itemConditions: string[] = [];
       if (filters.projectItemId !== undefined) { itemConditions.push('item.project_item_id = ?'); values.push(filters.projectItemId); }
-      if (filters.fullCode?.trim()) { itemConditions.push('coalesce(drawing.full_code, historical.full_code) like ?'); values.push(`%${filters.fullCode.trim()}%`); }
+      if (filters.fullCode?.trim()) { itemConditions.push('coalesce(drawing.deleted_full_code, drawing.full_code, historical.deleted_full_code, historical.full_code) like ?'); values.push(`%${filters.fullCode.trim()}%`); }
       if (filters.effectiveBatchRelativePath?.trim()) {
         itemConditions.push('item.effective_batch_relative_path like ?'); values.push(`%${filters.effectiveBatchRelativePath.trim()}%`);
       }
@@ -145,13 +145,14 @@ export class BomRepository {
       drawing.product_id as productId, drawing.color_id as colorId, color.code as colorCode, color.name as colorName,
       drawing.project_item_id as projectItemId, project_item.name as projectItemName, drawing.status
       from drawing_numbers drawing join dictionary_items color on color.id = drawing.color_id
-      join dictionary_items project_item on project_item.id = drawing.project_item_id where drawing.id = ?`).get(id) as BomDrawing | undefined;
+      join dictionary_items project_item on project_item.id = drawing.project_item_id
+      where drawing.id = ? and drawing.deleted_at is null`).get(id) as BomDrawing | undefined;
   }
 
   getHistoricalDrawing(id: number): BomHistoricalDrawing | undefined {
     return this.db.prepare(`select id, full_code as fullCode, product_id as productId, color_code as colorCode,
       main_category_code as mainCategoryCode, project_item_code as projectItemCode, status
-      from historical_drawing_numbers where id = ?`).get(id) as BomHistoricalDrawing | undefined;
+      from historical_drawing_numbers where id = ? and deleted_at is null`).get(id) as BomHistoricalDrawing | undefined;
   }
 
   getProjectCodes(id: number): { projectItemCode: string; mainCategoryCode: string } | undefined {
@@ -173,7 +174,8 @@ export class BomRepository {
       from drawing_numbers drawing join dictionary_items color on color.id = drawing.color_id
       join dictionary_items project_item on project_item.id = drawing.project_item_id
       where drawing.product_id = ? and drawing.project_item_id = ? ${whiteClause}
-        and drawing.status in ('reserved', 'active') order by drawing.sequence desc, drawing.id desc`).all(...values) as BomCandidate[];
+        and drawing.deleted_at is null and drawing.status in ('reserved', 'active')
+      order by drawing.sequence desc, drawing.id desc`).all(...values) as BomCandidate[];
     if ((input.entryMode ?? 'current') !== 'historical') return planned;
     const project = this.getProjectCodes(input.projectItemId);
     if (!project) return planned;
@@ -189,7 +191,7 @@ export class BomRepository {
       left join dictionary_items color on color.type = 'color' and color.code = historical.color_code
       join dictionary_items project_item on project_item.id = ?
       where historical.product_id = ? and historical.main_category_code = ? and historical.project_item_code = ?
-        ${historicalWhiteClause} and historical.status in ('active', 'inactive')
+        ${historicalWhiteClause} and historical.deleted_at is null and historical.status in ('active', 'inactive')
       order by historical.sequence desc, historical.id desc`)
       .all(input.projectItemId, input.projectItemId, ...historicalValues) as BomCandidate[];
     return [...planned, ...historical];

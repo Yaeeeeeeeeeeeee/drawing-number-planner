@@ -5,6 +5,7 @@ export type HistoricalDrawingStatus = 'active' | 'inactive';
 export type DrawingStatus = PlannedDrawingStatus | HistoricalDrawingStatus | 'historical';
 export type DrawingOrigin = 'planned' | 'historical';
 export type FilePresenceFilter = 'present' | 'missing' | 'all';
+export type DrawingDeletionState = 'normal' | 'deleted-retained' | 'deleted-released' | 'all';
 
 export interface DrawingRecord {
   id: number;
@@ -45,6 +46,11 @@ export interface DrawingRecord {
   hasSourceFile: boolean;
   hasOutlinedFile: boolean;
   dictionaryMappingStatus: 'mapped' | 'unmapped';
+  deletedAt: string | null;
+  deletionMode: 'retain_occupied' | 'release' | null;
+  deletedPreviousStatus: string | null;
+  deletedReason: string | null;
+  occupied: boolean;
   batchUsage?: DrawingBatchUsage;
 }
 
@@ -108,6 +114,7 @@ export interface DrawingSearchFilters {
   sourcePresence?: FilePresenceFilter;
   outlinedPresence?: FilePresenceFilter;
   keyword?: string;
+  deletionState?: DrawingDeletionState;
   page?: number;
   pageSize?: number;
 }
