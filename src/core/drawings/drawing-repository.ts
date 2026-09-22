@@ -197,7 +197,8 @@ export class DrawingRepository {
       join drawing_numbers usage_drawing on usage_drawing.id = item.drawing_id
       join dictionary_items color on color.id = usage_drawing.color_id
       join dictionary_items project on project.id = item.project_item_id
-      where item.drawing_id = ? order by product.model, color.name, project.name`)
+      where item.drawing_id = ? and item.deleted_at is null and version.deleted_at is null
+      order by product.model, color.name, project.name`)
       .all(drawing.id) as DrawingBomUsageRow[]).map((row): DrawingBomUsage => ({
         ...row, usesWhiteMaterial: row.usesWhiteMaterial === 1,
       })) : [];

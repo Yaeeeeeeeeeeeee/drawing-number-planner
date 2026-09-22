@@ -48,6 +48,14 @@ function sendDrawingError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQueryService): void {
+  app.post('/api/drawings/batch-delete', async (request, reply) => {
+    const parsed = z.object({ confirmed: z.literal(true), items: z.array(deleteDrawingSchema.extend({
+      signedId: z.number().int().refine((id) => id !== 0),
+    })).min(1).max(100) }).strict().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '批量删除请求无效' } });
+    try { return service.deleteDrawings(parsed.data.items); }
+    catch (error) { return sendDrawingError(reply, error); }
+  });
   app.get('/api/drawings', async (request, reply) => {
     const query = querySchema.safeParse(request.query);
     if (!query.success) {

@@ -109,11 +109,12 @@ export type BomItemView = BomDrawingReferenceView & {
   projectItemId: number; projectItemName: string; status: 'reserved' | 'active' | 'inactive' | 'voided';
   effectiveMaterialBatchId: number | null; effectiveBatchRelativePath: string | null; effectiveBatchName: string | null;
   material: string | null; dimensions: string | null; position: string | null; notes: string | null; usesWhiteMaterial: boolean;
-  assets: BomItemAssetView[]; qrCodes: BomQrCodeView[];
+  changeDetails: string | null; assets: BomItemAssetView[]; qrCodes: BomQrCodeView[];
 };
 export interface BomVersionSummaryView {
   id: number; productId: number; model: string; versionNumber: number; previousVersionId: number | null;
   businessChangeDate: string | null; businessChangeDateLabel: string; notes: string | null; createdAt: string;
+  updatedAt: string; editRevision: number;
 }
 export interface BomVersionDeletionPreviewView {
   versionId: number; productId: number; model: string; versionNumber: number; isCurrent: boolean;
@@ -131,8 +132,8 @@ export interface BomDiffView {
 }
 export interface SaveBomView {
   productId: number; entryMode?: BomEntryModeView; businessChangeDate: string; expectedCurrentVersionId: number | null; notes?: string;
-  items: Array<{ projectItemId: number; drawingReference: BomDrawingReferenceView; usesWhiteMaterial: boolean; effectiveMaterialBatchId?: number;
-    material?: string; dimensions?: string; position?: string; notes?: string;
+  items: Array<{ projectItemId: number; drawingReference: BomDrawingReferenceView; usesWhiteMaterial: boolean; effectiveMaterialBatchId?: number | null;
+    material?: string; dimensions?: string; position?: string; notes?: string; changeDetails?: string;
     assets?: Array<{ role: 'image' | 'diagram'; assetId?: number; reusePrevious?: boolean }>; qrCodeIds?: number[] }>;
 }
 
@@ -242,6 +243,8 @@ export interface PlannerApi {
   activateDrawing(id: number): Promise<DrawingDetailView>;
   voidDrawing(id: number): Promise<DrawingDetailView>;
   getDrawingDeletionPreview(id: number): Promise<DrawingDeletionPreviewView>;
+  deleteDrawings(items: Array<{ signedId: number; mode: 'retain_occupied' | 'release'; confirmedCode: string }>):
+    Promise<{ items: Array<{ signedId: number; status: 'deleted' | 'skipped' | 'failed'; message?: string }> }>;
   deleteDrawing(id: number, input: { mode: 'retain_occupied' | 'release'; confirmedCode: string; reason?: string }):
     Promise<{ outcome: 'deleted_retained' | 'deleted_released'; fullCode: string; occupied: boolean }>;
   restoreDrawing(id: number): Promise<DrawingDetailView>;
@@ -325,6 +328,7 @@ export interface PlannerApi {
   uploadBomAsset(productId: number, file: File): Promise<BomAssetView>;
   relinkBomMaterialBatch(id: number): Promise<{ relinked: number }>;
   saveBomVersion(input: SaveBomView): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
+  updateBomVersion(id: number, input: SaveBomView, expectedRevision: number): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
   getWorkspaceSettings(): Promise<WorkspaceSettingsView>;
   updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
   scanPdfFiles(): Promise<PdfScanSummaryView>;
@@ -476,6 +480,7 @@ export const apiClient: PlannerApi = {
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
   getDrawingDeletionPreview: (id) => request(`/api/drawings/${id}/deletion-preview`),
   deleteDrawing: (id, input) => request(`/api/drawings/${id}/delete`, json('POST', input)),
+  deleteDrawings: (items) => request('/api/drawings/batch-delete', json('POST', { confirmed: true, items })),
   restoreDrawing: (id) => request(`/api/drawings/${id}/restore`, json('POST', { confirmed: true })),
   resolveDeletedDrawingScan: (id, resolution) => request(`/api/drawings/${id}/scan-resolution`, json('POST', { resolution })),
   activateHistoricalDrawing: (id) => request(`/api/historical-drawings/${Math.abs(id)}/activate`, json('POST', { confirmed: true })),
@@ -576,6 +581,7 @@ export const apiClient: PlannerApi = {
   },
   relinkBomMaterialBatch: (id) => request(`/api/boms/material-batches/${id}/relink`, { method: 'POST' }),
   saveBomVersion: (input) => request('/api/boms/versions', json('POST', input)),
+  updateBomVersion: (id, input, expectedRevision) => request(`/api/boms/versions/${id}`, json('PUT', { input, expectedRevision })),
   getWorkspaceSettings: () => request('/api/files/settings'),
   updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
   scanPdfFiles: () => runLocalTask('workspace_scan', {}),

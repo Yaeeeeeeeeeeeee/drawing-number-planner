@@ -1131,3 +1131,50 @@ export const schemaVersionThirteen = `
   CREATE INDEX drawing_deletion_events_code_idx
     ON drawing_deletion_events(full_code, deleted_at DESC);
 `;
+
+export const schemaVersionFourteen = `
+  ALTER TABLE bom_item_assets ADD COLUMN inheritance_snapshot_json TEXT CHECK (inheritance_snapshot_json IS NULL OR json_valid(inheritance_snapshot_json));
+  ALTER TABLE products ADD COLUMN deleted_at TEXT;
+  ALTER TABLE products ADD COLUMN deletion_reason TEXT;
+  ALTER TABLE product_qr_codes ADD COLUMN deleted_at TEXT;
+  ALTER TABLE bom_versions ADD COLUMN updated_at TEXT;
+  ALTER TABLE bom_versions ADD COLUMN edit_revision INTEGER NOT NULL DEFAULT 0 CHECK (edit_revision >= 0);
+  UPDATE bom_versions SET updated_at = created_at;
+  ALTER TABLE bom_items ADD COLUMN change_details TEXT;
+  ALTER TABLE bom_items ADD COLUMN deleted_at TEXT;
+
+  CREATE TABLE product_cleanup_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    identity_json TEXT NOT NULL CHECK (json_valid(identity_json)),
+    summary_json TEXT NOT NULL CHECK (json_valid(summary_json)),
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE bom_asset_archive_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_asset_id INTEGER NOT NULL REFERENCES bom_assets(id),
+    archived_asset_id INTEGER NOT NULL REFERENCES bom_assets(id),
+    bom_item_asset_id INTEGER NOT NULL REFERENCES bom_item_assets(id),
+    created_at TEXT NOT NULL,
+    UNIQUE(source_asset_id, bom_item_asset_id, archived_asset_id)
+  );
+  ALTER TABLE outbound_packages ADD COLUMN product_identity_json TEXT CHECK (product_identity_json IS NULL OR json_valid(product_identity_json));
+  UPDATE outbound_packages SET product_identity_json = (
+    SELECT json_object('sku', product.sku, 'model', product.model,
+      'brandName', brand.name, 'productCategory', product.product_category)
+    FROM products product JOIN dictionary_items brand ON brand.id = product.brand_id
+    WHERE product.id = outbound_packages.product_id
+  );
+  CREATE TABLE outbound_package_parts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL REFERENCES outbound_packages(id) ON DELETE CASCADE,
+    part_number INTEGER NOT NULL CHECK (part_number > 0),
+    zip_relative_path TEXT NOT NULL,
+    size_bytes INTEGER CHECK (size_bytes IS NULL OR size_bytes >= 0),
+    UNIQUE(package_id, part_number)
+  );
+  INSERT INTO outbound_package_parts(package_id, part_number, zip_relative_path)
+    SELECT id, 1, zip_relative_path FROM outbound_packages;
+  ALTER TABLE outbound_package_items ADD COLUMN part_number INTEGER NOT NULL DEFAULT 1 CHECK (part_number > 0);
+  ALTER TABLE outbound_package_items ADD COLUMN change_details_snapshot TEXT;
+`;

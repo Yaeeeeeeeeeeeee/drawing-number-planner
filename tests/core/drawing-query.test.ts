@@ -208,10 +208,11 @@ describe('DrawingQueryService', () => {
     }));
   });
 
-  it('allows only reserved-to-active and reserved-or-active-to-voided transitions', () => {
+  it('restores voided drawings without changing their code or occupancy', () => {
     expect(drawings.transition(ids.second, 'active').status).toBe('active');
     expect(() => drawings.transition(ids.second, 'voided')).not.toThrow();
-    expect(() => drawings.transition(ids.second, 'active')).toThrowError(expect.objectContaining({ code: 'INVALID_TRANSITION' }));
+    expect(drawings.transition(ids.second, 'active')).toMatchObject({ status: 'active', fullCode: '02.0209.011.0402002' });
+    expect(new OccupiedNumberRepository(db).hasFullCode('02.0209.011.0402002')).toBe(true);
 
     db.prepare("update drawing_numbers set status = 'reserved' where id = ?").run(ids.second);
     expect(drawings.transition(ids.second, 'voided').status).toBe('voided');
@@ -234,6 +235,11 @@ describe('DrawingQueryService', () => {
     expect(drawings.get(ids.second)).toEqual(expect.objectContaining({ fullCode: before.fullCode, status: 'voided' }));
     expect(db.prepare('select count(*) as count from pdf_files where drawing_id = ?').get(ids.second)).toEqual({ count: 1 });
     expect(new OccupiedNumberRepository(db).hasFullCode(before.fullCode)).toBe(true);
+  });
+
+  it('requires the deletion restoration workflow before changing deleted drawing status', () => {
+    drawings.deleteDrawing({ signedId: ids.second, mode: 'retain_occupied', confirmedCode: '02.0209.011.0402002' });
+    expect(() => drawings.transition(ids.second, 'active')).toThrowError(expect.objectContaining({ code: 'INVALID_TRANSITION' }));
   });
 
   it('associates a present indexed PDF transactionally and rejects historical association changes', () => {

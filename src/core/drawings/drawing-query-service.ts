@@ -42,9 +42,11 @@ export class DrawingQueryService {
 
   transition(id: number, target: 'active' | 'voided'): DrawingDetailRecord {
     const drawing = this.get(id);
+    if (drawing.deletedAt) throw new DrawingQueryError('INVALID_TRANSITION', '请先恢复已删除的图号记录');
     if (drawing.readOnly) throw new DrawingQueryError('HISTORICAL_READ_ONLY', '历史图号的编码和文件关联不可修改；停用不释放号码。');
     const allowed = (drawing.status === 'reserved' && (target === 'active' || target === 'voided'))
-      || (drawing.status === 'active' && target === 'voided');
+      || (drawing.status === 'active' && target === 'voided')
+      || (drawing.status === 'voided' && target === 'active');
     if (!allowed) {
       const labels: Record<string, string> = { reserved: '已占号', active: '正式使用', voided: '作废' };
       throw new DrawingQueryError('INVALID_TRANSITION', `不支持从${labels[drawing.status] ?? drawing.status}变更为${labels[target] ?? target}`);
@@ -56,6 +58,7 @@ export class DrawingQueryService {
   previewDeletion(id: number) { return this.deletion.preview(id); }
 
   deleteDrawing(input: DeleteDrawingInput) { return this.deletion.delete(input); }
+  deleteDrawings(inputs: DeleteDrawingInput[]) { return this.deletion.deleteBatch(inputs); }
 
   restoreDrawing(id: number) { return this.deletion.restore(id); }
 
@@ -65,6 +68,7 @@ export class DrawingQueryService {
 
   updateHistoricalStatus(historicalId: number, status: HistoricalDrawingStatus): DrawingDetailRecord {
     const drawing = this.get(-historicalId);
+    if (drawing.deletedAt) throw new DrawingQueryError('INVALID_TRANSITION', '请先恢复已删除的图号记录');
     if (drawing.origin !== 'historical') throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
     this.repository.updateHistoricalStatus(historicalId, status);
     return this.get(-historicalId);

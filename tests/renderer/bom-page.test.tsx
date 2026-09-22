@@ -53,6 +53,40 @@ async function selectProduct(expectEmpty = true) {
 }
 
 describe('BomPage product-level BOM', () => {
+  it('shows query details as separate business fields and keeps model-wide deletion collapsed', async () => {
+    const api = apiFixture();
+    const record = { ...activeCurrent, editRevision: 1, updatedAt: '2026-09-03T10:00:00Z', items: [{
+      ...activeCurrent.items[0], material: 'PET', dimensions: '20×10', position: '正面', changeDetails: '改为哑光',
+    }] };
+    api.queryBomVersions.mockResolvedValue([record]); api.getBomVersion.mockResolvedValue(record);
+    render(<BomPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
+    expect(await screen.findByText('改为哑光')).toBeVisible();
+    expect(screen.getByText('PET')).toBeVisible();
+    expect(screen.getByText('20×10')).toBeVisible();
+    expect(screen.getByText('正面')).toBeVisible();
+    expect(screen.queryByRole('columnheader', { name: '版本' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('输入型号确认删除整个 BOM')).not.toBeVisible();
+  });
+  it('edits the selected history in place with its revision and independent change details', async () => {
+    const record = { ...activeCurrent, editRevision: 2, updatedAt: activeCurrent.createdAt };
+    const api = { ...apiFixture(), updateBomVersion: vi.fn().mockResolvedValue({ version: record, diff: [] }) };
+    api.queryBomVersions.mockResolvedValue([record]);
+    api.getBomVersion.mockResolvedValue(record);
+    render(<BomPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 BOM 20' }));
+    expect(await screen.findByLabelText('第 1 行修改明细')).toHaveValue('');
+    expect(screen.getByLabelText('业务变更日期')).toHaveValue('2026-09-02');
+    fireEvent.change(screen.getByLabelText('第 1 行修改明细'), { target: { value: '商标位置调整' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+    await waitFor(() => expect(api.updateBomVersion).toHaveBeenCalledWith(20, expect.objectContaining({
+      businessChangeDate: '2026-09-02', items: [expect.objectContaining({ changeDetails: '商标位置调整' })],
+    }), 2));
+    expect(api.saveBomVersion).not.toHaveBeenCalled();
+    expect(await screen.findByText('BOM 修改已保存')).toBeVisible();
+  });
   it('selects an explicit entry mode, filters project items by main category, and marks historical candidate origin and status', async () => {
     const api = apiFixture(); api.listBomCandidates.mockResolvedValue([{ origin: 'historical', historicalDrawingId: 19,
       fullCode: '02.0404.010.0401008', displayName: '02.0404.010.0401008', projectItemId: 7,
@@ -69,13 +103,11 @@ describe('BomPage product-level BOM', () => {
       usesWhiteMaterial: false, entryMode: 'historical' });
   });
 
-  it('keeps QR use optional and explains it is a business reference managed elsewhere', async () => {
+  it('does not show QR editing in the BOM editor', async () => {
     const api = apiFixture(); render(<BomPage api={api as never} />); await selectProduct();
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
     expect(screen.queryByLabelText('第 1 行二维码 9')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '第 1 行使用二维码' }));
-    expect(screen.getByText('这里只引用二维码管理中已有记录，不在 BOM 中新建或匹配文件。')).toBeVisible();
-    expect(screen.getByLabelText('第 1 行二维码 9')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '第 1 行使用二维码' })).not.toBeInTheDocument();
   });
 
   it('uses main category then project item in the query form', async () => {
@@ -100,7 +132,7 @@ describe('BomPage product-level BOM', () => {
     expect(screen.queryByLabelText('第 1 行数量')).not.toBeInTheDocument();
   });
 
-  it('saves immutable item snapshots, selected batch, uploaded image and active QR association', async () => {
+  it('saves item fields, selected batch and uploaded image without overwriting hidden QR associations', async () => {
     const api = apiFixture(); render(<BomPage api={api as never} />); await selectProduct();
     fireEvent.change(screen.getByLabelText('业务变更日期'), { target: { value: '2026-09-02' } });
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
@@ -112,8 +144,6 @@ describe('BomPage product-level BOM', () => {
     fireEvent.change(screen.getByLabelText('第 1 行尺寸'), { target: { value: '100×20' } });
     fireEvent.change(screen.getByLabelText('第 1 行位置'), { target: { value: '前门' } });
     fireEvent.change(screen.getByLabelText('第 1 行备注'), { target: { value: '按图施工' } });
-    fireEvent.click(screen.getByRole('button', { name: '第 1 行使用二维码' }));
-    fireEvent.click(screen.getByLabelText('第 1 行二维码 9'));
     const upload = new File([new Uint8Array([137, 80, 78, 71])], '客户示意图.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('第 1 行图片'), { target: { files: [upload] } });
     await waitFor(() => expect(api.uploadBomAsset).toHaveBeenCalledWith(1, upload));
@@ -121,7 +151,7 @@ describe('BomPage product-level BOM', () => {
     await waitFor(() => expect(api.saveBomVersion).toHaveBeenCalledWith({ productId: 1, entryMode: 'current', businessChangeDate: '2026-09-02',
       expectedCurrentVersionId: null, items: [{ projectItemId: 7, drawingReference: { origin: 'planned', drawingId: 10 }, usesWhiteMaterial: false,
         effectiveMaterialBatchId: 8, material: 'ABS', dimensions: '100×20', position: '前门', notes: '按图施工',
-        assets: [{ role: 'image', assetId: 31 }], qrCodeIds: [9] }] }));
+        assets: [{ role: 'image', assetId: 31 }] }] }));
   });
 
   it('separates add and query, exposes product/date/batch/project/drawing filters and renders legacy dates safely', async () => {
@@ -143,14 +173,13 @@ describe('BomPage product-level BOM', () => {
       effectiveBatchRelativePath: 'legacy/removed-snapshot', projectItemId: 7, fullCode: '0401001' }));
   });
 
-  it('keeps voided drawings and inactive historical QR links visible until the user resolves them', async () => {
+  it('keeps voided drawings visible for replacement without exposing historical QR editing', async () => {
     const api = apiFixture(); api.getCurrentBom.mockResolvedValue(currentWithReferences); api.listBomCandidates.mockResolvedValue([]);
     render(<BomPage api={api as never} />); await selectProduct(false);
     expect(await screen.findByRole('option', { name: /作废，需替换/ })).toBeDisabled();
     expect(screen.getByText('当前引用图号已作废，请选择可用图号替换后再保存。')).toBeVisible();
     expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeDisabled();
-    expect(screen.getByText('二维码“说明书”已停用，请取消关联后再保存。')).toBeVisible();
-    expect(screen.getByLabelText('第 1 行停用二维码 9')).toBeChecked();
+    expect(screen.queryByLabelText('第 1 行停用二维码 9')).not.toBeInTheDocument();
   });
 
   it('only offers previous-asset reuse when a source exists and makes a new upload replace it', async () => {
@@ -189,7 +218,7 @@ describe('BomPage product-level BOM', () => {
     expect(screen.getByLabelText('第 1 行图号')).toHaveValue('');
     expect(screen.queryByText('客户示意图.png')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('第 1 行沿用图片')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('第 1 行二维码 9')).not.toBeChecked();
+    expect(screen.queryByLabelText('第 1 行二维码 9')).not.toBeInTheDocument();
   });
 
   it('does not let an older history detail response overwrite the newest selection', async () => {

@@ -11,6 +11,21 @@ function multipartAsset(productId: number, filename: string, content: Buffer, bo
 }
 beforeEach(() => { db=openDatabase(':memory:'); migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined}); const d=new DictionaryService(db), p=new ProductService(db), brand=d.create({type:'brand',code:'02',name:'B'}), size=d.create({type:'product_size',code:'0404',name:'S'}), appearance=d.create({type:'appearance',code:'01',name:'A'}), white=d.create({type:'color',code:'0',name:'W'}), main=d.create({type:'main_category',code:'04',name:'M'}), logo=d.create({type:'project_item',code:'01',name:'L',parentId:main.id}), product=p.create({sku:'SKU',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id,model:'X',productCategory:'冰柜'}), plan=new PlanningService(db), input={productId:product.id,rows:[{clientId:'x',colorId:white.id,mainCategoryId:main.id,projectItemId:logo.id}]}, preview=plan.preview(input), drawing=plan.reserve({...input,rows:[{...input.rows[0],expectedFullCode:preview.rows[0].fullCode}]})[0]; refs={product,logo,drawing}; app=Fastify(); registerBomRoutes(app,new BomService(db)); }); afterEach(async()=>{await app.close();db.close();});
 describe('product-level BOM API',()=>{
+ it('edits in place and returns a conflict without overwriting a newer edit', async () => {
+   const input = { productId: refs.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
+     items: [{ projectItemId: refs.logo.id, drawingId: refs.drawing.id, usesWhiteMaterial: true, changeDetails: '初稿' }] };
+   const original = (await app.inject({ method: 'POST', url: '/api/boms/versions', payload: input })).json().version;
+   const edit = { input: { ...input, items: [{ ...input.items[0], changeDetails: '更换文字' }] }, expectedRevision: 0 };
+   const updated = await app.inject({ method: 'PUT', url: `/api/boms/versions/${original.id}`, payload: edit });
+   expect(updated.statusCode).toBe(200);
+   expect(updated.json().version).toMatchObject({ id: original.id, createdAt: original.createdAt, editRevision: 1,
+     items: [expect.objectContaining({ changeDetails: '更换文字' })] });
+   const stale = await app.inject({ method: 'PUT', url: `/api/boms/versions/${original.id}`, payload: edit });
+   expect(stale.statusCode).toBe(409);
+   expect(stale.json().error.code).toBe('BOM_STALE');
+   expect((await app.inject({ method: 'GET', url: `/api/boms/versions/${original.id}` })).json().items[0].changeDetails).toBe('更换文字');
+   expect((await app.inject({ method: 'GET', url: `/api/boms/versions?productId=${refs.product.id}` })).json().items).toHaveLength(1);
+ });
  it('accepts and returns a historical drawing reference only in historical entry mode',async()=>{
    const historicalDrawingId=Number(db.prepare(`insert into historical_drawing_numbers
      (full_code,brand_code,product_size_code,appearance_code,color_code,main_category_code,project_item_code,sequence,

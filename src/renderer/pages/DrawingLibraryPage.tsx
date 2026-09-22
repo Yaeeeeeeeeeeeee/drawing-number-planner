@@ -13,6 +13,7 @@ import type {
 } from '../data/client';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
+import { DrawingBatchDeletion } from '../components/DrawingBatchDeletion';
 import { openIndexedPdfLocation } from '../desktop-files';
 
 const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', appearanceId: '', mainCategoryId: '', projectItemId: '', colorId: '', materialBatchId: '', status: '', deletionState: 'normal', exactDrawingNumber: false };
@@ -22,7 +23,9 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const [filters, setFilters] = useState(emptyFilters);
   const [options, setOptions] = useState<Record<string, DictionaryItemView[]>>({});
   const [items, setItems] = useState<DrawingView[]>([]); const [total, setTotal] = useState(0);
+  const [checkedIds, setCheckedIds] = useState<number[]>([]);
   const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(20);
+  useEffect(() => { setCheckedIds([]); }, [filters, page, pageSize, view]);
   const [productCategories, setProductCategories] = useState<string[]>([]);
   const [materialBatchOptions, setMaterialBatchOptions] = useState<MaterialBatchView[]>([]);
   const [selected, setSelected] = useState<DrawingDetailView | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
@@ -93,7 +96,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
     if (!selected) return;
     const confirmed = window.confirm(target === 'active'
       ? '确认将该图号变更为正式使用？此操作会记录业务状态。'
-      : '确认作废该图号？作废后普通界面无法恢复，但图号仍永久占用。');
+      : '确认作废该图号？之后可以恢复使用，作废期间号码继续占用。');
     if (!confirmed) return;
     setMaintaining(true); setError('');
     try { if (target === 'active') await api.activateDrawing(selected.id); else await api.voidDrawing(selected.id); await refreshDetail(selected.id); }
@@ -204,8 +207,14 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
         <label><span>转曲后文件</span><select aria-label="转曲后文件" value={filters.outlinedPresence} onChange={(event) => set('outlinedPresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label></>}
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
     </form>
+    <div className="batch-toolbar"><label><input type="checkbox" aria-label="全选当前页" checked={items.length > 0 && items.filter((item) => !item.deletedAt).every((item) => checkedIds.includes(item.id))}
+      onChange={(event) => setCheckedIds(event.target.checked ? items.filter((item) => !item.deletedAt).map((item) => item.id) : [])} />全选当前页</label>
+      <DrawingBatchDeletion ids={checkedIds} api={api} onComplete={async () => { setCheckedIds([]); setSelected(null); await search(filters, page, pageSize); }} />
+    </div>
     {!loading && items.length === 0 ? <EmptyState title="图号库尚无记录" description="Phase 2 完成正式占号后，记录会显示在这里。" /> :
       <DataTable items={items} onRowClick={(item) => void openDetail(item)} columns={[
+        { key: 'select', label: '选择', render: (item) => <input type="checkbox" aria-label={`选择图号 ${item.fullCode}`} disabled={Boolean(item.deletedAt)} checked={checkedIds.includes(item.id)}
+          onClick={(event) => event.stopPropagation()} onChange={(event) => setCheckedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /> },
         { key: 'code', label: '完整图号', render: (item) => <button className="link-button" type="button">{item.fullCode}</button> },
         { key: 'sku', label: 'SKU', render: (item) => item.sku ?? '待补录' }, { key: 'model', label: '型号', render: (item) => item.model },
         { key: 'origin', label: '来源', render: (item) => item.origin === 'planned' ? '正式规划' : '历史扫描' },
@@ -270,6 +279,7 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
         : <button className="primary-button" disabled={maintaining} onClick={() => void onHistoricalStatus('active')} type="button">启用</button>}
     </div><p className="muted-text">停用不释放号码</p></> : <div className="drawing-actions">
       {selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">正式使用</button>}
+      {selected.status === 'voided' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">恢复使用</button>}
       {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}
       </div>}
     <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={onOpen} />

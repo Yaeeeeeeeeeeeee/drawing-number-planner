@@ -35,11 +35,11 @@ function buildDiff(previous: BomVersionDetail | null, current: BomVersionDetail)
     else if (!newItem) type = 'removed';
     else type = JSON.stringify({ drawingReference: referenceOf(oldItem), effectiveBatchRelativePath: oldItem.effectiveBatchRelativePath,
       effectiveBatchName: oldItem.effectiveBatchName,
-      material: oldItem.material, dimensions: oldItem.dimensions, position: oldItem.position, notes: oldItem.notes,
+        material: oldItem.material, dimensions: oldItem.dimensions, position: oldItem.position, notes: oldItem.notes, changeDetails: oldItem.changeDetails,
       usesWhiteMaterial: oldItem.usesWhiteMaterial, assets: oldItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: oldItem.qrCodes.map((qr) => qr.id) })
       === JSON.stringify({ drawingReference: referenceOf(newItem), effectiveBatchRelativePath: newItem.effectiveBatchRelativePath,
         effectiveBatchName: newItem.effectiveBatchName,
-        material: newItem.material, dimensions: newItem.dimensions, position: newItem.position, notes: newItem.notes,
+          material: newItem.material, dimensions: newItem.dimensions, position: newItem.position, notes: newItem.notes, changeDetails: newItem.changeDetails,
         usesWhiteMaterial: newItem.usesWhiteMaterial, assets: newItem.assets.map((asset) => ({ assetId: asset.assetId, role: asset.role })), qrCodes: newItem.qrCodes.map((qr) => qr.id) }) ? 'unchanged' : 'replaced';
     const item = newItem ?? oldItem!;
     return { type, projectItemId, projectItemName: item.projectItemName,
@@ -151,10 +151,13 @@ export class BomService {
       const now = new Date().toISOString();
       const versionId = this.repository.insertVersion(input.productId, this.repository.nextVersionNumber(input.productId),
         currentId, input.businessChangeDate, normalizedNotes(input.notes), now);
-      validated.forEach((item) => {
+      validated.forEach((item, index) => {
         const bomItemId = this.repository.insertItem(versionId, item);
         this.saveItemAssets(bomItemId, item.projectItemId, currentId, item.assets);
-        this.saveItemQrCodes(bomItemId, input.productId, item.qrCodeIds);
+        if (input.items[index].qrCodeIds === undefined) {
+          const previousItem = previous?.items.find((old) => old.projectItemId === item.projectItemId);
+          previousItem?.qrCodes.forEach((qr) => this.repository.insertItemQrCode(bomItemId, qr.id));
+        } else this.saveItemQrCodes(bomItemId, input.productId, item.qrCodeIds);
       });
       this.repository.activateDrawings(validated.flatMap((item) => item.drawingReference.origin === 'planned'
         ? [item.drawingReference.drawingId] : []));
@@ -162,6 +165,69 @@ export class BomService {
       const version = this.getVersion(versionId);
       return { version, diff: buildDiff(previous, version) };
     }).immediate();
+  }
+
+  updateVersion(id: number, input: SaveBomInput, expectedRevision: number): SavedBomVersion {
+    return this.db.transaction(() => {
+      const previous = this.getVersion(id);
+      if (previous.productId !== input.productId) throw new BomError('DRAWING_WRONG_PRODUCT', '不能改变 BOM 所属产品');
+      this.validateProduct(input.productId);
+      if (previous.editRevision !== expectedRevision) throw new BomError('BOM_STALE', '该记录已被修改，请重新加载后编辑');
+      if (!input.businessChangeDate || !validBusinessDate(input.businessChangeDate)) throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '业务变更日期无效');
+      if (!input.items.length) throw new BomError('INVALID_BOM_ITEM_COUNT', 'BOM 至少需要一个项目');
+      const projects = new Set<number>();
+      const validated = input.items.map((item) => {
+        const validatedItem = this.validateItem(item, input.productId, projects, input.entryMode ?? 'historical');
+        const original = previous.items.find((old) => old.projectItemId === item.projectItemId);
+        if (original && item.effectiveMaterialBatchId === undefined
+          && item.effectiveBatchRelativePath === undefined && item.effectiveBatchName === undefined) {
+          validatedItem.effectiveMaterialBatchId = original.effectiveMaterialBatchId;
+          validatedItem.effectiveBatchRelativePath = original.effectiveBatchRelativePath;
+          validatedItem.effectiveBatchName = original.effectiveBatchName;
+        }
+        return validatedItem;
+      });
+      const now = new Date().toISOString();
+      this.db.prepare(`update bom_versions set business_change_date = ?, updated_at = ?, edit_revision = edit_revision + 1,
+        notes = ? where id = ?`).run(input.businessChangeDate, now, input.notes === undefined ? previous.notes : normalizedNotes(input.notes), id);
+      this.db.prepare('update bom_items set deleted_at = ? where bom_version_id = ?').run(now, id);
+      validated.forEach((item, index) => {
+        const existing = this.db.prepare('select id from bom_items where bom_version_id = ? and project_item_id = ?')
+          .get(id, item.projectItemId) as { id: number } | undefined;
+        if (existing) {
+          this.db.prepare(`update bom_items set drawing_id = ?, historical_drawing_id = ?, effective_batch_relative_path = ?,
+            effective_batch_name = ?, effective_material_batch_id = ?, material = ?, dimensions = ?, position = ?, notes = ?,
+            change_details = ?, uses_white_material = ?, deleted_at = null where id = ?`).run(
+              item.drawingReference.origin === 'planned' ? item.drawingReference.drawingId : null,
+              item.drawingReference.origin === 'historical' ? item.drawingReference.historicalDrawingId : null,
+              item.effectiveBatchRelativePath, item.effectiveBatchName, item.effectiveMaterialBatchId,
+              item.material, item.dimensions, item.position, item.notes, item.changeDetails, item.usesWhiteMaterial ? 1 : 0, existing.id);
+          // Omitted assets/QR mean preserve existing relations while editing textual fields.
+          if (input.items[index].assets !== undefined) this.replaceEditedAssets(existing.id, item.projectItemId, previous.previousVersionId, item.assets);
+        } else {
+          const itemId = this.repository.insertItem(id, item);
+          this.saveItemAssets(itemId, item.projectItemId, previous.previousVersionId, item.assets);
+        }
+      });
+      const version = this.getVersion(id);
+      return { version, diff: buildDiff(previous, version) };
+    }).immediate();
+  }
+
+  private replaceEditedAssets(itemId: number, projectId: number, previousVersionId: number | null,
+    assets: NonNullable<BomItemInput['assets']>): void {
+    const existing = this.repository.listItemAssets(itemId);
+    const unchanged = existing.length === assets.length && assets.every((asset) =>
+      existing.some((old) => old.role === asset.role && (asset.reusePrevious || old.assetId === asset.assetId)));
+    if (unchanged) return;
+    // Historical consumers hold their own asset IDs; preserve their origin before changing this source link.
+    for (const old of existing) {
+      this.db.prepare(`update bom_item_assets set inheritance_snapshot_json = ?, inherited_from_bom_item_asset_id = null
+        where inherited_from_bom_item_asset_id = ?`).run(JSON.stringify({ sourceLinkId: old.id, sourceBomItemId: itemId,
+          assetId: old.assetId, fileName: old.originalFileName, relativePath: old.relativePath }), old.id);
+    }
+    this.db.prepare('delete from bom_item_assets where bom_item_id = ?').run(itemId);
+    this.saveItemAssets(itemId, projectId, previousVersionId, assets);
   }
 
   private validateProduct(productId: number): void {
@@ -218,7 +284,7 @@ export class BomService {
       effectiveMaterialBatchId, material: normalizedText(item.material),
       dimensions: normalizedText(item.dimensions), position: normalizedText(item.position), assets: item.assets ?? [],
       qrCodeIds: item.qrCodeIds ?? [],
-      notes: normalizedNotes(item.notes), usesWhiteMaterial: item.usesWhiteMaterial };
+      notes: normalizedNotes(item.notes), changeDetails: normalizedText(item.changeDetails), usesWhiteMaterial: item.usesWhiteMaterial };
   }
 
   private saveItemAssets(bomItemId: number, projectItemId: number, previousVersionId: number | null,

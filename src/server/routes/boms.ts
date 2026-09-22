@@ -32,6 +32,7 @@ const itemSchema = z.object({
   effectiveBatchRelativePath: z.string().max(1000).optional(), effectiveBatchName: z.string().max(500).optional(),
   effectiveMaterialBatchId: z.number().int().positive().nullable().optional(), material: z.string().max(1000).optional(),
   dimensions: z.string().max(1000).optional(), position: z.string().max(1000).optional(), notes: z.string().max(1000).optional(),
+  changeDetails: z.string().max(10000).optional(),
   assets: z.array(z.object({ role: z.enum(['image', 'diagram']), assetId: z.number().int().positive().optional(),
     reusePrevious: z.boolean().optional() }).strict()).max(2).optional(),
   qrCodeIds: z.array(z.number().int().positive()).max(100).optional(),
@@ -56,6 +57,17 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
   ensureMultipart(app);
+  app.put('/api/boms/versions/:id', async (request, reply) => {
+    const params = versionParams.safeParse(request.params);
+    const body = z.object({ input: saveSchema, expectedRevision: z.number().int().nonnegative() }).strict().safeParse(request.body);
+    if (!params.success || !body.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 编辑内容无效' } });
+    const input: SaveBomInput = { ...body.data.input, items: body.data.input.items.map((item): BomItemInput => {
+      const { drawingReference, drawingId, ...fields } = item;
+      return drawingReference ? { ...fields, drawingReference } : { ...fields, drawingId: drawingId! };
+    }) };
+    try { return service.updateVersion(params.data.id, input, body.data.expectedRevision); }
+    catch (error) { return sendBomError(reply, error); }
+  });
   app.get('/api/boms/query', async (request, reply) => {
     const query = bomQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });

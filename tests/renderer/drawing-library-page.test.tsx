@@ -282,7 +282,7 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getAllByText('正式使用').length).toBeGreaterThanOrEqual(2);
     fireEvent.click(screen.getByRole('button', { name: '作废' }));
     await waitFor(() => expect(api.voidDrawing).toHaveBeenCalledWith(10));
-    expect(confirm).toHaveBeenLastCalledWith('确认作废该图号？作废后普通界面无法恢复，但图号仍永久占用。');
+    expect(confirm).toHaveBeenLastCalledWith('确认作废该图号？之后可以恢复使用，作废期间号码继续占用。');
     expect(api.getDrawing).toHaveBeenCalledTimes(3);
     expect(screen.getAllByText('作废').length).toBeGreaterThanOrEqual(2);
   });

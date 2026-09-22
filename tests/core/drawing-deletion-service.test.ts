@@ -54,6 +54,24 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('DrawingDeletionService', () => {
+  it('deletes eligible batch items while preserving blocked items and reporting every outcome', () => {
+    const versionId = Number(db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at)
+      select product_id, 1, '2026-09-22', '2026-09-22' from drawing_numbers where id = ?`).run(plannedId).lastInsertRowid);
+    db.prepare(`insert into bom_items (bom_version_id, project_item_id, drawing_id)
+      select ?, project_item_id, id from drawing_numbers where id = ?`).run(versionId, plannedId);
+    db.prepare(`insert into bom_current (product_id, version_id, updated_at)
+      select product_id, ?, '2026-09-22' from drawing_numbers where id = ?`).run(versionId, plannedId);
+    const result = service.deleteBatch([
+      { signedId: plannedId, mode: 'retain_occupied', confirmedCode: plannedCode },
+      { signedId: -historicalId, mode: 'retain_occupied', confirmedCode: historicalCode },
+    ]);
+    expect(result.items).toEqual([
+      expect.objectContaining({ signedId: plannedId, status: 'skipped', code: 'DRAWING_DELETE_BLOCKED' }),
+      expect.objectContaining({ signedId: -historicalId, status: 'deleted' }),
+    ]);
+    expect(new DrawingQueryService(db).get(plannedId).deletedAt).toBeNull();
+    expect(new OccupiedNumberRepository(db).hasFullCode(historicalCode)).toBe(true);
+  });
   it('deletes either origin while retaining occupancy and audit history', () => {
     const otherId = Number(db.prepare(`insert into drawing_numbers
       (full_code, display_name, product_id, appearance_id, color_id, main_category_id, project_item_id,

@@ -3,6 +3,8 @@ import { BomService } from '../../src/core/bom/bom-service';
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { PlanningService } from '../../src/core/planning/planning-service';
 import { ProductService } from '../../src/core/products/product-service';
+import { DrawingDeletionService } from '../../src/core/drawings/drawing-deletion-service';
+import { DrawingRepository } from '../../src/core/drawings/drawing-repository';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 
@@ -40,6 +42,79 @@ function insertHistorical(productId: number | null, projectItemCode: string, sta
     .run(fullCode, projectItemCode, sequence, productId, status).lastInsertRowid);
 }
 describe('product-level BOM service', () => {
+  it('keeps an old batch snapshot when editing text after the batch index has disappeared', () => {
+    const r = setup(); const d = r.draw(r.product.id, r.white.id, r.logo.id);
+    const path = '01.冰柜\\SKU1-X1\\03.量产后的变更文件\\01.20260901';
+    const batch = insertBatch(r.product.id, path);
+    const item = { projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null,
+      items: [{ ...item, effectiveMaterialBatchId: batch }] };
+    const first = service.saveVersion(input).version;
+    db.prepare('update bom_items set effective_material_batch_id = null where bom_version_id = ?').run(first.id);
+    db.prepare('delete from material_batches where id = ?').run(batch);
+    const edited = service.updateVersion(first.id, { ...input, items: [{ ...item, changeDetails: '补充说明' }] }, 0).version;
+    expect(edited.items[0]).toMatchObject({ effectiveMaterialBatchId: null,
+      effectiveBatchRelativePath: path, effectiveBatchName: '01.20260901', changeDetails: '补充说明' });
+  });
+  it('preserves an existing QR reference when a hidden QR field is omitted from a new revision', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.white.id, r.logo.id);
+    const qr = db.prepare('select id from product_qr_codes where product_id = ? limit 1').get(r.product.id) as { id: number };
+    db.prepare("update product_qr_codes set status = 'active' where id = ?").run(qr.id);
+    const item = { projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null, items: [{ ...item, qrCodeIds: [qr.id] }] };
+    const first = service.saveVersion(input).version;
+    db.prepare("update product_qr_codes set status = 'inactive' where id = ?").run(qr.id);
+    const next = service.saveVersion({ ...input, expectedCurrentVersionId: first.id, items: [item] }).version;
+    expect(next.items[0].qrCodes).toEqual([expect.objectContaining({ id: qr.id, status: 'inactive' })]);
+  });
+  it('does not treat a removed BOM item as a current query match or deletion blocker', () => {
+    const r = setup(); const logo = r.draw(r.product.id, r.white.id, r.logo.id);
+    const manual = r.draw(r.product.id, r.white.id, r.manual.id);
+    const keep = { projectItemId: r.manual.id, drawingId: manual.id, usesWhiteMaterial: false };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: logo.id, usesWhiteMaterial: false }, keep] };
+    const first = service.saveVersion(input).version;
+    service.updateVersion(first.id, { ...input, items: [keep] }, 0);
+    expect(service.queryVersions({ fullCode: logo.fullCode })).toEqual([]);
+    expect(new DrawingDeletionService(db).preview(logo.id).references.currentBom).toBe(0);
+    expect(new DrawingRepository(db).getDetail(logo.id)?.currentBomUsage).toEqual([]);
+    expect(service.getVersion(first.id).items).toHaveLength(1);
+    expect(db.prepare('select count(*) as count from bom_items where bom_version_id = ?').get(first.id)).toEqual({ count: 2 });
+  });
+  it('reports edits to change details even when the drawing and other fields are unchanged', () => {
+    const r = setup(); const d = r.draw(r.product.id, r.white.id, r.logo.id);
+    const item = { projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, changeDetails: '初稿' };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null, items: [item] };
+    const first = service.saveVersion(input).version;
+    const result = service.updateVersion(first.id, { ...input, items: [{ ...item, changeDetails: '更新印刷文字' }] }, 0);
+    expect(result.diff[0].type).toBe('replaced');
+    expect(result.version.items[0].changeDetails).toBe('更新印刷文字');
+  });
+  it('keeps a later BOM inherited image readable when an earlier BOM image is replaced', () => {
+    const r = setup(); const d = r.draw(r.product.id, r.white.id, r.logo.id);
+    const firstAsset = insertAsset('first.png'); const secondAsset = insertAsset('replacement.png');
+    const item = { projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null,
+      items: [{ ...item, assets: [{ role: 'image' as const, assetId: firstAsset }] }] };
+    const first = service.saveVersion(input).version;
+    const later = service.saveVersion({ ...input, expectedCurrentVersionId: first.id,
+      items: [{ ...item, assets: [{ role: 'image', reusePrevious: true }] }] }).version;
+    service.updateVersion(first.id, { ...input, items: [{ ...item, assets: [{ role: 'image', assetId: secondAsset }] }] }, 0);
+    expect(service.getVersion(later.id).items[0].assets[0]).toMatchObject({ assetId: firstAsset, originalFileName: 'first.png' });
+    expect(service.getCurrent(r.product.id)?.id).toBe(later.id);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
+  it('edits the selected BOM record in place while preserving submission time and rejecting stale edits', () => {
+    const r = setup(); const d = r.draw(r.product.id, r.white.id, r.logo.id);
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null,
+      items: [{ projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, material: 'PET', changeDetails: '初稿' }] };
+    const first = service.saveVersion(input).version;
+    const edited = service.updateVersion(first.id, { ...input, items: [{ ...input.items[0], material: '亚银', changeDetails: '更新排版' }] }, 0).version;
+    expect(edited).toMatchObject({ id: first.id, createdAt: first.createdAt, editRevision: 1 });
+    expect(edited.items[0]).toMatchObject({ material: '亚银', changeDetails: '更新排版', bomItemId: first.items[0].bomItemId });
+    expect(service.listVersions(r.product.id)).toHaveLength(1);
+    expect(() => service.updateVersion(first.id, input, 0)).toThrowError(expect.objectContaining({ code: 'BOM_STALE' }));
+  });
   it('offers planned drawings in both entry modes and confirmed historical drawings only in historical mode', () => {
     const r = setup();
     const planned = r.draw(r.product.id, r.white.id, r.logo.id);

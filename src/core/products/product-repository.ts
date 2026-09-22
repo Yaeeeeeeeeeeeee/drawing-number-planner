@@ -97,10 +97,10 @@ export class ProductRepository {
   getReferenceSummary(id: number): ProductReferenceSummary {
     const row = this.db.prepare(`select
       (select count(*) from products where reference_product_id = @id) as reference_product_count,
-      (select count(*) from drawing_numbers where product_id = @id or source_product_id = @id) as planned_drawing_count,
-      (select count(*) from historical_drawing_numbers where product_id = @id) as historical_drawing_count,
+      (select count(*) from drawing_numbers where (product_id = @id or source_product_id = @id) and deleted_at is null) as planned_drawing_count,
+      (select count(*) from historical_drawing_numbers where product_id = @id and deleted_at is null) as historical_drawing_count,
       (select count(*) from material_batches where product_id = @id) as material_batch_count,
-      (select count(*) from bom_versions where product_id = @id) as bom_count,
+      (select count(*) from bom_versions where product_id = @id and deleted_at is null) as bom_count,
       (select count(*) from product_qr_codes code
         join qr_purposes purpose on purpose.id = code.purpose_id
         join products product on product.id = code.product_id

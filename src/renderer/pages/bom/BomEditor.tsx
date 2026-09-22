@@ -6,7 +6,7 @@ export type DraftCandidate = DraftStatus<BomCandidateView>;
 
 export interface DraftRow {
   clientId: string; mainCategoryId: string; projectItemId: string; drawingId: string; usesWhiteMaterial: boolean;
-  effectiveMaterialBatchId: string; material: string; dimensions: string; position: string; notes: string;
+  effectiveMaterialBatchId: string; material: string; dimensions: string; position: string; notes: string; changeDetails: string;
   imageAsset: BomItemAssetView | null; diagramAsset: BomItemAssetView | null;
   reuseImage: boolean; reuseDiagram: boolean; previousImageName: string | null; previousDiagramName: string | null;
   qrCodeIds: number[]; inactiveQrCodes: BomQrCodeView[]; showQrCodes: boolean;
@@ -24,10 +24,10 @@ const candidateLabel = (candidate: DraftCandidate) => candidate.origin === 'hist
   : candidate.status === 'reserved' ? '正式规划 · 已占号'
     : candidate.status === 'voided' ? '正式规划 · 作废，需替换' : '正式规划 · 正式使用';
 
-export function BomEditor({ base, rows, mainCategories, projects, batches, qrCandidates, busy, complete, needsRefresh, savedMessage, diff,
+export function BomEditor({ base, rows, mainCategories, projects, batches, qrCandidates, busy, complete, needsRefresh, savedMessage, diff, editing = false,
   onAdd, onDelete, onMainCategory, onProject, onWhite, onDrawing, onChange, onUpload, onQr, onSave, onRefresh }: {
   base: BomVersionView | null; rows: DraftRow[]; mainCategories: DictionaryItemView[]; projects: DictionaryItemView[]; batches: MaterialBatchView[]; qrCandidates: BomQrCandidateView[];
-  busy: boolean; complete: boolean; needsRefresh: boolean; savedMessage: string; diff: BomDiffView[];
+  busy: boolean; complete: boolean; needsRefresh: boolean; savedMessage: string; diff: BomDiffView[]; editing?: boolean;
   onAdd(): void; onDelete(clientId: string): void; onMainCategory(row: DraftRow, value: string): void;
   onProject(row: DraftRow, value: string): void; onWhite(row: DraftRow, value: boolean): void;
   onDrawing(row: DraftRow, value: string): void; onChange(row: DraftRow, field: keyof DraftRow, value: string | boolean): void;
@@ -51,13 +51,14 @@ export function BomEditor({ base, rows, mainCategories, projects, batches, qrCan
         <label><span>尺寸</span><input aria-label={`第 ${index + 1} 行尺寸`} disabled={busy} value={row.dimensions} onChange={(e) => onChange(row, 'dimensions', e.target.value)} /></label>
         <label><span>位置</span><input aria-label={`第 ${index + 1} 行位置`} disabled={busy} value={row.position} onChange={(e) => onChange(row, 'position', e.target.value)} /></label>
         <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes} onChange={(e) => onChange(row, 'notes', e.target.value)} /></label>
+        <label><span>修改明细</span><textarea aria-label={`第 ${index + 1} 行修改明细`} disabled={busy} value={row.changeDetails} onChange={(e) => onChange(row, 'changeDetails', e.target.value)} /></label>
         <label><span>图片</span><input aria-label={`第 ${index + 1} 行图片`} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onUpload(row, 'image', file); }} />{row.imageAsset && <small>{row.imageAsset.originalFileName}</small>}</label>
         <label><span>示意图</span><input aria-label={`第 ${index + 1} 行示意图`} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onUpload(row, 'diagram', file); }} />{row.diagramAsset && <small>{row.diagramAsset.originalFileName}</small>}</label>
         {base && row.previousImageName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用图片`} checked={row.reuseImage} disabled={busy} onChange={(e) => onChange(row, 'reuseImage', e.target.checked)} /> 沿用上一次 BOM：{row.previousImageName}</span></label>}{base && row.previousDiagramName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用示意图`} checked={row.reuseDiagram} disabled={busy} onChange={(e) => onChange(row, 'reuseDiagram', e.target.checked)} /> 沿用上一次 BOM：{row.previousDiagramName}</span></label>}
       </div>
-      {(qrCandidates.length > 0 || row.inactiveQrCodes.length > 0) && <section className="bom-qr"><button className="text-button" type="button" aria-expanded={row.showQrCodes} aria-label={`第 ${index + 1} 行使用二维码`} onClick={() => onChange(row, 'showQrCodes', !row.showQrCodes)}>使用二维码（可选）</button>{row.showQrCodes && <fieldset><legend>使用已有二维码</legend><small>这里只引用二维码管理中已有记录，不在 BOM 中新建或匹配文件。</small>{qrCandidates.map((qr) => <label key={qr.id}><input type="checkbox" aria-label={`第 ${index + 1} 行二维码 ${qr.id}`} checked={row.qrCodeIds.includes(qr.id)} onChange={(e) => onQr(row, qr.id, e.target.checked)} /> {qr.purposeDisplayName || qr.name}</label>)}{row.inactiveQrCodes.map((qr) => row.qrCodeIds.includes(qr.id) && <label className="bom-inactive-qr" key={qr.id}><input type="checkbox" aria-label={`第 ${index + 1} 行停用二维码 ${qr.id}`} checked onChange={(e) => onQr(row, qr.id, e.target.checked)} /> 二维码“{qr.purposeDisplayName || qr.name}”已停用，请取消关联后再保存。</label>)}</fieldset>}</section>}
+
     </article>)}</div>
-    <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete} onClick={() => void onSave()}>{busy ? '保存中…' : '保存当前 BOM'}</button>{needsRefresh && <button className="secondary-button" type="button" disabled={busy} onClick={onRefresh}>刷新当前 BOM</button>}</div>
+    <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete} onClick={() => void onSave()}>{busy ? '保存中…' : editing ? '保存修改' : '保存当前 BOM'}</button>{needsRefresh && <button className="secondary-button" type="button" disabled={busy} onClick={onRefresh}>刷新当前 BOM</button>}</div>
     {savedMessage && <p className="success-banner"><strong>{savedMessage}</strong></p>}
     {diff.length > 0 && <section className="bom-diff"><p className="eyebrow">LATEST CHANGE</p><h2>本次变更</h2><div className="bom-diff-list">{diff.filter((item) => item.type !== 'unchanged').map((item) => <span className={`bom-diff-${item.type}`} key={item.projectItemId}>{describeDiff(item)}</span>)}</div></section>}
   </section>;

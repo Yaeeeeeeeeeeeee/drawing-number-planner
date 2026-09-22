@@ -24,6 +24,7 @@ interface BomItemInputFields {
   assets?: BomItemAssetInput[];
   qrCodeIds?: number[];
   notes?: string;
+  changeDetails?: string;
   usesWhiteMaterial: boolean;
 }
 export type BomItemInput = BomItemInputFields & (
@@ -74,11 +75,14 @@ interface BomItemRecordFields {
   assets: BomItemAssetRecord[];
   qrCodes: BomQrCodeRecord[];
   notes: string | null;
+  changeDetails: string | null;
   usesWhiteMaterial: boolean;
 }
 export type BomItemRecord = BomItemRecordFields & BomDrawingReference;
 
 export interface BomVersionSummary {
+  updatedAt: string;
+  editRevision: number;
   id: number;
   productId: number;
   model: string;

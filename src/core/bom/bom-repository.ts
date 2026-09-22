@@ -14,6 +14,7 @@ export interface BomHistoricalDrawing {
 }
 
 interface VersionRow {
+  updated_at: string | null; edit_revision: number;
   id: number; product_id: number; model: string; version_number: number; previous_version_id: number | null;
   business_change_date: string | null; legacy_color_id: number | null; legacy_color_name: string | null;
   notes: string | null; created_at: string;
@@ -25,6 +26,7 @@ interface DeletionVersionRow {
 }
 
 interface ItemRow {
+  change_details: string | null;
   bom_item_id: number; drawing_id: number | null; historical_drawing_id: number | null; origin: 'planned' | 'historical';
   full_code: string; display_name: string; color_id: number | null; color_name: string;
   project_item_id: number; project_item_name: string; status: 'reserved' | 'active' | 'inactive' | 'voided'; quantity: number;
@@ -34,6 +36,7 @@ interface ItemRow {
 }
 
 const mapSummary = (row: VersionRow): BomVersionSummary => ({
+  updatedAt: row.updated_at ?? row.created_at, editRevision: row.edit_revision,
   id: row.id, productId: row.product_id, model: row.model, versionNumber: row.version_number,
   previousVersionId: row.previous_version_id, businessChangeDate: row.business_change_date,
   businessChangeDateLabel: row.business_change_date ?? '未补录', legacyColorId: row.legacy_color_id,
@@ -49,12 +52,12 @@ const mapItem = (row: ItemRow): BomItemRecord => ({
   effectiveBatchRelativePath: row.effective_batch_relative_path, effectiveBatchName: row.effective_batch_name,
   effectiveMaterialBatchId: row.effective_material_batch_id, material: row.material,
   dimensions: row.dimensions, position: row.position,
-  notes: row.notes, usesWhiteMaterial: row.uses_white_material === 1, assets: [], qrCodes: [],
+  notes: row.notes, changeDetails: row.change_details, usesWhiteMaterial: row.uses_white_material === 1, assets: [], qrCodes: [],
 });
 
 const versionSelect = `select version.id, version.product_id, product.model, version.version_number,
   version.previous_version_id, version.business_change_date, version.legacy_color_id,
-  legacy_color.name as legacy_color_name, version.notes, version.created_at
+  legacy_color.name as legacy_color_name, version.notes, version.created_at, version.updated_at, version.edit_revision
   from bom_versions version
   join products product on product.id = version.product_id
   left join dictionary_items legacy_color on legacy_color.id = version.legacy_color_id`;
@@ -100,7 +103,7 @@ export class BomRepository {
       item.project_item_id, project_item.name as project_item_name,
       coalesce(drawing.status, historical.status) as status, item.quantity, item.effective_batch_relative_path,
       item.effective_batch_name, item.effective_material_batch_id, item.material, item.dimensions, item.position,
-      item.notes, item.uses_white_material
+      item.notes, item.change_details, item.uses_white_material
       from bom_items item
       left join drawing_numbers drawing on drawing.id = item.drawing_id
       left join historical_drawing_numbers historical on historical.id = item.historical_drawing_id
@@ -108,7 +111,7 @@ export class BomRepository {
       left join dictionary_items historical_color on historical_color.type = 'color'
         and historical_color.code = historical.color_code
       join dictionary_items project_item on project_item.id = item.project_item_id
-      where item.bom_version_id = ? order by item.project_item_id`).all(id) as ItemRow[];
+      where item.bom_version_id = ? and item.deleted_at is null order by item.project_item_id`).all(id) as ItemRow[];
     return { ...mapSummary(row), items: items.map((item) => ({ ...mapItem(item), assets: this.listItemAssets(item.bom_item_id),
       qrCodes: this.listItemQrCodes(item.bom_item_id) })) };
   }
@@ -132,7 +135,7 @@ export class BomRepository {
       }
       conditions.push(`exists (select 1 from bom_items item left join drawing_numbers drawing on drawing.id = item.drawing_id
         left join historical_drawing_numbers historical on historical.id = item.historical_drawing_id
-        where item.bom_version_id = version.id and ${itemConditions.join(' and ')})`);
+        where item.bom_version_id = version.id and item.deleted_at is null and ${itemConditions.join(' and ')})`);
     }
     conditions.unshift('version.deleted_at is null');
     const where = ` where ${conditions.join(' and ')}`;
@@ -257,15 +260,15 @@ export class BomRepository {
 
   insertItem(versionId: number, item: { projectItemId: number; drawingReference: BomDrawingReference; effectiveBatchRelativePath: string | null;
     effectiveBatchName: string | null; effectiveMaterialBatchId: number | null; material: string | null;
-    dimensions: string | null; position: string | null; notes: string | null; usesWhiteMaterial: boolean }): number {
+    dimensions: string | null; position: string | null; notes: string | null; changeDetails?: string | null; usesWhiteMaterial: boolean }): number {
     return Number(this.db.prepare(`insert into bom_items
       (bom_version_id, project_item_id, drawing_id, historical_drawing_id, quantity, effective_batch_relative_path, effective_batch_name,
-        effective_material_batch_id, material, dimensions, position, notes, uses_white_material)
-      values (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        effective_material_batch_id, material, dimensions, position, notes, uses_white_material, change_details)
+      values (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(versionId, item.projectItemId, item.drawingReference.origin === 'planned' ? item.drawingReference.drawingId : null,
         item.drawingReference.origin === 'historical' ? item.drawingReference.historicalDrawingId : null,
         item.effectiveBatchRelativePath, item.effectiveBatchName,
-        item.effectiveMaterialBatchId, item.material, item.dimensions, item.position, item.notes, item.usesWhiteMaterial ? 1 : 0).lastInsertRowid);
+        item.effectiveMaterialBatchId, item.material, item.dimensions, item.position, item.notes, item.usesWhiteMaterial ? 1 : 0, item.changeDetails ?? null).lastInsertRowid);
   }
 
   listItemAssets(bomItemId: number) {

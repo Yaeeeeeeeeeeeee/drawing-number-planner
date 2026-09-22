@@ -53,7 +53,7 @@ describe('schema migrations', () => {
     const seeded = seedProduct(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 13 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 14 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select id, sku from products').get()).toEqual({ id: seeded.product, sku: null });
@@ -66,12 +66,13 @@ describe('schema migrations', () => {
     expect((database.pragma('table_info(bom_versions)') as Array<{ name: string }>).map((column) => column.name))
       .toEqual([
         'id', 'product_id', 'version_number', 'previous_version_id', 'business_change_date', 'legacy_color_id',
-        'notes', 'created_at', 'deleted_at', 'deleted_reason',
+        'notes', 'created_at', 'deleted_at', 'deleted_reason', 'updated_at', 'edit_revision',
       ]);
     expect((database.pragma('table_info(bom_items)') as Array<{ name: string }>).map((column) => column.name))
       .toEqual([
         'id', 'bom_version_id', 'project_item_id', 'drawing_id', 'historical_drawing_id', 'quantity', 'effective_batch_relative_path',
         'effective_batch_name', 'effective_material_batch_id', 'material', 'dimensions', 'position', 'notes', 'uses_white_material',
+        'change_details', 'deleted_at',
       ]);
     expect((database.pragma('table_info(qr_code_files)') as Array<{ name: string }>).map((column) => column.name))
       .toContain('detected_identifier');

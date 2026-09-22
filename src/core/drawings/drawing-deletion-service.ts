@@ -28,6 +28,22 @@ export class DrawingDeletionService {
 
   constructor(private readonly db: PlannerDatabase) { this.batches = new MaterialBatchService(db); }
 
+  deleteBatch(inputs: DeleteDrawingInput[]) {
+    const seen = new Set<number>();
+    const items = inputs.filter((input) => {
+      if (seen.has(input.signedId)) return false;
+      seen.add(input.signedId); return true;
+    }).map((input) => {
+      try { return { signedId: input.signedId, status: 'deleted' as const, result: this.delete(input) }; }
+      catch (error) {
+        if (!(error instanceof DrawingDeletionError)) return { signedId: input.signedId, status: 'failed' as const,
+          code: 'DRAWING_DELETE_FAILED', message: '该项删除失败，事务已回滚；请刷新后检查' };
+        return { signedId: input.signedId, status: 'skipped' as const, code: error.code, message: error.message };
+      }
+    });
+    return { items };
+  }
+
   preview(signedId: number): DrawingDeletionPreview {
     const row = this.getRow(signedId);
     if (!row) throw new DrawingDeletionError('DRAWING_NOT_FOUND', '图号记录不存在');
@@ -131,7 +147,7 @@ export class DrawingDeletionService {
       sum(case when current.version_id = item.bom_version_id then 1 else 0 end) as currentBom,
       sum(case when current.version_id is null or current.version_id <> item.bom_version_id then 1 else 0 end) as historicalBom
       from bom_items item left join bom_current current on current.version_id = item.bom_version_id
-      where item.${referenceColumn} = ?`).get(row.id) as Record<string, number | null>;
+      where item.${referenceColumn} = ? and item.deleted_at is null`).get(row.id) as Record<string, number | null>;
     const usage = this.batches.getDrawingUsage(row.fullCode, row.status);
     const lineage = row.origin === 'planned' ? (this.db.prepare(`select count(*) as count from drawing_numbers
       where deleted_at is null and id <> ? and (previous_drawing_id = ? or source_drawing_id = ?)`)

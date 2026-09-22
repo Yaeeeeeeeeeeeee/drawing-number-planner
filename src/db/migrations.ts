@@ -2,6 +2,7 @@ import type { PlannerDatabase } from './database.js';
 import { toWorkspacePathKey } from '../core/files/workspace-paths.js';
 import {
   schemaVersionFive,
+  schemaVersionFourteen,
   schemaVersionFour,
   schemaVersionOne,
   schemaVersionSix,
@@ -724,8 +725,8 @@ function applyDrawingDeletionSchema(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 13) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 13`);
-  if (from >= 13) {
+  if (from > 14) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 14`);
+  if (from >= 14) {
     if (!hasBatchPathIndex(database)) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => ensureBatchPathIndex(database))();
@@ -834,6 +835,18 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations (version, applied_at) values (13, ?)').run(new Date().toISOString());
       validateDrawingDeletionMigration(database, before);
     }
+    if (from < 14) {
+      const tables = ['products', 'drawing_numbers', 'historical_drawing_numbers', 'pdf_files', 'material_batches',
+        'bom_versions', 'bom_items', 'bom_assets', 'bom_item_assets', 'product_qr_codes',
+        'outbound_packages', 'outbound_package_items', 'outbound_email_drafts'];
+      const counts = tables.map((table) => countRows(database, table));
+      database.exec(schemaVersionFourteen);
+      database.prepare('insert into schema_migrations (version, applied_at) values (14, ?)').run(new Date().toISOString());
+      if (tables.some((table, index) => countRows(database, table) !== counts[index])
+        || (database.pragma('foreign_key_check') as unknown[]).length > 0) {
+        throw new Error('第二轮验收修正数据校验失败，数据库未升级');
+      }
+    }
   })();
-  return { from, to: 13 };
+  return { from, to: 14 };
 }

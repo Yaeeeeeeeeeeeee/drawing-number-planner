@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { ProductService } from '../../src/core/products/product-service';
+import { ProductRepository } from '../../src/core/products/product-repository';
 import { OccupiedNumberRepository } from '../../src/core/planning/occupied-number-repository';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
@@ -17,6 +18,15 @@ beforeEach(() => {
   products = new ProductService(db);
 });
 afterEach(() => db.close());
+
+it('does not count deleted historical drawings or BOM records as current product blockers', () => {
+  const product = products.create({ ...validReferences(), sku: 'SOFT-DELETE', model: 'T40', productCategory: '冰柜' });
+  insertHistorical({ fullCode: '02.0209.010.0401001', productId: product.id });
+  db.prepare("update historical_drawing_numbers set deleted_at = '2026-09-22', deletion_mode = 'retain_occupied'").run();
+  db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at, deleted_at)
+    values (?, 1, '2026-09-22', '2026-09-22', '2026-09-22')`).run(product.id);
+  expect(new ProductRepository(db).getReferenceSummary(product.id)).toMatchObject({ historicalDrawingCount: 0, bomCount: 0 });
+});
 
 function validReferences(prefix = '') {
   return {
