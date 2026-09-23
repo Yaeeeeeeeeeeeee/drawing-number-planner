@@ -57,6 +57,15 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
   ensureMultipart(app);
+  app.get('/api/boms/assets/:id/preview', async (request, reply) => {
+    const params = versionParams.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '附件编号无效' } });
+    try {
+      const asset = service.previewAsset(params.data.id);
+      return reply.header('Cache-Control', 'no-store').header('X-Content-Type-Options', 'nosniff')
+        .type(asset.mimeType).send(asset.content);
+    } catch (error) { return sendBomError(reply, error); }
+  });
   app.put('/api/boms/versions/:id', async (request, reply) => {
     const params = versionParams.safeParse(request.params);
     const body = z.object({ input: saveSchema, expectedRevision: z.number().int().nonnegative() }).strict().safeParse(request.body);

@@ -42,6 +42,34 @@ function insertHistorical(productId: number | null, projectItemCode: string, sta
     .run(fullCode, projectItemCode, sequence, productId, status).lastInsertRowid);
 }
 describe('product-level BOM service', () => {
+  it('does not reuse an attachment from an item removed from the previous BOM', () => {
+    const r = setup(); const logo = r.draw(r.product.id, r.white.id, r.logo.id);
+    const manual = r.draw(r.product.id, r.white.id, r.manual.id); const image = insertAsset('removed.png');
+    const keep = { projectItemId: r.manual.id, drawingId: manual.id, usesWhiteMaterial: false };
+    const old = { projectItemId: r.logo.id, drawingId: logo.id, usesWhiteMaterial: false };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null,
+      items: [keep, { ...old, assets: [{ role: 'image' as const, assetId: image }] }] };
+    const first = service.saveVersion(input).version;
+    service.updateVersion(first.id, { ...input, items: [keep] }, 0);
+    expect(() => service.saveVersion({ ...input, expectedCurrentVersionId: first.id,
+      items: [keep, { ...old, assets: [{ role: 'image', reusePrevious: true }] }] }))
+      .toThrowError(expect.objectContaining({ code: 'ASSET_REUSE_NOT_FOUND' }));
+    expect(service.listVersions(r.product.id)).toHaveLength(1);
+  });
+  it('allows text edits retaining a missing original batch but rejects assigning that batch to a new BOM', () => {
+    const r = setup(); const d = r.draw(r.product.id, r.white.id, r.logo.id);
+    const batch = insertBatch(r.product.id, '01.冰柜\\SKU1-X1\\03.量产后的变更文件\\01.20260901');
+    const item = { projectItemId: r.logo.id, drawingId: d.id, usesWhiteMaterial: false, effectiveMaterialBatchId: batch };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null, items: [item] };
+    const first = service.saveVersion(input).version;
+    db.prepare('update material_batches set is_present = 0 where id = ?').run(batch);
+    const edited = service.updateVersion(first.id, { ...input, items: [{ ...item, notes: '补录' }] }, 0).version;
+    expect(edited.items[0]).toMatchObject({ effectiveMaterialBatchId: batch, effectiveBatchName: '01.20260901', notes: '补录' });
+    expect(() => service.saveVersion({ ...input, expectedCurrentVersionId: first.id }))
+      .toThrowError(expect.objectContaining({ code: 'BATCH_NOT_ELIGIBLE' }));
+    const cleared = service.updateVersion(first.id, { ...input, items: [{ ...item, effectiveMaterialBatchId: null }] }, 1).version;
+    expect(cleared.items[0]).toMatchObject({ effectiveMaterialBatchId: null, effectiveBatchRelativePath: null, effectiveBatchName: null });
+  });
   it('keeps an old batch snapshot when editing text after the batch index has disappeared', () => {
     const r = setup(); const d = r.draw(r.product.id, r.white.id, r.logo.id);
     const path = '01.冰柜\\SKU1-X1\\03.量产后的变更文件\\01.20260901';
@@ -100,7 +128,7 @@ describe('product-level BOM service', () => {
     const later = service.saveVersion({ ...input, expectedCurrentVersionId: first.id,
       items: [{ ...item, assets: [{ role: 'image', reusePrevious: true }] }] }).version;
     service.updateVersion(first.id, { ...input, items: [{ ...item, assets: [{ role: 'image', assetId: secondAsset }] }] }, 0);
-    expect(service.getVersion(later.id).items[0].assets[0]).toMatchObject({ assetId: firstAsset, originalFileName: 'first.png' });
+    expect(service.getVersion(later.id).items[0].assets[0]).toMatchObject({ assetId: firstAsset, originalFileName: 'first.png', inherited: true });
     expect(service.getCurrent(r.product.id)?.id).toBe(later.id);
     expect(db.pragma('foreign_key_check')).toEqual([]);
   });

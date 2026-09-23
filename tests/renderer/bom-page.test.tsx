@@ -53,6 +53,14 @@ async function selectProduct(expectEmpty = true) {
 }
 
 describe('BomPage product-level BOM', () => {
+  it('shows the retained missing batch while editing instead of displaying an empty selection', async () => {
+    const api = apiFixture();
+    api.listMaterialBatches.mockResolvedValue([{ id: 8, name: '01.20260901', relativePath: 'X/01.20260901', productId: 1, isPresent: false }]);
+    api.getCurrentBom.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], effectiveMaterialBatchId: 8 }] });
+    render(<BomPage api={api as never} />); await selectProduct(false);
+    expect(await screen.findByRole('option', { name: /01.20260901.*已缺失/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('第 1 行生效资料批次')).toHaveValue('8');
+  });
   it('shows query details as separate business fields and keeps model-wide deletion collapsed', async () => {
     const api = apiFixture();
     const record = { ...activeCurrent, editRevision: 1, updatedAt: '2026-09-03T10:00:00Z', items: [{

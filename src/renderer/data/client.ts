@@ -101,7 +101,7 @@ export interface BomAssetView {
   id: number; relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number;
   contentSha256: string; createdAt: string;
 }
-export interface BomItemAssetView extends BomAssetView { assetId: number; role: 'image' | 'diagram'; inheritedFromBomItemAssetId: number | null; }
+export interface BomItemAssetView extends BomAssetView { assetId: number; role: 'image' | 'diagram'; inheritedFromBomItemAssetId: number | null; inherited?: boolean; }
 export interface BomQrCodeView { id: number; name: string; purposeDisplayName: string; status: 'active' | 'inactive'; }
 export interface BomQrCandidateView extends BomQrCodeView { status: 'active'; }
 export type BomItemView = BomDrawingReferenceView & {

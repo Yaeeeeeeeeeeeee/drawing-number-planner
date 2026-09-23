@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { BomVersionSummaryView, BomVersionView, DictionaryItemView } from '../../data/client';
 import { openBomAssetLocation } from '../../desktop-files';
+import { BomAssetPreview } from './BomAssetPreview';
 
 const businessDateLabel = (item: { businessChangeDate: string | null; businessChangeDateLabel: string }) =>
   item.businessChangeDate ?? (item.businessChangeDateLabel === '未补录' ? '业务日期未补录' : item.businessChangeDateLabel);
@@ -39,7 +40,7 @@ export function BomQuery({ model, businessChangeDate, effectiveBatchRelativePath
         <div className="planning-row-title"><strong>{item.projectItemName}</strong><span className="code-cell">{item.fullCode}</span></div>
         <p>生效批次：{item.effectiveBatchName ?? '—'}</p>
         <dl className="form-grid"><div><dt>材质</dt><dd>{item.material || '—'}</dd></div><div><dt>尺寸</dt><dd>{item.dimensions || '—'}</dd></div><div><dt>位置</dt><dd>{item.position || '—'}</dd></div></dl>
-        <ul className="bom-asset-paths">{item.assets.map((asset) => <li key={asset.id}><span><strong>{asset.role === 'diagram' ? '位置示意图' : '图片'} · {asset.originalFileName}{asset.inheritedFromBomItemAssetId ? '（沿用）' : ''}</strong><small className="bom-asset-path">{asset.relativePath}</small></span><button className="text-button" type="button" aria-label={`打开附件位置 ${asset.originalFileName}`} onClick={() => void openAssetLocation(asset.assetId)}>打开位置</button></li>)}</ul>
+        <ul className="bom-asset-paths">{item.assets.map((asset) => <li key={asset.id}><span><BomAssetPreview key={asset.assetId} assetId={asset.assetId} name={asset.originalFileName} /><strong>{asset.role === 'diagram' ? '位置示意图' : '图片'} · {asset.originalFileName}{(asset.inherited || asset.inheritedFromBomItemAssetId) ? '（沿用）' : ''}</strong><small className="bom-asset-path">{asset.relativePath}</small></span><button className="text-button" type="button" aria-label={`打开附件位置 ${asset.originalFileName}`} onClick={() => void openAssetLocation(asset.assetId)}>打开位置</button></li>)}</ul>
         <div><h4>修改明细</h4><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.changeDetails || '—'}</p></div>
         {item.notes && <div><h4>备注</h4><p>{item.notes}</p></div>}
       </article>)}</div>

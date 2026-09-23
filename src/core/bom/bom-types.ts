@@ -6,6 +6,7 @@ export type BomDrawingReference = { origin: 'planned'; drawingId: number }
 
 export interface BomItemAssetInput { role: BomAssetRole; assetId?: number; reusePrevious?: boolean }
 export interface BomItemAssetRecord {
+  inherited: boolean;
   id: number; assetId: number; role: BomAssetRole; inheritedFromBomItemAssetId: number | null;
   relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string; createdAt: string;
 }

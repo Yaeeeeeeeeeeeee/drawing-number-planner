@@ -67,6 +67,12 @@ export class BomService {
     return new BomAssetService(this.db, workspaceRoot).import({ sku: product.sku, model: product.model, sourcePath, originalFileName });
   }
 
+  previewAsset(id: number) {
+    const root = this.workspaceRoot?.();
+    if (!root) throw new BomError('ASSET_SOURCE_INVALID', '资料根目录未配置');
+    return new BomAssetService(this.db, root).preview(id);
+  }
+
   getCurrent(productId: number, _legacyColorId?: number): BomVersionDetail | null {
     const id = this.repository.getCurrentVersionId(productId);
     return id === null ? null : this.getVersion(id);
@@ -177,10 +183,15 @@ export class BomService {
       if (!input.items.length) throw new BomError('INVALID_BOM_ITEM_COUNT', 'BOM 至少需要一个项目');
       const projects = new Set<number>();
       const validated = input.items.map((item) => {
-        const validatedItem = this.validateItem(item, input.productId, projects, input.entryMode ?? 'historical');
         const original = previous.items.find((old) => old.projectItemId === item.projectItemId);
-        if (original && item.effectiveMaterialBatchId === undefined
-          && item.effectiveBatchRelativePath === undefined && item.effectiveBatchName === undefined) {
+        const keepBatch = original && (item.effectiveMaterialBatchId === undefined
+          || (item.effectiveMaterialBatchId !== null && item.effectiveMaterialBatchId === original.effectiveMaterialBatchId))
+          && (item.effectiveBatchRelativePath === undefined || item.effectiveBatchRelativePath === original.effectiveBatchRelativePath)
+          && (item.effectiveBatchName === undefined || item.effectiveBatchName === original.effectiveBatchName);
+        const validatedItem = this.validateItem(keepBatch ? { ...item, effectiveMaterialBatchId: undefined,
+          effectiveBatchRelativePath: undefined, effectiveBatchName: undefined } : item,
+        input.productId, projects, input.entryMode ?? 'historical');
+        if (keepBatch) {
           validatedItem.effectiveMaterialBatchId = original.effectiveMaterialBatchId;
           validatedItem.effectiveBatchRelativePath = original.effectiveBatchRelativePath;
           validatedItem.effectiveBatchName = original.effectiveBatchName;

@@ -82,6 +82,11 @@ describe('product-level BOM API',()=>{
    expect(accepted.statusCode).toBe(201); const asset=accepted.json().asset;
    expect(asset).toMatchObject({originalFileName:'客户示意图.png',mimeType:'image/png',sizeBytes:8});
    expect(existsSync(join(workspace,asset.relativePath))).toBe(true);
+   const preview = await uploadApp.inject({ method: 'GET', url: `/api/boms/assets/${asset.id}/preview` });
+   expect(preview.statusCode).toBe(200);
+   expect(preview.headers['content-type']).toBe('image/png');
+   expect(preview.headers['x-content-type-options']).toBe('nosniff');
+   expect(preview.rawPayload).toEqual(Buffer.from([137,80,78,71,13,10,26,10]));
    const fake=multipartAsset(refs.product.id,'fake.png',Buffer.from('not-an-image'),'FAKE-BOUNDARY');
    const rejected=await uploadApp.inject({method:'POST',url:'/api/boms/assets',headers:{'content-type':`multipart/form-data; boundary=${fake.boundary}`},payload:fake.payload});
    expect(rejected.statusCode).toBe(422); expect(rejected.json().error.code).toBe('ASSET_CONTENT_INVALID');

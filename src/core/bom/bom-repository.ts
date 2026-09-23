@@ -272,14 +272,16 @@ export class BomRepository {
   }
 
   listItemAssets(bomItemId: number) {
-    return this.db.prepare(`select link.id, link.asset_id as assetId, link.role, link.inherited_from_bom_item_asset_id as inheritedFromBomItemAssetId,
+    const rows = this.db.prepare(`select link.id, link.asset_id as assetId, link.role, link.inherited_from_bom_item_asset_id as inheritedFromBomItemAssetId,
+      (link.inherited_from_bom_item_asset_id is not null or link.inheritance_snapshot_json is not null) as inherited,
       asset.relative_path as relativePath, asset.original_file_name as originalFileName, asset.mime_type as mimeType,
       asset.size_bytes as sizeBytes, asset.content_sha256 as contentSha256, asset.created_at as createdAt
       from bom_item_assets link join bom_assets asset on asset.id = link.asset_id
       where link.bom_item_id = ? order by link.role`).all(bomItemId) as Array<{
-        id: number; assetId: number; role: BomAssetRole; inheritedFromBomItemAssetId: number | null;
+        id: number; assetId: number; role: BomAssetRole; inheritedFromBomItemAssetId: number | null; inherited: number;
         relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string; createdAt: string;
       }>;
+    return rows.map((row) => ({ ...row, inherited: row.inherited === 1 }));
   }
 
   assetExists(assetId: number): boolean { return Boolean(this.db.prepare('select 1 from bom_assets where id = ?').get(assetId)); }
@@ -287,7 +289,8 @@ export class BomRepository {
   previousItemAsset(previousVersionId: number, projectItemId: number, role: BomAssetRole): { id: number; assetId: number } | undefined {
     return this.db.prepare(`select link.id, link.asset_id as assetId from bom_item_assets link
       join bom_items item on item.id = link.bom_item_id
-      where item.bom_version_id = ? and item.project_item_id = ? and link.role = ?`).get(previousVersionId, projectItemId, role) as {
+      where item.bom_version_id = ? and item.project_item_id = ? and link.role = ?
+        and item.deleted_at is null`).get(previousVersionId, projectItemId, role) as {
         id: number; assetId: number;
       } | undefined;
   }

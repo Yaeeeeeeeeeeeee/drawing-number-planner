@@ -34,6 +34,30 @@ export class BomAssetService {
   readonly workspaceRoot: string;
   constructor(private readonly db: PlannerDatabase, workspaceRoot: string) { this.workspaceRoot = validateWorkspaceRoot(workspaceRoot); }
 
+  preview(id: number): { content: Buffer; mimeType: string } {
+    const asset = this.db.prepare('select relative_path as path, content_sha256 as hash from bom_assets where id = ?')
+      .get(id) as { path: string; hash: string } | undefined;
+    if (!asset) throw new BomError('ASSET_NOT_FOUND', 'BOM 附件不存在');
+    const path = resolveWorkspacePath(this.workspaceRoot, asset.path, { requireExistingParent: true });
+    const extension = extname(path).toLowerCase(); const mimeType = MIME_BY_EXTENSION[extension];
+    if (!mimeType) throw new BomError('ASSET_TYPE_INVALID', '附件不是支持的图片类型');
+    let content: Buffer;
+    try {
+      const stats = statSync(path);
+      if (!stats.isFile()) throw new BomError('ASSET_NOT_FOUND', 'BOM 附件已缺失');
+      if (stats.size > MAX_ASSET_BYTES) throw new BomError('ASSET_TOO_LARGE', 'BOM 图片超过预览大小限制');
+      content = readFileSync(path);
+    } catch (error) {
+      if (error instanceof BomError) throw error;
+      throw new BomError('ASSET_NOT_FOUND', 'BOM 附件已缺失或无法读取');
+    }
+    if (!hasExpectedImageSignature(content, extension)
+      || createHash('sha256').update(content).digest('hex') !== asset.hash) {
+      throw new BomError('ASSET_CONTENT_INVALID', '附件内容已变化，请重新关联后预览');
+    }
+    return { content, mimeType };
+  }
+
   import(input: ImportBomAssetInput): ManagedBomAsset {
     if (!isAbsolute(input.sourcePath)) throw new BomError('ASSET_SOURCE_INVALID', 'BOM 附件源文件必须是本机绝对路径');
     let sourceStats: ReturnType<typeof statSync>;

@@ -16,6 +16,20 @@ afterEach(() => {
 });
 
 describe('BomAssetService', () => {
+  it('previews only a registered image and rejects a missing or replaced attachment', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-preview-')); directories.push(workspace);
+    const source = join(workspace, 'image.png'); const content = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    writeFileSync(source, content);
+    const db = openDatabase(':memory:'); databases.push(db); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+    const service = new BomAssetService(db, workspace);
+    const asset = service.import({ sku: 'SKU', model: 'M', sourcePath: source });
+    expect(service.preview(asset.id)).toEqual({ content, mimeType: 'image/png' });
+    expect(() => service.preview(999)).toThrow(/不存在/);
+    writeFileSync(join(workspace, asset.relativePath), 'not-an-image');
+    expect(() => service.preview(asset.id)).toThrow(/内容/);
+    rmSync(join(workspace, asset.relativePath));
+    expect(() => service.preview(asset.id)).toThrow(/缺失/);
+  });
   it('rejects fake image content and oversized files without creating a managed asset', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-assets-invalid-')); directories.push(workspace);
     const fake = join(workspace, 'fake.png'); writeFileSync(fake, Buffer.from('not-an-image'));
