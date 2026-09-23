@@ -1133,6 +1133,7 @@ export const schemaVersionThirteen = `
 `;
 
 export const schemaVersionFourteen = `
+  ALTER TABLE bom_item_assets ADD COLUMN deleted_at TEXT;
   ALTER TABLE bom_item_assets ADD COLUMN inheritance_snapshot_json TEXT CHECK (inheritance_snapshot_json IS NULL OR json_valid(inheritance_snapshot_json));
   ALTER TABLE products ADD COLUMN deleted_at TEXT;
   ALTER TABLE products ADD COLUMN deletion_reason TEXT;

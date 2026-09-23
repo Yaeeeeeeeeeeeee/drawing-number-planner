@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,6 +16,37 @@ afterEach(() => {
 });
 
 describe('BomAssetService', () => {
+  it('keeps the old asset usable when archive registration fails', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-archive-fail-')); directories.push(workspace);
+    const source = join(workspace, 'image.png'); const content = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]); writeFileSync(source, content);
+    const db = openDatabase(':memory:'); databases.push(db); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+    const service = new BomAssetService(db, workspace); const old = service.import({ sku: 'SKU', model: 'M', sourcePath: source });
+    db.exec("create trigger reject_archive before insert on bom_assets begin select raise(abort, 'archive-failed'); end");
+    expect(() => service.archive({ assetId: old.id, model: 'M', businessDate: '2026-09-23', project: '铭牌', role: 'image' })).toThrow('archive-failed');
+    expect(service.preview(old.id).content).toEqual(content);
+    expect(readdirSync(join(workspace, 'BOM附件', 'M', '20260923'))).toEqual([]);
+    expect(() => service.archive({ assetId: old.id, model: '../escape', businessDate: '2026-09-23', project: '铭牌', role: 'image' })).toThrow(/路径/);
+    expect(() => service.archive({ assetId: old.id, model: 'M', businessDate: '2026-02-30', project: '铭牌', role: 'image' })).toThrow(/日期/);
+  });
+  it('archives by business date and role without overwriting a prior copy or changing its source', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-archive-')); directories.push(workspace);
+    const source = join(workspace, 'image.png'); const content = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    writeFileSync(source, content);
+    const db = openDatabase(':memory:'); databases.push(db); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+    const service = new BomAssetService(db, workspace);
+    const old = service.import({ sku: 'SKU', model: 'M', sourcePath: source });
+    const context = { assetId: old.id, model: 'M', businessDate: '2026-09-23', project: '铭牌', role: 'image' as const };
+    const first = service.archive(context); const second = service.archive(context);
+    const diagram = service.archive({ ...context, role: 'diagram' });
+    expect(first.relativePath).toBe(join('BOM附件', 'M', '20260923', '铭牌-20260923.png'));
+    expect(second.originalFileName).toBe('铭牌-20260923-1.png');
+    expect(diagram.originalFileName).toBe('铭牌-20260923-位置示意图.png');
+    for (const item of [old, first, second, diagram]) expect(readFileSync(join(workspace, item.relativePath))).toEqual(content);
+    expect(readFileSync(source)).toEqual(content);
+    writeFileSync(join(workspace, old.relativePath), 'changed');
+    expect(() => service.archive(context)).toThrow(/内容/);
+    expect(db.prepare('select count(*) as n from bom_assets').get()).toEqual({ n: 4 });
+  });
   it('previews only a registered image and rejects a missing or replaced attachment', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'planner-bom-preview-')); directories.push(workspace);
     const source = join(workspace, 'image.png'); const content = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);

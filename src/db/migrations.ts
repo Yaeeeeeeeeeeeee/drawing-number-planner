@@ -727,9 +727,14 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
   const from = currentVersion(database);
   if (from > 14) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 14`);
   if (from >= 14) {
-    if (!hasBatchPathIndex(database)) {
+    const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
+    if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
-      database.transaction(() => ensureBatchPathIndex(database))();
+      database.transaction(() => {
+        ensureBatchPathIndex(database);
+        if (missingAssetRemoval) database.exec('alter table bom_item_assets add column deleted_at text');
+        if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('附件关联兼容升级校验失败');
+      })();
     }
     return { from, to: from };
   }

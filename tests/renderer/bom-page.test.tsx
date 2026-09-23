@@ -78,8 +78,9 @@ describe('BomPage product-level BOM', () => {
     expect(screen.getByLabelText('输入型号确认删除整个 BOM')).not.toBeVisible();
   });
   it('edits the selected history in place with its revision and independent change details', async () => {
-    const record = { ...activeCurrent, editRevision: 2, updatedAt: activeCurrent.createdAt };
+    const record = { ...currentWithReferences, editRevision: 2, updatedAt: activeCurrent.createdAt };
     const api = { ...apiFixture(), updateBomVersion: vi.fn().mockResolvedValue({ version: record, diff: [] }) };
+    api.listBomCandidates.mockResolvedValue([{ ...candidate, status: 'voided' }]);
     api.queryBomVersions.mockResolvedValue([record]);
     api.getBomVersion.mockResolvedValue(record);
     render(<BomPage api={api as never} />);

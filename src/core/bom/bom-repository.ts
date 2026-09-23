@@ -277,7 +277,7 @@ export class BomRepository {
       asset.relative_path as relativePath, asset.original_file_name as originalFileName, asset.mime_type as mimeType,
       asset.size_bytes as sizeBytes, asset.content_sha256 as contentSha256, asset.created_at as createdAt
       from bom_item_assets link join bom_assets asset on asset.id = link.asset_id
-      where link.bom_item_id = ? order by link.role`).all(bomItemId) as Array<{
+      where link.bom_item_id = ? and link.deleted_at is null order by link.role`).all(bomItemId) as Array<{
         id: number; assetId: number; role: BomAssetRole; inheritedFromBomItemAssetId: number | null; inherited: number;
         relativePath: string; originalFileName: string; mimeType: string; sizeBytes: number; contentSha256: string; createdAt: string;
       }>;
@@ -290,14 +290,16 @@ export class BomRepository {
     return this.db.prepare(`select link.id, link.asset_id as assetId from bom_item_assets link
       join bom_items item on item.id = link.bom_item_id
       where item.bom_version_id = ? and item.project_item_id = ? and link.role = ?
-        and item.deleted_at is null`).get(previousVersionId, projectItemId, role) as {
+        and item.deleted_at is null and link.deleted_at is null`).get(previousVersionId, projectItemId, role) as {
         id: number; assetId: number;
       } | undefined;
   }
 
   insertItemAsset(bomItemId: number, assetId: number, role: BomAssetRole, inheritedFromBomItemAssetId: number | null): void {
     this.db.prepare(`insert into bom_item_assets (bom_item_id, asset_id, role, inherited_from_bom_item_asset_id)
-      values (?, ?, ?, ?)`).run(bomItemId, assetId, role, inheritedFromBomItemAssetId);
+      values (?, ?, ?, ?) on conflict(bom_item_id, role) do update set asset_id = excluded.asset_id,
+      inherited_from_bom_item_asset_id = excluded.inherited_from_bom_item_asset_id, inheritance_snapshot_json = null,
+      deleted_at = null`).run(bomItemId, assetId, role, inheritedFromBomItemAssetId);
   }
 
   listItemQrCodes(bomItemId: number): BomQrCodeRecord[] {

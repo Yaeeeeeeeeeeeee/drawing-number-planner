@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
+import { closeSync, copyFileSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 
@@ -33,6 +33,42 @@ function safeSegment(value: string, label: string): string {
 export class BomAssetService {
   readonly workspaceRoot: string;
   constructor(private readonly db: PlannerDatabase, workspaceRoot: string) { this.workspaceRoot = validateWorkspaceRoot(workspaceRoot); }
+
+  archive(input: { assetId: number; model: string; businessDate: string; project: string; role: 'image' | 'diagram' }): ManagedBomAsset {
+    const date = new Date(`${input.businessDate}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.businessDate) || Number.isNaN(date.getTime())
+      || date.toISOString().slice(0, 10) !== input.businessDate) throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '业务变更日期无效');
+    const model = safeSegment(input.model, '型号'); const project = safeSegment(input.project, '项目');
+    const source = this.db.prepare('select relative_path as path from bom_assets where id = ?').get(input.assetId) as { path: string } | undefined;
+    if (!source) throw new BomError('ASSET_NOT_FOUND', 'BOM 附件不存在');
+    const { content, mimeType } = this.preview(input.assetId);
+    const hash = createHash('sha256').update(content).digest('hex');
+    const day = input.businessDate.replaceAll('-', '');
+    const stem = `${project}-${day}${input.role === 'diagram' ? '-位置示意图' : ''}`;
+    const extension = extname(source.path).toLowerCase();
+    for (let suffix = 0; suffix < 10000; suffix++) {
+      const name = `${stem}${suffix ? `-${suffix}` : ''}${extension}`;
+      const relativePath = join('BOM附件', model, day, name);
+      const destination = resolveWorkspacePath(this.workspaceRoot, relativePath, { requireExistingParent: true });
+      mkdirSync(dirname(destination), { recursive: true });
+      resolveWorkspacePath(this.workspaceRoot, relativePath, { requireExistingParent: true });
+      let fd: number;
+      try { fd = openSync(destination, 'wx'); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue; throw error; }
+      try {
+        try { writeFileSync(fd, content); fsyncSync(fd); } finally { closeSync(fd); }
+        if (createHash('sha256').update(readFileSync(destination)).digest('hex') !== hash) {
+          throw new BomError('ASSET_CONTENT_INVALID', '归档附件校验失败');
+        }
+        const createdAt = new Date().toISOString();
+        const id = Number(this.db.prepare(`insert into bom_assets
+          (relative_path, original_file_name, mime_type, size_bytes, content_sha256, created_at) values (?, ?, ?, ?, ?, ?)`)
+          .run(relativePath, name, mimeType, content.length, hash, createdAt).lastInsertRowid);
+        return { id, relativePath, originalFileName: name, mimeType, sizeBytes: content.length, contentSha256: hash, createdAt };
+      } catch (error) { rmSync(destination, { force: true }); throw error; }
+    }
+    throw new BomError('ASSET_PATH_INVALID', '附件同名数量过多，请检查归档目录');
+  }
 
   preview(id: number): { content: Buffer; mimeType: string } {
     const asset = this.db.prepare('select relative_path as path, content_sha256 as hash from bom_assets where id = ?')

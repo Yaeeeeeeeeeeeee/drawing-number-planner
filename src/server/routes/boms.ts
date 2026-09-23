@@ -57,6 +57,15 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
   ensureMultipart(app);
+  app.get('/api/boms/assets/archive-preview', async (_request, reply) => {
+    try { return { items: service.previewAssetArchive() }; } catch (error) { return sendBomError(reply, error); }
+  });
+  app.post('/api/boms/assets/:id/archive', async (request, reply) => {
+    const params = versionParams.safeParse(request.params);
+    const body = z.object({ confirmed: z.literal(true) }).strict().safeParse(request.body);
+    if (!params.success || !body.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '请先确认附件迁移' } });
+    try { return service.archiveAssetLink(params.data.id); } catch (error) { return sendBomError(reply, error); }
+  });
   app.get('/api/boms/assets/:id/preview', async (request, reply) => {
     const params = versionParams.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '附件编号无效' } });

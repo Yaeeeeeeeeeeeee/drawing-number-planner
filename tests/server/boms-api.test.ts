@@ -11,6 +11,11 @@ function multipartAsset(productId: number, filename: string, content: Buffer, bo
 }
 beforeEach(() => { db=openDatabase(':memory:'); migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined}); const d=new DictionaryService(db), p=new ProductService(db), brand=d.create({type:'brand',code:'02',name:'B'}), size=d.create({type:'product_size',code:'0404',name:'S'}), appearance=d.create({type:'appearance',code:'01',name:'A'}), white=d.create({type:'color',code:'0',name:'W'}), main=d.create({type:'main_category',code:'04',name:'M'}), logo=d.create({type:'project_item',code:'01',name:'L',parentId:main.id}), product=p.create({sku:'SKU',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id,model:'X',productCategory:'冰柜'}), plan=new PlanningService(db), input={productId:product.id,rows:[{clientId:'x',colorId:white.id,mainCategoryId:main.id,projectItemId:logo.id}]}, preview=plan.preview(input), drawing=plan.reserve({...input,rows:[{...input.rows[0],expectedFullCode:preview.rows[0].fullCode}]})[0]; refs={product,logo,drawing}; app=Fastify(); registerBomRoutes(app,new BomService(db)); }); afterEach(async()=>{await app.close();db.close();});
 describe('product-level BOM API',()=>{
+ it('requires explicit confirmation for attachment migration and reports an unconfigured root', async () => {
+   expect((await app.inject({ method: 'POST', url: '/api/boms/assets/1/archive', payload: { confirmed: false } })).statusCode).toBe(400);
+   const response = await app.inject({ method: 'POST', url: '/api/boms/assets/1/archive', payload: { confirmed: true } });
+   expect(response.statusCode).toBe(422); expect(response.json().error.message).toContain('资料根目录');
+ });
  it('edits in place and returns a conflict without overwriting a newer edit', async () => {
    const input = { productId: refs.product.id, businessChangeDate: '2026-09-02', expectedCurrentVersionId: null,
      items: [{ projectItemId: refs.logo.id, drawingId: refs.drawing.id, usesWhiteMaterial: true, changeDetails: '初稿' }] };

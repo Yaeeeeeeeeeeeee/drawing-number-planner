@@ -102,6 +102,7 @@ export interface BomAssetView {
   contentSha256: string; createdAt: string;
 }
 export interface BomItemAssetView extends BomAssetView { assetId: number; role: 'image' | 'diagram'; inheritedFromBomItemAssetId: number | null; inherited?: boolean; }
+export interface BomArchiveCandidateView { linkId: number; assetId: number; model: string; businessDate: string | null; project: string; role: 'image' | 'diagram'; relativePath: string; versionId: number; }
 export interface BomQrCodeView { id: number; name: string; purposeDisplayName: string; status: 'active' | 'inactive'; }
 export interface BomQrCandidateView extends BomQrCodeView { status: 'active'; }
 export type BomItemView = BomDrawingReferenceView & {
@@ -326,6 +327,8 @@ export interface PlannerApi {
   listBomCandidates(input: { productId: number; projectItemId: number; usesWhiteMaterial: boolean; entryMode: BomEntryModeView }): Promise<BomCandidateView[]>;
   listBomQrCandidates(productId: number): Promise<BomQrCandidateView[]>;
   uploadBomAsset(productId: number, file: File): Promise<BomAssetView>;
+  previewBomAssetArchive(): Promise<BomArchiveCandidateView[]>;
+  archiveBomAssetLink(linkId: number): Promise<{ linkId: number; status: 'archived' | 'unchanged' }>;
   relinkBomMaterialBatch(id: number): Promise<{ relinked: number }>;
   saveBomVersion(input: SaveBomView): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
   updateBomVersion(id: number, input: SaveBomView, expectedRevision: number): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
@@ -569,6 +572,8 @@ export const apiClient: PlannerApi = {
     `/api/boms/query${queryString(filters)}`)).items,
   getBomVersion: (id) => request(`/api/boms/versions/${id}`),
   previewBomVersionDeletion: (id) => request(`/api/boms/versions/${id}/delete-preview`),
+  previewBomAssetArchive: async () => (await request<{ items: BomArchiveCandidateView[] }>('/api/boms/assets/archive-preview')).items,
+  archiveBomAssetLink: (id) => request(`/api/boms/assets/${id}/archive`, { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
   deleteBomVersion: (id, confirmed) => request(`/api/boms/versions/${id}`, json('DELETE', { confirmed })),
   deleteProductBom: (productId, modelConfirmation) => request(`/api/boms/products/${productId}`, json('DELETE', { modelConfirmation })),
   listBomCandidates: async (input) => (await request<{ items: BomCandidateView[] }>(

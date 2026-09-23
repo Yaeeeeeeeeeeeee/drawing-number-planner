@@ -42,6 +42,19 @@ function insertHistorical(productId: number | null, projectItemCode: string, sta
     .run(fullCode, projectItemCode, sequence, productId, status).lastInsertRowid);
 }
 describe('product-level BOM service', () => {
+  it('allows editing notes with the same formerly valid drawing without allowing a new voided reference', () => {
+    const r = setup(); const drawing = r.draw(r.product.id, r.white.id, r.logo.id);
+    const replacement = r.draw(r.product.id, r.white.id, r.logo.id);
+    const item = { projectItemId: r.logo.id, drawingId: drawing.id, usesWhiteMaterial: false };
+    const input = { productId: r.product.id, businessChangeDate: '2026-09-03', expectedCurrentVersionId: null, items: [item] };
+    const first = service.saveVersion(input).version;
+    db.prepare("update drawing_numbers set status = 'voided' where id in (?, ?)").run(drawing.id, replacement.id);
+    const edited = service.updateVersion(first.id, { ...input, items: [{ ...item, notes: '补录历史说明' }] }, 0).version;
+    expect(edited.items[0].notes).toBe('补录历史说明');
+    expect(edited.items[0].status).toBe('voided');
+    expect(() => service.updateVersion(first.id, { ...input, items: [{ ...item, drawingId: replacement.id }] }, 1)).toThrow(/作废/);
+    expect(() => service.saveVersion({ ...input, expectedCurrentVersionId: first.id })).toThrow(/作废/);
+  });
   it('does not reuse an attachment from an item removed from the previous BOM', () => {
     const r = setup(); const logo = r.draw(r.product.id, r.white.id, r.logo.id);
     const manual = r.draw(r.product.id, r.white.id, r.manual.id); const image = insertAsset('removed.png');

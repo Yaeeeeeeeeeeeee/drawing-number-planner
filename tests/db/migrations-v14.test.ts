@@ -47,3 +47,13 @@ it('rolls all v14 changes back when migration completion fails', () => {
   expect(db.prepare("select name from sqlite_master where name = 'outbound_package_parts'").get()).toBeUndefined();
   expect(db.pragma('table_info(products)')).not.toContainEqual(expect.objectContaining({ name: 'deleted_at' }));
 });
+it('backs up and completes an early v14 database before using attachment soft removal', () => {
+  const db = v13(); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+  if ((db.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((c) => c.name === 'deleted_at')) {
+    db.exec('alter table bom_item_assets drop column deleted_at');
+  }
+  const backup = vi.fn(); migrateDatabase(db, { databaseExists: true, createBackup: backup });
+  expect(backup).toHaveBeenCalledOnce();
+  expect(db.pragma('table_info(bom_item_assets)')).toContainEqual(expect.objectContaining({ name: 'deleted_at' }));
+  backup.mockClear(); migrateDatabase(db, { databaseExists: true, createBackup: backup }); expect(backup).not.toHaveBeenCalled();
+});

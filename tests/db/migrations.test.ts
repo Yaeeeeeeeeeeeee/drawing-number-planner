@@ -208,7 +208,7 @@ function businessRows(database: ReturnType<typeof openDatabase>, table: string) 
   const rows = database.prepare(`select * from "${table}" order by rowid`).all() as Array<Record<string, unknown>>;
   const added: Record<string, string[]> = { products: ['deleted_at', 'deletion_reason'], product_qr_codes: ['deleted_at'],
     bom_versions: ['updated_at', 'edit_revision'], bom_items: ['change_details', 'deleted_at'],
-    bom_item_assets: ['inheritance_snapshot_json'] };
+    bom_item_assets: ['inheritance_snapshot_json', 'deleted_at'] };
   if (added[table]) return rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !added[table].includes(key))));
   return table === 'drawing_numbers' || table === 'historical_drawing_numbers'
     ? rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !v13DeletionColumns.has(key))))

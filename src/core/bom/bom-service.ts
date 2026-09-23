@@ -1,5 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import { validateWorkspaceRelativePath } from '../files/workspace-paths.js';
+import { rmSync } from 'node:fs';
+import { resolveWorkspacePath, validateWorkspaceRelativePath } from '../files/workspace-paths.js';
+import { BomAssetArchiveService } from './bom-asset-archive-service.js';
 import { BomError } from './bom-errors.js';
 import { BomRepository } from './bom-repository.js';
 import { BomAssetService, type ManagedBomAsset } from './bom-asset-service.js';
@@ -73,6 +75,19 @@ export class BomService {
     return new BomAssetService(this.db, root).preview(id);
   }
 
+  previewAssetArchive() {
+    const root = this.workspaceRoot?.();
+    if (!root) throw new BomError('ASSET_SOURCE_INVALID', '资料根目录未配置');
+    return new BomAssetArchiveService(this.db, root).preview();
+  }
+
+  archiveAssetLink(linkId: number) {
+    const root = this.workspaceRoot?.();
+    if (!root) throw new BomError('ASSET_SOURCE_INVALID', '资料根目录未配置');
+    const asset = new BomAssetArchiveService(this.db, root).migrate(linkId);
+    return { linkId, status: asset ? 'archived' as const : 'unchanged' as const };
+  }
+
   getCurrent(productId: number, _legacyColorId?: number): BomVersionDetail | null {
     const id = this.repository.getCurrentVersionId(productId);
     return id === null ? null : this.getVersion(id);
@@ -142,7 +157,7 @@ export class BomService {
   }
 
   saveVersion(input: SaveBomInput): SavedBomVersion {
-    return this.db.transaction(() => {
+    return this.withArchiveTransaction((archive) => {
       this.validateProduct(input.productId);
       if (!input.businessChangeDate || !validBusinessDate(input.businessChangeDate)) {
         throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '业务变更日期必须是有效的 ISO 日期');
@@ -168,13 +183,14 @@ export class BomService {
       this.repository.activateDrawings(validated.flatMap((item) => item.drawingReference.origin === 'planned'
         ? [item.drawingReference.drawingId] : []));
       this.repository.setCurrent(input.productId, versionId, now);
+      archive(versionId);
       const version = this.getVersion(versionId);
       return { version, diff: buildDiff(previous, version) };
-    }).immediate();
+    });
   }
 
   updateVersion(id: number, input: SaveBomInput, expectedRevision: number): SavedBomVersion {
-    return this.db.transaction(() => {
+    return this.withArchiveTransaction((archive) => {
       const previous = this.getVersion(id);
       if (previous.productId !== input.productId) throw new BomError('DRAWING_WRONG_PRODUCT', '不能改变 BOM 所属产品');
       this.validateProduct(input.productId);
@@ -184,13 +200,16 @@ export class BomService {
       const projects = new Set<number>();
       const validated = input.items.map((item) => {
         const original = previous.items.find((old) => old.projectItemId === item.projectItemId);
+        const plannedId = item.drawingReference?.origin === 'planned' ? item.drawingReference.drawingId : item.drawingId;
+        const retainedPlannedId = original?.origin === 'planned' && original.drawingId === plannedId
+          && original.usesWhiteMaterial === item.usesWhiteMaterial ? plannedId : undefined;
         const keepBatch = original && (item.effectiveMaterialBatchId === undefined
           || (item.effectiveMaterialBatchId !== null && item.effectiveMaterialBatchId === original.effectiveMaterialBatchId))
           && (item.effectiveBatchRelativePath === undefined || item.effectiveBatchRelativePath === original.effectiveBatchRelativePath)
           && (item.effectiveBatchName === undefined || item.effectiveBatchName === original.effectiveBatchName);
         const validatedItem = this.validateItem(keepBatch ? { ...item, effectiveMaterialBatchId: undefined,
           effectiveBatchRelativePath: undefined, effectiveBatchName: undefined } : item,
-        input.productId, projects, input.entryMode ?? 'historical');
+        input.productId, projects, input.entryMode ?? 'historical', retainedPlannedId);
         if (keepBatch) {
           validatedItem.effectiveMaterialBatchId = original.effectiveMaterialBatchId;
           validatedItem.effectiveBatchRelativePath = original.effectiveBatchRelativePath;
@@ -220,9 +239,26 @@ export class BomService {
           this.saveItemAssets(itemId, item.projectItemId, previous.previousVersionId, item.assets);
         }
       });
+      archive(id);
       const version = this.getVersion(id);
       return { version, diff: buildDiff(previous, version) };
-    }).immediate();
+    });
+  }
+
+  private withArchiveTransaction<T>(work: (archive: (versionId: number) => void) => T): T {
+    const root = this.workspaceRoot?.(); const created: ManagedBomAsset[] = [];
+    try {
+      return this.db.transaction(() => work((versionId) => {
+        if (!root) return;
+        const archive = new BomAssetArchiveService(this.db, root);
+        for (const item of archive.preview().filter((candidate) => candidate.versionId === versionId)) {
+          const asset = archive.migrate(item.linkId); if (asset) created.push(asset);
+        }
+      })).immediate();
+    } catch (error) {
+      if (root) for (const asset of created) rmSync(resolveWorkspacePath(root, asset.relativePath, { requireExistingParent: true }), { force: true });
+      throw error;
+    }
   }
 
   private replaceEditedAssets(itemId: number, projectId: number, previousVersionId: number | null,
@@ -237,8 +273,25 @@ export class BomService {
         where inherited_from_bom_item_asset_id = ?`).run(JSON.stringify({ sourceLinkId: old.id, sourceBomItemId: itemId,
           assetId: old.assetId, fileName: old.originalFileName, relativePath: old.relativePath }), old.id);
     }
-    this.db.prepare('delete from bom_item_assets where bom_item_id = ?').run(itemId);
-    this.saveItemAssets(itemId, projectId, previousVersionId, assets);
+    const roles = new Set<string>();
+    for (const asset of assets) {
+      if (roles.has(asset.role)) throw new BomError('DUPLICATE_ASSET_ROLE', '同一 BOM 项目每种附件角色只能有一个');
+      roles.add(asset.role);
+      const old = existing.find((link) => link.role === asset.role);
+      if (!old) { this.saveItemAssets(itemId, projectId, previousVersionId, [asset]); continue; }
+      if (asset.reusePrevious) {
+        if (asset.assetId !== undefined) throw new BomError('ASSET_REUSE_NOT_FOUND', '沿用附件不能同时指定新附件');
+        continue;
+      }
+      if (asset.assetId === undefined || !Number.isInteger(asset.assetId) || !this.repository.assetExists(asset.assetId)) {
+        throw new BomError('ASSET_NOT_FOUND', 'BOM 附件不存在');
+      }
+      this.db.prepare(`update bom_item_assets set asset_id = ?, inherited_from_bom_item_asset_id = null,
+        inheritance_snapshot_json = null where id = ?`).run(asset.assetId, old.id);
+    }
+    for (const old of existing) if (!roles.has(old.role)) {
+      this.db.prepare('update bom_item_assets set deleted_at = ? where id = ?').run(new Date().toISOString(), old.id);
+    }
   }
 
   private validateProduct(productId: number): void {
@@ -246,7 +299,7 @@ export class BomService {
     if (!context || context.productStatus !== 'active') throw new BomError('PRODUCT_NOT_ACTIVE', '产品不存在或已停用');
   }
 
-  private validateItem(item: BomItemInput, productId: number, projectIds: Set<number>, entryMode: 'current' | 'historical') {
+  private validateItem(item: BomItemInput, productId: number, projectIds: Set<number>, entryMode: 'current' | 'historical', retainedPlannedId?: number) {
     if (projectIds.has(item.projectItemId)) throw new BomError('DUPLICATE_PROJECT', '同一 BOM 不能重复添加项目');
     projectIds.add(item.projectItemId);
     const hasDrawingReference = item.drawingReference !== undefined;
@@ -261,7 +314,7 @@ export class BomService {
       if (!drawing) throw new BomError('DRAWING_NOT_FOUND', '图号不存在');
       if (drawing.productId !== productId) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
       if (drawing.projectItemId !== item.projectItemId) throw new BomError('DRAWING_WRONG_PROJECT', '图号与 BOM 项目不一致');
-      if (drawing.status === 'voided') throw new BomError('DRAWING_NOT_ELIGIBLE', '已作废图号不能加入 BOM');
+      if (drawing.status === 'voided' && drawingReference.drawingId !== retainedPlannedId) throw new BomError('DRAWING_NOT_ELIGIBLE', '已作废图号不能加入 BOM');
       colorCode = drawing.colorCode;
     } else {
       const drawing = this.repository.getHistoricalDrawing(drawingReference.historicalDrawingId);
