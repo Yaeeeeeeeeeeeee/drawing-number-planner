@@ -87,6 +87,8 @@ describe('BomPage product-level BOM', () => {
     fireEvent.click(await screen.findByRole('button', { name: '编辑 BOM 20' }));
     expect(await screen.findByLabelText('第 1 行修改明细')).toHaveValue('');
     expect(screen.getByLabelText('业务变更日期')).toHaveValue('2026-09-02');
+    expect(screen.getByText('正在编辑所选 BOM · 业务日期 2026-09-02')).toBeVisible();
+    expect(screen.queryByText('当前 BOM · 业务日期 2026-09-02')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('第 1 行修改明细'), { target: { value: '商标位置调整' } });
     fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
     await waitFor(() => expect(api.updateBomVersion).toHaveBeenCalledWith(20, expect.objectContaining({
