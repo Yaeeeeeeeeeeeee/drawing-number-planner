@@ -76,3 +76,28 @@ it('archives attachments during BOM save when a workspace is configured', () => 
   expect(f.bom.getVersion(f.version.id).items[0].assets[0].assetId).toBe(f.asset.id);
   expect(readFileSync(join(root, f.asset.relativePath))).toEqual(f.content);
 });
+it('creates a new dated copy on date correction without changing the previous archived file', () => {
+  const f = fixture(); const service = new BomService(db, () => root);
+  const first = service.saveVersion({ ...f.input, expectedCurrentVersionId: f.version.id }).version;
+  const old = first.items[0].assets[0];
+  const edited = service.updateVersion(first.id, { ...f.input, businessChangeDate: '2026-09-24',
+    items: [{ ...f.input.items[0], assets: [{ assetId: old.assetId, role: 'image' }] }] }, 0).version;
+  expect(edited.items[0].assets[0].relativePath).toBe(join('BOM附件', 'M', '20260924', '铭牌-20260924.png'));
+  expect(readFileSync(join(root, old.relativePath))).toEqual(f.content);
+  expect(edited.createdAt).toBe(first.createdAt);
+});
+it('does not save a new BOM when an attachment cannot be verified', () => {
+  const f = fixture(); const service = new BomService(db, () => root);
+  writeFileSync(join(root, f.asset.relativePath), 'changed-by-test');
+  expect(() => service.saveVersion({ ...f.input, expectedCurrentVersionId: f.version.id })).toThrow(/内容/);
+  expect(service.getCurrent(f.input.productId)?.id).toBe(f.version.id);
+  expect(db.prepare('select count(*) as n from bom_versions').get()).toEqual({ n: 1 });
+  expect(db.prepare('select count(*) as n from bom_asset_archive_mappings').get()).toEqual({ n: 0 });
+});
+it('does not silently skip required attachment archiving when the configured workspace is unavailable', () => {
+  const f = fixture(); const service = new BomService(db, () => null);
+  expect(() => service.saveVersion({ ...f.input, expectedCurrentVersionId: f.version.id })).toThrow(/资料根目录/);
+  expect(service.getCurrent(f.input.productId)?.id).toBe(f.version.id);
+  expect(db.prepare('select count(*) as n from bom_versions').get()).toEqual({ n: 1 });
+  expect(readFileSync(join(root, f.asset.relativePath))).toEqual(f.content);
+});

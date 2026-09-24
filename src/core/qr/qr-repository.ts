@@ -101,7 +101,7 @@ export class QrRepository {
   }
 
   list(filters: ProductQrCodeFilters = {}): ProductQrCode[] {
-    const where: string[] = []; const params: Record<string, unknown> = {};
+    const where: string[] = ['code.deleted_at is null', 'product.deleted_at is null']; const params: Record<string, unknown> = {};
     if (filters.productId != null) { where.push('code.product_id = @productId'); params.productId = filters.productId; }
     if (filters.purposeId != null) { where.push('code.purpose_id = @purposeId'); params.purposeId = filters.purposeId; }
     if ((filters.status ?? 'all') !== 'all') { where.push('code.status = @status'); params.status = filters.status; }
@@ -117,7 +117,7 @@ export class QrRepository {
   }
 
   get(id: number): ProductQrCode | null {
-    const row = this.db.prepare(`${selectQrCodes} where code.id = ?`).get(id) as QrRow | undefined;
+    const row = this.db.prepare(`${selectQrCodes} where code.id = ? and code.deleted_at is null and product.deleted_at is null`).get(id) as QrRow | undefined;
     return row ? this.toCode(row) : null;
   }
 

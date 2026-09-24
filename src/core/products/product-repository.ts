@@ -50,12 +50,12 @@ export class ProductRepository {
   }
 
   get(id: number): Product | undefined {
-    const row = this.db.prepare(`${selectProducts} where product.id = ?`).get(id) as ProductRow | undefined;
+    const row = this.db.prepare(`${selectProducts} where product.id = ? and product.deleted_at is null`).get(id) as ProductRow | undefined;
     return row ? mapRow(row) : undefined;
   }
 
   list(filters: ProductFilters): Product[] {
-    const conditions: string[] = [];
+    const conditions: string[] = ['product.deleted_at is null'];
     const values: Array<string | number> = [];
     if ((filters.status ?? 'active') !== 'all') {
       conditions.push('product.status = ?'); values.push(filters.status ?? 'active');

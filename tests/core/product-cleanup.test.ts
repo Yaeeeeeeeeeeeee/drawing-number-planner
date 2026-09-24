@@ -1,0 +1,83 @@
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { openDatabase, type PlannerDatabase } from '../../src/db/database';
+import { migrateDatabase } from '../../src/db/migrations';
+import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
+import { ProductService } from '../../src/core/products/product-service';
+import { ProductCleanupService } from '../../src/core/products/product-cleanup-service';
+import { QrRepository } from '../../src/core/qr/qr-repository';
+import { MaterialBatchRepository } from '../../src/core/files/material-batch-repository';
+
+let db: PlannerDatabase;
+beforeEach(() => { db = openDatabase(':memory:'); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined }); });
+afterEach(() => db.close());
+function fixture() {
+  const d = new DictionaryService(db);
+  const brandId = d.create({ type: 'brand', code: '02', name: 'B' }).id;
+  const productSizeId = d.create({ type: 'product_size', code: '0209', name: 'S' }).id;
+  const products = new ProductService(db);
+  const product = products.create({ brandId, productSizeId, sku: 'SKU', model: 'T40', productCategory: '冰柜' });
+  db.prepare(`insert into historical_drawing_numbers
+    (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code, project_item_code,
+     sequence, product_id, first_seen_at, last_seen_at)
+    values ('02.0209.010.0401001', '02', '0209', '01', '0', '04', '01', 1, ?, '2026-09-23', '2026-09-23')`).run(product.id);
+  db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at)
+    values (?, 1, '2026-09-23', '2026-09-23')`).run(product.id);
+  db.prepare("insert into bom_current(product_id, version_id, updated_at) values (?, 1, '2026-09-23')").run(product.id);
+  return { product, products };
+}
+it('centrally exits owned records while retaining identity, number occupancy and historical rows', () => {
+  const { product } = fixture(); const cleanup = new ProductCleanupService(db);
+  expect(cleanup.preview(product.id).blockers).toEqual([]);
+  cleanup.cleanup(product.id, { confirmedModel: product.model });
+  expect(db.prepare('select deleted_at, status from products where id = ?').get(product.id))
+    .toMatchObject({ deleted_at: expect.any(String), status: 'inactive' });
+  expect(db.prepare('select count(*) as n from bom_current').get()).toEqual({ n: 0 });
+  expect(db.prepare('select deleted_at from bom_versions').get()).toMatchObject({ deleted_at: expect.any(String) });
+  expect(db.prepare('select full_code, deletion_mode from historical_drawing_numbers').get())
+    .toEqual({ full_code: '02.0209.010.0401001', deletion_mode: 'retain_occupied' });
+  expect(db.prepare('select count(*) as n from product_cleanup_events').get()).toEqual({ n: 1 });
+  expect(db.pragma('foreign_key_check')).toEqual([]);
+});
+it('does not treat previously deleted owned records as blockers and never releases their numbers', () => {
+  const { product } = fixture();
+  db.exec("update historical_drawing_numbers set deleted_at = 'old', deletion_mode = 'retain_occupied', deleted_full_code = full_code");
+  db.exec("update bom_versions set deleted_at = 'old'");
+  const service = new ProductCleanupService(db);
+  expect(service.preview(product.id).blockers).toEqual([]);
+  service.cleanup(product.id, { confirmedModel: product.model });
+  expect(db.prepare('select deleted_at, deletion_mode from historical_drawing_numbers').get())
+    .toEqual({ deleted_at: 'old', deletion_mode: 'retain_occupied' });
+});
+it('requires exact confirmation and refuses cleanup during a running task', () => {
+  const { product } = fixture();
+  expect(() => new ProductCleanupService(db).cleanup(product.id, { confirmedModel: 'wrong' })).toThrow(/型号/);
+  expect(() => new ProductCleanupService(db, () => true).cleanup(product.id, { confirmedModel: product.model })).toThrow(/任务/);
+  expect(db.prepare('select deleted_at from products where id = ?').get(product.id)).toEqual({ deleted_at: null });
+});
+it('rolls back every record when the cleanup audit cannot be stored', () => {
+  const { product } = fixture();
+  db.exec("create trigger reject_cleanup before insert on product_cleanup_events begin select raise(abort, 'audit-failed'); end");
+  expect(() => new ProductCleanupService(db).cleanup(product.id, { confirmedModel: product.model })).toThrow('audit-failed');
+  expect(db.prepare('select deleted_at from products where id = ?').get(product.id)).toEqual({ deleted_at: null });
+  expect(db.prepare('select deleted_at from historical_drawing_numbers').get()).toEqual({ deleted_at: null });
+  expect(db.prepare('select count(*) as n from bom_current').get()).toEqual({ n: 1 });
+  expect(db.prepare('select count(*) as n from drawing_deletion_events').get()).toEqual({ n: 0 });
+});
+it('excludes exited identities and QR records from normal lists and prevents reactivation', () => {
+  const { product, products } = fixture();
+  new ProductCleanupService(db).cleanup(product.id, { confirmedModel: product.model });
+  expect(products.list({ status: 'all' }).items).toEqual([]);
+  expect(() => products.activate(product.id)).toThrow();
+  expect(new QrRepository(db).list({ productId: product.id })).toEqual([]);
+});
+it('does not reconnect a rescanned directory to an exited product or mark its batch as current eligible', () => {
+  const { product } = fixture();
+  new ProductCleanupService(db).cleanup(product.id, { confirmedModel: product.model });
+  db.exec("insert into file_scan_runs(started_at, completed_at) values ('now', 'now')");
+  const batches = new MaterialBatchRepository(db);
+  const id = batches.upsert({ relativePath: '冰柜/SKU-T40/03.变更/00.首批大货', productDirectory: '冰柜/SKU-T40',
+    directoryContext: { productCategory: '冰柜', sku: 'SKU', model: 'T40' }, name: '00.首批大货',
+    sequenceNumber: 0, businessDate: null, recognitionStatus: 'recognized', classificationWarning: null }, 'now', 1);
+  expect(db.prepare('select product_id, recognition_status from material_batches where id = ?').get(id))
+    .toEqual({ product_id: null, recognition_status: 'pending' });
+});

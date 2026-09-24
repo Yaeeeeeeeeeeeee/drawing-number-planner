@@ -249,7 +249,16 @@ export class BomService {
     const root = this.workspaceRoot?.(); const created: ManagedBomAsset[] = [];
     try {
       return this.db.transaction(() => work((versionId) => {
-        if (!root) return;
+        if (!root) {
+          // Domain-only callers omit the workspace adapter; the running application must
+          // not report a successful archive when its configured root is unavailable.
+          if (this.workspaceRoot && this.db.prepare(`select 1 from bom_item_assets link
+            join bom_items item on item.id = link.bom_item_id
+            where item.bom_version_id = ? and item.deleted_at is null and link.deleted_at is null limit 1`).get(versionId)) {
+            throw new BomError('ASSET_PATH_INVALID', '资料根目录未配置，不能归档 BOM 附件；请先设置资料根目录');
+          }
+          return;
+        }
         const archive = new BomAssetArchiveService(this.db, root);
         for (const item of archive.preview().filter((candidate) => candidate.versionId === versionId)) {
           const asset = archive.migrate(item.linkId); if (asset) created.push(asset);
