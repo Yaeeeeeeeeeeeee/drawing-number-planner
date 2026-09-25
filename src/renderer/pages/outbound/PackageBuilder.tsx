@@ -19,7 +19,7 @@ export interface OutboundMailContext {
   packageName: string;
   product: ProductView;
   materialType: OutboundMaterialTypeView;
-  items: Array<{ projectItemName: string; fileName: string; sourceBatchName: string; pdfFileId: number }>;
+  items: Array<{ projectItemName: string; fileName: string; sourceBatchName: string; pdfFileId: number; changeDetails?: string | null }>;
 }
 
 interface PackageBuilderProps {
@@ -41,6 +41,14 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
   const [created, setCreated] = useState<CreatedOutboundPackageView | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [bomSelections, setBomSelections] = useState<Record<string, number>>({});
+  const [previewDirty, setPreviewDirty] = useState(false);
+
+  useEffect(() => {
+    setBomSelections({});
+    setPreview(null);
+    setCreated(null);
+  }, [productId, batchId, materialType, mode]);
 
   useEffect(() => {
     void Promise.all([api.listProducts({ status: 'active' }), api.listDictionaries('brand', false)])
@@ -74,6 +82,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
 
   const request = () => ({
     productId: Number(productId), selectedMaterialBatchId: Number(batchId), materialType, packageMode: mode,
+    ...(Object.keys(bomSelections).length ? { bomSelections } : {}),
   });
 
   const loadPreview = async () => {
@@ -83,6 +92,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
     try {
       const value = await api.previewOutboundPackage(request());
       setPreview(value);
+      setPreviewDirty(false);
       setSelected(value.items.filter((item) => item.selectable && item.pdfFileId).map((item) => item.pdfFileId!));
     } catch (previewError) {
       setError(previewError instanceof Error ? previewError.message : '外发预览失败');
@@ -92,7 +102,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
   };
 
   const generate = async () => {
-    if (!preview) return;
+    if (!preview || previewDirty) return;
     setError('');
     if (!window.plannerDesktop?.chooseOutboundDirectory) {
       setError('生成 ZIP 仅支持 Windows 桌面版，请在桌面版选择输出目录。');
@@ -114,7 +124,8 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
           materialType,
           items: preview.items.flatMap((item) => (
             item.pdfFileId && item.fileName && selected.includes(item.pdfFileId)
-              ? [{ projectItemName: item.projectItemName, fileName: item.fileName, sourceBatchName: item.sourceBatchName, pdfFileId: item.pdfFileId }]
+              ? [{ projectItemName: item.projectItemName, fileName: item.fileName, sourceBatchName: item.sourceBatchName, pdfFileId: item.pdfFileId,
+                changeDetails: item.bomContext?.changeDetails ?? null }]
               : []
           )),
         });
@@ -177,11 +188,30 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
                 <span>{item.sourceBatchName}</span>
                 <span className="file-primary">{item.fileName ?? '转曲后文件已缺失'}</span>
                 <span className={`outbound-status ${item.status}`}>{statusLabel[item.status]}</span>
+                {item.bomContext?.status === 'ambiguous' && (
+                  <label>
+                    <span>存在多条 BOM 修改记录，请明确选择后重新预览</span>
+                    <select aria-label={`${item.projectItemName} BOM 修改记录`} disabled={busy}
+                      value={bomSelections[String(item.projectItemId)] ?? ''}
+                      onChange={(event) => {
+                        const next = { ...bomSelections };
+                        if (event.target.value) next[String(item.projectItemId)] = Number(event.target.value);
+                        else delete next[String(item.projectItemId)];
+                        setBomSelections(next); setPreviewDirty(true); setCreated(null);
+                      }}>
+                      <option value="">请选择修改记录</option>
+                      {item.bomContext.candidates.map((candidate) => <option key={candidate.bomItemId} value={candidate.bomVersionId}>
+                        {candidate.businessDate} · 记录 {candidate.bomVersionId} · {candidate.changeDetails || '未填写修改明细'}
+                      </option>)}
+                    </select>
+                  </label>
+                )}
               </div>
             ))}
           </div>
           {blockers && <p className="error-banner">存在缺失、冲突或待确认资料，处理后才能打包。</p>}
-          <button className="primary-button" type="button" disabled={busy || blockers || selected.length === 0} onClick={() => void generate()}>生成压缩包</button>
+          {previewDirty && <p className="info-banner">BOM 选择已改变，请重新预览文件。</p>}
+          <button className="primary-button" type="button" disabled={busy || previewDirty || blockers || selected.length === 0} onClick={() => void generate()}>生成压缩包</button>
         </>
       )}
       {created && (

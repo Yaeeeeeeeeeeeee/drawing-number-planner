@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   OutboundContactView,
   OutboundEmailTemplateView,
@@ -22,7 +22,10 @@ interface EmailComposerProps {
   mailContext: OutboundMailContext | null;
 }
 
-export function EmailComposer({ api, mailContext }: EmailComposerProps) {
+export function EmailComposer({ api, mailContext: incomingContext }: EmailComposerProps) {
+  const [mailContext, setMailContext] = useState(incomingContext);
+  const [pendingContext, setPendingContext] = useState<OutboundMailContext | null>(null);
+  const lastIncoming = useRef(incomingContext);
   const [contacts, setContacts] = useState<OutboundContactView[]>([]);
   const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
   const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
@@ -33,9 +36,31 @@ export function EmailComposer({ api, mailContext }: EmailComposerProps) {
   const [blocks, setBlocks] = useState<number[]>([]);
   const [subject, setSubject] = useState(mailContext?.packageName ?? '');
   const [body, setBody] = useState('');
+  const [manuallyEdited, setManuallyEdited] = useState(false);
+  const [changeEdited, setChangeEdited] = useState(false);
   const [materialType, setMaterialType] = useState<OutboundMaterialTypeView>(mailContext?.materialType ?? 'update');
-  const [changeDescription, setChangeDescription] = useState('');
+  const [changeDescription, setChangeDescription] = useState(() => mailContext?.items
+    .filter((item) => item.changeDetails?.trim()).map((item, index) => `${index + 1}. ${item.projectItemName}：${item.changeDetails}`).join('\n') ?? '');
   const [message, setMessage] = useState('');
+
+  const adoptContext = (context: OutboundMailContext) => {
+    setMailContext(context);
+    setSubject(context.packageName);
+    setBody('');
+    setChangeDescription(context.items.filter((item) => item.changeDetails?.trim())
+      .map((item, index) => `${index + 1}. ${item.projectItemName}：${item.changeDetails}`).join('\n'));
+    setManuallyEdited(false);
+    setChangeEdited(false);
+    setPendingContext(null);
+  };
+
+  useEffect(() => {
+    if (incomingContext === lastIncoming.current) return;
+    lastIncoming.current = incomingContext;
+    if (!incomingContext) return;
+    if (manuallyEdited || changeEdited || body.trim()) setPendingContext(incomingContext);
+    else adoptContext(incomingContext);
+  }, [incomingContext]);
 
   useEffect(() => {
     void Promise.all([
@@ -57,10 +82,6 @@ export function EmailComposer({ api, mailContext }: EmailComposerProps) {
     }).catch((error) => setMessage(error instanceof Error ? error.message : '邮件资料加载失败'));
   }, [api, mailContext?.materialType]);
 
-  useEffect(() => {
-    if (mailContext?.packageName) setSubject(mailContext.packageName);
-  }, [mailContext]);
-
   const template = templates.find((item) => item.id === Number(templateId));
   const signature = signatures.find((item) => item.id === Number(signatureId));
   const toText = contacts.filter((item) => to.includes(item.id)).map((item) => item.email).join('; ');
@@ -71,12 +92,13 @@ export function EmailComposer({ api, mailContext }: EmailComposerProps) {
     [template, blocks],
   );
   const fileList = useMemo(
-    () => mailContext?.items.map((item) => `${item.projectItemName}：${item.fileName}（来源：${item.sourceBatchName}）`).join('\n') ?? '',
+    () => mailContext?.items.map((item) => `  ${item.fileName.split(/[\\/]/).at(-1)?.replace(/\.pdf$/i, '') ?? item.projectItemName}`).join('\n') ?? '',
     [mailContext],
   );
 
   const generate = async () => {
     if (!template) return;
+    if (manuallyEdited && !window.confirm('重新生成将替换您已修改的主题和正文，是否继续？')) return;
     setMessage('');
     const primary = selectedContacts[0];
     try {
@@ -93,6 +115,7 @@ export function EmailComposer({ api, mailContext }: EmailComposerProps) {
       });
       setSubject(rendered.subject);
       setBody(rendered.body);
+      setManuallyEdited(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '邮件内容生成失败');
     }
@@ -104,6 +127,12 @@ export function EmailComposer({ api, mailContext }: EmailComposerProps) {
 
   return (
     <section className="outbound-panel email-composer">
+      {pendingContext && <div className="info-banner">
+        新压缩包已生成：{pendingContext.packageName}。当前邮件仍保留原资料和已编辑内容。
+        <button type="button" className="text-button" onClick={() => {
+          if (window.confirm('使用新压缩包将替换当前邮件主题和修改明细，并清空正文。是否继续？')) adoptContext(pendingContext);
+        }}>使用新压缩包资料</button>
+      </div>}
       <div className="email-settings-row">
         <label>
           <span>资料类型</span>
@@ -142,7 +171,7 @@ export function EmailComposer({ api, mailContext }: EmailComposerProps) {
       {materialType === 'update' && (
         <label>
           <span>本次变更内容</span>
-          <textarea aria-label="本次变更内容" rows={3} value={changeDescription} onChange={(event) => setChangeDescription(event.target.value)} />
+          <textarea aria-label="本次变更内容" rows={3} value={changeDescription} onChange={(event) => { setChangeDescription(event.target.value); setChangeEdited(true); }} />
         </label>
       )}
       {fileList && <p className="muted-text">邮件文件清单将使用当前打包预览中已勾选的文件。</p>}
@@ -165,9 +194,9 @@ export function EmailComposer({ api, mailContext }: EmailComposerProps) {
       <button className="text-button" type="button" onClick={() => void copy(toText, setMessage)}>复制收件人</button>
       <label><span>抄送</span><input aria-label="抄送文本" readOnly value={ccText} /></label>
       <button className="text-button" type="button" onClick={() => void copy(ccText, setMessage)}>复制抄送</button>
-      <label><span>主题</span><input aria-label="主题" value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
+      <label><span>主题</span><input aria-label="主题" value={subject} onChange={(event) => { setSubject(event.target.value); setManuallyEdited(true); }} /></label>
       <button className="text-button" type="button" onClick={() => void copy(subject, setMessage)}>复制主题</button>
-      <label><span>正文</span><textarea aria-label="正文" rows={14} value={body} onChange={(event) => setBody(event.target.value)} /></label>
+      <label><span>正文</span><textarea aria-label="正文" rows={14} value={body} onChange={(event) => { setBody(event.target.value); setManuallyEdited(true); }} /></label>
       <button className="text-button" type="button" onClick={() => void copy(body, setMessage)}>复制正文</button>
       <button className="primary-button" type="button" onClick={() => void copy(`收件人：${toText}\n抄送：${ccText}\n主题：${subject}\n正文：\n${body}`, setMessage)}>全部复制</button>
       {message && <p className={message === '已复制' ? 'muted-text' : 'error-banner'}>{message}</p>}

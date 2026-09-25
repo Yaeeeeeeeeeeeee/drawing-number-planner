@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { ProductService } from '../../src/core/products/product-service';
+import { ProductCleanupService } from '../../src/core/products/product-cleanup-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import { registerProductRoutes } from '../../src/server/routes/products';
@@ -24,6 +25,26 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('product API', () => {
+  it('previews central cleanup and requires explicit model confirmation before exiting the product', async () => {
+    const service = new ProductService(db); const product = service.create({ ...refs, sku: 'CLEAN', model: 'T40', productCategory: '洗碗机' });
+    const app = Fastify(); registerProductRoutes(app, service, new ProductCleanupService(db));
+    try {
+      const preview = await app.inject({ method: 'GET', url: `/api/products/${product.id}/cleanup-preview` });
+      expect(preview.statusCode).toBe(200);
+      expect(preview.json()).toMatchObject({ model: 'T40', blockers: [] });
+      const legacyDelete = await app.inject({ method: 'DELETE', url: `/api/products/${product.id}` });
+      expect(legacyDelete.statusCode).toBe(409);
+      expect(legacyDelete.json().error.code).toBe('PRODUCT_CLEANUP_REQUIRED');
+      const missing = await app.inject({ method: 'POST', url: `/api/products/${product.id}/cleanup`, payload: { confirmedModel: 'T40' } });
+      expect(missing.statusCode).toBe(400);
+      const wrong = await app.inject({ method: 'POST', url: `/api/products/${product.id}/cleanup`, payload: { confirmed: true, confirmedModel: 'T41' } });
+      expect(wrong.statusCode).toBe(400);
+      const done = await app.inject({ method: 'POST', url: `/api/products/${product.id}/cleanup`, payload: { confirmed: true, confirmedModel: 'T40' } });
+      expect(done.statusCode).toBe(200);
+      expect(service.list({ status: 'all' }).items).toEqual([]);
+      expect(db.prepare('select count(*) as n from products').get()).toEqual({ n: 1 });
+    } finally { await app.close(); }
+  });
   it('requires sku when creating a product', async () => {
     const app = Fastify(); registerProductRoutes(app, new ProductService(db));
     const response = await app.inject({ method: 'POST', url: '/api/products',

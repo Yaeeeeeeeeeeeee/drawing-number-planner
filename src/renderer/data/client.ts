@@ -1,3 +1,6 @@
+import type { ProductCleanupPreview } from '../../core/products/product-cleanup-service.js';
+import type { OutboundBomContext } from '../../core/outbound/outbound-bom-context.js';
+export type ProductCleanupPreviewView = ProductCleanupPreview;
 export interface DictionaryItemView {
   id: number; type?: string; code: string; name: string;
   parentId?: number | null; status: 'active' | 'inactive';
@@ -197,9 +200,11 @@ export interface OutboundSignatureView {
 export interface OutboundSignatureInputView { name: string; content: string; isDefault: boolean }
 export type OutboundPackageModeView = 'change_only' | 'current_complete';
 export interface OutboundPackageRequestView {
+  bomSelections?: Record<string, number>;
   productId: number; selectedMaterialBatchId: number; materialType: OutboundMaterialTypeView; packageMode: OutboundPackageModeView;
 }
 export interface OutboundPackagePreviewItemView {
+  bomContext?: OutboundBomContext;
   slotKey: string; fullCode: string | null; projectItemId: number | null; projectItemName: string;
   pdfFileId: number | null; fileName: string | null; relativePath: string | null; sourceBatchId: number;
   sourceBatchName: string; status: 'normal' | 'carried_forward' | 'needs_confirmation' | 'conflict' | 'missing';
@@ -268,6 +273,8 @@ export interface PlannerApi {
   deactivateProduct(id: number): Promise<ProductView>;
   activateProduct(id: number): Promise<ProductView>;
   deleteProduct(id: number): Promise<{ deleted: true }>;
+  previewProductCleanup(id: number): Promise<ProductCleanupPreviewView>;
+  cleanupProduct(id: number, confirmedModel: string): Promise<ProductCleanupPreviewView>;
   listQrCodes(filters?: ProductQrCodeFilters): Promise<{ items: ProductQrCodeView[] }>;
   listQrPurposes(): Promise<{ items: QrPurposeView[] }>;
   createQrPurpose(input: { key: string; englishName: string; displayName: string; defaultForAll: boolean;
@@ -511,6 +518,10 @@ export const apiClient: PlannerApi = {
   deactivateProduct: (id) => request(`/api/products/${id}/deactivate`, json('POST')),
   activateProduct: (id) => request(`/api/products/${id}/activate`, json('POST')),
   deleteProduct: (id) => request(`/api/products/${id}`, { method: 'DELETE' }),
+  previewProductCleanup: (id) => request(`/api/products/${id}/cleanup-preview`),
+  cleanupProduct: (id, confirmedModel) => request(`/api/products/${id}/cleanup`, {
+    method: 'POST', body: JSON.stringify({ confirmed: true, confirmedModel }),
+  }),
   listQrCodes: (filters = {}) => request(`/api/qr-codes${queryString(filters)}`),
   listQrPurposes: () => request('/api/qr-purposes'),
   createQrPurpose: (input) => request('/api/qr-purposes', json('POST', input)),

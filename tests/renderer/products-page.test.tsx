@@ -101,7 +101,7 @@ describe('ProductsPage', () => {
     expect(api.deactivateProduct).toHaveBeenCalledWith(2);
   });
 
-  it('offers activation for inactive products and deletes only after two confirmations', async () => {
+  it('offers activation and central cleanup only after impact preview, exact model and confirmation', async () => {
     const inactive = { id: 2, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
       defaultAppearanceId: 3, defaultAppearanceName: '外观', sku: 'SKU-INACTIVE', model: 'ZC220', productCategory: '冰柜',
       referenceProductId: null, referenceProductModel: null, status: 'inactive' as const };
@@ -109,7 +109,10 @@ describe('ProductsPage', () => {
       listProducts: vi.fn().mockResolvedValue([inactive]), listQrCodes: vi.fn().mockResolvedValue({ items: [] }),
       listHistoricalProductCandidates: vi.fn().mockResolvedValue([]), listDictionaries: vi.fn().mockResolvedValue([]),
       createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn(),
-      activateProduct: vi.fn().mockResolvedValue({ ...inactive, status: 'active' }), deleteProduct: vi.fn().mockResolvedValue({ deleted: true }),
+      activateProduct: vi.fn().mockResolvedValue({ ...inactive, status: 'active' }),
+      previewProductCleanup: vi.fn().mockResolvedValue({ productId: 2, model: 'ZC220', sku: 'SKU-INACTIVE', blockers: [],
+        owned: { drawings: 2, historicalDrawings: 3, bomRecords: 1, qrCodes: 2, batches: 4 }, preservedSnapshots: 1 }),
+      cleanupProduct: vi.fn().mockResolvedValue({}),
     };
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<ProductsPage api={api as never} />);
@@ -119,13 +122,17 @@ describe('ProductsPage', () => {
     await waitFor(() => expect(api.activateProduct).toHaveBeenCalledWith(2));
     fireEvent.click(await screen.findByRole('button', { name: '删除 ZC220' }));
 
-    await waitFor(() => expect(api.deleteProduct).toHaveBeenCalledWith(2));
-    expect(confirm).toHaveBeenCalledTimes(2);
+    const submit = await screen.findByRole('button', { name: '确认退出当前业务' });
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('输入型号确认'), { target: { value: 'ZC220' } });
+    fireEvent.click(submit);
+    await waitFor(() => expect(api.cleanupProduct).toHaveBeenCalledWith(2, 'ZC220'));
+    expect(confirm).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('ZC220')).not.toBeInTheDocument();
     confirm.mockRestore();
   });
 
-  it('lists concrete modules when protected deletion reports reference counts', async () => {
+  it('shows cross-product blockers and disables central cleanup', async () => {
     const product = { id: 2, brandId: 1, brandName: 'SAMKYO', productSizeId: 2, productSizeName: '冰柜',
       defaultAppearanceId: 3, defaultAppearanceName: '外观', sku: 'SKU-PROTECTED', model: 'ZC220', productCategory: '冰柜',
       referenceProductId: null, referenceProductModel: null, status: 'active' as const };
@@ -133,18 +140,19 @@ describe('ProductsPage', () => {
       listProducts: vi.fn().mockResolvedValue([product]), listQrCodes: vi.fn().mockResolvedValue({ items: [] }),
       listHistoricalProductCandidates: vi.fn().mockResolvedValue([]), listDictionaries: vi.fn().mockResolvedValue([]),
       createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn(), activateProduct: vi.fn(),
-      deleteProduct: vi.fn().mockRejectedValue(Object.assign(new Error('产品仍被业务记录引用，不能删除'), {
-        code: 'PRODUCT_REFERENCED', referenceSummary: { plannedDrawingCount: 2, configuredQrCount: 1 },
-      })),
+      previewProductCleanup: vi.fn().mockResolvedValue({ productId: 2, model: 'ZC220', sku: 'SKU-PROTECTED',
+        blockers: ['其他产品 T40 的 BOM #7 仍引用本产品资料'],
+        owned: { drawings: 2, historicalDrawings: 0, bomRecords: 0, qrCodes: 1, batches: 0 }, preservedSnapshots: 0 }),
+      cleanupProduct: vi.fn(),
     };
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<ProductsPage api={api as never} />);
     await screen.findByText('ZC220');
     fireEvent.click(screen.getByRole('button', { name: '删除 ZC220' }));
 
-    const error = await screen.findByText((_, element) => element?.className === 'error-banner' && element.textContent?.includes('计划图号（2）') === true);
-    expect(error).toHaveTextContent('已配置二维码（1）');
-    expect(api.deleteProduct).toHaveBeenCalledWith(2);
+    expect(await screen.findByText('其他产品 T40 的 BOM #7 仍引用本产品资料')).toBeVisible();
+    expect(screen.getByRole('button', { name: '确认退出当前业务' })).toBeDisabled();
+    expect(api.cleanupProduct).not.toHaveBeenCalled();
     confirm.mockRestore();
   });
 

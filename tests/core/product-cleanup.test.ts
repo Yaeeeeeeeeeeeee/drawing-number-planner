@@ -6,6 +6,9 @@ import { ProductService } from '../../src/core/products/product-service';
 import { ProductCleanupService } from '../../src/core/products/product-cleanup-service';
 import { QrRepository } from '../../src/core/qr/qr-repository';
 import { MaterialBatchRepository } from '../../src/core/files/material-batch-repository';
+import { DrawingDeletionService } from '../../src/core/drawings/drawing-deletion-service';
+import { FileRepository } from '../../src/core/files/file-repository';
+import { parseDrawingCode } from '../../src/core/drawings/drawing-code';
 
 let db: PlannerDatabase;
 beforeEach(() => { db = openDatabase(':memory:'); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined }); });
@@ -80,4 +83,35 @@ it('does not reconnect a rescanned directory to an exited product or mark its ba
     sequenceNumber: 0, businessDate: null, recognitionStatus: 'recognized', classificationWarning: null }, 'now', 1);
   expect(db.prepare('select product_id, recognition_status from material_batches where id = ?').get(id))
     .toEqual({ product_id: null, recognition_status: 'pending' });
+});
+it('does not restore a deleted drawing into an exited product through the ordinary drawing restore action', () => {
+  const { product } = fixture();
+  new ProductCleanupService(db).cleanup(product.id, { confirmedModel: product.model });
+  expect(() => new DrawingDeletionService(db).restore(-1)).toThrow(/产品.*退出/);
+  expect(db.prepare('select deletion_mode from historical_drawing_numbers').get()).toEqual({ deletion_mode: 'retain_occupied' });
+});
+it('blocks another product active BOM reference but ignores that same BOM after it is soft deleted', () => {
+  const { product, products } = fixture();
+  const other = products.create({ brandId: product.brandId, productSizeId: product.productSizeId,
+    sku: 'OTHER', model: 'OTHER', productCategory: '冰柜' });
+  const dict = new DictionaryService(db); const main = dict.create({ type: 'main_category', code: '04', name: '印刷' });
+  const project = dict.create({ type: 'project_item', code: '01', name: '说明书', parentId: main.id });
+  db.prepare("insert into bom_versions(product_id, version_number, created_at) values (?, 1, 'now')").run(other.id);
+  db.prepare('insert into bom_items(bom_version_id, project_item_id, historical_drawing_id) values (2, ?, 1)').run(project.id);
+  const cleanup = new ProductCleanupService(db);
+  expect(cleanup.preview(product.id).blockers.join()).toContain('OTHER');
+  expect(() => cleanup.cleanup(product.id, { confirmedModel: product.model })).toThrow(/BOM/);
+  db.exec("update bom_versions set deleted_at = 'now' where id = 2");
+  expect(cleanup.preview(product.id).blockers).toEqual([]);
+  cleanup.cleanup(product.id, { confirmedModel: product.model });
+  expect(db.prepare('select historical_drawing_id from bom_items where bom_version_id = 2').get()).toEqual({ historical_drawing_id: 1 });
+  expect(db.pragma('foreign_key_check')).toEqual([]);
+});
+it('keeps newly discovered numbers unassigned rather than reconnecting an exited product', () => {
+  const { product } = fixture(); new ProductCleanupService(db).cleanup(product.id, { confirmedModel: product.model });
+  const code = parseDrawingCode('02.0209.010.0401002')!;
+  new FileRepository(db).replaceScan([], [{ ...code,
+    directoryContext: { productCategory: '冰柜', sku: 'SKU', model: 'T40' } }], new Date().toISOString());
+  expect(db.prepare('select product_id from historical_drawing_numbers where full_code = ?').get(code.fullCode))
+    .toEqual({ product_id: null });
 });

@@ -1,3 +1,4 @@
+import type { OutboundBomContext } from './outbound-bom-context.js';
 export interface MaterialSetFileInput {
   pdfIndexId: number;
   fullCode: string;
@@ -37,6 +38,7 @@ export type OutboundPackageMode = 'change_only' | 'current_complete';
 export type OutboundPackageMaterialType = 'initial' | 'update';
 
 export interface OutboundPackageRequest {
+  bomSelections?: Record<string, number>;
   productId: number;
   selectedMaterialBatchId: number;
   materialType: OutboundPackageMaterialType;
@@ -44,6 +46,7 @@ export interface OutboundPackageRequest {
 }
 
 export interface OutboundPackagePreviewItem {
+  bomContext?: OutboundBomContext;
   slotKey: string;
   fullCode: string | null;
   projectItemId: number | null;

@@ -34,6 +34,7 @@ import { registerMaterialBatchRoutes } from './routes/material-batches.js';
 import { registerOutboundReferenceRoutes } from './routes/outbound-reference.js';
 import { registerOutboundPackageRoutes } from './routes/outbound-packages.js';
 import { registerProductRoutes } from './routes/products.js';
+import { ProductCleanupService } from '../core/products/product-cleanup-service.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 import { registerQrCodeRoutes } from './routes/qr-codes.js';
 import { TaskRegistry } from '../core/tasks/task-registry.js';
@@ -98,7 +99,8 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     const qrRepository = new QrRepository(database);
     const tasks = new TaskRegistry();
     registerDictionaryRoutes(server, new DictionaryService(database));
-    registerProductRoutes(server, new ProductService(database));
+    registerProductRoutes(server, new ProductService(database), new ProductCleanupService(database,
+      () => tasks.list().some((task) => ['queued', 'running', 'finalizing'].includes(task.status))));
     registerQrCodeRoutes(server, new QrService(database));
     registerDrawingRoutes(server, new DrawingQueryService(database));
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings), tasks);

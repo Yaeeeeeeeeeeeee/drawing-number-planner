@@ -93,6 +93,10 @@ export class DrawingDeletionService {
         throw new DrawingDeletionError('DRAWING_RESTORE_CONFLICT', `图号 ${row.fullCode} 已被其他记录占用，无法恢复`);
       }
       const table = row.origin === 'planned' ? 'drawing_numbers' : 'historical_drawing_numbers';
+      if (this.db.prepare(`select 1 from ${table} drawing join products product on product.id = drawing.product_id
+        where drawing.id = ? and product.deleted_at is not null`).get(row.id)) {
+        throw new DrawingDeletionError('DRAWING_RESTORE_CONFLICT', '所属产品已退出当前业务，不能单独恢复其图号');
+      }
       this.db.prepare(`update ${table} set full_code = deleted_full_code, status = deleted_previous_status,
         deleted_at = null, deletion_mode = null, deleted_full_code = null, deleted_previous_status = null,
         deleted_reason = null, scan_resolution = null where id = ?`).run(row.id);

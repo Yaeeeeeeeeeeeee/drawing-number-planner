@@ -101,13 +101,19 @@ export class OutboundPackageRepository {
          zip_relative_path, status, created_at) values (?, ?, ?, ?, ?, ?, 'completed', ?)`)
         .run(input.productId, input.materialType, input.packageMode, input.selectedMaterialBatchId,
           input.packageName, input.zipRelativePath, input.createdAt).lastInsertRowid);
+      this.db.prepare(`update outbound_packages set product_identity_json = (
+        select json_object('sku', product.sku, 'model', product.model, 'brandName', brand.name,
+          'productCategory', product.product_category) from products product
+        join dictionary_items brand on brand.id = product.brand_id where product.id = ?
+      ) where id = ?`).run(input.productId, packageId);
       const insertItem = this.db.prepare(`insert into outbound_package_items
         (package_id, project_item_id, drawing_id, historical_drawing_id, pdf_file_id, source_material_batch_id,
          project_item_name_snapshot, drawing_code_snapshot, file_name_snapshot, relative_path_snapshot,
-         source_batch_name_snapshot) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+         source_batch_name_snapshot, change_details_snapshot) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const item of input.items) {
         insertItem.run(packageId, item.projectItemId, item.drawingId, item.historicalDrawingId, item.pdfFileId,
-          item.sourceBatchId, item.projectItemName, item.fullCode, item.fileName, item.relativePath, item.sourceBatchName);
+          item.sourceBatchId, item.projectItemName, item.fullCode, item.fileName, item.relativePath, item.sourceBatchName,
+          item.bomContext?.changeDetails ?? null);
       }
       return { id: packageId, packageName: input.packageName, zipRelativePath: input.zipRelativePath,
         fileCount: input.items.length, createdAt: input.createdAt };

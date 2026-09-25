@@ -193,7 +193,7 @@ export class FileRepository {
         if (suppressedCodes.has(code.fullCode)) continue;
         const context = code.directoryContext;
         const productRows = context ? this.db.prepare(`select id from products
-          where sku = ? collate nocase and model = ?`).all(context.sku, context.model) as Array<{ id: number }> : [];
+          where sku = ? collate nocase and model = ? and deleted_at is null`).all(context.sku, context.model) as Array<{ id: number }> : [];
         const existed = this.db.prepare('select 1 from historical_drawing_numbers where full_code = ?').get(code.fullCode);
         upsertHistorical.run({ fullCode: code.fullCode, brandCode: code.brandCode,
           productSizeCode: code.productSizeCode, appearanceCode: code.appearanceCode, colorCode: code.colorCode,

@@ -10,6 +10,7 @@ const previewSchema = z.object({
   selectedMaterialBatchId: z.number().int().positive(),
   materialType: z.enum(['initial', 'update']),
   packageMode: z.enum(['change_only', 'current_complete']),
+  bomSelections: z.record(z.string().regex(/^[1-9]\d*$/), z.number().int().positive()).optional(),
 }).strict();
 const createSchema = previewSchema.extend({
   previewToken: z.string().min(1).max(200),

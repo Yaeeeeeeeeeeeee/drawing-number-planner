@@ -9,6 +9,7 @@ import { ArchiverOutboundArchiveWriter, OutboundPackageService, OutboundPackageE
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import { TaskRegistry } from '../../src/core/tasks/task-registry';
+import { ProductCleanupService } from '../../src/core/products/product-cleanup-service';
 
 let db: PlannerDatabase;
 let root: string;
@@ -85,6 +86,51 @@ const request = () => ({ productId, selectedMaterialBatchId: batchId, materialTy
   packageMode: 'current_complete' as const });
 
 describe('OutboundPackageService', () => {
+  it('requires an explicit BOM choice when the same material has conflicting change records', () => {
+    const project = db.prepare("select id from dictionary_items where type = 'project_item'").get() as { id: number };
+    const historical = db.prepare('select id from historical_drawing_numbers').get() as { id: number };
+    for (const version of [1, 2]) {
+      db.prepare("insert into bom_versions(id, product_id, version_number, created_at) values (?, ?, ?, 'now')").run(version, productId, version);
+      db.prepare(`insert into bom_items(bom_version_id, project_item_id, historical_drawing_id, effective_material_batch_id, change_details)
+        values (?, ?, ?, ?, ?)`).run(version, project.id, historical.id, batchId, `修改${version}`);
+    }
+    expect(service.previewPackage(request()).items[0]).toMatchObject({ selectable: false, bomContext: { status: 'ambiguous' } });
+    expect(service.previewPackage({ ...request(), bomSelections: { [String(project.id)]: 2 } }).items[0])
+      .toMatchObject({ selectable: true, bomContext: { status: 'matched', changeDetails: '修改2' } });
+  });
+  it('loads exact BOM changes into preview, rejects a changed preview and freezes completed changes', async () => {
+    const project = db.prepare("select id from dictionary_items where type = 'project_item'").get() as { id: number };
+    const historical = db.prepare('select id from historical_drawing_numbers').get() as { id: number };
+    db.prepare("insert into bom_versions(product_id, version_number, created_at) values (?, 1, 'now')").run(productId);
+    db.prepare(`insert into bom_items(bom_version_id, project_item_id, historical_drawing_id, effective_material_batch_id, change_details)
+      values (1, ?, ?, ?, '修改说明文字')`).run(project.id, historical.id, batchId);
+    const first = service.previewPackage(request());
+    expect(first.items[0]).toMatchObject({ bomContext: { status: 'matched', changeDetails: '修改说明文字' } });
+    db.exec("update bom_items set change_details = '校正文案'");
+    await expect(service.createPackage({ ...request(), previewToken: first.previewToken, selectedPdfFileIds: [pdfId] }))
+      .rejects.toThrowError(expect.objectContaining({ code: 'PREVIEW_STALE' }));
+    const fresh = service.previewPackage(request());
+    await service.createPackage({ ...request(), previewToken: fresh.previewToken, selectedPdfFileIds: [pdfId] });
+    db.exec("update bom_items set change_details = '后续新内容'");
+    expect(db.prepare('select change_details_snapshot from outbound_package_items').get()).toEqual({ change_details_snapshot: '校正文案' });
+    const identity = db.prepare('select product_identity_json as identity from outbound_packages').get() as { identity: string };
+    expect(JSON.parse(identity.identity)).toMatchObject({ model: 'T40', sku: 'SKDWT040JP' });
+  });
+  it('keeps completed outbound snapshots and original PDF bytes unchanged when the product exits', async () => {
+    const preview = service.previewPackage(request());
+    await service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] });
+    const packages = db.prepare('select * from outbound_packages').all();
+    const entries = db.prepare('select * from outbound_package_items').all();
+    const file = db.prepare('select relative_path as path from pdf_files where id = ?').get(pdfId) as { path: string };
+    const bytes = readFileSync(join(workspace, file.path));
+    const cleanup = new ProductCleanupService(db);
+    expect(cleanup.preview(productId).preservedSnapshots).toBe(1);
+    cleanup.cleanup(productId, { confirmedModel: 'T40' });
+    expect(db.prepare('select * from outbound_packages').all()).toEqual(packages);
+    expect(db.prepare('select * from outbound_package_items').all()).toEqual(entries);
+    expect(readFileSync(join(workspace, file.path))).toEqual(bytes);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
   it('reports ZIP progress after every archived entry', async () => {
     const sources = ['one.pdf', 'two.pdf', 'three.pdf'];
     for (const file of sources) writeFileSync(join(root, file), file);

@@ -10,6 +10,7 @@ import { FileError } from '../files/file-errors.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
 import { resolveWorkspacePath, toWorkspaceRelativePath, validateWorkspaceRoot } from '../files/workspace-paths.js';
 import { CurrentMaterialSetService } from './current-material-set.js';
+import { OutboundBomContextService } from './outbound-bom-context.js';
 import { OutboundPackageRepository, type OutboundIndexedFile } from './outbound-package-repository.js';
 import { buildOutboundPackageName } from './package-naming.js';
 import { expectedOutboundClaimFileName } from './outbound-artifact-ownership.js';
@@ -283,7 +284,12 @@ export class OutboundPackageService {
         }
       } else selectable = false;
       if (!project) selectable = false;
-      return { slotKey: selection.slotKey, fullCode: selection.fullCode, projectItemId: project?.id ?? null,
+      const bomContext = project && selection.fullCode ? new OutboundBomContextService(this.db).resolve({
+        productId: input.productId, batchId: selection.sourceBatchId, projectItemId: project.id, fullCode: selection.fullCode,
+        bomVersionId: input.bomSelections?.[String(project.id)],
+      }) : undefined;
+      if (bomContext?.status === 'ambiguous' || (project && input.bomSelections?.[String(project.id)] && bomContext?.status !== 'matched')) selectable = false;
+      return { bomContext, slotKey: selection.slotKey, fullCode: selection.fullCode, projectItemId: project?.id ?? null,
         projectItemName: project?.name ?? '项目待确认', pdfFileId: indexed?.id ?? null,
         fileName: indexed?.fileName ?? selection.fileName, relativePath: indexed?.relativePath ?? selection.relativePath,
         sourceBatchId: selection.sourceBatchId, sourceBatchName: selection.sourceBatchName,
@@ -319,7 +325,7 @@ export class OutboundPackageService {
   }
 
   private requestKey(input: OutboundPackageRequest): string {
-    return `${input.productId}:${input.selectedMaterialBatchId}:${input.materialType}:${input.packageMode}`;
+    return `${input.productId}:${input.selectedMaterialBatchId}:${input.materialType}:${input.packageMode}:${JSON.stringify(Object.entries(input.bomSelections ?? {}).sort(([a], [b]) => a.localeCompare(b)))}`;
   }
 
   private pruneTokens(nowMs: number): void {

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
-import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductQrCodeView, ProductReferenceSummaryView, ProductView } from '../data/client';
+import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductQrCodeView, ProductView } from '../data/client';
+import { ProductCleanupPanel } from '../components/ProductCleanupPanel';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 
@@ -10,16 +11,10 @@ const sameCandidate = (left: HistoricalProductCandidateView, right: HistoricalPr
   left.productCategory === right.productCategory && left.sku === right.sku && left.model === right.model;
 
 const qrLabel = (item: ProductQrCodeView) => ({ user_manual: '说明书', warranty: '售后', recipe: '菜谱' }[item.key] ?? item.displayName);
-const referenceLabels: Array<[keyof ProductReferenceSummaryView, string]> = [
-  ['referenceProductCount', '参考产品'], ['plannedDrawingCount', '计划图号'], ['historicalDrawingCount', '历史图号'],
-  ['materialBatchCount', '资料批次'], ['bomCount', 'BOM'], ['configuredQrCount', '已配置二维码'],
-];
-const referenceDetails = (summary: Partial<ProductReferenceSummaryView>) => referenceLabels
-  .filter(([key]) => (summary[key] ?? 0) > 0)
-  .map(([key, label]) => `${label}（${summary[key]}）`);
 
 export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id: number) => void }) {
   const [items, setItems] = useState<ProductView[]>([]);
+  const [cleanupId, setCleanupId] = useState<number | null>(null);
   const [allProducts, setAllProducts] = useState<ProductView[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -67,6 +62,7 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const openCreate = () => { setEditingId(null); setForm(blank); setEditorOpen(true); };
   const openEdit = (item: ProductView) => {
+    setCleanupId(null);
     setEditingId(item.id);
     setForm({ sku: item.sku ?? '', model: item.model, productCategory: item.productCategory, brandId: String(item.brandId),
       productSizeId: String(item.productSizeId), defaultAppearanceId: item.defaultAppearanceId ? String(item.defaultAppearanceId) : '',
@@ -104,18 +100,11 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
       setItems(replace); setAllProducts(replace);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '产品启用失败'); }
   };
-  const deleteProduct = async (item: ProductView) => {
-    if (!window.confirm(`确认删除产品 ${item.model}？只有未被业务记录引用的产品可以删除。`)) return;
-    if (!window.confirm(`再次确认删除 ${item.model}？此操作会同时移除未配置的默认二维码占位记录。`)) return;
-    try {
-      await api.deleteProduct(item.id);
-      const remove = (current: ProductView[]) => current.filter((entry) => entry.id !== item.id);
-      setItems(remove); setAllProducts(remove); setQrCodes((current) => current.filter((code) => code.productId !== item.id));
-    } catch (reason) {
-      const error = reason as { code?: string; message?: string; referenceSummary?: Partial<ProductReferenceSummaryView> };
-      const details = error.code === 'PRODUCT_REFERENCED' && error.referenceSummary ? referenceDetails(error.referenceSummary) : [];
-      setError(details.length ? `${error.message ?? '产品删除失败'}：${details.join('、')}` : (reason instanceof Error ? reason.message : '产品删除失败'));
-    }
+  const deleteProduct = (item: ProductView) => { setEditorOpen(false); setCleanupId(item.id); };
+  const cleanupComplete = (id: number) => {
+    setItems((current) => current.filter((item) => item.id !== id));
+    setAllProducts((current) => current.filter((item) => item.id !== id));
+    setQrCodes((current) => current.filter((code) => code.productId !== id)); setCleanupId(null);
   };
   const openHistoricalCandidates = async () => {
     setHistoricalOpen(true); setHistoricalLoading(true); setHistoricalMessage(''); setSelectedCandidate(null);
@@ -204,6 +193,8 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
         { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active'
           ? <button className="text-button danger" aria-label={`停用 ${item.model}`} onClick={() => void deactivate(item)} type="button">停用</button>
           : <button className="text-button" aria-label={`启用 ${item.model}`} onClick={() => void activate(item)} type="button">启用</button>}<button className="text-button danger" aria-label={`删除 ${item.model}`} onClick={() => void deleteProduct(item)} type="button">删除</button></div> },
-      ]} renderExpandedRow={(item) => editorOpen && editingId === item.id ? productEditor : null} />}
+      ]} renderExpandedRow={(item) => cleanupId === item.id
+        ? <ProductCleanupPanel key={item.id} api={api} productId={item.id} onCancel={() => setCleanupId(null)} onComplete={() => cleanupComplete(item.id)} />
+        : editorOpen && editingId === item.id ? productEditor : null} />}
   </section>;
 }
