@@ -74,6 +74,7 @@ export interface CreateOutboundPackageInput extends OutboundPackageRequest {
 }
 
 export interface CreatedOutboundPackage {
+  parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number }>;
   id: number;
   packageName: string;
   zipRelativePath: string;

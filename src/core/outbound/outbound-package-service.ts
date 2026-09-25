@@ -11,6 +11,7 @@ import { MaterialBatchService } from '../files/material-batch-service.js';
 import { resolveWorkspacePath, toWorkspaceRelativePath, validateWorkspaceRoot } from '../files/workspace-paths.js';
 import { CurrentMaterialSetService } from './current-material-set.js';
 import { OutboundBomContextService } from './outbound-bom-context.js';
+import { OUTBOUND_ZIP_LIMIT_BYTES, OUTBOUND_ZIP_TARGET_BYTES, partitionOutboundFiles } from './outbound-partition.js';
 import { OutboundPackageRepository, type OutboundIndexedFile } from './outbound-package-repository.js';
 import { buildOutboundPackageName } from './package-naming.js';
 import { expectedOutboundClaimFileName } from './outbound-artifact-ownership.js';
@@ -21,7 +22,7 @@ import type { CreateOutboundPackageInput, CreatedOutboundPackage, OutboundPackag
 export type OutboundPackageErrorCode = 'PRODUCT_NOT_FOUND' | 'PACKAGE_EMPTY' | 'PACKAGE_HAS_BLOCKERS'
   | 'INVALID_SELECTION' | 'PREVIEW_STALE' | 'DUPLICATE_ACTUAL_PATH' | 'OUTPUT_NOT_CONFIGURED'
   | 'OUTPUT_ALREADY_EXISTS' | 'ARCHIVE_NAME_CONFLICT' | 'OUTPUT_INSIDE_WORKSPACE' | 'UNSAFE_ARCHIVE_ENTRY'
-  | 'PACKAGE_PUBLISH_FAILED' | 'UNSAFE_PACKAGE_NAME';
+  | 'PACKAGE_PUBLISH_FAILED' | 'UNSAFE_PACKAGE_NAME' | 'FILE_TOO_LARGE' | 'ZIP_TOO_LARGE';
 
 export class OutboundPackageError extends Error {
   constructor(readonly code: OutboundPackageErrorCode, message: string, options?: { cause?: unknown }) {
@@ -164,51 +165,88 @@ export class OutboundPackageService {
     if (outputDifference === '' || (!outputDifference.startsWith('..') && !isAbsolute(outputDifference))) {
       throw this.error('OUTPUT_INSIDE_WORKSPACE');
     }
-    const zipRelativePath = `${preview.packageName}.zip`;
-    const finalPath = resolveWorkspacePath(outputRoot, zipRelativePath, { requireExistingParent: true });
-    const temporaryPath = join(outputRoot, `.${randomUUID()}.tmp`);
-    const claimPath = join(outputRoot, expectedOutboundClaimFileName(basename(finalPath)));
     const entries = selected.map((item) => ({ sourcePath: preview.liveFiles.get(item.pdfFileId!)!.absolutePath,
-      archiveName: item.fileName! }));
+      archiveName: item.fileName!, item, sizeBytes: statSync(preview.liveFiles.get(item.pdfFileId!)!.absolutePath).size }));
+    const groups = partitionOutboundFiles(entries);
+    const prepareParts = () => groups.map((group, index) => {
+      const zipRelativePath = `${preview.packageName}${groups.length > 1 ? `-${index + 1}` : ''}.zip`;
+      const finalPath = resolveWorkspacePath(outputRoot, zipRelativePath, { requireExistingParent: true });
+      return { group, partNumber: index + 1, zipRelativePath, finalPath,
+        temporaryPath: join(outputRoot, `.${randomUUID()}.tmp`),
+        claimPath: join(outputRoot, expectedOutboundClaimFileName(basename(finalPath))),
+        sizeBytes: 0, claimed: false, published: false };
+    });
+    let parts = prepareParts();
     options.onProgress?.(0, entries.length, '正在生成压缩包');
-    let published = false; let claimed = false;
     try {
+      writePass: while (true) {
+      for (const part of parts) {
       try {
-        this.acquireClaim(claimPath, JSON.stringify({ version: 1, taskId: options.taskId ?? null, lifecycle: 'active',
-          createdAt: this.now().toISOString(), temporaryFile: basename(temporaryPath), finalFile: basename(finalPath) }));
-        claimed = true;
+        this.acquireClaim(part.claimPath, JSON.stringify({ version: 1, taskId: options.taskId ?? null, lifecycle: 'active',
+          createdAt: this.now().toISOString(), temporaryFile: basename(part.temporaryPath), finalFile: basename(part.finalPath) }));
+        part.claimed = true;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw this.error('OUTPUT_ALREADY_EXISTS');
         throw this.error('PACKAGE_PUBLISH_FAILED', error);
       }
-      if (existsSync(finalPath)) throw this.error('OUTPUT_ALREADY_EXISTS');
+      if (existsSync(part.finalPath)) throw this.error('OUTPUT_ALREADY_EXISTS');
+      }
+      let processedFiles = 0;
+      for (const part of parts) {
       options.signal?.throwIfAborted();
-      const written = await this.writer.write({ temporaryPath, entries, signal: options.signal,
-        onProgress: (processed, total) => options.onProgress?.(processed, total, `正在写入第 ${processed}/${total} 个文件`) });
-      if (written !== entries.length) throw new Error('ZIP 文件条目数与预览不一致');
+      const written = await this.writer.write({ temporaryPath: part.temporaryPath, entries: part.group, signal: options.signal,
+        onProgress: (processed) => options.onProgress?.(processedFiles + processed, entries.length, `正在写入第 ${processedFiles + processed}/${entries.length} 个文件`) });
+      if (written !== part.group.length) throw new Error('ZIP 文件条目数与预览不一致');
+      let zipBytes: number;
+      try { zipBytes = statSync(part.temporaryPath).size; }
+      catch (error) { throw this.error('PACKAGE_PUBLISH_FAILED', error); }
+      if (zipBytes > OUTBOUND_ZIP_TARGET_BYTES && part.group.length > 1) {
+        for (const previous of parts) {
+          this.safeRemove(previous.temporaryPath);
+          if (previous.claimed) this.safeRemoveClaim(previous.claimPath);
+        }
+        const split = Math.ceil(part.group.length / 2);
+        groups.splice(parts.indexOf(part), 1, part.group.slice(0, split), part.group.slice(split));
+        parts = prepareParts();
+        options.signal?.throwIfAborted();
+        continue writePass;
+      }
+      if (zipBytes > OUTBOUND_ZIP_LIMIT_BYTES) throw this.error('ZIP_TOO_LARGE');
+      part.sizeBytes = zipBytes;
+      processedFiles += part.group.length;
+      }
+      break;
+      }
       options.signal?.throwIfAborted();
       options.onFinalizing?.();
-      try { renameSync(temporaryPath, finalPath); }
+      for (const part of parts) {
+      try { renameSync(part.temporaryPath, part.finalPath); }
       catch { throw this.error('PACKAGE_PUBLISH_FAILED'); }
-      published = true;
+      part.published = true;
+      }
       const createdAt = this.now().toISOString();
-      const snapshots = selected.map((item) => {
+      const snapshots = parts.flatMap((part) => part.group.map(({ item }) => {
         const indexed = preview.liveFiles.get(item.pdfFileId!)!.indexed;
-        return { ...item, drawingId: indexed.drawingId, historicalDrawingId: indexed.historicalDrawingId };
-      });
+        return { ...item, partNumber: part.partNumber, drawingId: indexed.drawingId, historicalDrawingId: indexed.historicalDrawingId };
+      }));
       const result = this.repository.saveCompleted({ productId: input.productId, materialType: input.materialType,
         packageMode: input.packageMode, selectedMaterialBatchId: input.selectedMaterialBatchId,
-        packageName: preview.packageName, zipRelativePath, createdAt, items: snapshots });
+        packageName: preview.packageName, zipRelativePath: parts[0].zipRelativePath, createdAt,
+        parts: parts.map(({ partNumber, zipRelativePath, sizeBytes }) => ({ partNumber, zipRelativePath, sizeBytes })), items: snapshots });
       this.tokens.delete(input.previewToken);
       return result;
     } catch (error) {
-      this.safeRemove(temporaryPath);
-      if (published) this.safeRemove(finalPath);
+      for (const part of parts) {
+        this.safeRemove(part.temporaryPath);
+        if (part.published) this.safeRemove(part.finalPath);
+      }
       throw error;
     } finally {
-      if (claimed) this.safeRemoveClaim(claimPath);
+      for (const part of parts) if (part.claimed) this.safeRemoveClaim(part.claimPath);
     }
   }
+
+  listCompleted(productId: number) { return this.repository.listCompleted(productId); }
 
   private acquireClaim(path: string, content: string): void {
     let descriptor: number | undefined; let failure: unknown;
@@ -278,6 +316,9 @@ export class OutboundPackageService {
             physicalFileMissing = true;
           } else {
             const stats = statSync(absolutePath);
+            if (stats.size > OUTBOUND_ZIP_LIMIT_BYTES) {
+              throw new OutboundPackageError('FILE_TOO_LARGE', `${indexed.fileName} 超过50MB，不能切割原文件，请先处理该文件。`);
+            }
             liveFiles.set(indexed.id, { indexed, absolutePath });
             fileFacts.push({ id: indexed.id, path: absolutePath, size: stats.size, mtimeMs: stats.mtimeMs });
           }
@@ -341,6 +382,8 @@ export class OutboundPackageService {
   private error(code: OutboundPackageErrorCode, cause?: unknown): OutboundPackageError {
     const messages: Record<OutboundPackageErrorCode, string> = {
       PRODUCT_NOT_FOUND: '未找到外发产品', PACKAGE_EMPTY: '所选资料没有可打包的转曲后文件',
+      FILE_TOO_LARGE: '单个文件超过50MB，不能切割原文件',
+      ZIP_TOO_LARGE: '生成的压缩包超过50MB，未发布或登记成功，请减少本次文件选择',
       PACKAGE_HAS_BLOCKERS: '资料中存在缺失、冲突或待确认项目，暂不能生成压缩包',
       INVALID_SELECTION: '打包文件选择无效，请重新预览', PREVIEW_STALE: '打包预览已经过期，请重新预览',
       DUPLICATE_ACTUAL_PATH: '同一个实际文件路径被重复索引，暂不能打包', OUTPUT_NOT_CONFIGURED: '请先设置外发输出目录',

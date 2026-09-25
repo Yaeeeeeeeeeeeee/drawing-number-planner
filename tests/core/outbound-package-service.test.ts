@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -86,6 +86,104 @@ const request = () => ({ productId, selectedMaterialBatchId: batchId, materialTy
   packageMode: 'current_complete' as const });
 
 describe('OutboundPackageService', () => {
+  for (const failure of ['write failure', 'cancellation'] as const) {
+    it(`leaves no partial multi-package history or files after ${failure} in the final part`, async () => {
+      const main = db.prepare("select id from dictionary_items where type = 'main_category'").get() as { id: number };
+      dictionary('project_item', '02', '售后卡', main.id);
+      const second = addOutlined({ relativePath: 'card.pdf', fullCode: '02.0209.010.0402001' });
+      writeFileSync(join(output, 'keep.txt'), 'do not touch');
+      const controller = new AbortController();
+      let calls = 0;
+      const grouped = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output, now: fixedNow,
+        archiveWriter: { async write({ temporaryPath, entries }) {
+          calls += 1;
+          const fd = openSync(temporaryPath, 'wx');
+          try { ftruncateSync(fd, entries.length > 1 ? 50_000_001 : 100); } finally { closeSync(fd); }
+          if (calls === 3) {
+            if (failure === 'write failure') throw new Error('second part failed');
+            controller.abort(new Error('user cancelled'));
+          }
+          return entries.length;
+        } } });
+      const preview = grouped.previewPackage(request());
+      await expect(grouped.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId, second] },
+        { signal: controller.signal })).rejects.toThrow(failure === 'write failure' ? 'second part failed' : 'user cancelled');
+      expect(readdirSync(output)).toEqual(['keep.txt']);
+      expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
+      expect(db.prepare('select count(*) as total from outbound_package_parts').get()).toEqual({ total: 0 });
+      expect(readFileSync(join(output, 'keep.txt'), 'utf8')).toBe('do not touch');
+    });
+  }
+  it('regroups when measured ZIP size exceeds the target and publishes only the final parts', async () => {
+    const main = db.prepare("select id from dictionary_items where type = 'main_category'").get() as { id: number };
+    dictionary('project_item', '02', '售后卡', main.id);
+    const second = addOutlined({ relativePath: 'card.pdf', fullCode: '02.0209.010.0402001' });
+    const grouped = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output, now: fixedNow,
+      archiveWriter: { async write({ temporaryPath, entries }) {
+        const fd = openSync(temporaryPath, 'wx');
+        try { ftruncateSync(fd, entries.length > 1 ? 50_000_001 : 100); } finally { closeSync(fd); }
+        return entries.length;
+      } } });
+    const preview = grouped.previewPackage(request());
+    const result = await grouped.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId, second] });
+    expect(readdirSync(output).sort()).toEqual([`${result.packageName}-1.zip`, `${result.packageName}-2.zip`]);
+    expect(db.prepare('select size_bytes from outbound_package_parts order by part_number').all()).toEqual([{ size_bytes: 100 }, { size_bytes: 100 }]);
+  });
+  it('publishes whole-file groups as two numbered ZIPs in one completed business package', async () => {
+    const main = db.prepare("select id from dictionary_items where type = 'main_category'").get() as { id: number };
+    dictionary('project_item', '02', '售后卡', main.id); dictionary('project_item', '03', '外箱', main.id);
+    const ids = [pdfId, addOutlined({ relativePath: 'card.pdf', fullCode: '02.0209.010.0402001' }),
+      addOutlined({ relativePath: 'box.pdf', fullCode: '02.0209.010.0403001' })];
+    db.exec("update historical_drawing_numbers set project_item_code = substr(full_code, 15, 2)");
+    ids.forEach((id, index) => {
+      const row = db.prepare('select relative_path from pdf_files where id = ?').get(id) as { relative_path: string };
+      const fd = openSync(join(workspace, row.relative_path), 'r+');
+      try { ftruncateSync(fd, [22_000_000, 5_000_000, 31_000_000][index]); } finally { closeSync(fd); }
+    });
+    const written: string[][] = [];
+    const grouped = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output, now: fixedNow,
+      archiveWriter: { async write({ temporaryPath, entries }) {
+        written.push(entries.map((entry) => entry.archiveName)); writeFileSync(temporaryPath, 'ZIP fixture'); return entries.length;
+      } } });
+    const preview = grouped.previewPackage(request());
+    const result = await grouped.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: ids });
+    expect(written.map((part) => part.length)).toEqual([2, 1]);
+    expect(written.flat().sort()).toEqual(['manual（转曲）.pdf', 'card.pdf', 'box.pdf'].sort());
+    expect(readdirSync(output).sort()).toEqual([`${result.packageName}-1.zip`, `${result.packageName}-2.zip`]);
+    expect(db.prepare('select part_number from outbound_package_parts where package_id = ? order by part_number').all(result.id))
+      .toEqual([{ part_number: 1 }, { part_number: 2 }]);
+    expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 1 });
+  });
+  it('registers the measured first ZIP part together with the completed package', async () => {
+    const preview = service.previewPackage(request());
+    const result = await service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] });
+    expect(db.prepare('select part_number, zip_relative_path, size_bytes from outbound_package_parts where package_id = ?')
+      .all(result.id)).toEqual([{ part_number: 1, zip_relative_path: result.zipRelativePath,
+        size_bytes: statSync(join(output, result.zipRelativePath)).size }]);
+  });
+  it('rejects an oversized actual source before creating any ZIP or history record', () => {
+    const row = db.prepare('select relative_path from pdf_files where id = ?').get(pdfId) as { relative_path: string };
+    const descriptor = openSync(join(workspace, row.relative_path), 'r+');
+    try { ftruncateSync(descriptor, 63_000_000); } finally { closeSync(descriptor); }
+    expect(() => service.previewPackage(request())).toThrowError(expect.objectContaining({ code: 'FILE_TOO_LARGE' }));
+    expect(readdirSync(output)).toEqual([]);
+    expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
+  });
+  it('rejects a measured single-file ZIP above 50MB and removes only its temporary output', async () => {
+    writeFileSync(join(output, 'keep.txt'), 'existing');
+    const archiveWriter: OutboundArchiveWriter = { async write({ temporaryPath, entries }) {
+      const descriptor = openSync(temporaryPath, 'wx');
+      try { ftruncateSync(descriptor, 50_000_001); } finally { closeSync(descriptor); }
+      return entries.length;
+    } };
+    const oversized = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output,
+      now: fixedNow, archiveWriter });
+    const preview = oversized.previewPackage(request());
+    await expect(oversized.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] }))
+      .rejects.toThrowError(expect.objectContaining({ code: 'ZIP_TOO_LARGE' }));
+    expect(readdirSync(output)).toEqual(['keep.txt']);
+    expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
+  });
   it('requires an explicit BOM choice when the same material has conflicting change records', () => {
     const project = db.prepare("select id from dictionary_items where type = 'project_item'").get() as { id: number };
     const historical = db.prepare('select id from historical_drawing_numbers').get() as { id: number };

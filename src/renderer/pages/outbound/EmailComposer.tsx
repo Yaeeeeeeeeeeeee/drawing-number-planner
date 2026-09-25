@@ -26,6 +26,7 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
   const [mailContext, setMailContext] = useState(incomingContext);
   const [pendingContext, setPendingContext] = useState<OutboundMailContext | null>(null);
   const lastIncoming = useRef(incomingContext);
+  const generationRevision = useRef(0);
   const [contacts, setContacts] = useState<OutboundContactView[]>([]);
   const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
   const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
@@ -44,6 +45,7 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
   const [message, setMessage] = useState('');
 
   const adoptContext = (context: OutboundMailContext) => {
+    generationRevision.current += 1;
     setMailContext(context);
     setSubject(context.packageName);
     setBody('');
@@ -53,6 +55,8 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
     setChangeEdited(false);
     setPendingContext(null);
   };
+
+  useEffect(() => () => { generationRevision.current += 1; }, [api]);
 
   useEffect(() => {
     if (incomingContext === lastIncoming.current) return;
@@ -92,13 +96,18 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
     [template, blocks],
   );
   const fileList = useMemo(
-    () => mailContext?.items.map((item) => `  ${item.fileName.split(/[\\/]/).at(-1)?.replace(/\.pdf$/i, '') ?? item.projectItemName}`).join('\n') ?? '',
+    () => {
+      const files = mailContext?.items.map((item) => `  ${item.fileName.split(/[\\/]/).at(-1)?.replace(/\.pdf$/i, '') ?? item.projectItemName}`).join('\n') ?? '';
+      const packages = mailContext?.packageFiles ?? [];
+      return packages.length > 1 ? `${files}\n\n分包附件：\n${packages.map((name) => `  ${name.split(/[\\/]/).at(-1)}`).join('\n')}` : files;
+    },
     [mailContext],
   );
 
   const generate = async () => {
     if (!template) return;
     if (manuallyEdited && !window.confirm('重新生成将替换您已修改的主题和正文，是否继续？')) return;
+    const revision = ++generationRevision.current;
     setMessage('');
     const primary = selectedContacts[0];
     try {
@@ -113,10 +122,12 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
         optional_blocks: optionalText,
         signature: signature?.content ?? '',
       });
+      if (revision !== generationRevision.current) return;
       setSubject(rendered.subject);
       setBody(rendered.body);
       setManuallyEdited(false);
     } catch (error) {
+      if (revision !== generationRevision.current) return;
       setMessage(error instanceof Error ? error.message : '邮件内容生成失败');
     }
   };
@@ -126,7 +137,7 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
   };
 
   return (
-    <section className="outbound-panel email-composer">
+    <section className="outbound-panel email-composer" onChangeCapture={() => { generationRevision.current += 1; }}>
       {pendingContext && <div className="info-banner">
         新压缩包已生成：{pendingContext.packageName}。当前邮件仍保留原资料和已编辑内容。
         <button type="button" className="text-button" onClick={() => {

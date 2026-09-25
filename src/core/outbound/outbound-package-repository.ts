@@ -59,6 +59,19 @@ function toFile(row: FileRow): OutboundIndexedFile {
 export class OutboundPackageRepository {
   constructor(private readonly db: PlannerDatabase) {}
 
+  listCompleted(productId: number) {
+    const packages = this.db.prepare(`select package.id, package.package_name as packageName,
+      package.zip_relative_path as zipRelativePath, package.created_at as createdAt,
+      (select count(*) from outbound_package_items item where item.package_id = package.id) as fileCount
+      from outbound_packages package where package.product_id = ? and package.status = 'completed'
+      order by package.created_at desc, package.id desc`).all(productId) as Array<Omit<CreatedOutboundPackage, 'parts'>>;
+    const parts = this.db.prepare(`select part_number as partNumber, zip_relative_path as zipRelativePath,
+      size_bytes as sizeBytes from outbound_package_parts where package_id = ? order by part_number`);
+    return packages.map((item) => ({ ...item, parts: parts.all(item.id) as Array<{
+      partNumber: number; zipRelativePath: string; sizeBytes: number | null;
+    }> }));
+  }
+
   getProduct(id: number): OutboundProductIdentity | null {
     const row = this.db.prepare(`select product.id, brand.name as brand, product.model,
       product.product_category as productCategory from products product
@@ -93,7 +106,8 @@ export class OutboundPackageRepository {
 
   saveCompleted(input: { productId: number; materialType: OutboundPackageMaterialType; packageMode: OutboundPackageMode;
     selectedMaterialBatchId: number; packageName: string; zipRelativePath: string; createdAt: string;
-    items: Array<OutboundPackagePreviewItem & { drawingId: number | null; historicalDrawingId: number | null }>;
+    parts: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number }>;
+    items: Array<OutboundPackagePreviewItem & { drawingId: number | null; historicalDrawingId: number | null; partNumber: number }>;
   }): CreatedOutboundPackage {
     return this.db.transaction(() => {
       const packageId = Number(this.db.prepare(`insert into outbound_packages
@@ -101,6 +115,8 @@ export class OutboundPackageRepository {
          zip_relative_path, status, created_at) values (?, ?, ?, ?, ?, ?, 'completed', ?)`)
         .run(input.productId, input.materialType, input.packageMode, input.selectedMaterialBatchId,
           input.packageName, input.zipRelativePath, input.createdAt).lastInsertRowid);
+      for (const part of input.parts) this.db.prepare(`insert into outbound_package_parts(package_id, part_number, zip_relative_path, size_bytes)
+        values (?, ?, ?, ?)`).run(packageId, part.partNumber, part.zipRelativePath, part.sizeBytes);
       this.db.prepare(`update outbound_packages set product_identity_json = (
         select json_object('sku', product.sku, 'model', product.model, 'brandName', brand.name,
           'productCategory', product.product_category) from products product
@@ -109,14 +125,14 @@ export class OutboundPackageRepository {
       const insertItem = this.db.prepare(`insert into outbound_package_items
         (package_id, project_item_id, drawing_id, historical_drawing_id, pdf_file_id, source_material_batch_id,
          project_item_name_snapshot, drawing_code_snapshot, file_name_snapshot, relative_path_snapshot,
-         source_batch_name_snapshot, change_details_snapshot) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+         source_batch_name_snapshot, change_details_snapshot, part_number) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const item of input.items) {
         insertItem.run(packageId, item.projectItemId, item.drawingId, item.historicalDrawingId, item.pdfFileId,
           item.sourceBatchId, item.projectItemName, item.fullCode, item.fileName, item.relativePath, item.sourceBatchName,
-          item.bomContext?.changeDetails ?? null);
+          item.bomContext?.changeDetails ?? null, item.partNumber);
       }
       return { id: packageId, packageName: input.packageName, zipRelativePath: input.zipRelativePath,
-        fileCount: input.items.length, createdAt: input.createdAt };
+        fileCount: input.items.length, createdAt: input.createdAt, parts: input.parts };
     }).immediate();
   }
 }

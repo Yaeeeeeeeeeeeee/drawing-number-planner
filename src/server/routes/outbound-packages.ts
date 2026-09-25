@@ -35,6 +35,11 @@ function sendError(error: unknown, reply: FastifyReply) {
 }
 
 export function registerOutboundPackageRoutes(app: FastifyInstance, service: OutboundPackageService, tasks?: TaskRegistry): void {
+  app.get('/api/outbound-packages', async (request, reply) => {
+    const query = z.object({ productId: z.coerce.number().int().positive() }).strict().safeParse(request.query);
+    if (!query.success) return invalid(reply);
+    return service.listCompleted(query.data.productId);
+  });
   tasks?.register('outbound_package', (payload, context) => {
     const body = createSchema.safeParse(payload);
     if (!body.success) throw new OutboundPackageError('INVALID_SELECTION', '外发打包条件不完整');

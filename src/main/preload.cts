@@ -20,9 +20,9 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
     return ipcRenderer.invoke('planner:qr-file-action', relativePath, action);
   },
   chooseOutboundDirectory() { return ipcRenderer.invoke('planner:choose-outbound-directory'); },
-  showOutboundPackageInFolder(packageId: unknown) {
+  showOutboundPackageInFolder(packageId: unknown, partNumber?: unknown) {
     if (!Number.isInteger(packageId) || Number(packageId) <= 0) return Promise.resolve({ ok: false, error: { code: 'INVALID_PACKAGE_ID', message: '外发压缩包编号无效' } });
-    return ipcRenderer.invoke('planner:show-outbound-package-in-folder', packageId);
+    return ipcRenderer.invoke('planner:show-outbound-package-in-folder', packageId, partNumber);
   },
   getRecoveryStatus() { return ipcRenderer.invoke('planner:recovery-status'); },
   terminateTask() { return ipcRenderer.invoke('planner:recovery-terminate-task'); },

@@ -1,9 +1,31 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { expectedOutboundClaimFileName, parseOutboundClaim, mayCleanOutboundClaim,
-  resolveOwnedOutboundArtifacts } from '../../src/core/outbound/outbound-artifact-ownership';
+  resolveOwnedOutboundArtifacts, cleanupStaleOutboundArtifacts } from '../../src/core/outbound/outbound-artifact-ownership';
 
 describe('outbound temporary artifact ownership', () => {
+  it('recovers all abandoned part temporaries while preserving unrelated files and published ZIPs', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'multipart-recovery-'));
+    try {
+      const taskId = '6fc3f8a7-e1d0-4d61-9235-13d98350f091';
+      const temporaryFiles = ['.17b40f41-2eed-4912-9db7-cd998a8bd444.tmp', '.27b40f41-2eed-4912-9db7-cd998a8bd444.tmp'];
+      for (const [index, temporaryFile] of temporaryFiles.entries()) {
+        const finalFile = `package-${index + 1}.zip`;
+        writeFileSync(join(directory, temporaryFile), 'incomplete');
+        writeFileSync(join(directory, expectedOutboundClaimFileName(finalFile)), JSON.stringify({ version: 1, taskId,
+          lifecycle: 'active', createdAt: '2026-09-10T00:00:00.000Z', temporaryFile, finalFile }));
+      }
+      writeFileSync(join(directory, 'package-1.zip'), 'published, never infer ownership from a name alone');
+      writeFileSync(join(directory, 'customer.pdf'), 'original');
+      const result = cleanupStaleOutboundArtifacts(directory, { activeTaskIds: new Set(),
+        nowMs: Date.parse('2026-09-10T02:00:00Z'), minimumAgeMs: 3_600_000 });
+      expect(result).toEqual({ claimsRemoved: 2, temporaryFilesRemoved: 2 });
+      expect(readdirSync(directory).sort()).toEqual(['customer.pdf', 'package-1.zip']);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
   const taskId = '6fc3f8a7-e1d0-4d61-9235-13d98350f091';
   const temporaryFile = '.17b40f41-2eed-4912-9db7-cd998a8bd444.tmp';
   const finalFile = 'package.zip';

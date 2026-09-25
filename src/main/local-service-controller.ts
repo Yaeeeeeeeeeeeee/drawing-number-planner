@@ -113,7 +113,7 @@ export class LocalServiceController {
   resolveBomAssetPath(id: unknown): Promise<string> { return this.request('resolveBomAssetPath', [id]); }
   resolveQrFilePath(relativePath: string): Promise<{ path: string; mimeType: string }> { return this.request('resolveQrFilePath', [relativePath]); }
   setOutboundOutputRoot(path: string): Promise<string> { return this.request('setOutboundOutputRoot', [path]); }
-  resolveOutboundPackagePath(id: unknown): Promise<string> { return this.request('resolveOutboundPackagePath', [id]); }
+  resolveOutboundPackagePath(id: unknown, partNumber?: unknown): Promise<string> { return this.request('resolveOutboundPackagePath', partNumber === undefined ? [id] : [id, partNumber]); }
 
   private spawnService(resetAttempts: boolean, scheduled?: Deferred<LocalServiceConnection>): Promise<LocalServiceConnection> {
     if (resetAttempts) this.state = { status: 'starting', restartAttempts: 0 };

@@ -212,7 +212,8 @@ export interface OutboundPackagePreviewItemView {
   selectable: boolean; conflictFullCodes: string[];
 }
 export interface OutboundPackagePreviewView { previewToken: string; packageName: string; items: OutboundPackagePreviewItemView[] }
-export interface CreatedOutboundPackageView { id: number; packageName: string; zipRelativePath: string; fileCount: number; createdAt: string }
+export interface CreatedOutboundPackageView { id: number; packageName: string; zipRelativePath: string; fileCount: number; createdAt: string;
+  parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number }> }
 export interface MaterialBatchLogicalMaterialView {
   fullCode: string | null; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
 }
@@ -315,6 +316,9 @@ export interface PlannerApi {
   activateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deactivateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deleteOutboundSignature(id: number): Promise<{ deleted: true }>;
+  listOutboundPackages(productId: number): Promise<Array<Omit<CreatedOutboundPackageView, 'parts'> & {
+    parts: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number | null }>;
+  }>>;
   previewOutboundPackage(input: OutboundPackageRequestView): Promise<OutboundPackagePreviewView>;
   createOutboundPackage(input: OutboundPackageRequestView & { previewToken: string; selectedPdfFileIds: number[] }): Promise<CreatedOutboundPackageView>;
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
@@ -563,6 +567,7 @@ export const apiClient: PlannerApi = {
   activateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/activate`, json('POST')),
   deactivateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/deactivate`, json('POST')),
   deleteOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`, { method: 'DELETE' }),
+  listOutboundPackages: (productId) => request(`/api/outbound-packages?productId=${productId}`),
   previewOutboundPackage: (input) => request('/api/outbound-packages/preview', json('POST', input)),
   createOutboundPackage: (input) => runLocalTask('outbound_package', input),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(

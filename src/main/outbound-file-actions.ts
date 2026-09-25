@@ -16,11 +16,13 @@ export function createChooseOutboundDirectoryHandler(dependencies: {
 }
 
 export function createShowOutboundPackageHandler(dependencies: {
-  resolvePackagePath(id: unknown): string | Promise<string>; showItemInFolder(path: string): void;
+  resolvePackagePath(id: unknown, partNumber?: unknown): string | Promise<string>; showItemInFolder(path: string): void;
 }) {
-  return async (_event: unknown, packageId: unknown): Promise<DesktopFileResult> => {
+  return async (_event: unknown, packageId: unknown, partNumber?: unknown): Promise<DesktopFileResult> => {
     if (!Number.isInteger(packageId) || Number(packageId) <= 0) return { ok: false, error: { code: 'INVALID_PACKAGE_ID', message: '外发压缩包编号无效' } };
-    try { dependencies.showItemInFolder(await dependencies.resolvePackagePath(packageId)); return { ok: true }; }
+    if (partNumber !== undefined && (!Number.isInteger(partNumber) || Number(partNumber) <= 0)) return { ok: false, error: { code: 'INVALID_PART_NUMBER', message: '分包序号无效' } };
+    try { dependencies.showItemInFolder(await (partNumber === undefined ? dependencies.resolvePackagePath(packageId)
+      : dependencies.resolvePackagePath(packageId, partNumber))); return { ok: true }; }
     catch (error) { return { ok: false, error: { code: 'OPEN_PACKAGE_FAILED', message: error instanceof Error ? error.message : '压缩包当前不可用' } }; }
   };
 }

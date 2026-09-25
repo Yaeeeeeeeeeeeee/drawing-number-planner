@@ -10,12 +10,14 @@ import type {
   ProductView,
 } from '../../data/client';
 import { chooseOutboundDirectory, openOutboundPackageLocation } from '../../desktop-files';
+import { PackageHistory } from './PackageHistory';
 
 const statusLabel = {
   normal: '正常', carried_forward: '沿用', needs_confirmation: '待确认', conflict: '冲突', missing: '缺失',
 } as const;
 
 export interface OutboundMailContext {
+  packageFiles?: string[];
   packageName: string;
   product: ProductView;
   materialType: OutboundMaterialTypeView;
@@ -120,6 +122,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
       if (chosenProduct) {
         onPackage(value, {
           packageName: value.packageName,
+          packageFiles: value.parts?.map((part) => part.zipRelativePath) ?? [value.zipRelativePath],
           product: chosenProduct,
           materialType,
           items: preview.items.flatMap((item) => (
@@ -214,10 +217,18 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
           <button className="primary-button" type="button" disabled={busy || previewDirty || blockers || selected.length === 0} onClick={() => void generate()}>生成压缩包</button>
         </>
       )}
+      {productId && <PackageHistory api={api} productId={Number(productId)} refreshId={created?.id} />}
       {created && (
         <section className="success-banner outbound-result">
           <strong>压缩包已生成</strong>
-          <span>{created.packageName}.zip</span>
+          {created.parts?.length ? created.parts.map((part) => <div key={part.partNumber}>
+            <span>{part.zipRelativePath}</span>
+            <span> · {(part.sizeBytes / 1_000_000).toFixed(2)} MB</span>
+            <button type="button" className="text-button" onClick={async () => {
+              const result = await openOutboundPackageLocation(created.id, part.partNumber);
+              if (!result.ok) setError(result.error?.message ?? '打开位置失败');
+            }}>打开第{part.partNumber}份位置</button>
+          </div>) : <span>{created.packageName}.zip</span>}
           <span>保存位置：{created.zipRelativePath}</span>
           <span>文件数量：{created.fileCount}</span>
           <button className="text-button" type="button" onClick={async () => { const result = await openOutboundPackageLocation(created.id); if (!result.ok) setError(result.error?.message ?? '打开位置失败'); }}>打开位置</button>

@@ -8,7 +8,7 @@ declare global {
     showFileInFolder(pdfFileId: number): Promise<DesktopFileResult>;
     showBomAssetInFolder?(assetId: number): Promise<DesktopFileResult>;
     chooseOutboundDirectory?(): Promise<DesktopFileResult & { cancelled?: boolean; path?: string }>;
-    showOutboundPackageInFolder?(packageId: number): Promise<DesktopFileResult>;
+    showOutboundPackageInFolder?(packageId: number, partNumber?: number): Promise<DesktopFileResult>;
   }
   interface Window {
     plannerDesktop?: PlannerDesktop;
@@ -21,10 +21,11 @@ export async function chooseOutboundDirectory(): Promise<DesktopFileResult & { c
   catch (error) { return { ok: false, error: { code: 'SELECT_OUTPUT_FAILED', message: error instanceof Error ? error.message : '选择外发输出目录失败' } }; }
 }
 
-export async function openOutboundPackageLocation(packageId: number): Promise<DesktopFileResult> {
+export async function openOutboundPackageLocation(packageId: number, partNumber?: number): Promise<DesktopFileResult> {
   if (!Number.isInteger(packageId) || packageId <= 0) return { ok: false, error: { code: 'INVALID_PACKAGE_ID', message: '外发压缩包编号无效' } };
   if (!window.plannerDesktop?.showOutboundPackageInFolder) return { ok: false, error: { code: 'DESKTOP_ONLY', message: '请在 Windows 桌面版打开压缩包位置' } };
-  try { return await window.plannerDesktop.showOutboundPackageInFolder(packageId); }
+  try { return await (partNumber === undefined ? window.plannerDesktop.showOutboundPackageInFolder(packageId)
+    : window.plannerDesktop.showOutboundPackageInFolder(packageId, partNumber)); }
   catch (error) { return { ok: false, error: { code: 'OPEN_PACKAGE_FAILED', message: error instanceof Error ? error.message : '打开压缩包位置失败' } }; }
 }
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OutboundPage } from '../../src/renderer/pages/OutboundPage';
@@ -18,6 +18,7 @@ function apiFixture() {
   return {
     listProducts: vi.fn().mockResolvedValue([product]), listDictionaries: vi.fn().mockResolvedValue([{ id: 1, code: '02', name: 'SAMKYO', status: 'active' }]),
     listMaterialBatches: vi.fn().mockResolvedValue([batch]), previewOutboundPackage: vi.fn().mockResolvedValue(preview),
+    listOutboundPackages: vi.fn().mockResolvedValue([]),
     createOutboundPackage: vi.fn().mockResolvedValue({ id: 9, packageName: preview.packageName, zipRelativePath: `${preview.packageName}.zip`, fileCount: 1, createdAt: '' }),
     listOutboundContacts: vi.fn().mockResolvedValue([contact]), listOutboundTemplates: vi.fn().mockResolvedValue([template]), listOutboundSignatures: vi.fn().mockResolvedValue([signature]),
     renderOutboundTemplate: vi.fn().mockResolvedValue({ subject: preview.packageName, body: '供应商甲：\n王经理，您好！\n铭牌待 METI 后更新。\n顺祝商祺\n田嘉滨 Yae' }),
@@ -29,6 +30,81 @@ function apiFixture() {
 afterEach(() => { delete window.plannerDesktop; vi.restoreAllMocks(); });
 
 describe('OutboundPage', () => {
+  it('shows persisted package parts after selecting a product and opens the historical part', async () => {
+    const api = apiFixture();
+    api.listOutboundPackages.mockResolvedValue([{ id: 90, packageName: '历史包', zipRelativePath: '历史包-1.zip',
+      fileCount: 3, createdAt: '2026-09-20T12:00:00Z', parts: [
+        { partNumber: 1, zipRelativePath: '历史包-1.zip', sizeBytes: null },
+        { partNumber: 2, zipRelativePath: '历史包-2.zip', sizeBytes: 123 },
+      ] }] as never);
+    const showOutboundPackageInFolder = vi.fn().mockResolvedValue({ ok: true });
+    window.plannerDesktop = { showOutboundPackageInFolder } as never;
+    render(<OutboundPage api={api as never} />);
+    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
+    fireEvent.click(screen.getByText('已生成的压缩包'));
+    expect(await screen.findByText('历史包-2.zip')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '打开历史包第2份位置' }));
+    await waitFor(() => expect(showOutboundPackageInFolder).toHaveBeenCalledWith(90, 2));
+    expect(screen.queryByText('NaN MB')).not.toBeInTheDocument();
+  });
+  it('keeps the latest generation when responses finish out of order', async () => {
+    const api = apiFixture();
+    const pending: Array<(value: { subject: string; body: string }) => void> = [];
+    api.renderOutboundTemplate.mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
+    render(<EmailComposer api={api as never} mailContext={null} />);
+    const button = screen.getByRole('button', { name: '生成邮件内容' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await act(async () => { pending[1]({ subject: '最新主题', body: '最新正文' }); });
+    await act(async () => { pending[0]({ subject: '过期主题', body: '过期正文' }); });
+    expect(screen.getByLabelText('主题')).toHaveValue('最新主题');
+    expect(screen.getByLabelText('正文')).toHaveValue('最新正文');
+  });
+
+  it('preserves text edited while email generation is pending', async () => {
+    const api = apiFixture();
+    let finish!: (value: { subject: string; body: string }) => void;
+    api.renderOutboundTemplate.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    render(<EmailComposer api={api as never} mailContext={null} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '生成邮件内容' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
+    fireEvent.change(screen.getByLabelText('正文'), { target: { value: '请求期间补充的重要说明' } });
+    fireEvent.change(screen.getByLabelText('主题'), { target: { value: '最新人工主题' } });
+    await act(async () => { finish({ subject: '旧生成主题', body: '旧生成正文' }); });
+    expect(screen.getByLabelText('正文')).toHaveValue('请求期间补充的重要说明');
+    expect(screen.getByLabelText('主题')).toHaveValue('最新人工主题');
+  });
+  it('includes all multipart attachment names in generated mail without output paths', async () => {
+    const api = apiFixture();
+    render(<EmailComposer api={api as never} mailContext={{ packageName: '包材资料', product: product as never,
+      materialType: 'update', items: [], packageFiles: ['私有目录/包材资料-1.zip', '私有目录/包材资料-2.zip'] } as never} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '生成邮件内容' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
+    await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalled());
+    const fields = api.renderOutboundTemplate.mock.calls[0][1];
+    expect(fields.file_list).toContain('包材资料-1.zip');
+    expect(fields.file_list).toContain('包材资料-2.zip');
+    expect(fields.file_list).not.toContain('私有目录');
+  });
+  it('shows every generated ZIP and opens the selected part instead of inventing a single ZIP name', async () => {
+    const api = apiFixture();
+    api.previewOutboundPackage.mockResolvedValue({ ...preview, items: [preview.items[0]] });
+    api.createOutboundPackage.mockResolvedValue({ id: 9, packageName: '资料', zipRelativePath: '资料-1.zip', fileCount: 1, createdAt: '',
+      parts: [{ partNumber: 1, zipRelativePath: '资料-1.zip', sizeBytes: 100 }, { partNumber: 2, zipRelativePath: '资料-2.zip', sizeBytes: 200 }] } as never);
+    const showOutboundPackageInFolder = vi.fn().mockResolvedValue({ ok: true });
+    window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true }), showOutboundPackageInFolder } as never;
+    render(<OutboundPage api={api as never} />);
+    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
+    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+    await screen.findByText('铭牌（转曲）.pdf');
+    fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    expect(await screen.findByText('资料-2.zip')).toBeVisible();
+    expect(screen.queryByText('资料.zip')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '打开第2份位置' }));
+    await waitFor(() => expect(showOutboundPackageInFolder).toHaveBeenCalledWith(9, 2));
+  });
   it('keeps packaging and email on one page and preserves a draft while managing contacts', async () => {
     const api = apiFixture();
     render(<OutboundPage api={api as never} />);

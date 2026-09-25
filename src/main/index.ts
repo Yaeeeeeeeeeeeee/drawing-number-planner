@@ -147,7 +147,7 @@ app.whenReady().then(() => {
     setOutputRoot: (path) => { if (!localService) throw new Error('本机文件服务尚未启动'); return localService.setOutboundOutputRoot(path); },
   }));
   ipcMain.handle('planner:show-outbound-package-in-folder', createShowOutboundPackageHandler({
-    resolvePackagePath: (id) => { if (!localService) throw new Error('本机文件服务尚未启动'); return localService.resolveOutboundPackagePath(id); },
+    resolvePackagePath: (id, partNumber) => { if (!localService) throw new Error('本机文件服务尚未启动'); return localService.resolveOutboundPackagePath(id, partNumber); },
     showItemInFolder: (path) => shell.showItemInFolder(path),
   }));
   return createWindow();

@@ -52,6 +52,24 @@ beforeEach(() => {
 afterEach(async () => { await app.close(); db.close(); rmSync(root, { recursive: true, force: true }); });
 
 describe('outbound package API', () => {
+  it('reads all persisted package parts after file indexes are cleared', async () => {
+    const payload = { productId, selectedMaterialBatchId: batchId, materialType: 'initial', packageMode: 'current_complete' };
+    const preview = await app.inject({ method: 'POST', url: '/api/outbound-packages/preview', payload });
+    const created = await app.inject({ method: 'POST', url: '/api/outbound-packages', payload: {
+      ...payload, previewToken: preview.json().previewToken, selectedPdfFileIds: [pdfId],
+    } });
+    expect(created.statusCode).toBe(201);
+    db.prepare('insert into outbound_package_parts(package_id, part_number, zip_relative_path, size_bytes) values (?, 2, ?, 123)')
+      .run(created.json().id, 'second.zip');
+    db.exec('delete from pdf_files');
+    const history = await app.inject({ method: 'GET', url: `/api/outbound-packages?productId=${productId}` });
+    expect(history.statusCode).toBe(200);
+    expect(history.json()).toHaveLength(1);
+    expect(history.json()[0]).toMatchObject({ id: created.json().id, fileCount: 1,
+      parts: [{ partNumber: 1, zipRelativePath: created.json().zipRelativePath },
+        { partNumber: 2, zipRelativePath: 'second.zip', sizeBytes: 123 }] });
+    expect((await app.inject({ method: 'GET', url: '/api/outbound-packages?productId=-1' })).statusCode).toBe(400);
+  });
   it('registers ZIP generation as a progress-reporting task', async () => {
     await app.close();
     const tasks = new TaskRegistry(); const workspace = join(root, 'workspace'); const output = join(root, 'exports');

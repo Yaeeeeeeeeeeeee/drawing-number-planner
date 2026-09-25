@@ -57,7 +57,7 @@ export interface RunningServer {
   resolveBomAssetPath(id: unknown): string;
   resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
   setOutboundOutputRoot(path: string): string;
-  resolveOutboundPackagePath(id: unknown): string;
+  resolveOutboundPackagePath(id: unknown, partNumber?: unknown): string;
   close(): Promise<void>;
 }
 
@@ -166,10 +166,13 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
         }
       },
       setOutboundOutputRoot: (path) => workspaceSettings.setOutboundOutputRoot(path),
-      resolveOutboundPackagePath: (id) => {
+      resolveOutboundPackagePath: (id, partNumber) => {
         if (!Number.isInteger(id) || Number(id) <= 0) throw new Error('外发压缩包编号无效');
-        const row = database.prepare("select zip_relative_path as relativePath from outbound_packages where id = ? and status = 'completed'")
-          .get(id) as { relativePath: string | null } | undefined;
+        if (partNumber !== undefined && (!Number.isInteger(partNumber) || Number(partNumber) <= 0)) throw new Error('分包序号无效');
+        const row = (partNumber === undefined ? database.prepare("select zip_relative_path as relativePath from outbound_packages where id = ? and status = 'completed'").get(id)
+          : database.prepare(`select part.zip_relative_path as relativePath from outbound_package_parts part
+            join outbound_packages package on package.id = part.package_id
+            where package.id = ? and package.status = 'completed' and part.part_number = ?`).get(id, partNumber)) as { relativePath: string | null } | undefined;
         if (!row?.relativePath) throw new Error('未找到已完成的外发压缩包');
         const outputRoot = workspaceSettings.getOutboundOutputRoot() ?? paths.exports;
         const resolved = resolveWorkspacePath(outputRoot, row.relativePath, { requireExistingParent: true });
