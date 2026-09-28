@@ -11,6 +11,7 @@ import type {
 } from '../../data/client';
 import { chooseOutboundDirectory, openOutboundPackageLocation } from '../../desktop-files';
 import { PackageHistory } from './PackageHistory';
+import { materialBatchLabel } from '../../../core/files/material-batch-label';
 
 const statusLabel = {
   normal: '正常', carried_forward: '沿用', needs_confirmation: '待确认', conflict: '冲突', missing: '缺失',
@@ -166,7 +167,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
         <label>
           <span>资料批次</span>
           <select aria-label="资料批次" value={batchId} disabled={!productId} onChange={(event) => { setBatchId(event.target.value); setPreview(null); }}>
-            <option value="">请选择</option>{batches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            <option value="">请选择</option>{batches.map((item) => <option key={item.id} value={item.id}>{materialBatchLabel(item.name)}</option>)}
           </select>
         </label>
         <button className="primary-button" type="button" disabled={busy || !productId || !batchId} onClick={() => void loadPreview()}>预览文件</button>
@@ -188,7 +189,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
                 <input type="checkbox" aria-label={`选择 ${item.projectItemName}`} disabled={!item.selectable || !item.pdfFileId} checked={item.pdfFileId ? selected.includes(item.pdfFileId) : false} onChange={() => item.pdfFileId && setSelected((value) => value.includes(item.pdfFileId!) ? value.filter((id) => id !== item.pdfFileId) : [...value, item.pdfFileId!])} />
                 <strong>{item.projectItemName}</strong>
                 <span className="mono">{item.fullCode ?? '图号待确认'}</span>
-                <span>{item.sourceBatchName}</span>
+                <span>{materialBatchLabel(item.sourceBatchName)}</span>
                 <span className="file-primary">{item.fileName ?? '转曲后文件已缺失'}</span>
                 <span className={`outbound-status ${item.status}`}>{statusLabel[item.status]}</span>
                 {item.bomContext?.status === 'ambiguous' && (

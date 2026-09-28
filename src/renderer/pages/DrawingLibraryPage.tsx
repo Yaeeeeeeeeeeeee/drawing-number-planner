@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { materialBatchLabel } from '../../core/files/material-batch-label';
 
 import type {
   DictionaryItemView,
@@ -195,7 +196,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
       <label><span>SKU</span><input aria-label="SKU" value={filters.sku} onChange={(event) => set('sku', event.target.value)} /></label>
-      <label><span>资料批次</span><select aria-label="资料批次" value={filters.materialBatchId} onChange={(event) => set('materialBatchId', event.target.value)}><option value="">全部</option>{materialBatchOptions.map((batch) => <option key={batch.id} value={batch.id}>{batch.sku ?? 'SKU待识别'} · {batch.model ?? '型号待识别'} · {batch.name}</option>)}</select></label>
+      <label><span>资料批次</span><select aria-label="资料批次" value={filters.materialBatchId} onChange={(event) => set('materialBatchId', event.target.value)}><option value="">全部</option>{materialBatchOptions.map((batch) => <option key={batch.id} value={batch.id}>{batch.sku ?? 'SKU待识别'} · {batch.model ?? '型号待识别'} · {materialBatchLabel(batch.name)}</option>)}</select></label>
       <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
       {moreFilters && <><label><span>产品类别</span><select aria-label="产品类别" value={filters.productCategory} onChange={(event) => set('productCategory', event.target.value)}><option value="">全部</option>{productCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
@@ -283,12 +284,12 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
       {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}
       </div>}
     <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={onOpen} />
-    <FileSection title="转曲后文件" present={selected.hasOutlinedFile} files={selected.outlinedFiles ?? []} onOpen={onOpen} />
+    <CurrentOutlinedFiles selected={selected} onOpen={onOpen} />
     <section className="drawing-detail-section"><h3>资料批次</h3>{!selected.batchUsage || selected.batchUsage.occurrences.length === 0
       ? <p className="muted-text">尚未识别到资料批次</p>
-      : <ul>{selected.batchUsage.occurrences.map((occurrence) => <li key={occurrence.batchId}>{occurrence.batchName}{occurrence.usageState === 'current' ? ' · 当前' : ''}<small>{occurrence.productDirectory} · {occurrence.files.length} 个文件实例</small></li>)}</ul>}</section>
+      : <ul>{selected.batchUsage.occurrences.map((occurrence) => <li key={occurrence.batchId} className={`batch-occurrence ${occurrence.usageState}`}><span>{materialBatchLabel(occurrence.batchName)}</span><span className={`usage-badge ${occurrence.usageState}`}>{usageLabel(occurrence.usageState)}</span><small>{occurrence.productDirectory} · {occurrence.files.length} 个文件实例</small></li>)}</ul>}</section>
     <section className="drawing-detail-section"><h3>当前 BOM 使用</h3>{(selected.currentBomUsage ?? []).length === 0 ? <p className="muted-text">当前 BOM 未使用此图号</p>
-      : <ul>{selected.currentBomUsage.map((usage) => <li key={`${usage.bomVersionId}-${usage.projectItemId}`}>{usage.model} · {usage.colorName} · BOM v{usage.versionNumber}<small>{usage.projectItemName} · 数量 {usage.quantity}{usage.usesWhiteMaterial ? ' · 引用白色物料' : ''}</small></li>)}</ul>}</section>
+      : <ul>{selected.currentBomUsage.map((usage) => <li key={`${usage.bomVersionId}-${usage.projectItemId}`}>{usage.model} · {usage.colorName} · 当前 BOM<small>{usage.projectItemName}{usage.usesWhiteMaterial ? ' · 引用白色物料' : ''}</small></li>)}</ul>}</section>
     {!selected.readOnly && !selected.deletedAt && <section className="drawing-detail-section pdf-association"><h3>关联现有 PDF 索引</h3>
       <div className="pdf-search"><input aria-label="搜索现有 PDF" value={pdfKeyword} onChange={(event) => setPdfKeyword(event.target.value)} placeholder="文件名或相对路径" />
         <button className="secondary-button" onClick={() => void onSearchPdf(pdfKeyword).catch((reason) => onError(reason instanceof Error ? reason.message : 'PDF 搜索失败'))} type="button">搜索 PDF</button></div>
@@ -353,7 +354,7 @@ function BatchBrowser({ search, setSearch, loading, batches, selected, materials
     {batches.length === 0 ? <EmptyState title="请输入型号查看资料批次" description="例如输入 T40，可查看当前批次和全部历史批次。" /> :
       <div className="material-batch-layout"><div className="material-batch-list">{batches.map((batch) =>
         <article key={batch.id} className={`material-batch-card ${selected?.id === batch.id ? 'selected' : ''}`}>
-          <div><strong>{batch.name}</strong><span className={`usage-badge ${batch.currentState}`}>
+          <div><strong>{materialBatchLabel(batch.name)}</strong><span className={`usage-badge ${batch.currentState}`}>
             {batch.recognitionStatus === 'pending' ? '待确认' : usageLabel(batch.currentState)}</span></div>
           <small>{batch.sku ?? 'SKU待识别'} · {batch.model ?? '型号待识别'} · {batch.fileCount} 个文件实例</small>
           <button className="text-button" type="button" aria-label={`查看批次 ${batch.name}`} onClick={() => void onSelect(batch)}>查看批次</button>
@@ -385,6 +386,24 @@ function BatchFileInstances({ title, files, onOpen }: { title: string; files: Ma
     : <ul>{files.map((file) => <li key={file.pdfIndexId} className="drawing-file-row"><span><strong>{file.fileName}</strong><small>{file.relativePath}</small></span>
       <button className="text-button" type="button" disabled={!file.isPresent}
         aria-label={`打开${title} ${file.fileName} 的位置`} onClick={() => void onOpen(file.pdfIndexId)}>{file.isPresent ? '打开位置' : '已缺失'}</button></li>)}</ul>}</section>;
+}
+
+function CurrentOutlinedFiles({ selected, onOpen }: { selected: DrawingDetailView; onOpen(id: number): Promise<void> }) {
+  const currentIds = new Set(selected.batchUsage?.occurrences
+    .filter((occurrence) => occurrence.usageState === 'current')
+    .flatMap((occurrence) => occurrence.files.filter((file) => file.conversionType === 'outlined').map((file) => file.pdfIndexId)) ?? []);
+  const current = (selected.outlinedFiles ?? []).filter((file) => currentIds.has(file.pdfIndexId));
+  const history = (selected.outlinedFiles ?? []).filter((file) => !currentIds.has(file.pdfIndexId));
+  return <>
+    <FileSection title="转曲后文件" present={current.some((file) => file.isPresent)} files={current} onOpen={onOpen} />
+    {current.length === 0 && <p className="muted-text">未找到当前有效批次的转曲后文件，不使用历史文件替代。</p>}
+    {current.length > 1 && <p className="info-banner">当前有效批次有多个文件实例，请核对路径后选择。</p>}
+    {history.length > 0 && <details key={selected.id} className="drawing-detail-section">
+      <summary>查看历史文件</summary>
+      <p className="muted-text">历史及未归入当前有效批次的实例</p>
+      <FileSection title="转曲后文件" present={history.some((file) => file.isPresent)} files={history} onOpen={onOpen} />
+    </details>}
+  </>;
 }
 
 function FileSection({ title, present, files, onOpen }: { title: string; present: boolean; files: DrawingFileView[]; onOpen(id: number): Promise<void> }) {

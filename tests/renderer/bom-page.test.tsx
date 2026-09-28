@@ -58,7 +58,8 @@ describe('BomPage product-level BOM', () => {
     api.listMaterialBatches.mockResolvedValue([{ id: 8, name: '01.20260901', relativePath: 'X/01.20260901', productId: 1, isPresent: false }]);
     api.getCurrentBom.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], effectiveMaterialBatchId: 8 }] });
     render(<BomPage api={api as never} />); await selectProduct(false);
-    expect(await screen.findByRole('option', { name: /01.20260901.*已缺失/ })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: /20260901.*已缺失/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /20260901.*已缺失/ })).not.toHaveTextContent('01.20260901');
     expect(screen.getByLabelText('第 1 行生效资料批次')).toHaveValue('8');
   });
   it('shows query details as separate business fields and keeps model-wide deletion collapsed', async () => {
@@ -253,7 +254,8 @@ describe('BomPage product-level BOM', () => {
     const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
     fireEvent.click(await screen.findByRole('button', { name: '删除 BOM 20' }));
-    await waitFor(() => expect(confirmation).toHaveBeenCalledWith(expect.stringMatching(/当前 BOM.*V3/)));
+    await waitFor(() => expect(confirmation).toHaveBeenCalledWith(expect.stringMatching(/当前 BOM.*上一条.*记录 19/)));
+    expect(confirmation.mock.calls[0][0]).not.toMatch(/V\d/);
     expect(api.deleteBomVersion).toHaveBeenCalledWith(20, true);
     await waitFor(() => expect(api.queryBomVersions).toHaveBeenCalledTimes(2));
     confirmation.mockRestore();

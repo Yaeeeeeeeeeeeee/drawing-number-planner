@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { materialBatchLabel } from '../../core/files/material-batch-label';
 
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
@@ -192,7 +193,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
     <form className="filter-bar files-filter" onSubmit={submit}>
       <label><span>文件关键词</span><input aria-label="文件关键词" value={filters.keyword} onChange={(event) => setFilter('keyword', event.target.value)} /></label>
       <label><span>产品档案</span><select aria-label="产品档案" value={filters.productId} onChange={(event) => setFilter('productId', event.target.value)}><option value="">全部</option>{products.map((product) => <option value={product.id} key={product.id}>{product.sku ?? '待补录'} · {product.model}</option>)}</select></label>
-      <label><span>资料批次</span><select aria-label="资料批次" value={filters.materialBatchId} onChange={(event) => setFilter('materialBatchId', event.target.value)}><option value="">全部</option>{batches.map((batch) => <option value={batch.id} key={batch.id}>{batch.sku ?? 'SKU待识别'} · {batch.model ?? '型号待识别'} · {batch.name}</option>)}</select></label>
+      <label><span>资料批次</span><select aria-label="资料批次" value={filters.materialBatchId} onChange={(event) => setFilter('materialBatchId', event.target.value)}><option value="">全部</option>{batches.map((batch) => <option value={batch.id} key={batch.id}>{batch.sku ?? 'SKU待识别'} · {batch.model ?? '型号待识别'} · {materialBatchLabel(batch.name)}</option>)}</select></label>
       <label><span>匹配状态</span><select aria-label="匹配状态" value={filters.matchStatus} onChange={(event) => setFilter('matchStatus', event.target.value)}>
         <option value="">全部</option><option value="matched">已匹配</option><option value="pending">待确认</option><option value="unmatched">未匹配</option><option value="conflict">冲突</option></select></label>
       <label><span>转曲类型</span><select aria-label="转曲类型" value={filters.conversionType} onChange={(event) => setFilter('conversionType', event.target.value)}>

@@ -187,7 +187,8 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
         { key: 'qr', label: '二维码', render: (item) => {
           const records = qrCodes.filter((code) => code.productId === item.id);
           return records.length === 0 ? '—' : <div className="product-qr-summary">{records.map((code) => <button className="text-button" key={code.id} type="button"
-            onClick={() => onOpenQr?.(code.id)} disabled={!onOpenQr}>{qrLabel(code)} · {code.status === 'active' ? '启用中' : '已停用'}</button>)}</div>;
+            aria-label={`${qrLabel(code)} · ${code.status === 'active' ? '启用中' : '已停用'}`}
+            onClick={() => onOpenQr?.(code.id)} disabled={!onOpenQr}><span>{qrLabel(code)}</span><span className={`status-text ${code.status}`}>{code.status === 'active' ? '启用中' : '已停用'}</span></button>)}</div>;
         } },
         { key: 'status', label: '状态', render: (item) => item.status === 'active' ? '启用中' : '已停用' },
         { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active'

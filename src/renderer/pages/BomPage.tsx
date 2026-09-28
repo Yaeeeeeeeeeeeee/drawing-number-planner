@@ -105,9 +105,9 @@ export function BomPage({ api }: { api: PlannerApi }) {
   const deleteVersion = async (id: number) => { setBusy(true); setError(''); try {
     const preview = await api.previewBomVersionDeletion(id);
     const impact = preview.isCurrent ? preview.fallbackVersionNumber === null
-      ? '这是当前 BOM，删除后该型号将没有当前 BOM。' : `这是当前 BOM，删除后将回退到 V${preview.fallbackVersionNumber}。`
+      ? '这是当前 BOM，删除后该型号将没有当前 BOM。' : `这是当前 BOM，删除后将回退到上一条有效变更记录（记录 ${preview.fallbackVersionId}）。`
       : '这是一条历史变更记录，删除不会改变当前 BOM。';
-    if (!window.confirm(`${impact}\n确认只删除选中的 V${preview.versionNumber} 变更记录吗？`)) return;
+    if (!window.confirm(`${impact}\n确认只删除选中的变更记录 ${id} 吗？`)) return;
     await api.deleteBomVersion(id, true); setHistoryDetail((current) => current?.id === id ? null : current); await query();
   } catch (reason) { setError(reason instanceof Error ? reason.message : 'BOM 删除失败'); } finally { setBusy(false); } };
   const deleteProductBom = async (selectedProductId: number, confirmation: string) => {

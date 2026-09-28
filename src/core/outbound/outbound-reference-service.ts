@@ -1,4 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { currentBuiltinEmailTemplate } from './builtin-email-template.js';
 import { OutboundReferenceRepository, type OutboundContact, type OutboundContactInput,
   type OutboundEmailTemplate, type OutboundEmailTemplateInput, type OutboundMaterialType,
   type OutboundReferenceStatus, type OutboundSignature, type OutboundSignatureInput,
@@ -17,7 +18,7 @@ export class OutboundReferenceError extends Error {
 
 export const outboundTemplateVariables = [
   'change_description', 'company_name', 'contact_salutation', 'file_list', 'model', 'optional_blocks',
-  'package_name', 'product_category', 'signature',
+  'package_name', 'product_category', 'signature', 'brand_name', 'change_files', 'package_files',
 ] as const;
 type TemplateVariable = typeof outboundTemplateVariables[number];
 
@@ -66,10 +67,10 @@ export class OutboundReferenceService {
   }
 
   listTemplates(status: OutboundReferenceStatus | 'all' = 'all'): OutboundEmailTemplate[] {
-    return this.repository.listTemplates(status);
+    return this.repository.listTemplates(status).map(currentBuiltinEmailTemplate);
   }
   getTemplate(id: number): OutboundEmailTemplate {
-    return this.require(this.repository.getTemplate(id), '邮件模板不存在');
+    return currentBuiltinEmailTemplate(this.require(this.repository.getTemplate(id), '邮件模板不存在'));
   }
   createTemplate(input: OutboundEmailTemplateInput): OutboundEmailTemplate {
     const normalized = this.normalizeTemplate(input);
@@ -99,6 +100,8 @@ export class OutboundReferenceService {
     const template = this.getTemplate(id);
     const suppliedUnknown = Object.keys(values).filter((name) => !allowedVariables.has(name)).sort();
     if (suppliedUnknown.length) this.unknownVariables(suppliedUnknown);
+    values = { brand_name: '', package_files: '',
+      change_files: [values.change_description, values.file_list].filter(Boolean).join('\n'), ...values };
     const required = variablesIn(template.subjectTemplate, template.bodyTemplate);
     const missing = required.filter((name) => !Object.prototype.hasOwnProperty.call(values, name) || values[name as TemplateVariable] == null);
     if (missing.length) {

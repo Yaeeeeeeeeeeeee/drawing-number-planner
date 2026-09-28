@@ -178,7 +178,7 @@ describe('FilesPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
 
-    expect(await screen.findByRole('option', { name: 'SKDWT040JP · T40 · 06.20260309' })).toBeVisible();
+    expect(await screen.findByRole('option', { name: 'SKDWT040JP · T40 · 20260309' })).toBeVisible();
     expect(api.listMaterialBatches).toHaveBeenCalledTimes(2);
   });
 

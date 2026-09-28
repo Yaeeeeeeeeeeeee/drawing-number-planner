@@ -73,7 +73,12 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   expect((await request.post(`/api/products/${lifecycleProductId}/deactivate`, { headers })).ok()).toBeTruthy();
   const activated = await request.post(`/api/products/${lifecycleProductId}/activate`, { headers });
   expect(await activated.json()).toMatchObject({ status: 'active' });
-  expect((await request.delete(`/api/products/${lifecycleProductId}`, { headers })).ok()).toBeTruthy();
+  expect((await request.get(`/api/products/${lifecycleProductId}/cleanup-preview`)).ok()).toBeTruthy();
+  expect((await request.post(`/api/products/${lifecycleProductId}/cleanup`, {
+    headers, data: { confirmed: true, confirmedModel: 'LIFE17' },
+  })).ok()).toBeTruthy();
+  const currentProducts = await request.get('/api/products');
+  expect((await currentProducts.json()).items.some((item: { id: number }) => item.id === lifecycleProductId)).toBe(false);
 
   const productId = await createProduct('ACCEPT17', 'MODEL17');
   const manualDrawings: Array<{ id: number; fullCode: string }> = [];
@@ -90,7 +95,7 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   expect((await request.post(`/api/drawings/${manualDrawings[0].id}/activate`, { headers, data: { confirmed: true } })).ok()).toBeTruthy();
   const protectedProductDelete = await request.delete(`/api/products/${productId}`, { headers });
   expect(protectedProductDelete.status()).toBe(409);
-  expect(await protectedProductDelete.json()).toMatchObject({ error: { code: 'PRODUCT_REFERENCED' } });
+  expect(await protectedProductDelete.json()).toMatchObject({ error: { code: 'PRODUCT_CLEANUP_REQUIRED' } });
 
   const purpose = await request.post('/api/qr-purposes', { headers, data: {
     key: 'acceptance_guide', englishName: 'Acceptance Guide', displayName: '验收指南',
@@ -245,7 +250,7 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   await page.getByRole('button', { name: '按资料批次' }).click();
   await page.getByLabel('搜索型号或批次').fill('MODEL17');
   await page.getByRole('button', { name: '查询资料批次' }).click();
-  await expect(page.getByText('01.20260917', { exact: true })).toBeVisible();
+  await expect(page.getByText('20260917', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /二维码管理/ }).click();
   await page.getByRole('button', { name: '展开 MODEL17 的二维码用途' }).click();
@@ -257,7 +262,7 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   await expect(page.getByRole('cell', { name: '2026-09-17', exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /外发资料/ }).click();
-  await page.getByRole('tab', { name: '邮件撰写' }).click();
+  await page.getByRole('button', { name: '邮件撰写', exact: true }).click();
   await page.getByLabel('收件人 验收联系人').check();
   await page.getByRole('button', { name: '复制收件人' }).click();
   await expect(page.getByText('已复制', { exact: true })).toBeVisible();

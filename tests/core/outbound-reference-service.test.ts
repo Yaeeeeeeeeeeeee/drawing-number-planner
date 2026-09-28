@@ -73,6 +73,23 @@ describe('OutboundReferenceService contacts', () => {
 });
 
 describe('OutboundReferenceService templates and blocks', () => {
+  it('renders the untouched built-in update template with paired change files while preserving stored drafts and custom templates', () => {
+    const template = service.listTemplates().find((item) => item.key === 'update_default')!;
+    const draftId = insertDraft(insertPackage(), template.id, null);
+    const values = { package_name: '更新资料', company_name: '供应商甲', contact_salutation: '王经理',
+      brand_name: 'SAMKYO', model: 'T40', product_category: '洗碗机', change_description: '旧兼容字段',
+      change_files: '1.说明书：更新排版\n　　新文件：说明书（转曲）', file_list: '说明书（转曲）',
+      package_files: '', optional_blocks: '', signature: '顺祝商祺' };
+    const rendered = service.renderTemplate(template.id, values);
+    expect(rendered.body).toContain('附件为 SAMKYO T40洗碗机需要更新的包材资料，请注意查收。');
+    expect(rendered.body).toContain('本次修改的内容为：\n1.说明书：更新排版\n　　新文件：说明书（转曲）');
+    expect(rendered.body).not.toContain('旧兼容字段');
+    expect(db.prepare('select body from outbound_email_drafts where id = ?').get(draftId)).toEqual({ body: 'Original body' });
+    service.updateTemplate(template.id, { key: template.key, name: template.name, materialType: 'update',
+      subjectTemplate: '{{package_name}}', bodyTemplate: '自定义正文 {{change_description}}' });
+    expect(service.renderTemplate(template.id, values).body).toBe('自定义正文 旧兼容字段');
+  });
+
   it('manages templates and optional blocks without embedding supplier contacts', () => {
     const template = service.createTemplate({ key: 'supplier_initial', name: '供应商首批模板', materialType: 'initial',
       subjectTemplate: '{{package_name}}', bodyTemplate: '{{company_name}}：\n{{contact_salutation}}，您好！\n{{signature}}' });

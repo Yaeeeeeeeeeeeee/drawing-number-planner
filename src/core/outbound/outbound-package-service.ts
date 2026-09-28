@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { closeSync, createWriteStream, existsSync, openSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, copyFileSync, createWriteStream, existsSync, openSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, win32 } from 'node:path';
 
 import type { Archiver } from 'archiver';
@@ -220,9 +220,14 @@ export class OutboundPackageService {
       options.signal?.throwIfAborted();
       options.onFinalizing?.();
       for (const part of parts) {
-      try { renameSync(part.temporaryPath, part.finalPath); }
-      catch { throw this.error('PACKAGE_PUBLISH_FAILED'); }
+      // Exclusive creation also protects a file that appeared after the earlier existence check.
+      try { copyFileSync(part.temporaryPath, part.finalPath, constants.COPYFILE_EXCL); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw this.error('OUTPUT_ALREADY_EXISTS');
+        throw this.error('PACKAGE_PUBLISH_FAILED');
+      }
       part.published = true;
+      this.safeRemove(part.temporaryPath);
       }
       const createdAt = this.now().toISOString();
       const snapshots = parts.flatMap((part) => part.group.map(({ item }) => {

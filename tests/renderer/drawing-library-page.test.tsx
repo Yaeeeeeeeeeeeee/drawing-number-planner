@@ -4,6 +4,26 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
 describe('DrawingLibraryPage', () => {
+  it.each([true, false])('shows only the current batch outlined file (present=%s) until history is expanded', async (isPresent) => {
+    const oldFile = { pdfIndexId: 1, fileName: 'old.pdf', relativePath: '00/old.pdf', isPresent: true, conversionType: 'outlined' };
+    const currentFile = { ...oldFile, pdfIndexId: 2, fileName: 'current.pdf', relativePath: '06/current.pdf', isPresent };
+    const row = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active',
+      model: 'T40', displayName: '外箱', sourceFiles: [], outlinedFiles: [oldFile, currentFile],
+      hasSourceFile: false, hasOutlinedFile: true, currentBomUsage: [], readOnly: true,
+      batchUsage: { state: 'current', occurrences: [
+        { batchId: 1, batchName: '00.首批大货', usageState: 'historical', files: [oldFile] },
+        { batchId: 2, batchName: '06.20260309', usageState: 'current', files: [currentFile] },
+      ] } };
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [row], total: 1 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row) };
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(row.fullCode));
+    expect(await screen.findByText('current.pdf')).toBeVisible();
+    if (!isPresent) expect(screen.getByRole('button', { name: '打开转曲后文件 current.pdf 的位置' })).toBeDisabled();
+    expect(screen.queryByText('old.pdf')).not.toBeVisible();
+    fireEvent.click(screen.getByText('查看历史文件'));
+    expect(screen.getByText('old.pdf')).toBeVisible();
+  });
   it('aggregates one logical drawing and expands all of its material batch occurrences', async () => {
     const occurrences = Array.from({ length: 7 }, (_, index) => ({
       batchId: index + 1,
@@ -34,8 +54,8 @@ describe('DrawingLibraryPage', () => {
     expect(await screen.findAllByText(row.fullCode)).toHaveLength(1);
     expect(screen.getByText('当前使用 · 出现于 7 个资料批次')).toBeVisible();
     fireEvent.click(screen.getByText(row.fullCode));
-    expect(await screen.findByText('06.20260309 · 当前')).toBeVisible();
-    expect(screen.getByText('00.20250101')).toBeVisible();
+    expect(await screen.findByText('20260309')).toBeVisible();
+    expect(screen.getByText('20250101')).toBeVisible();
   });
 
   it('browses logical batch materials without hiding physical file instances', async () => {
@@ -152,6 +172,7 @@ describe('DrawingLibraryPage', () => {
 
     render(<DrawingLibraryPage api={api as never} />); fireEvent.click(await screen.findByText(row.fullCode));
     fireEvent.click(await screen.findByRole('button', { name: '打开源文件 source.pdf 的位置' }));
+    fireEvent.click(screen.getByText('查看历史文件'));
     fireEvent.click(screen.getByRole('button', { name: '打开转曲后文件 outlined.pdf 的位置' }));
 
     await waitFor(() => expect(showFileInFolder).toHaveBeenNthCalledWith(1, 21));
@@ -256,7 +277,8 @@ describe('DrawingLibraryPage', () => {
     expect(panel).toHaveTextContent('转曲后文件缺失');
     expect(panel).toHaveTextContent('SKU/source.pdf');
     expect(panel).toHaveTextContent('当前 BOM 使用');
-    expect(panel).toHaveTextContent('ZC220 · 白色 · BOM v2');
+    expect(panel).toHaveTextContent('ZC220 · 白色 · 当前 BOM');
+    expect(panel).not.toHaveTextContent('BOM v2');
   });
 
   it('confirms lifecycle actions and refreshes both detail and its visible row', async () => {

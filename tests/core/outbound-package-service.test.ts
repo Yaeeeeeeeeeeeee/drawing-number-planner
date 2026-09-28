@@ -1,6 +1,10 @@
 import { closeSync, existsSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { inflateRawSync } from 'node:zlib';
+import { spawnSync } from 'node:child_process';
+import { cleanupStaleOutboundArtifacts } from '../../src/core/outbound/outbound-artifact-ownership';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -85,7 +89,119 @@ afterEach(() => { if (db.open) db.close(); rmSync(root, { recursive: true, force
 const request = () => ({ productId, selectedMaterialBatchId: batchId, materialType: 'initial' as const,
   packageMode: 'current_complete' as const });
 
+// Independent ZIP32 reader for the real writer's small test archives; never extracts to disk.
+function decodedZipEntries(path: string): Map<string, Buffer> {
+  const zip = readFileSync(path);
+  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  expect(end).toBeGreaterThanOrEqual(0);
+  const count = zip.readUInt16LE(end + 10);
+  let cursor = zip.readUInt32LE(end + 16);
+  const entries = new Map<string, Buffer>();
+  for (let index = 0; index < count; index += 1) {
+    expect(zip.readUInt32LE(cursor)).toBe(0x02014b50);
+    const method = zip.readUInt16LE(cursor + 10);
+    const compressedSize = zip.readUInt32LE(cursor + 20);
+    const nameLength = zip.readUInt16LE(cursor + 28);
+    const extraLength = zip.readUInt16LE(cursor + 30);
+    const commentLength = zip.readUInt16LE(cursor + 32);
+    const local = zip.readUInt32LE(cursor + 42);
+    const name = zip.subarray(cursor + 46, cursor + 46 + nameLength).toString('utf8');
+    expect(entries.has(name)).toBe(false);
+    expect(zip.readUInt32LE(local)).toBe(0x04034b50);
+    const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
+    const compressed = zip.subarray(start, start + compressedSize);
+    expect([0, 8]).toContain(method);
+    const decoded = method === 8 ? inflateRawSync(compressed) : compressed;
+    expect(decoded.length).toBe(zip.readUInt32LE(cursor + 24));
+    entries.set(name, decoded);
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
 describe('OutboundPackageService', () => {
+  it('never records half a multipart publication as completed after abrupt process exit', async () => {
+    const main = db.prepare("select id from dictionary_items where type = 'main_category'").get() as { id: number };
+    dictionary('project_item', '02', '售后卡', main.id);
+    const second = addOutlined({ relativePath: 'card.pdf', fullCode: '02.0209.010.0402001' });
+    db.exec("update historical_drawing_numbers set project_item_code = substr(full_code, 15, 2)");
+    for (const id of [pdfId, second]) {
+      const row = db.prepare('select relative_path from pdf_files where id = ?').get(id) as { relative_path: string };
+      const fd = openSync(join(workspace, row.relative_path), 'r+');
+      try { ftruncateSync(fd, 30_000_000); } finally { closeSync(fd); }
+    }
+    await db.backup(join(root, 'crash.sqlite'));
+    const child = spawnSync(process.execPath, ['--import', 'tsx',
+      join(process.cwd(), 'tests/fixtures/crash-outbound-publication.ts'), root,
+      String(productId), String(batchId), JSON.stringify([pdfId, second])], { encoding: 'utf8', timeout: 15_000 });
+    expect(child.error, child.stderr).toBeUndefined();
+    expect(child.status, child.stderr).toBe(79);
+    const recovered = openDatabase(join(root, 'crash.sqlite'));
+    try {
+      expect(recovered.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
+      expect(recovered.prepare('select count(*) as total from outbound_package_parts').get()).toEqual({ total: 0 });
+      expect(recovered.pragma('integrity_check')).toEqual([{ integrity_check: 'ok' }]);
+    } finally { recovered.close(); }
+    const published = readdirSync(output).filter((name) => name.endsWith('.zip'));
+    expect(published).toHaveLength(1);
+    const hash = createHash('sha256').update(readFileSync(join(output, published[0]))).digest('hex');
+    const cleanup = cleanupStaleOutboundArtifacts(output, { activeTaskIds: new Set(),
+      nowMs: Date.parse('2026-09-11T00:00:00Z'), minimumAgeMs: 3_600_000 });
+    expect(cleanup).toEqual({ claimsRemoved: 2, temporaryFilesRemoved: 2 });
+    expect(readdirSync(output)).toEqual(published);
+    expect(createHash('sha256').update(readFileSync(join(output, published[0]))).digest('hex')).toBe(hash);
+    const preview = service.previewPackage(request());
+    await expect(service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId, second] }))
+      .rejects.toThrowError(expect.objectContaining({ code: 'OUTPUT_ALREADY_EXISTS' }));
+  }, 20_000);
+
+  it('does not overwrite an unrelated ZIP created after preflight but before publication', async () => {
+    const preview = service.previewPackage(request());
+    const finalPath = join(output, `${preview.packageName}.zip`);
+    const raced = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output, now: fixedNow,
+      archiveWriter: { async write({ temporaryPath, entries }) {
+        writeFileSync(temporaryPath, 'new package');
+        writeFileSync(finalPath, 'existing external file', { flag: 'wx' });
+        return entries.length;
+      } } });
+    const fresh = raced.previewPackage(request());
+    await expect(raced.createPackage({ ...request(), previewToken: fresh.previewToken, selectedPdfFileIds: [pdfId] }))
+      .rejects.toThrow();
+    expect(readFileSync(finalPath, 'utf8')).toBe('existing external file');
+    expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
+    expect(readdirSync(output)).toEqual([`${preview.packageName}.zip`]);
+  });
+
+  it('decodes every real multipart ZIP to the exact original bytes without changing the sources', async () => {
+    const main = db.prepare("select id from dictionary_items where type = 'main_category'").get() as { id: number };
+    dictionary('project_item', '02', '售后卡', main.id); dictionary('project_item', '03', '外箱', main.id);
+    const ids = [pdfId, addOutlined({ relativePath: 'card.pdf', fullCode: '02.0209.010.0402001' }),
+      addOutlined({ relativePath: 'box.pdf', fullCode: '02.0209.010.0403001' })];
+    db.exec("update historical_drawing_numbers set project_item_code = substr(full_code, 15, 2)");
+    const originals = ids.map((id, index) => {
+      const row = db.prepare('select relative_path, file_name from pdf_files where id = ?').get(id) as { relative_path: string; file_name: string };
+      const path = join(workspace, row.relative_path);
+      const fd = openSync(path, 'r+');
+      try { ftruncateSync(fd, [22_000_000, 5_000_000, 31_000_000][index]); } finally { closeSync(fd); }
+      return { path, name: row.file_name, hash: createHash('sha256').update(readFileSync(path)).digest('hex') };
+    });
+    const preview = service.previewPackage(request());
+    const result = await service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: ids });
+    expect(result.parts).toHaveLength(2);
+    const decoded = result.parts!.map((part) => {
+      expect(statSync(join(output, part.zipRelativePath)).size).toBeLessThanOrEqual(50_000_000);
+      return decodedZipEntries(join(output, part.zipRelativePath));
+    });
+    expect(decoded.map((entries) => entries.size)).toEqual([2, 1]);
+    const all = decoded.flatMap((entries) => [...entries]);
+    expect(all.map(([name]) => name).sort()).toEqual(originals.map((item) => item.name).sort());
+    for (const original of originals) {
+      const bytes = all.find(([name]) => name === original.name)![1];
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(original.hash);
+      expect(createHash('sha256').update(readFileSync(original.path)).digest('hex')).toBe(original.hash);
+    }
+  });
+
   for (const failure of ['write failure', 'cancellation'] as const) {
     it(`leaves no partial multi-package history or files after ${failure} in the final part`, async () => {
       const main = db.prepare("select id from dictionary_items where type = 'main_category'").get() as { id: number };

@@ -21,7 +21,7 @@ function apiFixture() {
     listOutboundPackages: vi.fn().mockResolvedValue([]),
     createOutboundPackage: vi.fn().mockResolvedValue({ id: 9, packageName: preview.packageName, zipRelativePath: `${preview.packageName}.zip`, fileCount: 1, createdAt: '' }),
     listOutboundContacts: vi.fn().mockResolvedValue([contact]), listOutboundTemplates: vi.fn().mockResolvedValue([template]), listOutboundSignatures: vi.fn().mockResolvedValue([signature]),
-    renderOutboundTemplate: vi.fn().mockResolvedValue({ subject: preview.packageName, body: '供应商甲：\n王经理，您好！\n铭牌待 METI 后更新。\n顺祝商祺\n田嘉滨 Yae' }),
+    renderOutboundTemplate: vi.fn().mockImplementation(async (_id, fields) => ({ subject: fields.package_name, body: '供应商甲：\n王经理，您好！\n铭牌待 METI 后更新。\n顺祝商祺\n田嘉滨 Yae' })),
     createOutboundContact: vi.fn().mockResolvedValue(contact), updateOutboundContact: vi.fn(), activateOutboundContact: vi.fn(), deactivateOutboundContact: vi.fn(), deleteOutboundContact: vi.fn(),
     createOutboundTemplate: vi.fn(), updateOutboundTemplate: vi.fn(), activateOutboundTemplate: vi.fn(), deactivateOutboundTemplate: vi.fn(), deleteOutboundTemplate: vi.fn(), createOutboundTemplateBlock: vi.fn(), updateOutboundTemplateBlock: vi.fn(), activateOutboundTemplateBlock: vi.fn(), deactivateOutboundTemplateBlock: vi.fn(), deleteOutboundTemplateBlock: vi.fn(), createOutboundSignature: vi.fn(), updateOutboundSignature: vi.fn(), activateOutboundSignature: vi.fn(), deactivateOutboundSignature: vi.fn(), deleteOutboundSignature: vi.fn(),
   };
@@ -30,6 +30,33 @@ function apiFixture() {
 afterEach(() => { delete window.plannerDesktop; vi.restoreAllMocks(); });
 
 describe('OutboundPage', () => {
+  it('replaces an untouched automatic draft with the next completed package', async () => {
+    const api = apiFixture();
+    api.renderOutboundTemplate.mockImplementation(async (_id, fields) => ({ subject: fields.package_name, body: fields.package_name }));
+    const first = { packageName: '第一包', product: product as never, materialType: 'update' as const, items: [] };
+    const { rerender } = render(<EmailComposer api={api as never} mailContext={first} />);
+    await waitFor(() => expect(screen.getByLabelText('正文')).toHaveValue('第一包'));
+    rerender(<EmailComposer api={api as never} mailContext={{ ...first, packageName: '第二包' }} />);
+    await waitFor(() => expect(screen.getByLabelText('正文')).toHaveValue('第二包'));
+    expect(screen.queryByRole('button', { name: '使用新压缩包资料' })).not.toBeInTheDocument();
+  });
+
+  it('automatically prepares the completed package email after templates load without requiring a generate click', async () => {
+    const api = apiFixture();
+    api.renderOutboundTemplate.mockImplementation(async (_id, fields) => ({
+      subject: fields.package_name, body: `本次修改：\n${fields.change_description}\n${fields.file_list}`,
+    }));
+    const context = { packageName: '新完成包', product: product as never, materialType: 'update' as const,
+      items: [{ projectItemName: '铭牌', fileName: '铭牌（转曲）.pdf', sourceBatchName: batch.name,
+        pdfFileId: 41, changeDetails: '调整功率' }] };
+    render(<EmailComposer api={api as never} mailContext={context} />);
+    await waitFor(() => expect(screen.getByLabelText('正文')).toHaveValue('本次修改：\n1. 铭牌：调整功率\n  铭牌（转曲）'));
+    expect(screen.getByLabelText('主题')).toHaveValue('新完成包');
+    fireEvent.change(screen.getByLabelText('正文'), { target: { value: '人工补充' } });
+    fireEvent.click(screen.getByLabelText('收件人 王经理'));
+    expect(screen.getByLabelText('正文')).toHaveValue('人工补充');
+  });
+
   it('shows persisted package parts after selecting a product and opens the historical part', async () => {
     const api = apiFixture();
     api.listOutboundPackages.mockResolvedValue([{ id: 90, packageName: '历史包', zipRelativePath: '历史包-1.zip',
@@ -179,6 +206,8 @@ describe('OutboundPage', () => {
     await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalled());
     const fields = api.renderOutboundTemplate.mock.calls[0][1];
     expect(fields.change_description).toContain('更正额定功率');
+    expect(fields.change_files).toBe('1.铭牌：更正额定功率\n　　新文件：铭牌（转曲）');
+    expect(fields.brand_name).toBe('SAMKYO');
     expect(fields.file_list).toContain('铭牌（转曲）');
     expect(fields.file_list).not.toMatch(/\.pdf|来源|06\.20260910/i);
   });
@@ -258,7 +287,8 @@ describe('OutboundPage', () => {
     fireEvent.click(screen.getByLabelText('附加段落 METI 后更新'));
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
     await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalledWith(2, expect.objectContaining({ company_name: '供应商甲', contact_salutation: '王经理', optional_blocks: '铭牌待 METI 后更新。', signature: signature.content })));
-    expect(await screen.findByDisplayValue(preview.packageName)).toBeVisible();
+    await waitFor(() => expect((screen.getByLabelText('正文') as HTMLTextAreaElement).value).toContain('王经理，您好！'));
+    expect(screen.getByLabelText('主题')).toHaveValue(''); // No package has been created in this flow.
     fireEvent.change(screen.getByLabelText('正文'), { target: { value: '人工修改后的正文' } });
     fireEvent.click(screen.getByRole('button', { name: '全部复制' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('收件人：wang@example.com')));
