@@ -524,9 +524,7 @@ export const apiClient: PlannerApi = {
   activateProduct: (id) => request(`/api/products/${id}/activate`, json('POST')),
   deleteProduct: (id) => request(`/api/products/${id}`, { method: 'DELETE' }),
   previewProductCleanup: (id) => request(`/api/products/${id}/cleanup-preview`),
-  cleanupProduct: (id, confirmedModel) => request(`/api/products/${id}/cleanup`, {
-    method: 'POST', body: JSON.stringify({ confirmed: true, confirmedModel }),
-  }),
+  cleanupProduct: (id, confirmedModel) => request(`/api/products/${id}/cleanup`, json('POST', { confirmed: true, confirmedModel })),
   listQrCodes: (filters = {}) => request(`/api/qr-codes${queryString(filters)}`),
   listQrPurposes: () => request('/api/qr-purposes'),
   createQrPurpose: (input) => request('/api/qr-purposes', json('POST', input)),

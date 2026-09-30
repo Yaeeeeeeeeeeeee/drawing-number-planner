@@ -15,6 +15,44 @@ afterEach(() => {
 });
 
 describe('renderer API client', () => {
+  it('sends product cleanup as JSON over real HTTP and retires only the confirmed product', async () => {
+    const { default: Fastify } = await import('fastify');
+    const { openDatabase } = await import('../../src/db/database');
+    const { migrateDatabase } = await import('../../src/db/migrations');
+    const { DictionaryService } = await import('../../src/core/dictionaries/dictionary-service');
+    const { ProductService } = await import('../../src/core/products/product-service');
+    const { ProductCleanupService } = await import('../../src/core/products/product-cleanup-service');
+    const { registerProductRoutes } = await import('../../src/server/routes/products');
+    const db = openDatabase(':memory:');
+    const app = Fastify();
+    const nativeFetch = globalThis.fetch;
+    try {
+      migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
+      const dictionaries = new DictionaryService(db);
+      const refs = {
+        brandId: dictionaries.create({ type: 'brand', code: '02', name: 'SAMKYO' }).id,
+        productSizeId: dictionaries.create({ type: 'product_size', code: '0209', name: '冰柜' }).id,
+        defaultAppearanceId: dictionaries.create({ type: 'appearance', code: '01', name: '外观' }).id,
+      };
+      const products = new ProductService(db);
+      const product = products.create({ ...refs, sku: 'CLEAN-F60', model: 'F60', productCategory: '空气炸锅' });
+      const other = products.create({ ...refs, sku: 'KEEP-F20', model: 'F20', productCategory: '空气炸锅' });
+      app.post('/api/session', async () => ({ token: 'isolated-test-token' }));
+      registerProductRoutes(app, products, new ProductCleanupService(db));
+      const origin = await app.listen({ host: '127.0.0.1', port: 0 });
+      // Preserve native HTTP serialization, including the automatic text/plain header for string bodies.
+      vi.stubGlobal('fetch', (path: string, init?: RequestInit) => nativeFetch(new URL(path, origin), init));
+      await expect(apiClient.cleanupProduct(product.id, 'WRONG')).rejects.toMatchObject({ code: 'PRODUCT_CONFIRMATION_MISMATCH' });
+      expect(products.list({ status: 'all' }).items).toHaveLength(2);
+      await expect(apiClient.cleanupProduct(product.id, 'F60')).resolves.toMatchObject({ model: 'F60' });
+      expect(products.list({ status: 'all' }).items.map((item) => item.id)).toEqual([other.id]);
+      expect(db.prepare('select count(*) as n from products').get()).toEqual({ n: 2 });
+    } finally {
+      vi.unstubAllGlobals();
+      await app.close();
+      db.close();
+    }
+  });
   it('runs every cancellable UI operation through the task registry and returns its completed result', async () => {
     const completed = [
       { imported: 3, skipped: 1 },
