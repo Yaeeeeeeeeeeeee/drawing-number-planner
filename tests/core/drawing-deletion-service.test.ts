@@ -54,6 +54,18 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('DrawingDeletionService', () => {
+  it.each(['planned', 'historical'])('releases an already retained %s record without restoring it', (origin) => {
+    const signedId = origin === 'planned' ? plannedId : -historicalId;
+    const code = origin === 'planned' ? plannedCode : historicalCode;
+    service.delete({ signedId, mode: 'retain_occupied', confirmedCode: code });
+    expect(service.preview(signedId).deletable).toBe(true);
+    expect(() => service.delete({ signedId, mode: 'release', confirmedCode: 'wrong' })).toThrow(/确认图号/);
+    expect(new OccupiedNumberRepository(db).hasFullCode(code)).toBe(true);
+    expect(service.delete({ signedId, mode: 'release', confirmedCode: code })).toMatchObject({ occupied: false });
+    expect(new OccupiedNumberRepository(db).hasFullCode(code)).toBe(false);
+    expect(new DrawingQueryService(db).get(signedId)).toMatchObject({ deletionMode: 'release', fullCode: code });
+    expect(db.prepare('select count(*) as n from drawing_deletion_events where full_code=?').get(code)).toEqual({n:2});
+  });
   it('deletes eligible batch items while preserving blocked items and reporting every outcome', () => {
     const versionId = Number(db.prepare(`insert into bom_versions (product_id, version_number, business_change_date, created_at)
       select product_id, 1, '2026-09-22', '2026-09-22' from drawing_numbers where id = ?`).run(plannedId).lastInsertRowid);

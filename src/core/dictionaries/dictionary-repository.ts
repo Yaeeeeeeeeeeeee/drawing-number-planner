@@ -3,12 +3,13 @@ import type { CreateDictionaryItem, DictionaryItem, DictionaryType } from './dic
 
 interface DictionaryRow {
   id: number; type: DictionaryType; code: string; name: string;
-  parent_id: number | null; status: 'active' | 'inactive';
+  parent_id: number | null; status: 'active' | 'inactive'; deleted_at: string | null;
 }
 
 const mapRow = (row: DictionaryRow): DictionaryItem => ({
   id: row.id, type: row.type, code: row.code, name: row.name,
   parentId: row.parent_id, status: row.status,
+  ...(row.deleted_at ? { deletedAt: row.deleted_at } : {}),
 });
 
 export class DictionaryRepository {
@@ -22,13 +23,13 @@ export class DictionaryRepository {
   }
 
   get(id: number): DictionaryItem | undefined {
-    const row = this.db.prepare('select id, type, code, name, parent_id, status from dictionary_items where id = ?').get(id) as DictionaryRow | undefined;
+    const row = this.db.prepare('select id, type, code, name, parent_id, status, deleted_at from dictionary_items where id = ?').get(id) as DictionaryRow | undefined;
     return row ? mapRow(row) : undefined;
   }
 
-  list(type: DictionaryType, includeInactive: boolean): DictionaryItem[] {
-    const rows = this.db.prepare(`select id, type, code, name, parent_id, status from dictionary_items
-      where type = ? ${includeInactive ? '' : "and status = 'active'"} order by code`).all(type) as DictionaryRow[];
+  list(type: DictionaryType, includeInactive: boolean, includeDeleted = false): DictionaryItem[] {
+    const rows = this.db.prepare(`select id, type, code, name, parent_id, status, deleted_at from dictionary_items
+      where type = ? ${includeDeleted ? '' : 'and deleted_at is null'} ${includeInactive ? '' : "and status = 'active'"} order by code`).all(type) as DictionaryRow[];
     return rows.map(mapRow);
   }
 
@@ -44,7 +45,7 @@ export class DictionaryRepository {
   }
 
   activate(id: number): DictionaryItem {
-    this.db.prepare("update dictionary_items set status = 'active', deactivated_at = null where id = ?").run(id);
+    this.db.prepare("update dictionary_items set status = 'active', deactivated_at = null, deleted_at = null where id = ?").run(id);
     return this.get(id)!;
   }
 
@@ -78,7 +79,10 @@ export class DictionaryRepository {
   deleteUnused(id: number): boolean {
     this.db.exec('begin immediate');
     try {
-      if (this.isReferenced(id)) { this.db.exec('rollback'); return false; }
+      if (this.isReferenced(id)) {
+        this.db.prepare("update dictionary_items set deleted_at = ?, status = 'inactive' where id = ?").run(new Date().toISOString(), id);
+        this.db.exec('commit'); return true;
+      }
       const deleted = this.db.prepare('delete from dictionary_items where id = ?').run(id).changes === 1;
       this.db.exec('commit');
       return deleted;

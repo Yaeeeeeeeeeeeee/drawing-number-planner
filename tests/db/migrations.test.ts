@@ -206,7 +206,7 @@ const v13DeletionColumns = new Set([
 
 function businessRows(database: ReturnType<typeof openDatabase>, table: string) {
   const rows = database.prepare(`select * from "${table}" order by rowid`).all() as Array<Record<string, unknown>>;
-  const added: Record<string, string[]> = { products: ['deleted_at', 'deletion_reason'], product_qr_codes: ['deleted_at'],
+  const added: Record<string, string[]> = { dictionary_items: ['deleted_at'], products: ['deleted_at', 'deletion_reason'], product_qr_codes: ['deleted_at'],
     bom_versions: ['updated_at', 'edit_revision'], bom_items: ['change_details', 'deleted_at'],
     bom_item_assets: ['inheritance_snapshot_json', 'deleted_at'] };
   if (added[table]) return rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !added[table].includes(key))));
@@ -292,7 +292,7 @@ describe('database migrations', () => {
     };
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 11, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 11, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare(`select id, full_code, display_name, product_id, appearance_id, color_id,
@@ -306,7 +306,7 @@ describe('database migrations', () => {
       .toEqual(before.historical);
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual(before.pdfCount);
     expect(database.prepare('select count(*) as count from bom_items').get()).toEqual(before.bomCount);
-    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 14 });
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 15 });
     expect(database.prepare("select name from sqlite_master where type = 'table' and name = 'drawing_deletion_events'").get())
       .toEqual({ name: 'drawing_deletion_events' });
     expect(database.pragma('foreign_key_check')).toEqual([]);
@@ -341,13 +341,13 @@ describe('database migrations', () => {
     };
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 11, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 11, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select * from outbound_packages order by id').all()).toMatchObject(before.packages);
     expect(database.prepare('select * from outbound_package_items order by id').all()).toMatchObject(before.items);
     expect(database.prepare('select * from outbound_email_drafts order by id').all()).toEqual(before.drafts);
-    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 14 });
+    expect(database.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 15 });
     expect(database.prepare("select sql from sqlite_master where type = 'index' and name = 'outbound_packages_completed_custom'")
       .get()).toEqual({ sql: "CREATE INDEX outbound_packages_completed_custom\n      on outbound_packages(package_name) where status = 'completed'" });
     expect((database.pragma('foreign_key_list(outbound_packages)') as Array<{ from: string; on_delete: string }>))
@@ -406,7 +406,7 @@ describe('database migrations', () => {
     const before = Object.fromEntries(oldTables.map((table) => [table, businessRows(database, table)]));
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 10, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 10, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(Object.fromEntries(oldTables.map((table) => [table, businessRows(database, table)]))).toEqual(before);
@@ -566,7 +566,7 @@ describe('database migrations', () => {
     };
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 9, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 9, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(v9TableCounts(database)).toEqual(beforeCounts);
@@ -692,7 +692,7 @@ describe('database migrations', () => {
       .run('2026-09-02T00:00:00.000Z', '2026-09-02T00:00:00.000Z').lastInsertRowid);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 8, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 8, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare(`select id, product_id, version_number, previous_version_id, business_change_date,
@@ -800,7 +800,7 @@ describe('database migrations', () => {
     const child = Number(insertVersion.run(products.refrigerator, legacy.color, 2, legacy.version, now).lastInsertRowid);
     const grandchild = Number(insertVersion.run(products.refrigerator, legacy.color, 3, child, now).lastInsertRowid);
 
-    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 8, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: false, createBackup: () => undefined })).toEqual({ from: 8, to: 15 });
     expect(database.prepare('select previous_version_id from bom_versions where id = ?').get(grandchild))
       .toEqual({ previous_version_id: child });
   });
@@ -1009,7 +1009,7 @@ describe('database migrations', () => {
     const products = seedV7Products(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 7, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 7, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
@@ -1182,11 +1182,11 @@ describe('database migrations', () => {
     databases.push(db);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 14 });
-    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 14, to: 14 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 0, to: 15 });
+    expect(migrateDatabase(db, { databaseExists: false, createBackup: backup })).toEqual({ from: 15, to: 15 });
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.prepare('select version from schema_migrations order by version').all()).toEqual([
-      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 }, { version: 13 }, { version: 14 },
+      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 }, { version: 13 }, { version: 14 }, { version: 15 },
     ]);
     const drawingColumns = (db.pragma('table_info(drawing_numbers)') as Array<{ name: string }>).map((column) => column.name);
     expect(drawingColumns).toEqual(expect.arrayContaining([
@@ -1217,7 +1217,7 @@ describe('database migrations', () => {
     const db = openDatabase(':memory:'); databases.push(db); db.exec(schemaVersionOne); db.exec(schemaVersionTwo);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 14 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 2, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name like 'bom_%' order by name").all())
@@ -1233,7 +1233,7 @@ describe('database migrations', () => {
     db.exec('drop index material_batches_relative_path_nocase_unique');
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 14, to: 14 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 15, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'index' and name = 'material_batches_relative_path_nocase_unique'").get())
@@ -1245,7 +1245,7 @@ describe('database migrations', () => {
     db.exec(schemaVersionOne); db.exec(schemaVersionTwo); db.exec(schemaVersionThree);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 3, to: 14 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 3, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare("select name from sqlite_master where type = 'table' and name = 'pdf_files'").get())
@@ -1282,7 +1282,7 @@ describe('database migrations', () => {
       .run(product, color, main, item, now);
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 14 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare(`select appearance_id, brand_code, product_size_code, appearance_code,
@@ -1343,7 +1343,7 @@ describe('database migrations', () => {
     db.prepare('delete from schema_migrations where version >= 2').run();
     const backup = vi.fn();
 
-    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 14 });
+    expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 1, to: 15 });
 
     expect(db.prepare('select appearance_id, appearance_code, notes from drawing_numbers').get()).toEqual({
       appearance_id: drawingAppearance, appearance_code: '2', notes: '不得丢失',
@@ -1422,7 +1422,7 @@ describe('database migrations', () => {
     const seeded = seedV6Rows(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 6, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 6, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
@@ -1557,11 +1557,11 @@ describe('database migrations', () => {
       .toEqual({ count: 0 });
   });
 
-  it('rejects databases above schema version fourteen', () => {
+  it('rejects databases above schema version fifteen', () => {
     const database = createV6Database();
-    database.prepare('insert into schema_migrations (version, applied_at) values (15, ?)').run('2026-09-01T00:00:00.000Z');
+    database.prepare('insert into schema_migrations (version, applied_at) values (16, ?)').run('2026-09-01T00:00:00.000Z');
 
     expect(() => migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() }))
-      .toThrow('数据库版本 15 高于当前软件支持的版本 14');
+      .toThrow('数据库版本 16 高于当前软件支持的版本 15');
   });
 });

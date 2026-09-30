@@ -47,7 +47,7 @@ export class DrawingDeletionService {
   preview(signedId: number): DrawingDeletionPreview {
     const row = this.getRow(signedId);
     if (!row) throw new DrawingDeletionError('DRAWING_NOT_FOUND', '图号记录不存在');
-    if (row.deletedAt) throw new DrawingDeletionError('DRAWING_ALREADY_DELETED', '图号记录已经删除');
+    if (row.deletedAt && row.deletionMode !== 'retain_occupied') throw new DrawingDeletionError('DRAWING_ALREADY_DELETED', '图号号码已经释放');
     return this.buildPreview(signedId, row);
   }
 
@@ -55,7 +55,9 @@ export class DrawingDeletionService {
     return this.db.transaction(() => {
       const row = this.getRow(input.signedId);
       if (!row) throw new DrawingDeletionError('DRAWING_NOT_FOUND', '图号记录不存在');
-      if (row.deletedAt) throw new DrawingDeletionError('DRAWING_ALREADY_DELETED', '图号记录已经删除');
+      if (row.deletedAt && (row.deletionMode !== 'retain_occupied' || input.mode !== 'release')) {
+        throw new DrawingDeletionError('DRAWING_ALREADY_DELETED', '已删除记录只能继续释放占号，不能重复删除');
+      }
       if (row.fullCode !== input.confirmedCode.trim()) {
         throw new DrawingDeletionError('DRAWING_CONFIRMATION_MISMATCH', '确认图号与当前图号不一致');
       }

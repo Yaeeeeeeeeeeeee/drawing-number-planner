@@ -12,8 +12,8 @@ export class DictionaryService {
   private readonly repository: DictionaryRepository;
   constructor(database: PlannerDatabase) { this.repository = new DictionaryRepository(database); }
 
-  list(input: { type: DictionaryType; includeInactive?: boolean }): DictionaryItem[] {
-    return this.repository.list(input.type, input.includeInactive ?? false);
+  list(input: { type: DictionaryType; includeInactive?: boolean; includeDeleted?: boolean }): DictionaryItem[] {
+    return this.repository.list(input.type, input.includeInactive ?? false, input.includeDeleted ?? false);
   }
 
   create(input: CreateDictionaryItem): DictionaryItem {

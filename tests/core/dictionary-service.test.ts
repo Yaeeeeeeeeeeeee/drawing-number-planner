@@ -15,6 +15,18 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('DictionaryService', () => {
+  it('hides a referenced dictionary identity but preserves historical interpretation and allows restoration', () => {
+    const brand = service.create({ type: 'brand', code: '02', name: '验收样例' });
+    db.exec("insert into historical_drawing_numbers(full_code,brand_code,product_size_code,appearance_code,color_code,main_category_code,project_item_code,sequence,first_seen_at,last_seen_at) values('02.0209.010.0401001','02','0209','01','0','04','01',1,'2026-09-30','2026-09-30')");
+    service.deleteUnused(brand.id);
+    expect(service.list({ type: 'brand', includeInactive: true })).toEqual([]);
+    expect(service.list({ type: 'brand', includeInactive: true, includeDeleted: true })).toEqual([expect.objectContaining({ id: brand.id, deletedAt: expect.any(String), status: 'inactive' })]);
+    expect(db.prepare('select brand_code from historical_drawing_numbers').get()).toEqual({brand_code:'02'});
+    expect(() => service.create({ type: 'brand', code: '02', name: '不得冲突' })).toThrow(/已存在/);
+    service.activate(brand.id);
+    expect(service.list({ type: 'brand' })).toEqual([expect.objectContaining({id:brand.id,status:'active'})]);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
   it('rejects duplicate codes within one dictionary type', () => {
     service.create({ type: 'brand', code: '02', name: 'SAMKYO' });
     expect(() => service.create({ type: 'brand', code: '02', name: '另一个品牌' }))
@@ -122,10 +134,9 @@ describe('DictionaryService', () => {
 
     const main = service.create({ type: 'main_category', code: '04', name: '印刷件类' });
     service.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id });
-    expect(() => service.deleteUnused(main.id)).toThrowError(expect.objectContaining({
-      code: 'DICTIONARY_ITEM_REFERENCED',
-      message: '该编码已被产品、正式图号、历史图号、BOM 或字典层级引用，无法删除。可以选择停用。',
-    }));
+    service.deleteUnused(main.id);
+    expect(service.list({ type: 'main_category', includeInactive: true })).toEqual([]);
+    expect(db.prepare('select parent_id from dictionary_items where type=?').get('project_item')).toEqual({parent_id:main.id});
   });
 
   it('protects historical code snapshots, formal records and BOM references from deletion', () => {
@@ -154,7 +165,10 @@ describe('DictionaryService', () => {
        sequence, first_seen_at, last_seen_at) values ('02.0209.010.0401002', '02', '0209', '01', '0', '04', '01', 2, '2026-08-28', '2026-08-28')`).run();
 
     for (const dictionary of [brand, size, appearance, color, main, item]) {
-      expect(() => service.deleteUnused(dictionary.id)).toThrowError(expect.objectContaining({ code: 'DICTIONARY_ITEM_REFERENCED' }));
+      service.deleteUnused(dictionary.id);
+      expect(db.prepare('select id,deleted_at from dictionary_items where id=?').get(dictionary.id)).toEqual({id:dictionary.id,deleted_at:expect.any(String)});
     }
+    expect(db.prepare('select full_code from drawing_numbers where id=?').get(drawingId)).toEqual({full_code:'02.0209.010.0401001'});
+    expect(db.pragma('foreign_key_check')).toEqual([]);
   });
 });

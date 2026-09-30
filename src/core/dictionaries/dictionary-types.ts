@@ -17,6 +17,7 @@ export interface DictionaryItem {
   name: string;
   parentId: number | null;
   status: 'active' | 'inactive';
+  deletedAt?: string | null;
 }
 
 export interface CreateDictionaryItem {

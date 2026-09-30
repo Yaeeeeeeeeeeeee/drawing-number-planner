@@ -121,7 +121,7 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   const beginDrawingDeletion = async () => {
     if (!selected) return;
     setMaintaining(true); setError('');
-    try { setDeletionPreview(await api.getDrawingDeletionPreview(selected.id)); }
+    try { setDeletionPreview(await api.getDrawingDeletionPreview(selected.id)); if (selected.deletedAt) setDeletionMode('release'); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '删除引用检查失败'); }
     finally { setMaintaining(false); }
   };
@@ -187,8 +187,9 @@ export function DrawingLibraryPage({ api }: { api: PlannerApi }) {
   return <section className="page-surface page-enter">
     <header className="page-header"><div><p className="eyebrow">DRAWING LIBRARY</p><h1>图号库</h1><p>统一检索正式规划与历史扫描图号，并核对文件完整性。</p></div><span className="record-count">{total} 条记录</span></header>
     <nav className="segmented-tabs" aria-label="图号库查看方式">
-      <button type="button" aria-selected={view === 'drawing'} onClick={() => { setView('drawing'); setSelectedBatch(null); setPage(1); void search(filters, 1, pageSize); }}>按图号</button>
+      <button type="button" aria-selected={view === 'drawing' && filters.deletionState === 'normal'} onClick={() => { const next = { ...filters, deletionState: 'normal' }; setFilters(next); setView('drawing'); setSelected(null); setSelectedBatch(null); setPage(1); void search(next, 1, pageSize); }}>按图号</button>
       <button type="button" aria-selected={view === 'batch'} onClick={() => { setView('batch'); setSelected(null); setPage(1); }}>按资料批次</button>
+      <button type="button" aria-selected={view === 'drawing' && filters.deletionState.startsWith('deleted')} onClick={() => { const next = { ...emptyFilters, deletionState: 'deleted-retained' }; setFilters(next); setView('drawing'); setSelected(null); setSelectedBatch(null); setMoreFilters(true); setPage(1); void search(next, 1, pageSize); }}>回收站</button>
     </nav>
     {error && <p className="error-banner">{error}</p>}
     {view === 'drawing' ? <>
@@ -301,15 +302,16 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
     <section className="drawing-detail-section danger-zone"><h3>危险操作</h3>
       {selected.deletedAt ? <><p>删除方式：{selected.deletionMode === 'release' ? '彻底删除并释放图号' : '删除记录并保留占号'}</p>
         {selected.deletedReason && <p className="muted-text">原因：{selected.deletedReason}</p>}
-        <button className="secondary-button" disabled={maintaining} onClick={() => void onRestore()} type="button">恢复记录</button></>
-        : !deletionPreview ? <><p className="muted-text">删除只处理系统记录和当前关联，不会删除磁盘中的 PDF、AI 或其他文件。</p>
+        <button className="secondary-button" disabled={maintaining} onClick={() => void onRestore()} type="button">恢复记录</button>
+        {selected.deletionMode === 'retain_occupied' && !deletionPreview && <button className="text-button danger" disabled={maintaining} onClick={() => void onBeginDelete()} type="button">检查引用并释放占号</button>}</> : null}
+      {(!selected.deletedAt || selected.deletionMode === 'retain_occupied') && (!deletionPreview ? !selected.deletedAt && <><p className="muted-text">删除只处理系统记录和当前关联，不会删除磁盘中的 PDF、AI 或其他文件。</p>
           <button className="text-button danger" disabled={maintaining} onClick={() => void onBeginDelete()} type="button">删除图号</button></>
           : <div className="drawing-delete-panel">
             <p><strong>{deletionPreview.fullCode}</strong> · {deletionPreview.origin === 'planned' ? '正式规划' : '历史扫描'}</p>
             <DeletionReferenceSummary preview={deletionPreview} />
             {deletionPreview.blockers.length > 0 ? <div className="error-banner">{deletionPreview.blockers.map((item) => <p key={item.kind}>{item.message}</p>)}</div>
-              : <><label className="choice-row"><input type="radio" name="drawing-delete-mode" checked={deletionMode === 'retain_occupied'}
-                onChange={() => setDeletionMode('retain_occupied')} />删除记录并保留占号</label>
+              : <>{!selected.deletedAt && <label className="choice-row"><input type="radio" name="drawing-delete-mode" checked={deletionMode === 'retain_occupied'}
+                onChange={() => setDeletionMode('retain_occupied')} />删除记录并保留占号</label>}
                 <label className="choice-row"><input type="radio" name="drawing-delete-mode" checked={deletionMode === 'release'}
                   onChange={() => setDeletionMode('release')} />彻底删除并释放图号</label>
                 <label><span>删除原因（可选）</span><input value={deletionReason} onChange={(event) => setDeletionReason(event.target.value)} /></label>
@@ -319,7 +321,7 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
                 <div className="drawing-actions"><button className="text-button danger" disabled={maintaining}
                   onClick={() => void onConfirmDelete()} type="button">确认删除</button>
                   <button className="secondary-button" disabled={maintaining} onClick={onCancelDelete} type="button">取消</button></div></>}
-          </div>}
+          </div>)}
     </section>
   </aside>;
 }

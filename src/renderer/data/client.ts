@@ -4,6 +4,7 @@ export type ProductCleanupPreviewView = ProductCleanupPreview;
 export interface DictionaryItemView {
   id: number; type?: string; code: string; name: string;
   parentId?: number | null; status: 'active' | 'inactive';
+  deletedAt?: string | null;
 }
 
 export interface ProductView {
@@ -263,7 +264,7 @@ export interface PlannerApi {
   listMaterialBatches(filters?: { search?: string; productId?: number }): Promise<MaterialBatchView[]>;
   getMaterialBatchFiles(id: number): Promise<MaterialBatchFileView[]>;
   getMaterialBatchMaterials(id: number): Promise<MaterialBatchLogicalMaterialView[]>;
-  listDictionaries(type: string, includeInactive?: boolean): Promise<DictionaryItemView[]>;
+  listDictionaries(type: string, includeInactive?: boolean, includeDeleted?: boolean): Promise<DictionaryItemView[]>;
   createDictionary(type: string, input: { code: string; name: string; parentId?: number }): Promise<DictionaryItemView>;
   updateDictionaryName(id: number, name: string): Promise<DictionaryItemView>;
   deactivateDictionary(id: number): Promise<DictionaryItemView>;
@@ -508,8 +509,8 @@ export const apiClient: PlannerApi = {
     `/api/material-batches/${id}/files`)).items,
   getMaterialBatchMaterials: async (id) => (await request<{ items: MaterialBatchLogicalMaterialView[] }>(
     `/api/material-batches/${id}/materials`)).items,
-  listDictionaries: async (type, includeInactive = true) => {
-    const result = await request<{ items: DictionaryItemView[] }>(`/api/dictionaries/${type}?includeInactive=${includeInactive}`);
+  listDictionaries: async (type, includeInactive = true, includeDeleted = false) => {
+    const result = await request<{ items: DictionaryItemView[] }>(`/api/dictionaries/${type}?includeInactive=${includeInactive}${includeDeleted ? '&includeDeleted=true' : ''}`);
     return result.items;
   },
   createDictionary: (type, input) => request(`/api/dictionaries/${type}`, json('POST', input)),

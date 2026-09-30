@@ -23,6 +23,7 @@ describe('renderer API client', () => {
     const { ProductService } = await import('../../src/core/products/product-service');
     const { ProductCleanupService } = await import('../../src/core/products/product-cleanup-service');
     const { registerProductRoutes } = await import('../../src/server/routes/products');
+    const { registerDictionaryRoutes } = await import('../../src/server/routes/dictionaries');
     const db = openDatabase(':memory:');
     const app = Fastify();
     const nativeFetch = globalThis.fetch;
@@ -39,6 +40,7 @@ describe('renderer API client', () => {
       const other = products.create({ ...refs, sku: 'KEEP-F20', model: 'F20', productCategory: '空气炸锅' });
       app.post('/api/session', async () => ({ token: 'isolated-test-token' }));
       registerProductRoutes(app, products, new ProductCleanupService(db));
+      registerDictionaryRoutes(app, dictionaries);
       const origin = await app.listen({ host: '127.0.0.1', port: 0 });
       // Preserve native HTTP serialization, including the automatic text/plain header for string bodies.
       vi.stubGlobal('fetch', (path: string, init?: RequestInit) => nativeFetch(new URL(path, origin), init));
@@ -47,6 +49,12 @@ describe('renderer API client', () => {
       await expect(apiClient.cleanupProduct(product.id, 'F60')).resolves.toMatchObject({ model: 'F60' });
       expect(products.list({ status: 'all' }).items.map((item) => item.id)).toEqual([other.id]);
       expect(db.prepare('select count(*) as n from products').get()).toEqual({ n: 2 });
+      await apiClient.deleteDictionary(refs.brandId);
+      expect(await apiClient.listDictionaries('brand', true)).toEqual([]);
+      expect(await apiClient.listDictionaries('brand', true, true)).toEqual([expect.objectContaining({ id: refs.brandId, deletedAt: expect.any(String) })]);
+      expect(products.get(other.id).brandName).toBe('SAMKYO');
+      await apiClient.activateDictionary(refs.brandId);
+      expect(await apiClient.listDictionaries('brand', false)).toEqual([expect.objectContaining({id:refs.brandId,status:'active'})]);
     } finally {
       vi.unstubAllGlobals();
       await app.close();

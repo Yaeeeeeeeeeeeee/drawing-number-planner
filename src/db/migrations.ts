@@ -725,8 +725,8 @@ function applyDrawingDeletionSchema(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 14) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 14`);
-  if (from >= 14) {
+  if (from > 15) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 15`);
+  if (from >= 15) {
     const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
@@ -852,6 +852,16 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
         throw new Error('第二轮验收修正数据校验失败，数据库未升级');
       }
     }
+    if (from < 15) {
+      const before = countRows(database, 'dictionary_items');
+      if (!(database.pragma('table_info(dictionary_items)') as Array<{ name: string }>).some(column => column.name === 'deleted_at')) {
+        database.exec('alter table dictionary_items add column deleted_at text');
+      }
+      database.prepare('insert into schema_migrations (version, applied_at) values (15, ?)').run(new Date().toISOString());
+      if (before !== countRows(database, 'dictionary_items') || (database.pragma('foreign_key_check') as unknown[]).length) {
+        throw new Error('回收站升级校验失败，数据库未升级');
+      }
+    }
   })();
-  return { from, to: 14 };
+  return { from, to: 15 };
 }

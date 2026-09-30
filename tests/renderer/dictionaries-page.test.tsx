@@ -11,6 +11,16 @@ function deferred<T>() {
 }
 
 describe('DictionariesPage', () => {
+  it('reveals archived dictionary identities with a restore action', async () => {
+    const archived = { id: 1, type: 'brand', code: '02', name: '历史品牌', status: 'inactive', deletedAt: '2026-09-30' };
+    const api = { listDictionaries: vi.fn((_type, _inactive, deleted) => Promise.resolve(deleted ? [archived] : [])) };
+    render(<DictionariesPage api={api as never} />);
+    await screen.findByText('当前字典暂无数据');
+    fireEvent.click(screen.getByLabelText('显示已删除字典记录'));
+    expect(await screen.findByText('已删除 · 历史保留')).toBeVisible();
+    expect(screen.getByRole('button', {name:'恢复 历史品牌'})).toBeVisible();
+    expect(screen.queryByRole('button', {name:'删除 历史品牌'})).not.toBeInTheDocument();
+  });
   const mainCategories = [
     { id: 10, type: 'main_category', code: '04', name: '印刷件类', parentId: null, status: 'active' as const },
     { id: 11, type: 'main_category', code: '05', name: '包装类', parentId: null, status: 'inactive' as const },
@@ -57,7 +67,7 @@ describe('DictionariesPage', () => {
       }), createDictionary: vi.fn(), deactivateDictionary: vi.fn(), updateDictionaryName: vi.fn(),
     };
     render(<DictionariesPage api={api as never} />);
-    await waitFor(() => expect(api.listDictionaries).toHaveBeenCalledWith('brand', true));
+    await waitFor(() => expect(api.listDictionaries).toHaveBeenCalledWith('brand', true, false));
     fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
 
     expect(screen.getByRole('status')).toHaveTextContent('正在加载');
@@ -111,7 +121,7 @@ describe('DictionariesPage', () => {
     const api = hierarchyApi();
     api.createDictionary.mockReturnValue(createdBrand.promise as never);
     render(<DictionariesPage api={api as never} />);
-    await waitFor(() => expect(api.listDictionaries).toHaveBeenCalledWith('brand', true));
+    await waitFor(() => expect(api.listDictionaries).toHaveBeenCalledWith('brand', true, false));
 
     fireEvent.change(screen.getByLabelText('编码'), { target: { value: '02' } });
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '延迟品牌' } });

@@ -53,7 +53,7 @@ describe('schema migrations', () => {
     const seeded = seedProduct(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 14 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 15 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select id, sku from products').get()).toEqual({ id: seeded.product, sku: null });

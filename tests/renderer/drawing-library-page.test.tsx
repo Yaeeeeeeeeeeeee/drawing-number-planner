@@ -4,6 +4,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
 describe('DrawingLibraryPage', () => {
+  it('opens the recycle bin directly and offers release for retained deleted records', async () => {
+    const row = { id: -1, fullCode: '02.0209.010.0401001', origin: 'historical', status: 'active', model: 'T40',
+      displayName: '历史资料', deletedAt: '2026-09-30', deletionMode: 'retain_occupied', readOnly: true,
+      sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
+    const api = { searchDrawings: vi.fn().mockImplementation((filters) => Promise.resolve({ items: filters.deletionState === 'deleted-retained' ? [row] : [], total: filters.deletionState === 'deleted-retained' ? 1 : 0 })),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row),
+      getDrawingDeletionPreview: vi.fn().mockResolvedValue({ fullCode: row.fullCode, origin: 'historical', references: {}, blockers: [], deletable: true }) };
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '回收站' }));
+    fireEvent.click(await screen.findByText(row.fullCode));
+    fireEvent.click(await screen.findByRole('button', { name: '检查引用并释放占号' }));
+    expect(await screen.findByLabelText('输入完整图号确认释放')).toBeVisible();
+    expect(screen.getByText('释放后，该号码未来可能被重新规划使用。')).toBeVisible();
+  });
   it('requires a directory choice when one product has current files in multiple directories', async () => {
     const files = ['A', 'B'].map((directory, index) => ({ pdfIndexId: index + 1, fileName: `${directory}.pdf`,
       relativePath: `${directory}/00/${directory}.pdf`, isPresent: true, conversionType: 'outlined' }));
