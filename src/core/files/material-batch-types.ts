@@ -28,6 +28,7 @@ export interface BatchFileInstance {
 
 export interface DrawingBatchOccurrence {
   batchId: number;
+  productId?: number | null;
   productDirectory: string;
   batchName: string;
   sequenceNumber: number | null;
@@ -37,6 +38,7 @@ export interface DrawingBatchOccurrence {
 }
 
 export interface DrawingBatchUsage {
+  effectiveCurrentFileIds?: number[];
   state: BatchUsageState;
   occurrenceCount: number;
   currentProductCount: number;

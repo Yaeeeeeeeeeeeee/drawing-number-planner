@@ -1,6 +1,6 @@
 interface ProgressItem { id: number; name: string; status: string; done: string; remaining: string; tests: string; updatedAt: string; acceptance: string[] }
 export interface ProgressData { updatedAt: string; branch: string; lastCommit: string; execution: string; current: string; recent: string; next: string; blockers: string[]; tests: string; completionRule: string; items: ProgressItem[]; log: { at: string; message: string }[] }
-const statuses = ['已完成', '开发中', '待测试', '未开始', '阻塞'];
+const statuses = ['已完成', '开发中', '待测试', '待开发', '阻塞'];
 const escape = (text: string) => text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 export function renderProgress(data: ProgressData): { html: string; markdown: string } {
   if (data.items.length !== 30 || data.items.some((item, i) => item.id !== i + 1 || !statuses.includes(item.status)

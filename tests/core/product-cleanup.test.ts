@@ -57,6 +57,30 @@ it('requires exact confirmation and refuses cleanup during a running task', () =
   expect(() => new ProductCleanupService(db, () => true).cleanup(product.id, { confirmedModel: product.model })).toThrow(/任务/);
   expect(db.prepare('select deleted_at from products where id = ?').get(product.id)).toEqual({ deleted_at: null });
 });
+it('separates deleted business rows from live and missing PDF indexes in the preview', () => {
+  const { product } = fixture();
+  db.exec("update bom_versions set deleted_at = 'old'");
+  for (const [path, present] of [['exists.pdf', 1], ['missing.pdf', 0]] as const) {
+    db.prepare(`insert into pdf_files(relative_path, path_key, file_name, historical_drawing_id,
+      match_status, conversion_type, size_bytes, modified_at, scanned_at, is_present)
+      values (?, ?, ?, 1, 'matched', 'outlined', 1, '2026-09-29', '2026-09-29', ?)`)
+      .run(path, path, path, present);
+  }
+  const result = new ProductCleanupService(db).preview(product.id);
+  expect(result.classification).toEqual({ alreadyDeleted: 1, presentPdfIndexes: 1, missingPdfIndexes: 1, preservedDrafts: 0 });
+  expect(result.blockers).toEqual([]);
+});
+it('blocks retirement while another live product references its identity, but ignores retired dependents', () => {
+  const { product, products } = fixture();
+  const dependent = products.create({ brandId: product.brandId, productSizeId: product.productSizeId,
+    sku: 'DEPENDENT', model: 'T60', productCategory: '冰柜', referenceProductId: product.id });
+  const cleanup = new ProductCleanupService(db);
+  expect(cleanup.preview(product.id).blockers).toContain('其他产品 T60 仍以本产品为参考来源');
+  expect(() => cleanup.cleanup(product.id, { confirmedModel: product.model })).toThrow(/T60/);
+  expect(products.update(dependent.id, { ...dependent, sku: 'DEPENDENT-EDIT' }).sku).toBe('DEPENDENT-EDIT');
+  cleanup.cleanup(dependent.id, { confirmedModel: dependent.model });
+  expect(cleanup.preview(product.id).blockers).toEqual([]);
+});
 it('rolls back every record when the cleanup audit cannot be stored', () => {
   const { product } = fixture();
   db.exec("create trigger reject_cleanup before insert on product_cleanup_events begin select raise(abort, 'audit-failed'); end");

@@ -69,6 +69,10 @@ describe('outbound package API', () => {
       parts: [{ partNumber: 1, zipRelativePath: created.json().zipRelativePath },
         { partNumber: 2, zipRelativePath: 'second.zip', sizeBytes: 123 }] });
     expect((await app.inject({ method: 'GET', url: '/api/outbound-packages?productId=-1' })).statusCode).toBe(400);
+    db.prepare("update products set deleted_at = '2026-09-29' where id = ?").run(productId);
+    const allHistory = await app.inject({ method: 'GET', url: '/api/outbound-packages' });
+    expect(allHistory.statusCode).toBe(200);
+    expect(allHistory.json()[0].id).toBe(created.json().id);
   });
   it('registers ZIP generation as a progress-reporting task', async () => {
     await app.close();

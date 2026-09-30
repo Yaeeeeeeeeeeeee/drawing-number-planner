@@ -91,6 +91,9 @@ describe('BomPage product-level BOM', () => {
     expect(screen.getByLabelText('业务变更日期')).toHaveValue('2026-09-02');
     expect(screen.getByText('正在编辑所选 BOM · 业务日期 2026-09-02')).toBeVisible();
     expect(screen.queryByText('当前 BOM · 业务日期 2026-09-02')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '编辑所选 BOM' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: /^当前 BOM$/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/保存后生成不可变快照/)).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('第 1 行修改明细'), { target: { value: '商标位置调整' } });
     fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
     await waitFor(() => expect(api.updateBomVersion).toHaveBeenCalledWith(20, expect.objectContaining({
@@ -164,6 +167,31 @@ describe('BomPage product-level BOM', () => {
       expectedCurrentVersionId: null, items: [{ projectItemId: 7, drawingReference: { origin: 'planned', drawingId: 10 }, usesWhiteMaterial: false,
         effectiveMaterialBatchId: 8, material: 'ABS', dimensions: '100×20', position: '前门', notes: '按图施工',
         assets: [{ role: 'image', assetId: 31 }] }] }));
+  });
+
+  it.each([[false, false], [true, false], [false, true], [true, true]])('saves independent optional image=%s and location diagram=%s', async (image, diagram) => {
+    const api = apiFixture();
+    api.uploadBomAsset.mockImplementation(async (_productId, file) => ({ ...asset,
+      id: file.name === 'image.png' ? 31 : 32, originalFileName: file.name }));
+    render(<BomPage api={api as never} />); await selectProduct();
+    fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
+    fireEvent.change(screen.getByLabelText('第 1 行主类别'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('第 1 行项目明细'), { target: { value: '7' } });
+    fireEvent.change(await screen.findByLabelText('第 1 行图号'), { target: { value: 'planned:10' } });
+    expect(screen.getByLabelText('第 1 行位置示意图')).toBeEnabled();
+    for (const [enabled, label, name] of [[image, '图片', 'image.png'], [diagram, '位置示意图', 'diagram.png']] as const) {
+      if (!enabled) continue;
+      const file = new File(['image'], name, { type: 'image/png' });
+      fireEvent.change(screen.getByLabelText(`第 1 行${label}`), { target: { files: [file] } });
+      await screen.findByText(name);
+    }
+    fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
+    await waitFor(() => expect(api.saveBomVersion).toHaveBeenCalled());
+    const submitted = api.saveBomVersion.mock.calls[0][0] as { items: { assets?: unknown[] }[] };
+    expect(submitted.items[0].assets ?? []).toEqual([
+      ...(image ? [{ role: 'image', assetId: 31 }] : []),
+      ...(diagram ? [{ role: 'diagram', assetId: 32 }] : []),
+    ]);
   });
 
   it('separates add and query, exposes product/date/batch/project/drawing filters and renders legacy dates safely', async () => {

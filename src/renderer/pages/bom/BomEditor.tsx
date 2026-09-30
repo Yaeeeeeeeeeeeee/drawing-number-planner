@@ -36,7 +36,7 @@ export function BomEditor({ base, rows, mainCategories, projects, batches, qrCan
   onSave(): Promise<void>; onRefresh(): void;
 }) {
   return <section aria-label="添加 BOM">
-    <div className="batch-toolbar"><div><h2>当前 BOM</h2><small>业务变更日期与提交时间分别记录；保存后生成不可变快照。</small></div>
+    <div className="batch-toolbar"><div><h2>{editing ? '编辑所选 BOM' : '当前 BOM'}</h2><small>{editing ? '修改所选记录，保留原提交时间；已完成外发及附件沿用快照不变。' : '业务变更日期与提交时间分别记录；保存后建立 BOM 记录。'}</small></div>
       <button className="secondary-button" type="button" disabled={busy} onClick={onAdd}>添加 BOM 项目</button></div>
     {!base && rows.length === 0 && <div className="bom-empty"><strong>尚未建立 BOM</strong><span>添加至少一个项目后保存。</span></div>}
     <div className="planning-rows">{rows.map((row, index) => <article className="planning-row bom-row" key={row.clientId}>
@@ -54,8 +54,8 @@ export function BomEditor({ base, rows, mainCategories, projects, batches, qrCan
         <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes} onChange={(e) => onChange(row, 'notes', e.target.value)} /></label>
         <label><span>修改明细</span><textarea aria-label={`第 ${index + 1} 行修改明细`} disabled={busy} value={row.changeDetails} onChange={(e) => onChange(row, 'changeDetails', e.target.value)} /></label>
         <label><span>图片</span><input aria-label={`第 ${index + 1} 行图片`} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onUpload(row, 'image', file); }} />{row.imageAsset && <small>{row.imageAsset.originalFileName}</small>}</label>
-        <label><span>示意图</span><input aria-label={`第 ${index + 1} 行示意图`} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onUpload(row, 'diagram', file); }} />{row.diagramAsset && <small>{row.diagramAsset.originalFileName}</small>}</label>
-        {base && row.previousImageName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用图片`} checked={row.reuseImage} disabled={busy} onChange={(e) => onChange(row, 'reuseImage', e.target.checked)} /> 沿用上一次 BOM：{row.previousImageName}</span></label>}{base && row.previousDiagramName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用示意图`} checked={row.reuseDiagram} disabled={busy} onChange={(e) => onChange(row, 'reuseDiagram', e.target.checked)} /> 沿用上一次 BOM：{row.previousDiagramName}</span></label>}
+        <label><span>位置示意图</span><input aria-label={`第 ${index + 1} 行位置示意图`} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onUpload(row, 'diagram', file); }} />{row.diagramAsset && <small>{row.diagramAsset.originalFileName}</small>}</label>
+        {base && row.previousImageName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用图片`} checked={row.reuseImage} disabled={busy} onChange={(e) => onChange(row, 'reuseImage', e.target.checked)} /> 沿用上一次 BOM：{row.previousImageName}</span></label>}{base && row.previousDiagramName && <label><span><input type="checkbox" aria-label={`第 ${index + 1} 行沿用位置示意图`} checked={row.reuseDiagram} disabled={busy} onChange={(e) => onChange(row, 'reuseDiagram', e.target.checked)} /> 沿用上一次 BOM：{row.previousDiagramName}</span></label>}
       </div>
 
     </article>)}</div>

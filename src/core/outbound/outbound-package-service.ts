@@ -251,7 +251,7 @@ export class OutboundPackageService {
     }
   }
 
-  listCompleted(productId: number) { return this.repository.listCompleted(productId); }
+  listCompleted(productId?: number) { return this.repository.listCompleted(productId); }
 
   private acquireClaim(path: string, content: string): void {
     let descriptor: number | undefined; let failure: unknown;
@@ -322,7 +322,7 @@ export class OutboundPackageService {
           } else {
             const stats = statSync(absolutePath);
             if (stats.size > OUTBOUND_ZIP_LIMIT_BYTES) {
-              throw new OutboundPackageError('FILE_TOO_LARGE', `${indexed.fileName} 超过50MB，不能切割原文件，请先处理该文件。`);
+              throw new OutboundPackageError('FILE_TOO_LARGE', `${indexed.fileName} 单文件大小为 ${(stats.size / 1_000_000).toFixed(2)}MB，超过50MB，不能切割原文件，请先处理该文件。`);
             }
             liveFiles.set(indexed.id, { indexed, absolutePath });
             fileFacts.push({ id: indexed.id, path: absolutePath, size: stats.size, mtimeMs: stats.mtimeMs });

@@ -30,6 +30,36 @@ function apiFixture() {
 afterEach(() => { delete window.plannerDesktop; vi.restoreAllMocks(); });
 
 describe('OutboundPage', () => {
+  it('opens completed history without requiring a still-active product', async () => {
+    const api = apiFixture(); api.listProducts.mockResolvedValue([]);
+    api.listOutboundPackages.mockResolvedValue([{ id: 90, packageName: '已退出型号历史包', zipRelativePath: 'old.zip',
+      fileCount: 1, createdAt: '2026-09-20', parts: [{ partNumber: 1, zipRelativePath: 'old.zip', sizeBytes: 100 }] }] as never);
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查询全部外发历史（含退出产品）' }));
+    expect(await screen.findByText('已退出型号历史包')).toBeVisible();
+    expect(api.listOutboundPackages).toHaveBeenCalledWith(undefined);
+  });
+  it.each(['missing', 'matched'])('warns about %s BOM change details before packaging', async (status) => {
+    const api = apiFixture();
+    api.previewOutboundPackage.mockResolvedValue({ ...preview, items: [{ ...preview.items[0],
+      bomContext: { status, changeDetails: null, candidates: [] } }] } as never);
+    render(<OutboundPage api={api as never} />);
+    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
+    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+    expect(await screen.findByText(status === 'missing' ? /未找到对应 BOM/ : /BOM 未填写修改明细/)).toBeVisible();
+  });
+  it('marks missing change details visibly in the generated draft and offers manual supplementation', async () => {
+    const api = apiFixture();
+    api.renderOutboundTemplate.mockImplementation(async (_id, fields) => ({ subject: fields.package_name, body: fields.change_files }));
+    render(<EmailComposer api={api as never} mailContext={{ packageName: '测试包', product: product as never,
+      materialType: 'update', items: [{ projectItemName: '铭牌', fileName: '铭牌.pdf', sourceBatchName: batch.name, pdfFileId: 41 }] }} />);
+    expect(await screen.findByText(/修改明细待补充：铭牌/)).toBeVisible();
+    await waitFor(() => expect((screen.getByLabelText('正文') as HTMLTextAreaElement).value).toContain('【待补充修改明细】'));
+    fireEvent.change(screen.getByLabelText('本次变更内容'), { target: { value: '铭牌：调整功率' } });
+    fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
+    await waitFor(() => expect((screen.getByLabelText('正文') as HTMLTextAreaElement).value).toContain('调整功率'));
+  });
   it('replaces an untouched automatic draft with the next completed package', async () => {
     const api = apiFixture();
     api.renderOutboundTemplate.mockImplementation(async (_id, fields) => ({ subject: fields.package_name, body: fields.package_name }));

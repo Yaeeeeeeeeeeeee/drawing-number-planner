@@ -4,6 +4,8 @@ import { parseMaterialBatch } from '../../src/core/files/material-batch-parser';
 import { MaterialBatchService } from '../../src/core/files/material-batch-service';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
+import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
+import { ProductService } from '../../src/core/products/product-service';
 
 let db: PlannerDatabase;
 let service: MaterialBatchService;
@@ -58,6 +60,31 @@ function insertUnbatchedSource(productDirectory: string, historicalId: number, s
 }
 
 describe('MaterialBatchService', () => {
+  it('identifies carried-forward current instances without falling back after their replacement is missing', () => {
+    const dict = new DictionaryService(db);
+    const brand = dict.create({ type: 'brand', code: '02', name: 'B' });
+    const size = dict.create({ type: 'product_size', code: '0209', name: 'S' });
+    const product = new ProductService(db).create({ brandId: brand.id, productSizeId: size.id, sku: 'SKU', model: 'T40', productCategory: '洗碗机' });
+    const first = insertBatch('01.洗碗机\\SKU-T40', '00.首批大货');
+    const latest = insertBatch('01.洗碗机\\SKU-T40', '01.20260929');
+    db.prepare('update material_batches set product_id = ?').run(product.id);
+    const code = '02.0209.010.0401001';
+    const drawing = insertHistorical(code);
+    insertFile(first, drawing, 'carried');
+    const other = insertHistorical('02.0209.010.0402001');
+    insertFile(latest, other, 'different-project');
+    expect(service.getDrawingUsage(code, 'active').effectiveCurrentFileIds).toEqual([1]);
+    expect(service.getDrawingUsage(code, 'active')).toMatchObject({ state: 'current', currentProductCount: 1, historicalProductCount: 0 });
+    expect(service.getDrawingUsage(code, 'active').occurrences[0].productId).toBe(product.id);
+    insertFile(latest, drawing, 'carried');
+    db.prepare('update pdf_files set content_sha256 = ? where historical_drawing_id = ?').run('same-content', drawing);
+    expect(service.getDrawingUsage(code, 'active').effectiveCurrentFileIds).toEqual([3]);
+    // A later replacement-only batch must not silently fall back to the first batch.
+    db.prepare('delete from pdf_files where id = 3').run();
+    const replacement = insertHistorical('02.0209.010.0401002');
+    insertFile(latest, replacement, 'missing-replacement', now, 'outlined', false);
+    expect(service.getDrawingUsage(code, 'active').effectiveCurrentFileIds).toEqual([]);
+  });
   it('parses and orders 00.首批大货, 01.20241210, and 06.20260309', () => {
     const product = '01.洗碗机\\SKU-T40';
     const first = insertBatch(product, '00.首批大货');

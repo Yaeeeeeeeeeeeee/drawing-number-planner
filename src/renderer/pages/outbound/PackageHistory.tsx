@@ -3,7 +3,7 @@ import type { PlannerApi } from '../../data/client';
 import { openOutboundPackageLocation } from '../../desktop-files';
 
 export function PackageHistory({ api, productId, refreshId }: {
-  api: PlannerApi; productId: number; refreshId?: number;
+  api: PlannerApi; productId?: number; refreshId?: number;
 }) {
   const [packages, setPackages] = useState<Awaited<ReturnType<PlannerApi['listOutboundPackages']>>>([]);
   const [error, setError] = useState('');
@@ -14,7 +14,7 @@ export function PackageHistory({ api, productId, refreshId }: {
       .catch((failure) => { if (current) setError(failure instanceof Error ? failure.message : '外发历史加载失败'); });
     return () => { current = false; };
   }, [api, productId, refreshId]);
-  return <details className="outbound-panel">
+  return <details className="outbound-panel" open={productId === undefined ? true : undefined}>
     <summary>已生成的压缩包</summary>
     {error && <p className="error-banner">{error}</p>}
     {!packages.length && !error && <p className="muted-text">暂无已生成记录</p>}

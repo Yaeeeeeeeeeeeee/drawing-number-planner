@@ -10,6 +10,7 @@ import { FileService } from '../src/core/files/file-service.js';
 import { FileRepository } from '../src/core/files/file-repository.js';
 import { WorkspaceSettingsStore } from '../src/core/files/workspace-settings.js';
 import { BomService } from '../src/core/bom/bom-service.js';
+import { BomAssetService } from '../src/core/bom/bom-asset-service.js';
 import { startServer } from '../src/server/start-server.js';
 
 // Development-only disposable preview; never opens the user's real database or PDF library.
@@ -31,11 +32,16 @@ const input = { productId: product.id, rows: items.map((item) => ({ clientId: St
   mainCategoryId: main.id, projectItemId: item.id })) };
 const preview = planning.preview(input);
 const drawings = planning.reserve({ ...input, rows: input.rows.map((row, index) => ({ ...row, expectedFullCode: preview.rows[index].fullCode })) });
+const updateInput = { productId: product.id, rows: [input.rows[0]] };
+const updatePreview = planning.preview(updateInput);
+const updatedManual = planning.reserve({ ...updateInput, rows: [{ ...input.rows[0], expectedFullCode: updatePreview.rows[0].fullCode }] })[0];
+const latestDrawings = [updatedManual, ...drawings.slice(1)];
 const productDirectory = join(root, '01.空气炸锅', 'PREVIEWF60-F60');
 for (const folder of ['02.未转曲源文件', '03.量产后的变更文件（已量产的产品看最新日期）/00.首批大货',
   '03.量产后的变更文件（已量产的产品看最新日期）/01.20260928']) {
   const directory = join(productDirectory, folder); mkdirSync(directory, { recursive: true });
-  for (const [index, drawing] of drawings.entries()) {
+  const batchDrawings = folder.endsWith('00.首批大货') ? drawings : latestDrawings;
+  for (const [index, drawing] of batchDrawings.entries()) {
     writeFileSync(join(directory, `${drawing.fullCode}-验收样例-F60白色-${items[index].name}${folder.startsWith('02.') ? '' : '（转曲）'}.pdf`), '%PDF-1.4\n% disposable acceptance fixture');
   }
 }
@@ -43,10 +49,14 @@ const settings = new WorkspaceSettingsStore(join(dataDir, 'settings.json'));
 settings.setWorkspaceRoot(root);
 const scan = await new FileService(new FileRepository(db), settings).scan();
 const batch = db.prepare('select id from material_batches order by sequence_number desc limit 1').get() as { id: number };
+const assetSource = join(dataDir, '隔离验收图片.png');
+writeFileSync(assetSource, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a2s8AAAAASUVORK5CYII=', 'base64'));
+const sampleAsset = new BomAssetService(db, root).import({ sku: product.sku!, model: product.model, sourcePath: assetSource });
 new BomService(db, () => root).saveVersion({ productId: product.id, businessChangeDate: '2026-09-28',
-  expectedCurrentVersionId: null, items: items.map((item, index) => ({ projectItemId: item.id, drawingId: drawings[index].id,
+  expectedCurrentVersionId: null, items: items.map((item, index) => ({ projectItemId: item.id, drawingId: latestDrawings[index].id,
     usesWhiteMaterial: false, effectiveMaterialBatchId: batch.id, material: '铜版纸', dimensions: '210×297mm',
-    position: '包装内部', changeDetails: `${item.name}：调整文字及排版` })) });
+    position: '包装内部', changeDetails: `${item.name}：调整文字及排版`,
+    ...(index === 0 ? { assets: [{ role: 'image' as const, assetId: sampleAsset.id }, { role: 'diagram' as const, assetId: sampleAsset.id }] } : {}) })) });
 db.close();
 const server = await startServer({ port: 5187, dataDir, rendererDir: resolve('dist/renderer') });
 console.log(JSON.stringify({ preview: server.url, dataDir, scan, note: '隔离样例数据，不是用户真实资料库' }));

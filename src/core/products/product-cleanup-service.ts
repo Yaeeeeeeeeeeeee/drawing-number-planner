@@ -9,6 +9,7 @@ export interface ProductCleanupPreview {
   blockers: string[];
   owned: { drawings: number; historicalDrawings: number; bomRecords: number; qrCodes: number; batches: number };
   preservedSnapshots: number;
+  classification: { alreadyDeleted: number; presentPdfIndexes: number; missingPdfIndexes: number; preservedDrafts: number };
 }
 export class ProductCleanupService {
   constructor(private readonly db: PlannerDatabase, private readonly isTaskRunning: () => boolean = () => false) {}
@@ -19,6 +20,9 @@ export class ProductCleanupService {
     const count = (sql: string) => (this.db.prepare(sql).get({ id: productId }) as { n: number }).n;
     const blockers: string[] = [];
     if (this.isTaskRunning()) blockers.push('后台任务正在执行，请先等待完成或取消任务');
+    const dependentProducts = this.db.prepare(`select model from products
+      where reference_product_id = ? and deleted_at is null and id <> ?`).all(productId, productId) as Array<{ model: string }>;
+    for (const dependent of dependentProducts) blockers.push(`其他产品 ${dependent.model} 仍以本产品为参考来源`);
     const externalBoms = this.db.prepare(`select distinct version.id, product.model from bom_items item
       join bom_versions version on version.id = item.bom_version_id
       join products product on product.id = version.product_id
@@ -39,7 +43,18 @@ export class ProductCleanupService {
       (file.drawing_id in (select id from drawing_numbers where product_id = @id)
        or file.historical_drawing_id in (select id from historical_drawing_numbers where product_id = @id))`);
     if (externalFiles) blockers.push(`其他产品资料批次有 ${externalFiles} 个文件引用本产品图号`);
+    const fileOwnership = `(file.drawing_id in (select id from drawing_numbers where product_id = @id)
+      or file.historical_drawing_id in (select id from historical_drawing_numbers where product_id = @id)
+      or file.material_batch_id in (select id from material_batches where product_id = @id))`;
     return { productId, ...product, blockers,
+      classification: {
+        alreadyDeleted: ['drawing_numbers', 'historical_drawing_numbers', 'bom_versions', 'product_qr_codes']
+          .reduce((sum, table) => sum + count(`select count(*) as n from ${table} where product_id = @id and deleted_at is not null`), 0),
+        presentPdfIndexes: count(`select count(*) as n from pdf_files file where file.is_present = 1 and ${fileOwnership}`),
+        missingPdfIndexes: count(`select count(*) as n from pdf_files file where file.is_present = 0 and ${fileOwnership}`),
+        preservedDrafts: count(`select count(*) as n from outbound_email_drafts where package_id in
+          (select id from outbound_packages where product_id = @id)`),
+      },
       owned: {
         drawings: count('select count(*) as n from drawing_numbers where product_id = @id and deleted_at is null'),
         historicalDrawings: count('select count(*) as n from historical_drawing_numbers where product_id = @id and deleted_at is null'),

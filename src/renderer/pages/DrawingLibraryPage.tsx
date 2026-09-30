@@ -284,7 +284,7 @@ function DrawingDetailPanel({ selected, maintaining, pdfKeyword, setPdfKeyword, 
       {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}
       </div>}
     <FileSection title="源文件" present={selected.hasSourceFile} files={selected.sourceFiles ?? []} onOpen={onOpen} />
-    <CurrentOutlinedFiles selected={selected} onOpen={onOpen} />
+    <CurrentOutlinedFiles key={`${selected.origin}-${selected.id}`} selected={selected} onOpen={onOpen} />
     <section className="drawing-detail-section"><h3>资料批次</h3>{!selected.batchUsage || selected.batchUsage.occurrences.length === 0
       ? <p className="muted-text">尚未识别到资料批次</p>
       : <ul>{selected.batchUsage.occurrences.map((occurrence) => <li key={occurrence.batchId} className={`batch-occurrence ${occurrence.usageState}`}><span>{materialBatchLabel(occurrence.batchName)}</span><span className={`usage-badge ${occurrence.usageState}`}>{usageLabel(occurrence.usageState)}</span><small>{occurrence.productDirectory} · {occurrence.files.length} 个文件实例</small></li>)}</ul>}</section>
@@ -389,18 +389,29 @@ function BatchFileInstances({ title, files, onOpen }: { title: string; files: Ma
 }
 
 function CurrentOutlinedFiles({ selected, onOpen }: { selected: DrawingDetailView; onOpen(id: number): Promise<void> }) {
-  const currentIds = new Set(selected.batchUsage?.occurrences
-    .filter((occurrence) => occurrence.usageState === 'current')
-    .flatMap((occurrence) => occurrence.files.filter((file) => file.conversionType === 'outlined').map((file) => file.pdfIndexId)) ?? []);
+  const [directory, setDirectory] = useState('');
+  const occurrences = (selected.batchUsage?.occurrences ?? []).filter((occurrence) =>
+    selected.productId == null || occurrence.productId === selected.productId);
+  const directories = [...new Set(occurrences.map((occurrence) => occurrence.productDirectory))];
+  const effectiveDirectory = directories.length === 1 ? directories[0] : directory;
+  const currentIds = new Set(occurrences
+    .filter((occurrence) => directories.length === 1 || (directory !== '' && occurrence.productDirectory === effectiveDirectory))
+    .flatMap((occurrence) => occurrence.files.filter((file) => file.conversionType === 'outlined'
+      && (selected.batchUsage?.effectiveCurrentFileIds !== undefined
+        ? selected.batchUsage.effectiveCurrentFileIds.includes(file.pdfIndexId) : occurrence.usageState === 'current'))
+      .map((file) => file.pdfIndexId)));
   const current = (selected.outlinedFiles ?? []).filter((file) => currentIds.has(file.pdfIndexId));
   const history = (selected.outlinedFiles ?? []).filter((file) => !currentIds.has(file.pdfIndexId));
   return <>
+    {directories.length > 1 && <label>当前文件所属资料目录<select aria-label="当前文件所属资料目录" value={directory} onChange={(event) => setDirectory(event.target.value)}>
+      <option value="">存在多个资料目录，请选择</option>{directories.map((path) => <option key={path} value={path}>{path}</option>)}
+    </select></label>}
     <FileSection title="转曲后文件" present={current.some((file) => file.isPresent)} files={current} onOpen={onOpen} />
     {current.length === 0 && <p className="muted-text">未找到当前有效批次的转曲后文件，不使用历史文件替代。</p>}
     {current.length > 1 && <p className="info-banner">当前有效批次有多个文件实例，请核对路径后选择。</p>}
     {history.length > 0 && <details key={selected.id} className="drawing-detail-section">
       <summary>查看历史文件</summary>
-      <p className="muted-text">历史及未归入当前有效批次的实例</p>
+      <p className="muted-text">历史、其他产品及未归入所选目录当前有效批次的实例</p>
       <FileSection title="转曲后文件" present={history.some((file) => file.isPresent)} files={history} onOpen={onOpen} />
     </details>}
   </>;

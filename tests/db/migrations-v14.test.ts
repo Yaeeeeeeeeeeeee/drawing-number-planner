@@ -2,11 +2,20 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { openDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import * as schemas from '../../src/db/schema.sql';
+import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { createDatabaseBackup } from '../../src/db/backup';
 
 const databases: ReturnType<typeof openDatabase>[] = [];
-afterEach(() => databases.splice(0).forEach((db) => db.close()));
-function v13() {
-  const db = openDatabase(':memory:'); databases.push(db);
+const temporaryDirectories: string[] = [];
+afterEach(() => {
+  databases.splice(0).forEach((db) => { if (db.open) db.close(); });
+  temporaryDirectories.splice(0).forEach((directory) => rmSync(directory, { recursive: true, force: true }));
+});
+function v13(path = ':memory:') {
+  const db = openDatabase(path); databases.push(db);
   db.exec(schemas.schemaVersionOne); db.exec(schemas.schemaVersionTwo);
   db.exec(schemas.schemaVersionThree); db.exec(schemas.schemaVersionFour);
   db.exec('alter table products add column sku text');
@@ -26,6 +35,44 @@ function v13() {
     values('02.0209.010.0401001','02','0209','01','0','04','01',1,'2026-09-22','2026-09-22');`);
   return db;
 }
+it.each([false, true])('upgrades a disk-backed v13 copy safely with completion failure=%s', (fail) => {
+  const directory = mkdtempSync(join(tmpdir(), 'planner-v14-copy-verification-'));
+  temporaryDirectories.push(directory);
+  const originalPath = join(directory, 'original-v13.db');
+  const original = v13(originalPath);
+  original.exec(`insert into pdf_files(relative_path, path_key, file_name, historical_drawing_id,
+    match_status, detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
+    values('旧目录\\历史文件.pdf', '旧目录\\历史文件.pdf', '历史文件.pdf', 1, 'matched', '[]',
+      'outlined', 123, '2026-09-22', '2026-09-22', 1);`);
+  const beforeHistory = original.prepare('select * from historical_drawing_numbers').all();
+  const beforeFiles = original.prepare('select * from pdf_files').all();
+  original.pragma('wal_checkpoint(TRUNCATE)'); original.close();
+  const hash = () => createHash('sha256').update(readFileSync(originalPath)).digest('hex');
+  const originalHash = hash();
+  const workingPath = join(directory, 'working-copy.db'); copyFileSync(originalPath, workingPath);
+  const working = openDatabase(workingPath); databases.push(working);
+  if (fail) working.exec(`create trigger stop_v14 before insert on schema_migrations when new.version=14
+    begin select raise(abort, 'copy-upgrade-failed'); end;`);
+  let backupPath = '';
+  const upgrade = () => migrateDatabase(working, { databaseExists: true, createBackup: () => {
+    expect(working.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 13 });
+    backupPath = createDatabaseBackup(working, workingPath, join(directory, 'backups'), 'migration');
+  } });
+  if (fail) expect(upgrade).toThrow('copy-upgrade-failed');
+  else expect(upgrade()).toEqual({ from: 13, to: 14 });
+  const backup = openDatabase(backupPath); databases.push(backup);
+  for (const database of [backup, working]) {
+    expect(database.prepare('select * from historical_drawing_numbers').all()).toEqual(beforeHistory);
+    expect(database.prepare('select * from pdf_files').all()).toEqual(beforeFiles);
+    expect(database.pragma('integrity_check', { simple: true })).toBe('ok');
+    expect(database.pragma('foreign_key_check')).toEqual([]);
+  }
+  expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 13 });
+  expect(working.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: fail ? 13 : 14 });
+  expect(working.prepare("select name from sqlite_master where name='outbound_package_parts'").get())
+    .toEqual(fail ? undefined : { name: 'outbound_package_parts' });
+  expect(hash()).toBe(originalHash);
+});
 it('backs up v13 before additive v14 migration and preserves occupied history', () => {
   const db = v13(); const before = db.prepare('select * from historical_drawing_numbers').all();
   const backup = vi.fn(() => {

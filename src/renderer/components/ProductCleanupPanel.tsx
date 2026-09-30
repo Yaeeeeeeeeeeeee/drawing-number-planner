@@ -30,6 +30,11 @@ export function ProductCleanupPanel({ api, productId, onCancel, onComplete }: {
       <p>正式图号 {preview.owned.drawings} · 历史图号 {preview.owned.historicalDrawings}（均保留占号）</p>
       <p>BOM 记录 {preview.owned.bomRecords} · 二维码 {preview.owned.qrCodes} · 资料批次 {preview.owned.batches}（集中退出或解除关联）</p>
       <p>历史外发快照 {preview.preservedSnapshots}（保留，不阻止退出）</p>
+      {preview.classification && <>
+        <p>已删除业务记录 {preview.classification.alreadyDeleted}（保留，不作为当前阻塞）</p>
+        <p>当前 PDF 索引 {preview.classification.presentPdfIndexes} · 缺失 PDF 索引 {preview.classification.missingPdfIndexes}（保留索引、解除本产品关联，不删除磁盘文件）</p>
+        <p>历史邮件草稿 {preview.classification.preservedDrafts}（保留，不阻止退出）</p>
+      </>}
       {preview.blockers.map((blocker) => <p className="error-banner" key={blocker}>{blocker}</p>)}
       <label>输入型号确认<input value={confirmation} disabled={busy} onChange={(event) => setConfirmation(event.target.value)} placeholder={preview.model} /></label>
       <button type="button" className="text-button danger" disabled={busy || preview.blockers.length > 0 || confirmation !== preview.model}

@@ -121,7 +121,7 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
         brand_name: mailContext?.product.brandName ?? '',
         change_description: changeDescription,
         change_files: changeEdited ? [changeDescription, fileList].filter(Boolean).join('\n')
-          : mailContext?.items.map((item, index) => `${index + 1}.${item.projectItemName}：${item.changeDetails?.trim() ?? ''}\n　　新文件：${item.fileName.split(/[\\/]/).at(-1)?.replace(/\.pdf$/i, '') ?? ''}`).join('\n') ?? '',
+          : mailContext?.items.map((item, index) => `${index + 1}.${item.projectItemName}：${item.changeDetails?.trim() || '【待补充修改明细】'}\n　　新文件：${item.fileName.split(/[\\/]/).at(-1)?.replace(/\.pdf$/i, '') ?? ''}`).join('\n') ?? '',
         package_files: (mailContext?.packageFiles?.length ?? 0) > 1
           ? `分包附件：\n${mailContext!.packageFiles!.map((name) => `  ${name.split(/[\\/]/).at(-1)}`).join('\n')}` : '',
         file_list: fileList,
@@ -197,6 +197,9 @@ export function EmailComposer({ api, mailContext: incomingContext }: EmailCompos
       {materialType === 'update' && (
         <label>
           <span>本次变更内容</span>
+          {mailContext?.items.some((item) => !item.changeDetails?.trim()) && <span className="info-banner">
+            修改明细待补充：{mailContext.items.filter((item) => !item.changeDetails?.trim()).map((item) => item.projectItemName).join('、')}。请补充本次变更内容并重新生成，或编辑正文，核对后再复制外发。
+          </span>}
           <textarea aria-label="本次变更内容" rows={3} value={changeDescription} onChange={(event) => { setChangeDescription(event.target.value); setChangeEdited(true); }} />
         </label>
       )}

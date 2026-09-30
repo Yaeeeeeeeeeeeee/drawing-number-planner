@@ -45,10 +45,11 @@ export interface DrawingDetailView extends DrawingView {
 
 export type BatchUsageStateView = 'current' | 'historical' | 'unbatched' | 'indeterminate';
 export interface DrawingBatchUsageView {
+  effectiveCurrentFileIds?: number[];
   state: BatchUsageStateView; occurrenceCount: number; currentProductCount: number; historicalProductCount: number;
   conflictWithBusinessStatus: boolean;
   occurrences: Array<{
-    batchId: number; productDirectory: string; batchName: string; sequenceNumber: number | null;
+    batchId: number; productId?: number | null; productDirectory: string; batchName: string; sequenceNumber: number | null;
     recognitionStatus: 'recognized' | 'pending'; usageState: BatchUsageStateView; files: DrawingFileView[];
   }>;
 }
@@ -316,7 +317,7 @@ export interface PlannerApi {
   activateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deactivateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deleteOutboundSignature(id: number): Promise<{ deleted: true }>;
-  listOutboundPackages(productId: number): Promise<Array<Omit<CreatedOutboundPackageView, 'parts'> & {
+  listOutboundPackages(productId?: number): Promise<Array<Omit<CreatedOutboundPackageView, 'parts'> & {
     parts: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number | null }>;
   }>>;
   previewOutboundPackage(input: OutboundPackageRequestView): Promise<OutboundPackagePreviewView>;
@@ -567,7 +568,7 @@ export const apiClient: PlannerApi = {
   activateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/activate`, json('POST')),
   deactivateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/deactivate`, json('POST')),
   deleteOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`, { method: 'DELETE' }),
-  listOutboundPackages: (productId) => request(`/api/outbound-packages?productId=${productId}`),
+  listOutboundPackages: (productId) => request(productId === undefined ? '/api/outbound-packages' : `/api/outbound-packages?productId=${productId}`),
   previewOutboundPackage: (input) => request('/api/outbound-packages/preview', json('POST', input)),
   createOutboundPackage: (input) => runLocalTask('outbound_package', input),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(

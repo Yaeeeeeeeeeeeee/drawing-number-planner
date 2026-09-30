@@ -36,7 +36,7 @@ function sendError(error: unknown, reply: FastifyReply) {
 
 export function registerOutboundPackageRoutes(app: FastifyInstance, service: OutboundPackageService, tasks?: TaskRegistry): void {
   app.get('/api/outbound-packages', async (request, reply) => {
-    const query = z.object({ productId: z.coerce.number().int().positive() }).strict().safeParse(request.query);
+    const query = z.object({ productId: z.coerce.number().int().positive().optional() }).strict().safeParse(request.query);
     if (!query.success) return invalid(reply);
     return service.listCompleted(query.data.productId);
   });

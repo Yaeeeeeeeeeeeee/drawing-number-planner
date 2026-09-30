@@ -281,7 +281,7 @@ describe('OutboundPackageService', () => {
     const row = db.prepare('select relative_path from pdf_files where id = ?').get(pdfId) as { relative_path: string };
     const descriptor = openSync(join(workspace, row.relative_path), 'r+');
     try { ftruncateSync(descriptor, 63_000_000); } finally { closeSync(descriptor); }
-    expect(() => service.previewPackage(request())).toThrowError(expect.objectContaining({ code: 'FILE_TOO_LARGE' }));
+    expect(() => service.previewPackage(request())).toThrowError(expect.objectContaining({ code: 'FILE_TOO_LARGE', message: expect.stringContaining('63.00MB') }));
     expect(readdirSync(output)).toEqual([]);
     expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
   });

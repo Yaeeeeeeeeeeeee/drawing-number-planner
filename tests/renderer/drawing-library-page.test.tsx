@@ -4,6 +4,42 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
 describe('DrawingLibraryPage', () => {
+  it('requires a directory choice when one product has current files in multiple directories', async () => {
+    const files = ['A', 'B'].map((directory, index) => ({ pdfIndexId: index + 1, fileName: `${directory}.pdf`,
+      relativePath: `${directory}/00/${directory}.pdf`, isPresent: true, conversionType: 'outlined' }));
+    const row = { id: 1, productId: 10, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active',
+      model: 'T40', displayName: '外箱', sourceFiles: [], outlinedFiles: files, currentBomUsage: [], readOnly: true,
+      batchUsage: { state: 'current', occurrences: files.map((file, index) => ({ batchId: index + 1, productId: 10,
+        productDirectory: index === 0 ? 'A' : 'B', batchName: '00.首批大货', usageState: 'current', files: [file] })) } };
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [row], total: 1 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row) };
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(row.fullCode));
+    const directory = await screen.findByLabelText('当前文件所属资料目录');
+    expect(screen.queryByText('A.pdf')).not.toBeVisible();
+    expect(screen.queryByText('B.pdf')).not.toBeVisible();
+    fireEvent.change(directory, { target: { value: 'A' } });
+    expect(screen.getByText('A.pdf')).toBeVisible();
+    expect(screen.queryByText('B.pdf')).not.toBeVisible();
+  });
+  it('does not present another product current file as the selected product current material', async () => {
+    const own = { pdfIndexId: 1, fileName: 'own-old.pdf', relativePath: 'A/00/own-old.pdf', isPresent: true, conversionType: 'outlined' };
+    const other = { ...own, pdfIndexId: 2, fileName: 'other-current.pdf', relativePath: 'B/01/other-current.pdf' };
+    const row = { id: 1, productId: 10, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active',
+      model: 'T40', displayName: '外箱', sourceFiles: [], outlinedFiles: [own, other], currentBomUsage: [], readOnly: true,
+      batchUsage: { state: 'current', occurrences: [
+        { batchId: 1, productId: 10, productDirectory: 'A', batchName: '00.首批大货', usageState: 'historical', files: [own] },
+        { batchId: 2, productId: 20, productDirectory: 'B', batchName: '01.20260929', usageState: 'current', files: [other] },
+      ] } };
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [row], total: 1 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row) };
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByText(row.fullCode));
+    expect(await screen.findByText(/未找到当前有效批次的转曲后文件/)).toBeVisible();
+    expect(screen.queryByText('other-current.pdf')).not.toBeVisible();
+    fireEvent.click(screen.getByText('查看历史文件'));
+    expect(screen.getByText('other-current.pdf')).toBeVisible();
+  });
   it.each([true, false])('shows only the current batch outlined file (present=%s) until history is expanded', async (isPresent) => {
     const oldFile = { pdfIndexId: 1, fileName: 'old.pdf', relativePath: '00/old.pdf', isPresent: true, conversionType: 'outlined' };
     const currentFile = { ...oldFile, pdfIndexId: 2, fileName: 'current.pdf', relativePath: '06/current.pdf', isPresent };

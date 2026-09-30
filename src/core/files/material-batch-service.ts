@@ -1,4 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { resolveCurrentMaterialSet, MaterialBatchOrderAmbiguousError } from '../outbound/current-material-set.js';
 import type { DrawingStatus } from '../drawings/drawing-types.js';
 import type { MaterialSetBatchInput } from '../outbound/outbound-types.js';
 import type {
@@ -15,6 +16,7 @@ import type {
 
 interface OccurrenceRow {
   batch_id: number;
+  product_id: number | null;
   product_directory: string;
   batch_name: string;
   sequence_number: number | null;
@@ -107,7 +109,7 @@ export class MaterialBatchService {
     return rows.map((row) => ({ ...row, isPresent: row.isPresent === 1 }));
   }
 
-  getMaterialSetBatches(productId: number, throughBatchId: number): MaterialSetBatchInput[] | null {
+  getMaterialSetBatches(productId: number, throughBatchId: number, productDirectory?: string): MaterialSetBatchInput[] | null {
     const through = this.db.prepare(`select sequence_number as sequenceNumber
       from material_batches
       where id = ? and product_id = ? and is_present = 1 and recognition_status = 'recognized'
@@ -118,7 +120,8 @@ export class MaterialBatchService {
       from material_batches
       where product_id = ? and is_present = 1 and recognition_status = 'recognized'
         and sequence_number is not null and sequence_number <= ?
-      order by sequence_number, id`).all(productId, through.sequenceNumber) as Array<{
+        and (? is null or product_directory = ?)
+      order by sequence_number, id`).all(productId, through.sequenceNumber, productDirectory ?? null, productDirectory ?? null) as Array<{
         id: number; name: string; sequenceNumber: number; businessDate: string | null;
       }>;
     const result = batches.map((batch): MaterialSetBatchInput => ({ ...batch, files: [] }));
@@ -209,7 +212,7 @@ export class MaterialBatchService {
   }
 
   getDrawingUsage(fullCode: string, businessStatus: DrawingStatus): DrawingBatchUsage {
-    const rows = this.db.prepare(`select batch.id as batch_id, batch.product_directory,
+    const rows = this.db.prepare(`select batch.id as batch_id, batch.product_id, batch.product_directory,
         batch.name as batch_name, batch.sequence_number, batch.recognition_status,
         file.id as pdf_index_id, file.file_name, file.relative_path, file.is_present, file.conversion_type
       from pdf_files file
@@ -236,6 +239,7 @@ export class MaterialBatchService {
       if (!occurrence) {
         occurrence = {
           batchId: row.batch_id,
+          productId: row.product_id,
           productDirectory: row.product_directory,
           batchName: row.batch_name,
           sequenceNumber: row.sequence_number,
@@ -264,6 +268,34 @@ export class MaterialBatchService {
         productStates.set(occurrence.productDirectory, occurrence.usageState);
       }
     }
+    const effectiveCurrentFileIds: number[] = [];
+    for (const [directory, selection] of selectionByProduct) {
+      if (selection.status !== 'selected') continue;
+      const productId = occurrences.find((entry) => entry.productDirectory === directory)?.productId;
+      if (productId == null) {
+        effectiveCurrentFileIds.push(...occurrences.filter((entry) => entry.productDirectory === directory && entry.usageState === 'current')
+          .flatMap((entry) => entry.files.filter((file) => file.conversionType === 'outlined').map((file) => file.pdfIndexId)));
+        continue;
+      }
+      const batches = this.getMaterialSetBatches(productId, selection.batchId, directory);
+      if (!batches) continue;
+      try {
+        for (const material of resolveCurrentMaterialSet(batches)) {
+          if (material.fullCode === fullCode && material.pdfIndexId != null && material.status !== 'conflict' && material.status !== 'missing') {
+            // The resolver retains the original change source for identical carried files.
+            // Drawing detail instead opens the newest batch instance of that effective code.
+            const latestInstanceBatch = [...batches].sort((left, right) =>
+              (right.sequenceNumber ?? -1) - (left.sequenceNumber ?? -1))
+              .find((batch) => batch.files.some((file) => file.fullCode === fullCode));
+            effectiveCurrentFileIds.push(...(latestInstanceBatch?.files ?? [])
+              .filter((file) => file.fullCode === fullCode && file.isPresent).map((file) => file.pdfIndexId));
+            if (latestInstanceBatch?.files.some((file) => file.fullCode === fullCode && file.isPresent)) {
+              productStates.set(directory, 'current');
+            }
+          }
+        }
+      } catch (error) { if (!(error instanceof MaterialBatchOrderAmbiguousError)) throw error; }
+    }
     const currentProductCount = [...productStates.values()].filter((state) => state === 'current').length;
     const historicalProductCount = [...productStates.values()].filter((state) => state === 'historical').length;
     const state: BatchUsageState = currentProductCount > 0 ? 'current'
@@ -271,6 +303,7 @@ export class MaterialBatchService {
         : occurrences.length > 0 ? 'indeterminate' : 'unbatched';
     return {
       state,
+      effectiveCurrentFileIds,
       occurrenceCount: occurrences.length,
       currentProductCount,
       historicalProductCount,

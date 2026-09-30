@@ -59,12 +59,12 @@ function toFile(row: FileRow): OutboundIndexedFile {
 export class OutboundPackageRepository {
   constructor(private readonly db: PlannerDatabase) {}
 
-  listCompleted(productId: number) {
+  listCompleted(productId?: number) {
     const packages = this.db.prepare(`select package.id, package.package_name as packageName,
       package.zip_relative_path as zipRelativePath, package.created_at as createdAt,
       (select count(*) from outbound_package_items item where item.package_id = package.id) as fileCount
-      from outbound_packages package where package.product_id = ? and package.status = 'completed'
-      order by package.created_at desc, package.id desc`).all(productId) as Array<Omit<CreatedOutboundPackage, 'parts'>>;
+      from outbound_packages package where (? is null or package.product_id = ?) and package.status = 'completed'
+      order by package.created_at desc, package.id desc`).all(productId ?? null, productId ?? null) as Array<Omit<CreatedOutboundPackage, 'parts'>>;
     const parts = this.db.prepare(`select part_number as partNumber, zip_relative_path as zipRelativePath,
       size_bytes as sizeBytes from outbound_package_parts where package_id = ? order by part_number`);
     return packages.map((item) => ({ ...item, parts: parts.all(item.id) as Array<{

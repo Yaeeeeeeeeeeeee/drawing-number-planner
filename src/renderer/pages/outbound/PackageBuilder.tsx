@@ -46,6 +46,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
   const [busy, setBusy] = useState(false);
   const [bomSelections, setBomSelections] = useState<Record<string, number>>({});
   const [previewDirty, setPreviewDirty] = useState(false);
+  const [allHistory, setAllHistory] = useState(false);
 
   useEffect(() => {
     setBomSelections({});
@@ -143,6 +144,8 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
 
   return (
     <section className="outbound-panel package-builder">
+      <button type="button" className="text-button" onClick={() => setAllHistory((value) => !value)}>{allHistory ? '收起全部外发历史' : '查询全部外发历史（含退出产品）'}</button>
+      {allHistory && <PackageHistory api={api} refreshId={created?.id} />}
       <div className="choice-row" role="group" aria-label="打包模式">
         <label><input type="radio" aria-label="本次变更资料" checked={mode === 'change_only'} onChange={() => { setMode('change_only'); setPreview(null); }} />本次变更资料</label>
         <label><input type="radio" aria-label="当前完整包材资料" checked={mode === 'current_complete'} onChange={() => { setMode('current_complete'); setPreview(null); }} />当前完整包材资料</label>
@@ -192,6 +195,11 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
                 <span>{materialBatchLabel(item.sourceBatchName)}</span>
                 <span className="file-primary">{item.fileName ?? '转曲后文件已缺失'}</span>
                 <span className={`outbound-status ${item.status}`}>{statusLabel[item.status]}</span>
+                {item.bomContext?.status === 'matched' && item.bomContext.changeDetails?.trim()
+                  ? <p>修改明细：{item.bomContext.changeDetails}</p>
+                  : item.bomContext?.status !== 'ambiguous' && <p className="info-banner">
+                    {item.bomContext?.status === 'matched' ? 'BOM 未填写修改明细' : '未找到对应 BOM'}；更新邮件请在“本次变更内容”中补充后再复制外发。
+                  </p>}
                 {item.bomContext?.status === 'ambiguous' && (
                   <label>
                     <span>存在多条 BOM 修改记录，请明确选择后重新预览</span>
