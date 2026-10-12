@@ -186,15 +186,15 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
               <button className="text-button" type="button" onClick={() => setSelected([])}>取消全选</button>
             </div>
           </div>
-          <div className="outbound-file-list" role="table" aria-label="外发文件预览">
+          <div className="outbound-file-list"><table aria-label="外发文件预览"><thead><tr>{['选择','项目','图号','资料批次','文件名','状态','BOM / 说明'].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>
             {preview.items.map((item, index) => (
-              <div className={`outbound-file-row ${!item.selectable ? 'blocked' : ''}`} role="row" key={`${item.slotKey}-${index}`}>
+              <tr className={!item.selectable ? 'blocked' : ''} key={`${item.slotKey}-${index}`}><td>
                 <input type="checkbox" aria-label={`选择 ${item.projectItemName}`} disabled={!item.selectable || !item.pdfFileId} checked={item.pdfFileId ? selected.includes(item.pdfFileId) : false} onChange={() => item.pdfFileId && setSelected((value) => value.includes(item.pdfFileId!) ? value.filter((id) => id !== item.pdfFileId) : [...value, item.pdfFileId!])} />
-                <strong>{item.projectItemName}</strong>
-                <span className="mono">{item.fullCode ?? '图号待确认'}</span>
-                <span>{materialBatchLabel(item.sourceBatchName)}</span>
-                <span className="file-primary">{item.fileName ?? '转曲后文件已缺失'}</span>
-                <span className={`outbound-status ${item.status}`}>{statusLabel[item.status]}</span>
+                </td><td><strong>{item.projectItemName}</strong></td>
+                <td><span className="mono">{item.fullCode ?? '图号待确认'}</span></td>
+                <td>{materialBatchLabel(item.sourceBatchName)}</td>
+                <td className="file-primary">{item.fileName ?? '转曲后文件已缺失'}</td>
+                <td><span className={`outbound-status ${item.status}`}>{statusLabel[item.status]}</span></td><td>
                 {item.bomContext?.status === 'matched' && item.bomContext.changeDetails?.trim()
                   ? <p>修改明细：{item.bomContext.changeDetails}</p>
                   : item.bomContext?.status !== 'ambiguous' && <p className="info-banner">
@@ -218,9 +218,9 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
                     </select>
                   </label>
                 )}
-              </div>
+              </td></tr>
             ))}
-          </div>
+          </tbody></table></div>
           {blockers && <p className="error-banner">存在缺失、冲突或待确认资料，处理后才能打包。</p>}
           {previewDirty && <p className="info-banner">BOM 选择已改变，请重新预览文件。</p>}
           <button className="primary-button" type="button" disabled={busy || previewDirty || blockers || selected.length === 0} onClick={() => void generate()}>生成压缩包</button>

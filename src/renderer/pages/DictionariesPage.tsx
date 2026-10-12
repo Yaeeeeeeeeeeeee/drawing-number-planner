@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import type { DictionaryItemView, PlannerApi } from '../data/client';
 import { DataTable } from '../components/DataTable';
+import { QueryFeedback } from '../components/QueryFeedback';
 import { EmptyState } from '../components/EmptyState';
+import { DictionariesMockPage, isDictionariesMock } from './dictionaries-mock';
 
 const rootTypes = [['brand', '品牌'], ['product_size', '品类尺寸'], ['appearance', '外观'], ['color', '颜色'],
   ['main_category', '主类别']] as const;
@@ -12,15 +14,24 @@ const statusCell = (item: DictionaryItemView) => item.deletedAt ? <span classNam
   ? '启用中' : <span className="status-text inactive">已停用</span>;
 
 export function DictionariesPage({ api }: { api: PlannerApi }) {
+  return isDictionariesMock() ? <DictionariesMockPage/> : <DictionariesWorkspace api={api}/>;
+}
+function DictionariesWorkspace({ api }: { api: PlannerApi }) {
   const [type, setType] = useState<RootDictionaryType>('brand');
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [items, setItems] = useState<DictionaryItemView[]>([]);
   const [projects, setProjects] = useState<DictionaryItemView[]>([]);
   const [selectedMainId, setSelectedMainId] = useState<number | null>(null);
+  const [creatingRoot, setCreatingRoot] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const visibleItems = items.filter(item => (!search.trim() || `${item.code} ${item.name}`.toLowerCase().includes(search.trim().toLowerCase())) && (statusFilter === 'all' || (statusFilter === 'deleted' ? Boolean(item.deletedAt) : !item.deletedAt && item.status === statusFilter)));
   const [code, setCode] = useState(''); const [name, setName] = useState('');
   const [projectCode, setProjectCode] = useState(''); const [projectName, setProjectName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [editing, setEditing] = useState<DictionaryItemView | null>(null); const [editingName, setEditingName] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -29,7 +40,7 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
 
   const load = async () => {
     const generation = ++requestGeneration.current;
-    setItems([]); setProjects([]); setSelectedMainId(null); setEditing(null); setError(''); setLoading(true);
+    setItems([]); setProjects([]); setSelectedMainId(null); setEditing(null); setError(''); setLoadError(''); setLoading(true);
     try {
       if (type === 'main_category') {
         const [mainCategories, projectItems] = await Promise.all([
@@ -43,7 +54,7 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
       if (generation !== requestGeneration.current) return;
       setItems(rootItems);
     } catch (reason) {
-      if (generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : '字典加载失败');
+      if (generation === requestGeneration.current) setLoadError(reason instanceof Error ? reason.message : '字典加载失败');
     } finally { if (generation === requestGeneration.current) setLoading(false); }
   };
   useEffect(() => { void load(); }, [type, includeDeleted]);
@@ -52,7 +63,7 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
     if (next === type) return;
     ++requestGeneration.current;
     setItems([]); setProjects([]); setSelectedMainId(null); setEditing(null); setError(''); setLoading(true);
-    setType(next);
+    setCreatingRoot(false); setCreatingProject(false); setSearch(''); setStatusFilter('all'); setType(next);
   };
 
   const selectedMain = useMemo(() => items.find((item) => item.id === selectedMainId) ?? null, [items, selectedMainId]);
@@ -127,30 +138,30 @@ export function DictionariesPage({ api }: { api: PlannerApi }) {
   };
   const itemActions = (item: DictionaryItemView) => <div className="row-actions">
     <button className="text-button" disabled={pendingId === item.id} aria-label={`修改 ${item.name}`} onClick={() => { setEditing(item); setEditingName(item.name); setConfirmDeleteId(null); setRowFeedback(null); }} type="button">修改</button>
-    {item.status === 'active' && <button className="text-button danger" disabled={pendingId === item.id} aria-label={`停用 ${item.name}`} onClick={() => void deactivate(item.id)} type="button">停用</button>}
+    {item.status === 'active' && <button className="text-button dictionary-stop" disabled={pendingId === item.id} aria-label={`停用 ${item.name}`} onClick={() => void deactivate(item.id)} type="button">停用</button>}
     {item.status === 'inactive' && <button className="text-button" disabled={pendingId === item.id} aria-label={`${item.deletedAt ? '恢复' : '启用'} ${item.name}`} onClick={() => { if (!item.deletedAt || window.confirm(`确认恢复字典 ${item.code} ${item.name}？`)) void activate(item.id); }} type="button">{item.deletedAt ? '恢复记录' : '启用'}</button>}
     {!item.deletedAt && <button className="text-button danger" disabled={pendingId === item.id} aria-label={`删除 ${item.name}`} onClick={() => { setConfirmDeleteId(item.id); setEditing(null); setRowFeedback(null); }} type="button">删除</button>}
   </div>;
   const dictionaryEditor = (item: DictionaryItemView) => editing?.id === item.id || confirmDeleteId === item.id || rowFeedback?.id === item.id ? <div className="record-inline-panel panel-enter">
-    {editing?.id === item.id && <form className="editor-strip" onSubmit={saveName}>
+    {editing?.id === item.id && <form className="editor-strip dictionary-name-editor" onSubmit={saveName}>
       <p className="muted-text">编码锁定：{item.code}</p>
       <label><span>修改名称</span><input aria-label="修改名称" value={editingName} onChange={(event) => setEditingName(event.target.value)} required /></label>
       <div className="form-actions"><button className="text-button" type="button" onClick={() => setEditing(null)}>取消</button><button className="primary-button" disabled={pendingId === item.id} type="submit">{pendingId === item.id ? '保存中…' : '保存名称'}</button></div>
     </form>}
-    {confirmDeleteId === item.id && <div className="inline-confirm" role="alert"><p>确认删除“{item.code} {item.name}”？未引用的编码会物理删除；已引用的编码退出正常列表并保留历史身份，不改变历史图号或占号。</p>
+    {confirmDeleteId === item.id && <div className="inline-confirm" role="alert"><p>确认删除“{item.code} {item.name}”？未引用的编码会物理删除；已引用的编码退出正常列表并保留历史身份，不改变历史图号或占号。当前接口未提供独立引用预检，实际影响由服务在确认时核对；失败不表示删除成功。</p>
       <div className="form-actions"><button className="text-button" type="button" onClick={() => setConfirmDeleteId(null)}>取消</button><button className="primary-button danger" disabled={pendingId === item.id} type="button" onClick={() => void deleteItem(item)}>{pendingId === item.id ? '删除中…' : '确认删除'}</button></div></div>}
     {rowFeedback?.id === item.id && <p className={rowFeedback.kind === 'error' ? 'error-banner' : 'success-banner'}>{rowFeedback.message}</p>}
   </div> : null;
   const dictionaryTable = (source: DictionaryItemView[], options?: { selectMain?: boolean }) => <DataTable items={source} columns={[
     { key: 'code', label: '编码', render: (item) => <strong className="mono">{item.code}</strong> },
     { key: 'name', label: '名称', render: (item) => item.name }, { key: 'status', label: '状态', render: statusCell },
-    ...(options?.selectMain ? [{ key: 'detail', label: '项目明细', render: (item: DictionaryItemView) => <button className="text-button" aria-label={`查看 ${item.name} 的项目明细`} onClick={() => setSelectedMainId(item.id)} type="button">查看</button> }] : []),
+    ...(options?.selectMain ? [{ key: 'detail', label: '项目明细', render: (item: DictionaryItemView) => <button className="text-button" aria-label={`查看 ${item.name} 的项目明细`} aria-pressed={selectedMainId === item.id} onClick={() => { setSelectedMainId(item.id); setCreatingProject(false); }} type="button">查看</button> }] : []),
     { key: 'action', label: '操作', render: itemActions },
   ]} renderExpandedRow={dictionaryEditor} />;
   const mainCategoryView = <div className="dictionary-hierarchy">
-    <section className="dictionary-master"><h2>主类别</h2><p>电子元件类、铭牌类、提示贴纸类、印刷件类、包装类等在这里维护。</p><form className="inline-form" onSubmit={createRoot}><label><span>主类别编码</span><input aria-label="主类别编码" value={code} onChange={(event) => setCode(event.target.value)} required /></label><label><span>主类别名称</span><input aria-label="主类别名称" value={name} onChange={(event) => setName(event.target.value)} required /></label><button className="primary-button" type="submit">新增主类别</button></form>{items.length === 0 ? <EmptyState title="还没有主类别" description="先建立业务分类，再维护其项目明细。" symbol="＋" /> : dictionaryTable(items, { selectMain: true })}</section>
-    <section className="dictionary-detail"><h2>项目明细{selectedMain ? ` · ${selectedMain.name}` : ''}</h2>{selectedMain ? <><p>项目明细按所选主类别归属；停用类别仍可查阅历史项目，但不能新增。</p><form className="inline-form" onSubmit={createProject}><label><span>项目明细编码</span><input aria-label="项目明细编码" value={projectCode} onChange={(event) => setProjectCode(event.target.value)} disabled={selectedMain.status !== 'active'} required /></label><label><span>项目明细名称</span><input aria-label="项目明细名称" value={projectName} onChange={(event) => setProjectName(event.target.value)} disabled={selectedMain.status !== 'active'} required /></label><button className="primary-button" type="submit" disabled={selectedMain.status !== 'active'}>新增项目明细</button></form>{selectedProjects.length === 0 ? <p className="muted-text">该主类别暂无项目明细。</p> : dictionaryTable(selectedProjects)}</> : <p className="muted-text">请在左侧主类别中选择一项，查看并维护对应项目明细。</p>}
+    <section className="dictionary-master"><h2>主类别</h2><p>电子元件类、铭牌类、提示贴纸类、印刷件类、包装类等在这里维护。</p>{creatingRoot && <form className="inline-form dictionary-create" onSubmit={createRoot}><label><span>主类别编码</span><input aria-label="主类别编码" value={code} onChange={(event) => setCode(event.target.value)} required /></label><label><span>主类别名称</span><input aria-label="主类别名称" value={name} onChange={(event) => setName(event.target.value)} required /></label><button className="primary-button" type="submit">新增主类别</button><button className="secondary-button" type="button" onClick={() => setCreatingRoot(false)}>取消新增</button></form>}{items.length === 0 ? <EmptyState title="还没有主类别" description="先建立业务分类，再维护其项目明细。" symbol="＋" /> : <div className="dictionary-parent-list">{visibleItems.map(item => <button type="button" className="dictionary-parent" key={item.id} aria-label={`查看 ${item.name} 的项目明细`} aria-pressed={selectedMainId === item.id} onClick={() => { setSelectedMainId(item.id); setCreatingProject(false); setEditing(null); setConfirmDeleteId(null); }}><strong>{item.code}</strong><span>{item.name}</span><small>{item.deletedAt ? '已删除' : item.status === 'active' ? '启用中' : '已停用'}</small></button>)}</div>}</section>
+    <section className="dictionary-detail"><h2>项目明细{selectedMain ? ` · ${selectedMain.name}` : ''}</h2>{selectedMain ? <><div className="dictionary-parent-actions">{itemActions(selectedMain)}</div>{dictionaryEditor(selectedMain)}<p>项目明细按所选主类别归属；停用类别仍可查阅历史项目，但不能新增。</p><button className="secondary-button" type="button" disabled={selectedMain.status !== 'active'} title={selectedMain.status !== 'active' ? '停用主类别不能新增项目明细' : undefined} onClick={() => setCreatingProject(!creatingProject)}>新增项目明细</button>{creatingProject && <form className="inline-form dictionary-create" onSubmit={createProject}><label><span>项目明细编码</span><input aria-label="项目明细编码" value={projectCode} onChange={(event) => setProjectCode(event.target.value)} disabled={selectedMain.status !== 'active'} required /></label><label><span>项目明细名称</span><input aria-label="项目明细名称" value={projectName} onChange={(event) => setProjectName(event.target.value)} disabled={selectedMain.status !== 'active'} required /></label><button className="primary-button" type="submit" disabled={selectedMain.status !== 'active'}>保存项目明细</button><button className="secondary-button" type="button" onClick={() => setCreatingProject(false)}>取消新增</button></form>}{selectedProjects.length === 0 ? <p className="muted-text">该主类别暂无项目明细。</p> : dictionaryTable(selectedProjects)}</> : <p className="muted-text">请在主类别列表中选择一项，查看并维护对应项目明细。</p>}
     </section>
   </div>;
-  return <section className="page-surface page-enter"><header className="page-header"><div><p className="eyebrow">CODE DICTIONARIES</p><h1>编码字典</h1><p>删除已引用编码只退出正常列表，历史身份仍保留。</p></div></header><label className="choice-row"><input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />显示已删除字典记录</label><div className="segmented-tabs" role="tablist">{rootTypes.map(([value, label]) => <button role="tab" aria-selected={type === value} onClick={() => selectType(value)} key={value}>{label}</button>)}</div>{loading ? <p className="dictionary-loading" role="status">正在加载字典…</p> : type === 'main_category' ? mainCategoryView : <><form className="inline-form" onSubmit={createRoot}><label><span>编码</span><input value={code} onChange={(event) => setCode(event.target.value)} required /></label><label><span>名称</span><input value={name} onChange={(event) => setName(event.target.value)} required /></label><button className="primary-button" type="submit">新增编码</button></form>{items.length === 0 ? <EmptyState title="当前字典暂无数据" description="可在上方录入第一条正式编码。" symbol="＋" /> : dictionaryTable(items)}</>}{error && <p className="error-banner">{error}</p>}</section>;
+  return <section className="page-surface page-enter dictionaries-real-page"><header className="page-header"><div><h1>编码字典</h1><p>删除已引用编码只退出正常列表，历史身份仍保留。</p></div></header><label className="choice-row"><input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />显示已删除字典记录</label><div className="segmented-tabs" role="tablist">{rootTypes.map(([value, label]) => <button role="tab" aria-selected={type === value} onClick={() => selectType(value)} key={value}>{label}</button>)}</div><div className="dictionary-tools"><label>搜索编码或名称<input aria-label="搜索编码或名称" value={search} onChange={e => setSearch(e.target.value)}/></label><label>状态<select aria-label="字典状态" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="all">全部状态</option><option value="active">启用中</option><option value="inactive">已停用</option><option value="deleted">已删除</option></select></label><span>{visibleItems.length} / {items.length} 项</span><button className="primary-button" disabled={loading || Boolean(loadError)} type="button" onClick={() => setCreatingRoot(!creatingRoot)}>{type === 'main_category' ? '新增主类别' : '新增'}</button></div>{loading || loadError ? <QueryFeedback state={loading ? 'loading' : 'failed'} error={loadError} onRetry={() => void load()}/> : type === 'main_category' ? mainCategoryView : <>{creatingRoot && <form className="inline-form dictionary-create" onSubmit={createRoot}><label><span>编码</span><input value={code} onChange={(event) => setCode(event.target.value)} required /></label><label><span>名称</span><input value={name} onChange={(event) => setName(event.target.value)} required /></label><button className="primary-button" type="submit">新增编码</button><button className="secondary-button" type="button" onClick={() => setCreatingRoot(false)}>取消新增</button></form>}{items.length === 0 ? <EmptyState title="当前字典暂无数据" description="可在上方录入第一条正式编码。" symbol="＋" /> : visibleItems.length ? dictionaryTable(visibleItems) : <p>没有符合筛选条件的记录。</p>}</>}{error && <p className="error-banner">{error}</p>}</section>;
 }

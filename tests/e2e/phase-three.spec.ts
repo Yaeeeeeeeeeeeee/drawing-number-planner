@@ -48,7 +48,7 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   const bomRow = page.getByRole('row').filter({ hasText: '2026-09-02' }).filter({ hasText: 'ZC100' });
   await expect(bomRow).toHaveCount(1);
   await bomRow.getByRole('button', { name: /^查看 BOM / }).click();
-  await expect(page.getByRole('region', { name: 'BOM 历史明细' })).toContainText(fullCode);
+  await expect(page.getByRole('region', { name: '所选 BOM 记录' })).toContainText(fullCode);
   await bomRow.getByRole('button', { name: /^编辑 BOM / }).click();
   await expect(page.getByRole('heading', { name: '编辑所选 BOM' })).toBeVisible();
   await page.getByLabel('第 1 行材质').fill('亚银特多龙 银底黑字');
@@ -61,7 +61,7 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   const editedRow = page.getByRole('row').filter({ hasText: '2026-09-02' }).filter({ hasText: 'ZC100' });
   await expect(editedRow).toHaveCount(1);
   await editedRow.getByRole('button', { name: /^查看 BOM / }).click();
-  const details = page.getByRole('region', { name: 'BOM 历史明细' });
+  const details = page.getByRole('region', { name: '所选 BOM 记录' });
   await expect(details).toContainText('亚银特多龙 银底黑字');
   await expect(details).toContainText('宽45.5mm × 高34.5mm');
   await expect(details).toContainText('本体背部下侧');

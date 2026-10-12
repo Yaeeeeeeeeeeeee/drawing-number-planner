@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BomArchiveCandidateView, PlannerApi } from '../../data/client';
-export function BomArchivePanel({ api }: { api: PlannerApi }) {
+export function BomArchivePanel({ api, previewOnly = false }: { api: PlannerApi; previewOnly?: boolean }) {
   const [items, setItems] = useState<BomArchiveCandidateView[]>([]);
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState('');
   const running = useRef(false); const cancelled = useRef(false);
   useEffect(() => () => { cancelled.current = true; }, []);
   const inspect = async () => {
-    if (running.current) return; setBusy(true); setMessage('');
+    if (previewOnly || running.current) return; setBusy(true); setMessage('');
     try { setItems(await api.previewBomAssetArchive()); }
     catch (error) { setMessage(error instanceof Error ? error.message : '检查失败'); }
     finally { setBusy(false); }
   };
   const migrate = async () => {
-    if (running.current || !window.confirm('将复制并校验附件后更新 BOM 关联。旧文件不会移动或删除。是否继续？')) return;
+    if (previewOnly || running.current || !window.confirm('将复制并校验附件后更新 BOM 关联。旧文件不会移动或删除。是否继续？')) return;
     running.current = true; cancelled.current = false; setBusy(true);
     let completed = 0; const errors: string[] = [];
     try {
@@ -27,9 +27,9 @@ export function BomArchivePanel({ api }: { api: PlannerApi }) {
   };
   return <details className="bom-archive-panel"><summary>旧 BOM 附件归档</summary>
     <p>复制 → 校验 → 更新关联。保留原文件；缺少业务日期或文件的项目不会切换关联。</p>
-    <button type="button" disabled={busy} onClick={() => void inspect()}>检查旧附件归档</button>
+    <button type="button" disabled={busy || previewOnly} onClick={() => void inspect()}>检查旧附件归档</button>
     {items.length > 0 && <><ul>{items.map((item) => <li key={item.linkId}>{item.model} · {item.businessDate ?? '日期未补录'} · {item.project}<div style={{ overflowWrap: 'anywhere' }}>{item.relativePath}</div></li>)}</ul>
-      <button type="button" disabled={busy} onClick={() => void migrate()}>开始复制并归档 {items.length} 项</button></>}
+      <button type="button" disabled={busy || previewOnly} onClick={() => void migrate()}>开始复制并归档 {items.length} 项</button></>}
     {busy && running.current && <button type="button" onClick={() => { cancelled.current = true; }}>取消剩余迁移</button>}
     {message && <p role="status">{message}</p>}
   </details>;

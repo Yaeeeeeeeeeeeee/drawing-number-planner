@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { BomPage, localBusinessDateToday } from '../../src/renderer/pages/BomPage';
@@ -216,7 +216,8 @@ describe('BomPage product-level BOM', () => {
   it('keeps voided drawings visible for replacement without exposing historical QR editing', async () => {
     const api = apiFixture(); api.getCurrentBom.mockResolvedValue(currentWithReferences); api.listBomCandidates.mockResolvedValue([]);
     render(<BomPage api={api as never} />); await selectProduct(false);
-    expect(await screen.findByRole('option', { name: /作废，需替换/ })).toBeDisabled();
+    expect(await screen.findByRole('option', { name: candidate.fullCode })).toBeDisabled();
+    expect(screen.getByText('正式规划 · 作废，需替换')).toBeVisible();
     expect(screen.getByText('当前引用图号已作废，请选择可用图号替换后再保存。')).toBeVisible();
     expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeDisabled();
     expect(screen.queryByLabelText('第 1 行停用二维码 9')).not.toBeInTheDocument();
@@ -226,7 +227,7 @@ describe('BomPage product-level BOM', () => {
     const api = apiFixture();
     api.getCurrentBom.mockResolvedValue(activeCurrent); render(<BomPage api={api as never} />); await selectProduct(false);
     expect(await screen.findByLabelText('第 1 行沿用图片')).toBeChecked();
-    expect(screen.getByText('沿用上一次 BOM：客户示意图.png')).toBeVisible();
+    expect(screen.getByLabelText('第 1 行沿用图片')).toBeChecked();
     const replacement = new File(['new'], '新版图片.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('第 1 行图片'), { target: { files: [replacement] } });
     await waitFor(() => expect(api.uploadBomAsset).toHaveBeenCalledWith(1, replacement));
@@ -252,11 +253,11 @@ describe('BomPage product-level BOM', () => {
     const api = apiFixture(); api.listDictionaries.mockResolvedValue([project, secondProject]);
     api.getCurrentBom.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], qrCodes: [{ id: 9, name: '说明书二维码', purposeDisplayName: '说明书', status: 'active' as const }] }] });
     render(<BomPage api={api as never} />); await selectProduct(false);
-    await screen.findByText('沿用上一次 BOM：客户示意图.png');
+    await screen.findByLabelText('第 1 行沿用图片');
     fireEvent.change(screen.getByLabelText('第 1 行项目明细'), { target: { value: '8' } });
     await waitFor(() => expect(api.listBomCandidates).toHaveBeenLastCalledWith({ productId: 1, projectItemId: 8, usesWhiteMaterial: false, entryMode: 'current' }));
     expect(screen.getByLabelText('第 1 行图号')).toHaveValue('');
-    expect(screen.queryByText('客户示意图.png')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: '第 1 行图片附件' })).queryByText('客户示意图.png')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('第 1 行沿用图片')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('第 1 行二维码 9')).not.toBeInTheDocument();
   });
@@ -305,7 +306,7 @@ describe('BomPage product-level BOM', () => {
     const api = apiFixture(); const desktopAction = vi.fn().mockResolvedValue({ ok: true });
     window.plannerDesktop = { showBomAssetInFolder: desktopAction } as never;
     api.queryBomVersions.mockResolvedValue([activeCurrent]);
-    api.getBomVersion.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], assets: [{ ...asset, assetId: 31,
+    api.getBomVersion.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], assets: [{ ...asset, assetId: 31, role: 'image', inheritedFromBomItemAssetId: null,
       relativePath: '_图号规划器\\BOM附件\\SKU\\一段非常长但必须完整显示且允许自动换行的文件夹\\客户示意图.png' }] }] });
     render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '查询' })).toBeEnabled());

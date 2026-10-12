@@ -24,7 +24,8 @@ describe('ImportPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
 
     expect(await screen.findByText('发现 1 个问题')).toBeVisible();
-    expect(screen.getAllByText('0209')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
+    expect(screen.getAllByText('0209')).toHaveLength(1);
     expect(screen.getByText('SAMKYO')).toBeVisible();
   });
 
@@ -46,6 +47,7 @@ describe('ImportPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
 
     expect(await screen.findByText('可导入 2 条')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
     fireEvent.click(screen.getByRole('button', { name: '全选可导入项' }));
     expect(screen.getByText('已选择 2 条')).toBeVisible();
     expect(screen.getByLabelText('选择 SAMKYO')).toBeChecked();
@@ -79,6 +81,7 @@ describe('ImportPage', () => {
     fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
     expect(await screen.findByText('可导入 2 条')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
     fireEvent.click(screen.getByLabelText('选择 SAMKYO'));
     fireEvent.click(screen.getByLabelText('选择 白色'));
     expect(screen.getByText('已选择 2 条')).toBeVisible();
@@ -110,6 +113,7 @@ describe('ImportPage', () => {
     fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
     expect(await screen.findByText('可导入 1 条')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
     fireEvent.click(screen.getByRole('button', { name: '全选可导入项' }));
     fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
 
@@ -137,6 +141,7 @@ describe('ImportPage', () => {
     fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
     expect(await screen.findByText('可导入 2 条')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
     fireEvent.click(screen.getByLabelText('选择 SAMKYO'));
     fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
 

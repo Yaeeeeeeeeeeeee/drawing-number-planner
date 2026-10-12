@@ -36,8 +36,8 @@ async function completeFirstRow() {
   fireEvent.change(await screen.findByLabelText('产品型号'), { target: { value: '1' } });
   fireEvent.change(screen.getByLabelText('外观'), { target: { value: '3' } });
   fireEvent.change(screen.getByLabelText('第 1 行主类别'), { target: { value: '5' } });
-  expect(screen.getByRole('option', { name: 'LOGO' })).toBeVisible();
-  expect(screen.queryByRole('option', { name: '纸箱' })).not.toBeInTheDocument();
+  expect(screen.getByRole('option', { name: '01 · LOGO' })).toBeVisible();
+  expect(screen.queryByRole('option', { name: '01 · 纸箱' })).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('第 1 行项目明细'), { target: { value: '6' } });
   fireEvent.change(screen.getByLabelText('第 1 行颜色'), { target: { value: '4' } });
 }
@@ -57,7 +57,7 @@ describe('PlanningPage', () => {
       productId: 1, appearanceId: 3,
       rows: [expect.objectContaining({ clientId: 'row-1', expectedFullCode: '02.0404.010.0401001' })],
     })));
-    expect(await screen.findByText('已成功占用 1 个图号')).toBeVisible();
+    expect(await screen.findByText('已成功占用 1 个图号 · 正式保存')).toBeVisible();
   });
 
   it('adds and removes batch rows without allowing an incomplete preview', async () => {

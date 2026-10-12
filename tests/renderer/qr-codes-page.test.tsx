@@ -56,8 +56,8 @@ describe('QrCodesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '查看 Q100 使用说明' }));
     expect(await screen.findByRole('heading', { name: 'Q100 使用说明' })).toBeVisible();
     expect(screen.getByText('业务状态')).toBeVisible();
-    expect(screen.getByText('启用中')).toBeVisible();
-    expect(screen.getByText('文件状态')).toBeVisible();
+    expect(screen.getAllByText('启用中')[0]).toBeVisible();
+    expect(screen.getAllByText('文件状态')[0]).toBeVisible();
     expect(screen.getAllByText('文件可用').length).toBeGreaterThan(0);
     expect(screen.getByText('创建时间')).toBeVisible();
     expect(screen.getByText('更新时间')).toBeVisible();
@@ -72,6 +72,12 @@ describe('QrCodesPage', () => {
     render(<QrCodesPage api={api as never} initialQrCodeId={mixed.id} />);
 
     expect(await screen.findByText('部分缺失')).toBeVisible();
+    expect(screen.getByText('部分已匹配 · 仍有待确认')).toBeVisible();
+    expect(screen.getAllByRole('button', { name: '查看文件' })[1]).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '打开所在位置' })[1]).toBeDisabled();
+    expect(screen.getByRole('button', { name: '关联此文件' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '关联此文件' }));
+    expect(api.associateQrFile).not.toHaveBeenCalled();
   });
 
   it('groups QR purposes under one product row and keeps filter choices after narrowing results', async () => {
@@ -102,9 +108,10 @@ describe('QrCodesPage', () => {
   });
 
   it('saves metadata and manually associates a pending file without changing the business status', async () => {
-    const associated = { ...manual, files: [...manual.files, { ...manual.pendingFiles[0], isPresent: false, matchStatus: 'matched' }], pendingFiles: [] };
-    const api = { listQrCodes: vi.fn().mockResolvedValue({ items: [manual] }), getQrCode: vi.fn().mockResolvedValue(manual),
-      updateQrCode: vi.fn().mockResolvedValue({ ...manual, name: '新版说明书' }), activateQrCode: vi.fn(), deactivateQrCode: vi.fn(),
+    const available = { ...manual, pendingFiles: [{ ...manual.pendingFiles[0], isPresent: true }] };
+    const associated = { ...available, files: [...manual.files, { ...available.pendingFiles[0], matchStatus: 'matched' }], pendingFiles: [] };
+    const api = { listQrCodes: vi.fn().mockResolvedValue({ items: [available] }), getQrCode: vi.fn().mockResolvedValue(available),
+      updateQrCode: vi.fn().mockResolvedValue({ ...available, name: '新版说明书' }), activateQrCode: vi.fn(), deactivateQrCode: vi.fn(),
       associateQrFile: vi.fn().mockResolvedValue(associated) };
     render(<QrCodesPage api={api as never} initialQrCodeId={manual.id} />);
 

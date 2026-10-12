@@ -73,10 +73,22 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
       const result = await invoke.call(desktop);
       if (!result.ok) throw new Error(result.error?.message ?? '恢复操作失败');
       if (action === 'restartService') resetApiSession();
-      if (mounted.current) setMessage(action === 'terminateTask' && !result.cancelled ? '当前没有可终止的任务' : '操作已完成');
+      let feedback = '操作已执行，最终结果尚未验证';
+      if (action === 'terminateTask') feedback = result.cancelled === true
+        ? '终止请求已受理，任务是否终止尚未验证'
+        : result.cancelled === false ? '当前没有可终止的任务，未执行终止操作' : '终止操作已返回，任务终止结果无法确认';
+      if (action === 'reloadRenderer') feedback = '已执行界面重新加载，重新加载结果尚未验证';
+      if (action === 'relaunchApp') feedback = '已执行应用重启，重启后的状态尚未验证';
+      if (action === 'restartService') {
+        try {
+          const health = await api.checkServiceHealth();
+          feedback = health.status === 'ok' ? '本地服务已恢复，健康检查通过' : '服务重启已执行，健康检查未通过';
+        } catch { feedback = '服务重启已执行，恢复结果无法确认：健康检查失败'; }
+      }
+      if (mounted.current) setMessage(feedback);
       await refresh();
     } catch (error) {
-      if (mounted.current) setMessage(error instanceof Error ? error.message : '恢复操作失败');
+      if (mounted.current) setMessage(`操作失败：${error instanceof Error ? error.message : '恢复操作失败'}`);
     } finally {
       if (mounted.current) setBusy(null);
     }
@@ -94,13 +106,13 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
       : status.activeTask ? `正在${status.activeTask.progress?.message || '处理任务'}…` : '系统正常';
   const statusBusy = status.service === 'starting' || Boolean(status.activeTask);
 
-  return <div className="safe-recovery">
+  return <div className="safe-recovery integrated-recovery">
     <div className={`system-status ${serviceUnavailable ? 'failed' : statusBusy ? 'busy' : ''}`}>
       <span className="connection-dot" />{statusText}
     </div>
     <button className="safe-recovery-trigger" type="button" onClick={() => setOpen((value) => !value)}>安全恢复</button>
     {open && <section className="safe-recovery-panel" aria-label="安全恢复面板">
-      <strong>安全恢复</strong>
+      <div className="integrated-recovery-heading"><strong>安全恢复</strong><button type="button" disabled={Boolean(busy)} onClick={() => setOpen(false)}>关闭</button></div>
       {!desktop && <p className="desktop-only-note">安全恢复仅在 Windows 桌面版可用</p>}
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('terminateTask')}>终止当前任务</button>
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('reloadRenderer')}>重新加载界面</button>

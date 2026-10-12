@@ -3,7 +3,11 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductQrCodeView, ProductView } from '../data/client';
 import { ProductCleanupPanel } from '../components/ProductCleanupPanel';
 import { DataTable } from '../components/DataTable';
+import { QueryFeedback, type QueryState } from '../components/QueryFeedback';
 import { EmptyState } from '../components/EmptyState';
+import { isProductsMockEnabled } from './products/products-mock';
+import { ProductsMockPage } from './products/ProductsMockPage';
+import { ProductBomRoundtripMock } from './products/ProductBomRoundtripMock';
 
 const blank = { sku: '', model: '', productCategory: '', brandId: '', productSizeId: '', defaultAppearanceId: '', referenceProductId: '' };
 const blankHistorical = { brandId: '', productSizeId: '', defaultAppearanceId: '' };
@@ -13,7 +17,15 @@ const sameCandidate = (left: HistoricalProductCandidateView, right: HistoricalPr
 const qrLabel = (item: ProductQrCodeView) => ({ user_manual: '说明书', warranty: '售后', recipe: '菜谱' }[item.key] ?? item.displayName);
 
 export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id: number) => void }) {
+  return isProductsMockEnabled() ? new URLSearchParams(window.location.search).get('flow') === 'bom' ? <ProductBomRoundtripMock/> : <ProductsMockPage/> : <ProductsWorkspace api={api} onOpenQr={onOpenQr}/>;
+}
+function ProductsWorkspace({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id: number) => void }) {
+  const [queryState, setQueryState] = useState<QueryState>('idle');
+  const [queryError, setQueryError] = useState('');
+  const [queriedFilters, setQueriedFilters] = useState<Record<string, string | number>>({ status: 'all' });
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [items, setItems] = useState<ProductView[]>([]);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [cleanupId, setCleanupId] = useState<number | null>(null);
   const [allProducts, setAllProducts] = useState<ProductView[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -36,8 +48,9 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
   const [qrCodes, setQrCodes] = useState<ProductQrCodeView[]>([]);
 
   const load = async (filters: Record<string, string | number> = { status: 'all' }) => {
-    try { setItems(await api.listProducts(filters)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '产品档案加载失败'); }
+    setQueryState('loading'); setQueryError(''); setQueriedFilters(filters);
+    try { setItems(await api.listProducts(filters)); setQueryState('ready'); }
+    catch (reason) { setQueryState('failed'); setQueryError(reason instanceof Error ? reason.message : '产品档案加载失败'); }
   };
   const refreshProductQrCodes = async (productId: number) => {
     const listQrCodes = (api as Partial<PlannerApi>).listQrCodes;
@@ -46,7 +59,8 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
     setQrCodes((current) => [...current.filter((item) => item.productId !== productId), ...result.items]);
   };
 
-  useEffect(() => {
+  const loadInitial = () => {
+    setQueryState('loading'); setQueryError('');
     void Promise.all([
       api.listProducts({ status: 'all' }),
       api.listDictionaries('brand', false),
@@ -55,9 +69,10 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
       typeof (api as Partial<PlannerApi>).listQrCodes === 'function' ? api.listQrCodes() : Promise.resolve({ items: [] as ProductQrCodeView[] }),
     ]).then(([products, brandItems, sizeItems, appearanceItems, qrCodeResult]) => {
       setItems(products); setAllProducts(products); setBrands(brandItems); setSizes(sizeItems); setAppearances(appearanceItems);
-      setQrCodes(qrCodeResult.items);
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : '产品档案加载失败'));
-  }, []);
+      setQrCodes(qrCodeResult.items); setInitialLoaded(true); setQueryState('ready');
+    }).catch((reason) => { setQueryState('failed'); setQueryError(reason instanceof Error ? reason.message : '产品档案加载失败'); });
+  };
+  useEffect(() => { loadInitial(); }, []);
 
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const openCreate = () => { setEditingId(null); setForm(blank); setEditorOpen(true); };
@@ -144,7 +159,7 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
     <label><span>参考来源型号</span><select aria-label="参考来源型号" value={form.referenceProductId} onChange={(event) => set('referenceProductId', event.target.value)}><option value="">不指定</option>{allProducts.filter((item) => item.id !== editingId && item.status === 'active').map((item) => <option value={item.id} key={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
   </div><div className="form-actions"><button className="text-button" onClick={() => setEditorOpen(false)} type="button">取消</button><button className="primary-button" type="submit">{editingId ? '保存修改' : '保存产品'}</button></div></form>;
 
-  return <section className="page-surface page-enter">
+  return <section className="page-surface page-enter products-integrated">
     <header className="page-header"><div><p className="eyebrow">PRODUCT ARCHIVE</p><h1>产品档案</h1><p>产品档案是图号、BOM 与 PDF 记录共用的产品身份来源。</p></div>
       <div className="header-actions"><button className="secondary-button" onClick={() => void openHistoricalCandidates()} type="button">从资料库识别历史产品</button><button className="primary-button" onClick={openCreate} type="button">新建产品</button></div>
     </header>
@@ -175,15 +190,12 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
       {historicalMessage && <p className="success-banner">{historicalMessage}</p>}
     </section>}
     {error && <p className="error-banner">{error}</p>}
-    {items.length === 0 ? <EmptyState title="还没有产品档案" description="先完成编码字典，再创建首个产品型号。" symbol="品" /> :
+    {queryState !== 'ready' ? <QueryFeedback state={queryState} error={queryError} onRetry={() => initialLoaded ? void load(queriedFilters) : loadInitial()}/> : items.length === 0 ? <EmptyState title={Object.entries(queriedFilters).some(([key,value]) => key === 'status' ? value !== 'all' : Boolean(value)) ? '没有符合筛选条件的产品' : '还没有产品档案'} description="先完成编码字典，再创建首个产品型号。" symbol="品" /> :
       <DataTable items={items} columns={[
         { key: 'sku', label: 'SKU', render: (item) => <strong>{item.sku ?? '待补录'}</strong> },
         { key: 'model', label: '型号', render: (item) => item.model },
         { key: 'brand', label: '品牌', render: (item) => item.brandName },
         { key: 'category', label: '产品类别', render: (item) => item.productCategory },
-        { key: 'size', label: '品类尺寸', render: (item) => item.productSizeName },
-        { key: 'appearance', label: '默认外观', render: (item) => item.defaultAppearanceName ?? '—' },
-        { key: 'reference', label: '参考型号', render: (item) => item.referenceProductModel ?? '—' },
         { key: 'qr', label: '二维码', render: (item) => {
           const records = qrCodes.filter((code) => code.productId === item.id);
           return records.length === 0 ? '—' : <div className="product-qr-summary">{records.map((code) => <button className="text-button" key={code.id} type="button"
@@ -191,11 +203,11 @@ export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (i
             onClick={() => onOpenQr?.(code.id)} disabled={!onOpenQr}><span>{qrLabel(code)}</span><span className={`status-text ${code.status}`}>{code.status === 'active' ? '启用中' : '已停用'}</span></button>)}</div>;
         } },
         { key: 'status', label: '状态', render: (item) => item.status === 'active' ? '启用中' : '已停用' },
-        { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active'
+        { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" type="button" aria-label={`详情 ${item.model}`} onClick={() => { setDetailId(detailId === item.id ? null : item.id); setCleanupId(null); setEditorOpen(false); }}>详情</button><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active'
           ? <button className="text-button danger" aria-label={`停用 ${item.model}`} onClick={() => void deactivate(item)} type="button">停用</button>
           : <button className="text-button" aria-label={`启用 ${item.model}`} onClick={() => void activate(item)} type="button">启用</button>}<button className="text-button danger" aria-label={`删除 ${item.model}`} onClick={() => void deleteProduct(item)} type="button">删除</button></div> },
       ]} renderExpandedRow={(item) => cleanupId === item.id
         ? <ProductCleanupPanel key={item.id} api={api} productId={item.id} onCancel={() => setCleanupId(null)} onComplete={() => cleanupComplete(item.id)} />
-        : editorOpen && editingId === item.id ? productEditor : null} />}
+        : editorOpen && editingId === item.id ? productEditor : detailId === item.id ? <div className="product-integrated-detail"><dl>{[['品类尺寸',item.productSizeName],['默认外观',item.defaultAppearanceName ?? '不指定'],['参考型号',item.referenceProductModel ?? '不指定']].map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><table className="product-detail-qr"><thead><tr><th>用途</th><th>业务状态</th><th>文件状态</th><th>操作</th></tr></thead><tbody>{qrCodes.filter(code=>code.productId===item.id).map(code=><tr key={code.id}><td>{qrLabel(code)}</td><td><span className={`status-text ${code.status}`}>{code.status==='active'?'启用中':'已停用'}</span></td><td>{!code.files.length?'未关联文件':code.files.every(file=>file.isPresent)?'文件可用':code.files.some(file=>file.isPresent)?'部分文件缺失':'文件已缺失'}</td><td><button type="button" className="text-button" disabled={!onOpenQr} onClick={()=>onOpenQr?.(code.id)}>查看二维码</button></td></tr>)}</tbody></table><p>产品资料与二维码入口保留在对应记录；退出当前业务保留历史身份和实际文件。</p><button className="text-button danger" type="button" aria-label={`删除档案 ${item.model}`} onClick={() => void deleteProduct(item)}>删除档案</button></div> : null} />}
   </section>;
 }

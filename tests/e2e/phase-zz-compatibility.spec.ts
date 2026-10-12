@@ -80,7 +80,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await page.getByLabel('完整图号').fill('02.0404.010.0401007');
   await page.getByRole('button', { name: '检索', exact: true }).click();
   const historicalRow = page.getByRole('row').filter({ hasText: '02.0404.010.0401007' });
-  await expect(historicalRow.getByText('源文件缺失 · 转曲后缺失', { exact: true })).toBeVisible();
+  await expect(historicalRow.locator('.integrity-missing')).toHaveCount(2);
 
   await page.getByRole('button', { name: /图号规划/ }).click();
   await page.getByLabel('产品型号').selectOption({ label: 'SAMKYO · T40' });

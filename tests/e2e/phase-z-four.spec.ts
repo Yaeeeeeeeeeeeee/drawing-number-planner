@@ -64,8 +64,8 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   await page.getByRole('button', { name: '扫描资料库' }).click();
   await expect(page.getByText('资料库扫描完成')).toBeVisible();
   await expect(page.getByRole('region', { name: '当前资料库状态' })).toBeVisible();
-  await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO.pdf`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO（转曲）.pdf`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO（转曲）`, { exact: true })).toBeVisible();
 
   const database = new Database(join(dataDir!, 'planner.db'), { readonly: true });
   try {

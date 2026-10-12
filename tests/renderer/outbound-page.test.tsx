@@ -166,11 +166,13 @@ describe('OutboundPage', () => {
     const api = apiFixture();
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('button', { name: '预览文件' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '邮件撰写' }));
     expect(screen.getByLabelText('正文')).toBeVisible();
     fireEvent.change(screen.getByLabelText('正文'), { target: { value: '保留草稿' } });
     fireEvent.click(screen.getByRole('button', { name: '联系人' }));
     fireEvent.click(screen.getByRole('button', { name: '返回外发工作' }));
     expect(screen.getByLabelText('正文')).toHaveValue('保留草稿');
+    fireEvent.click(screen.getByRole('button', { name: '资料打包' }));
     expect(screen.getByRole('button', { name: '预览文件' })).toBeVisible();
   });
   it('loads a completed package into the mounted composer without mixing it with an existing draft', async () => {

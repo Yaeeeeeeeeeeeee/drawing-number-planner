@@ -1,0 +1,32 @@
+import { useRef, useState } from 'react';
+export const isPublicUiMock=()=>import.meta.env.DEV&&typeof window!=='undefined'&&new URLSearchParams(location.search).get('mock')==='ui';
+const data=[
+ {id:1,code:'02.0404.010.0401001',name:'F100 白色说明书',state:'正常',kind:'neutral'},
+ {id:2,code:'03.0404.101.0501007',name:'长名称核对样例：当前资料与历史来源保持独立展示，不截断关键编码',state:'历史沿用',kind:'warning'},
+ {id:3,code:'02.0404.010.0401008',name:'文件缺失样例',state:'文件缺失',kind:'error'},
+ {id:4,code:'02.0404.010.0401009',name:'删除后保留占号样例',state:'删除 · 保留占号',kind:'neutral'},
+ {id:5,code:'02.0404.010.0401010',name:'明确释放样例',state:'已释放',kind:'neutral'},
+];
+export function PublicUiMock(){
+ const [search,setSearch]=useState('');const [query,setQuery]=useState('');const [filter,setFilter]=useState('all');const [applied,setApplied]=useState('all');const [selected,setSelected]=useState<number[]>([]);
+ const [scenario,setScenario]=useState('normal');const [busy,setBusy]=useState(false);const [notice,setNotice]=useState('');const [dialog,setDialog]=useState<'ordinary'|'danger'|null>(null);const [popover,setPopover]=useState(false);
+ const returnFocus=useRef<HTMLButtonElement|null>(null);const submitting=useRef(false);const [nav,setNav]=useState('图号规划 / 更新包材');
+ const rows=(scenario==='empty'?[]:data).filter(x=>(!query||`${x.code} ${x.name}`.includes(query))&&(applied==='all'||x.kind===applied));
+ const close=()=>{if(busy)return;setDialog(null);requestAnimationFrame(()=>returnFocus.current?.focus());};
+ const save=()=>{if(submitting.current)return;submitting.current=true;setBusy(true);setNotice('');setTimeout(()=>{submitting.current=false;setBusy(false);setNotice(scenario==='saveFailure'?'模拟保存失败，数据未改变':'样例提交完成，未修改真实数据');setDialog(null);requestAnimationFrame(()=>returnFocus.current?.focus());},500);};
+ return <section className="page-surface ui-lab"><header className="page-header"><h1>公共 UI 验收台</h1><label>状态样例<select aria-label="状态样例" value={scenario} onChange={e=>{setScenario(e.target.value);setNotice('');}} disabled={busy}>{Object.entries({normal:'正常数据',loading:'加载中',empty:'真正空数据',failure:'加载失败',saveFailure:'保存失败'}).map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label></header>
+ <p className="ul-note">独立内存样板，不替换现有组件、不执行业务操作。</p>
+ <div className="ul-navigation" aria-label="导航名称样例">{['图号规划 / 更新包材','BOM 管理','PDF 文件中心','编码字典'].map(n=><button key={n} aria-pressed={nav===n} onClick={()=>setNav(n)}>{n}</button>)}</div>
+ <form className="ul-filter" onSubmit={e=>{e.preventDefault();setQuery(search);setApplied(filter);}}><label>搜索编码或名称<input aria-label="搜索编码或名称" value={search} onChange={e=>setSearch(e.target.value)}/></label><label>状态范围<select aria-label="状态范围" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">全部样例</option><option value="neutral">中性状态</option><option value="warning">需核对</option><option value="error">异常</option></select></label><button className="ul-primary">查询</button><button type="button" onClick={()=>{setSearch('');setQuery('');setFilter('all');setApplied('all');}}>重置</button><span>筛选结果 {rows.length} 条 · 已选 {selected.length} 条</span></form>
+ {scenario==='loading'?<p role="status" className="ul-empty">正在加载样例…</p>:scenario==='failure'?<p role="alert" className="ul-feedback error">加载失败，不显示空数据结论。<button onClick={()=>setScenario('normal')}>重试</button></p>:rows.length===0?<p className="ul-empty">{scenario==='empty'?'当前没有记录，可从新增入口开始':'没有符合筛选条件的记录，可重置筛选'}</p>:<table aria-label="公共工作表样例"><colgroup><col style={{width:'5%'}}/><col style={{width:'25%'}}/><col style={{width:'36%'}}/><col style={{width:'18%'}}/><col style={{width:'16%'}}/></colgroup><thead><tr>{['选择','完整编码','名称','业务状态','操作'].map(n=><th key={n}>{n}</th>)}</tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><input type="checkbox" aria-label={`选择 ${r.code}`} checked={selected.includes(r.id)} onChange={()=>setSelected(old=>old.includes(r.id)?old.filter(id=>id!==r.id):[...old,r.id])}/></td><td><strong>{r.code}</strong></td><td>{r.name}</td><td><span className={`ul-state ${r.kind}`}>{r.state}</span></td><td><button onClick={e=>{returnFocus.current=e.currentTarget;setDialog('ordinary');}}>查看</button><button className="ul-danger" onClick={e=>{returnFocus.current=e.currentTarget;setDialog('danger');}}>危险样例</button></td></tr>)}</tbody></table>}
+ <div className="ul-pagination"><span>当前页 {rows.length} 条 · 第 1 / 1 页（仅演示样式）</span><button disabled>上一页</button><button disabled>下一页</button></div>
+ <section className="ul-spec"><h2>同组控件与反馈</h2><div className="ul-buttons"><button className="ul-primary" disabled={busy} onClick={save}>{busy?'保存中…':'保存样例'}</button><button disabled={busy} onClick={()=>setNotice('已取消样例输入')}>取消</button><button disabled>不可用操作</button><button onClick={()=>setPopover(!popover)}>浮层样例</button></div>
+ {notice&&<p role={scenario==='saveFailure'?'alert':'status'} className={`ul-feedback ${scenario==='saveFailure'?'error':'success'}`}>{notice}</p>}
+ <p className="ul-path">长路径示例：资料库 / 样例产品 / 历史批次 / 长目录名称用于检查路径换行而非业务归属 / 完整文件名称.pdf</p>
+ <div className="ul-states"><span className="ul-state success">启用中</span><span className="ul-state warning">已停用</span><span className="ul-state neutral">已删除 · 历史保留</span><span className="ul-state error">冲突</span><span className="ul-state warning">待确认</span></div>
+ </section>
+ {popover&&<aside className="ul-popover" aria-label="样例浮层"><strong>轻量浮层</strong><p>固定定位，不被工作表容器裁切。</p><button onClick={()=>setPopover(false)}>关闭浮层</button></aside>}
+ {dialog&&<div className="ul-overlay"><section role="dialog" aria-modal="true" aria-label="公共确认样例" tabIndex={-1} ref={el=>el?.focus()} onKeyDown={e=>{if(e.key==='Escape')close();if(e.key==='Tab'){const buttons=e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');if(!buttons.length){e.preventDefault();return;}const first=buttons[0],last=buttons[buttons.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===e.currentTarget)){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}}}>
+ <h2>{dialog==='danger'?'危险操作影响说明':'普通确认样例'}</h2><p>{dialog==='danger'?'仅演示确认布局，不调用删除或退出服务，不释放图号，不删除历史或磁盘文件。实际影响必须由各业务预检提供，不能套用通用“删除成功”。':'查看与编辑布局样例，没有真实数据变更。'}</p><div className="ul-dialog-actions"><button disabled={busy} onClick={close}>取消</button><button className={dialog==='danger'?'ul-danger':'ul-primary'} disabled={busy} onClick={save}>{busy?'处理中…':'确认模拟'}</button></div></section></div>}
+ </section>;
+}

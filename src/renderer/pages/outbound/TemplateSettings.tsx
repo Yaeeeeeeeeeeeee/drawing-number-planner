@@ -15,7 +15,18 @@ const blankTemplate: OutboundEmailTemplateInputView = {
 const blankBlock: OutboundTemplateBlockInputView = { key: '', name: '', bodyTemplate: '', displayOrder: 0 };
 const blankSignature: OutboundSignatureInputView = { name: '', content: '', isDefault: false };
 
-export function TemplateSettings({ api }: { api: PlannerApi }) {
+const previewFields = [
+  ['package_name', '外发包名称', 'F60-包材资料-1001'],
+  ['contact_salutation', '联系人称呼', '张工'],
+  ['change_files', '资料与修改明细', '1. 包装箱：更新文字与排版。\n　新文件：F60白色-包装箱（转曲）'],
+  ['package_files', '分包附件', '分包附件：\nF60-包材资料-1001-part01\nF60-包材资料-1001-part02'],
+  ['optional_blocks', '附加段落', '请核对资料后安排生产。'],
+  ['signature', '邮件签名', '样例项目组'],
+] as const;
+const samplePreview = (text: string) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (token, key: string) => previewFields.find(field => field[0] === key)?.[2] ?? token);
+
+export function TemplateSettings({ api, fieldHelper = false }: { api: PlannerApi; fieldHelper?: boolean }) {
+  const [insertTarget, setInsertTarget] = useState<'subjectTemplate' | 'bodyTemplate'>('bodyTemplate');
   const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
   const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
   const [message, setMessage] = useState('');
@@ -70,6 +81,10 @@ export function TemplateSettings({ api }: { api: PlannerApi }) {
       </label>
       <label><span>主题模板</span><input aria-label="主题模板" required value={value.subjectTemplate} onChange={(event) => setEditTemplate({ ...value, subjectTemplate: event.target.value })} /></label>
       <label><span>正文模板</span><textarea aria-label="正文模板" rows={6} required value={value.bodyTemplate} onChange={(event) => setEditTemplate({ ...value, bodyTemplate: event.target.value })} /></label>
+      {fieldHelper && <div className="ob-template-helper">
+        <div className="ob-template-insert"><label>插入到<select aria-label="字段插入位置" value={insertTarget} onChange={event => setInsertTarget(event.target.value as 'subjectTemplate' | 'bodyTemplate')}><option value="subjectTemplate">主题</option><option value="bodyTemplate">正文</option></select></label>{previewFields.map(([key, label]) => { const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'); const present = new RegExp(pattern.source).test(value[insertTarget]); return <button className={`text-button ${present ? 'is-inserted' : ''}`} aria-pressed={present} type="button" key={key} onClick={() => setEditTemplate({ ...value, [insertTarget]: present ? value[insertTarget].replace(pattern, '') : `${value[insertTarget]}${insertTarget === 'bodyTemplate' && value[insertTarget] ? '\n' : ''}{{${key}}}` })}>{label} · {present ? '移除' : '添加'}</button>; })}</div>
+        <details className="ob-template-preview" open><summary>样例效果预览</summary><div className="ob-template-preview-content"><strong>{samplePreview(value.subjectTemplate) || '（主题未填写）'}</strong><pre>{samplePreview(value.bodyTemplate) || '（正文未填写）'}</pre></div></details>
+      </div>}
       <button className="primary-button" type="submit">保存模板</button>
       <button className="text-button" type="button" onClick={() => setEditTemplate(null)}>取消</button>
     </form>
@@ -88,11 +103,11 @@ export function TemplateSettings({ api }: { api: PlannerApi }) {
         })();
       }}
     >
-      {!editor.id && <input aria-label="段落编码" required value={editor.form.key} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, key: event.target.value } })} />}
-      <input aria-label="段落名称" required value={editor.form.name} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, name: event.target.value } })} />
-      <textarea aria-label="段落内容" required value={editor.form.bodyTemplate} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, bodyTemplate: event.target.value } })} />
-      <input aria-label="显示顺序" type="number" value={editor.form.displayOrder} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, displayOrder: Number(event.target.value) } })} />
-      <button type="submit">保存附加段落</button>
+      {!editor.id && <label><span>段落编码</span><input aria-label="段落编码" required value={editor.form.key} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, key: event.target.value } })} /></label>}
+      <label><span>段落名称</span><input aria-label="段落名称" required value={editor.form.name} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, name: event.target.value } })} /></label>
+      <label><span>邮件中插入的内容</span><textarea aria-label="段落内容" rows={3} required value={editor.form.bodyTemplate} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, bodyTemplate: event.target.value } })} /></label>
+      <label><span>排列顺序</span><input aria-label="显示顺序" type="number" value={editor.form.displayOrder} onChange={(event) => setBlockEditor({ ...editor, form: { ...editor.form, displayOrder: Number(event.target.value) } })} /></label>
+      <button className="primary-button" type="submit">保存附加段落</button>
       <button className="text-button" type="button" onClick={() => setBlockEditor(null)}>取消</button>
     </form>
   );
@@ -134,7 +149,7 @@ export function TemplateSettings({ api }: { api: PlannerApi }) {
           {templates.map((item) => (
             <article key={item.id}>
               <strong>{item.name}</strong>
-              <small>{item.materialType === 'initial' ? '首批资料' : '更新资料'} · {item.status === 'active' ? '启用中' : '已停用'}</small>
+              <small><span className={`ob-template-status ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span></small>
               <div>
                 <button className="text-button" type="button" aria-label={`编辑模板 ${item.name}`} onClick={() => setEditTemplate({ id: item.id, key: item.key, name: item.name, materialType: item.materialType, subjectTemplate: item.subjectTemplate, bodyTemplate: item.bodyTemplate })}>编辑</button>
                 <button className="text-button" type="button" onClick={() => void run(() => item.status === 'active' ? api.deactivateOutboundTemplate(item.id) : api.activateOutboundTemplate(item.id))}>{item.status === 'active' ? '停用' : '启用'}</button>

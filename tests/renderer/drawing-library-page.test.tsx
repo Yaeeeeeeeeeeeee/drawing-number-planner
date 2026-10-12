@@ -1,9 +1,61 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
 describe('DrawingLibraryPage', () => {
+  afterEach(() => window.history.replaceState({}, '', '/'));
+  it('keeps detail attributes, state actions and file maintenance grouped without losing information', async () => {
+    window.history.replaceState({}, '', '/?mock=drawing-library');
+    const realCall = vi.fn();
+    render(<DrawingLibraryPage api={new Proxy({}, { get: () => realCall }) as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '02.0209.010.0501001' }));
+    const detail = await screen.findByRole('complementary', { name: '图号详情' });
+    expect(within(detail).getAllByRole('term').map((term) => term.textContent)).toEqual(['SKU', '品牌', '型号', '产品类别', '主类别', '项目']);
+    const state = within(detail).getByRole('region', { name: '状态维护' });
+    expect(within(state).getByText('正式使用')).toBeVisible();
+    expect(within(state).getByRole('button', { name: '作废' })).toBeDisabled();
+    const maintenance = within(detail).getByRole('region', { name: '文件维护 / 索引维护' });
+    expect(within(maintenance).getByText('关联现有 PDF 索引')).toBeVisible();
+    expect(within(maintenance).getByRole('combobox', { name: '现有 PDF 索引' })).toBeVisible();
+    expect(within(maintenance).getByRole('button', { name: '关联为源文件' })).toBeDisabled();
+    expect(within(detail).getByText(/超长型号目录-SKU-T40-PRODUCTION-QC/)).toBeVisible();
+    expect(within(detail).getByRole('button', { name: '删除图号' })).toBeDisabled();
+    fireEvent.keyDown(detail, { key: 'Escape' });
+    expect(screen.queryByRole('complementary', { name: '图号详情' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '02.0209.010.0501001' })).toHaveFocus();
+    expect(realCall).not.toHaveBeenCalled();
+  });
+  it('exposes the detail disclosure and returns focus to the drawing on close', async () => {
+    const row = { id: 77, fullCode: '02.0209.010.0501077', origin: 'planned', status: 'active',
+      model: 'T40', displayName: '说明书', readOnly: true, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [row], total: 1 }),
+      listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row) };
+    render(<DrawingLibraryPage api={api as never} />);
+    const trigger = await screen.findByRole('button', { name: row.fullCode });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger);
+    const detail = await screen.findByRole('complementary', { name: '图号详情' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger.getAttribute('aria-controls')).toBe(detail.id);
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(trigger).toHaveFocus();
+  });
+
+  it('keeps all Mock maintenance and disk buttons disabled even with colliding real IDs', async () => {
+    window.history.replaceState({}, '', '/?mock=drawing-library');
+    const realCall = vi.fn();
+    const api = new Proxy({}, { get: () => realCall });
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '02.0209.010.0501001' }));
+    expect(await screen.findByRole('button', { name: /^作废$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^删除图号$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /打开源文件.*的位置/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: '全选当前页' }));
+    expect(screen.getByRole('button', { name: /批量删除/ })).toBeDisabled();
+    expect(realCall).not.toHaveBeenCalled();
+    window.history.replaceState({}, '', '/');
+  });
   it('opens the recycle bin directly and offers release for retained deleted records', async () => {
     const row = { id: -1, fullCode: '02.0209.010.0401001', origin: 'historical', status: 'active', model: 'T40',
       displayName: '历史资料', deletedAt: '2026-09-30', deletionMode: 'retain_occupied', readOnly: true,
@@ -102,7 +154,7 @@ describe('DrawingLibraryPage', () => {
     render(<DrawingLibraryPage api={api as never} />);
 
     expect(await screen.findAllByText(row.fullCode)).toHaveLength(1);
-    expect(screen.getByText('当前使用 · 出现于 7 个资料批次')).toBeVisible();
+    expect(screen.getByTitle('当前使用 · 出现于 7 个资料批次')).toHaveTextContent('当前使用 · 7批次');
     fireEvent.click(screen.getByText(row.fullCode));
     expect(await screen.findByText('20260309')).toBeVisible();
     expect(screen.getByText('20250101')).toBeVisible();
@@ -266,7 +318,7 @@ describe('DrawingLibraryPage', () => {
       sku: 'SKDZC220JP', productCategory: '冰柜', sourcePresence: 'present', outlinedPresence: 'missing',
     })));
     expect(screen.getByText('正式规划')).toBeVisible();
-    expect(screen.getByText(/源文件已有.*转曲后缺失/)).toBeVisible();
+    expect(screen.getByText((_, element) => element?.className === 'file-integrity-summary' && /源文件已有.*转曲后缺失/.test(element.textContent ?? ''))).toBeVisible();
     expect(await screen.findByRole('complementary', { name: '图号详情' })).toHaveTextContent('SAMKYO-ZC220白色-LOGO');
   });
 
@@ -302,7 +354,7 @@ describe('DrawingLibraryPage', () => {
 
     expect(await screen.findByText('历史扫描')).toBeVisible();
     expect(screen.getByText(/字典待映射/)).toBeVisible();
-    expect(screen.getByText(/源文件缺失.*转曲后已有/)).toBeVisible();
+    expect(screen.getByText((_, element) => element?.className === 'file-integrity-summary' && /源文件缺失.*转曲后已有/.test(element.textContent ?? ''))).toBeVisible();
   });
 
   it('separates business status, file completeness, and current BOM usage in planned maintenance detail', async () => {
@@ -475,7 +527,7 @@ describe('DrawingLibraryPage', () => {
     expect(confirm).toHaveBeenCalledWith('确认停用该历史图号？停用不释放号码，也不会改变文件完整性。');
     expect(await screen.findByText('历史扫描来源；编码不可直接修改。')).toBeVisible();
     expect(screen.getAllByText('已停用').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText(/源文件缺失.*转曲后已有/)).toBeVisible();
+    expect(screen.getByText((_, element) => element?.className === 'file-integrity-summary' && /源文件缺失.*转曲后已有/.test(element.textContent ?? ''))).toBeVisible();
     expect(screen.getByText('停用不释放号码')).toBeVisible();
     expect(screen.queryByRole('button', { name: '正式使用' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('搜索现有 PDF')).not.toBeInTheDocument();

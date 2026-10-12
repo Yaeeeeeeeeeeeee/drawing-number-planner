@@ -1,13 +1,39 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
 
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 import type { FileIndexClearPreviewView, FileScanChangesView, MaterialBatchView, PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
 import { openIndexedPdfLocation } from '../desktop-files';
+import { createFilesMockApi, filesScenarios, initialFilesScenario, isFilesMockEnabled, type FilesScenario } from './files-mock';
 
 const initialFilters = { keyword: '', productId: '', materialBatchId: '', matchStatus: '', conversionType: '', presence: 'present' };
 const pageSize = 50;
+
+function FilePath({ path, name, onClose }: { path: string; name: string; onClose: () => void }) {
+  const [feedback, setFeedback] = useState('');
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(path);
+      setFeedback('已复制');
+    } catch { setFeedback('复制不可用，请选中完整路径复制'); }
+  };
+  return <div className="files-path-row"><span className="files-path-full">{path}</span>
+      <div className="files-path-actions"><button type="button" className="text-button" aria-label={`复制 ${name} 的完整相对路径`} onClick={() => void copy()}>复制路径</button>
+      <button type="button" className="text-button" onClick={onClose}>收起路径</button>
+      {feedback && <small role="status">{feedback}</small>}</div>
+  </div>;
+}
+
+function FileBatch({ item, batches }: { item: PdfFileView; batches: MaterialBatchView[] }) {
+  const batch = batches.find(value => value.id === item.materialBatchId);
+  const state = batch?.isPresent === false ? 'missing'
+    : item.materialBatchStatus === 'pending' ? 'pending' : batch?.currentState ?? 'indeterminate';
+  const labels = { current: '当前批次', historical: '历史批次', pending: '待确认',
+    missing: '批次缺失', unbatched: '未分批', indeterminate: '当前关系未确定' };
+  return item.materialBatchName ? <span className={`files-batch ${state}`}><small className="files-status">{labels[state]}</small></span>
+    : <span className="muted-text">未归入批次</span>;
+}
 
 function searchInput(values: typeof initialFilters, page: number) {
   return { keyword: values.keyword, matchStatus: values.matchStatus, conversionType: values.conversionType, presence: values.presence,
@@ -15,13 +41,19 @@ function searchInput(values: typeof initialFilters, page: number) {
     ...(values.materialBatchId ? { materialBatchId: Number(values.materialBatchId) } : {}), page, pageSize };
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+export function FilesPage({ api }: { api: PlannerApi }) {
+  const mock = isFilesMockEnabled();
+  const [scenario, setScenario] = useState<FilesScenario>(initialFilesScenario);
+  const mockApi = useMemo(() => createFilesMockApi(scenario), [scenario]);
+  return <>
+    {mock && <section className="info-banner files-preview" aria-label="PDF 开发预览"><span><strong>开发预览 Mock</strong> · 仅内存数据，扫描、清理、任务与定位均已隔离。移除 ?mock=files 退出。</span>
+      <label>压力场景<select aria-label="PDF 压力场景" value={scenario} onChange={event => setScenario(event.target.value as FilesScenario)}>{Object.entries(filesScenarios).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></section>}
+    <FilesWorkspace key={mock ? scenario : 'live'} api={mock ? mockApi : api} mock={mock} />
+  </>;
 }
 
-export function FilesPage({ api }: { api: PlannerApi }) {
+function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
+  const [expandedPathId, setExpandedPathId] = useState<number | null>(null);
   const [settings, setSettings] = useState<WorkspaceSettingsView>({ workspaceRoot: null, configured: false, available: false });
   const [rootInput, setRootInput] = useState(''); const [files, setFiles] = useState<PdfFileView[]>([]);
   const [products, setProducts] = useState<ProductView[]>([]);
@@ -147,12 +179,13 @@ export function FilesPage({ api }: { api: PlannerApi }) {
   };
   const openLocation = async (id: number) => {
     setError(''); setMessage('');
+    if (mock) { setMessage('Mock：文件定位已隔离，不访问桌面或磁盘文件。'); return; }
     const result = await openIndexedPdfLocation(id);
     if (!result.ok) setError(result.error?.message ?? '打开文件位置失败');
   };
 
   return <section className="page-surface page-enter files-page">
-    <header className="page-header"><div><p className="eyebrow">PDF WORKSPACE</p><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
+    <header className="page-header"><div><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
       <span className="record-count">{total} 个索引文件</span></header>
     <p className="info-banner">同一图号出现在不同资料批次属于正常历史快照；只有规范化后的同一相对路径重复建立索引才是扫描重复。</p>
     <section className="workspace-strip" aria-label="资料根目录设置">
@@ -166,18 +199,15 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         <span>{settings.configured ? '保存后请手动扫描以更新索引' : '输入资源管理器中的完整目录路径'}</span>
       </div>
     </section>
-    <section className="file-cleanup-toolbar" aria-label="资料库索引清空">
-      <span>仅清空扫描生成的数据库索引，不会释放任何已占用图号。</span>
-      <button className="text-button danger" type="button" disabled={scanning || clearingIndex || !settings.configured}
-        onClick={() => void requestIndexClear()}>清空资料库索引</button>
-    </section>
-    {error && <p className="error-banner">{error}</p>}{message && <p className="success-banner"><strong>{message}</strong></p>}
+    {error && <p className="error-banner" role="alert">{error}</p>}{message && <p className="success-banner" role="status"><strong>{message}</strong></p>}
+    {mock && scanning && <section className="scan-comparison" role="status"><span>正在模拟扫描 · 仅处理内存样例，不读取文件</span><button type="button" className="secondary-button" onClick={() => void api.listLocalTasks().then(tasks => { const task = tasks.find(item => item.status === 'running'); if (task) return api.cancelLocalTask(task.id); }).catch(reason => setError(String(reason)))}>取消模拟扫描</button></section>}
     {summary && <>
-      <section className="scan-summary" aria-label="当前资料库状态"><strong>当前资料库状态</strong><span>{summary.currentTotal} 个索引文件（PDF / 二维码）</span>
+      <section className="scan-summary" aria-label="当前资料库状态"><strong>当前索引统计</strong><span>{summary.currentTotal} 个索引文件（PDF / 二维码）</span>
+        <span className="files-stat-scope">PDF：{summary.total} 个本次扫描文件</span>
         <span>{summary.matched} 已匹配</span><span>{summary.pending} 待确认</span>
         <span>{summary.historicalRegistered} 个历史图号已登记</span><span>{summary.unmatched} 未匹配</span>
         <span>{summary.conflict} 冲突</span><span>{summary.source} 转曲前</span><span>{summary.outlined} 转曲后</span></section>
-      <section className="scan-comparison" aria-label="与上一次扫描相比"><div><strong>与上一次扫描相比</strong>
+      <section className="scan-comparison" aria-label="与上一次扫描相比"><div><strong>本次扫描变化（PDF / 二维码）</strong>
         <span>{summary.comparison.added} 新增</span><span>{summary.comparison.missing} 删除/缺失</span>
         <span>{summary.comparison.moved} 路径变化</span><span>{summary.comparison.changed} 内容变化</span>
         <span>{summary.comparison.unchanged} 无变化</span></div>
@@ -202,6 +232,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         <option value="present">当前存在</option><option value="missing">已缺失</option><option value="all">全部</option></select></label>
       <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
     </form>
+    <p className="files-selection-note">仅缺失记录可选，存在文件的选择控件已禁用。{mock && ' Mock：选择与清理仅作用于内存预览。'}</p>
     {missingOnPage.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
       <span>本页有 {missingOnPage.length} 条缺失索引记录</span>
       <div>
@@ -237,30 +268,39 @@ export function FilesPage({ api }: { api: PlannerApi }) {
         <button className="primary-button" type="button" disabled={clearingIndex || indexClearPhrase !== '清空资料库索引'}
           onClick={() => void confirmIndexClear()}>{clearingIndex ? '清空中…' : '确认清空资料库索引'}</button></div>
     </section>}
-    {!loading && files.length === 0 ? <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
+    {loading && <p className="info-banner" role="status">正在加载 PDF 文件索引…</p>}
+    {!loading && !error && files.length === 0 ? <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
       description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} /> :
-      <DataTable items={files} columns={[
-        { key: 'select', label: '选择', render: (item) => item.isPresent ? <span className="muted-text">—</span> : <input type="checkbox"
-          aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning}
+      <DataTable items={files} renderExpandedRow={item => expandedPathId === item.id
+        ? <div id={`file-path-${item.id}`}><FilePath path={item.relativePath} name={item.fileName} onClose={() => {
+          setExpandedPathId(null);
+          document.getElementById(`file-path-toggle-${item.id}`)?.focus();
+        }} /></div> : null} columns={[
+        { key: 'select', label: '选择', render: (item) => <input type="checkbox"
+          aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning || item.isPresent}
           onChange={() => toggleSelection(item.id)} /> },
-        { key: 'name', label: '文件名', render: (item) => <span className="file-primary">{item.fileName}</span> },
-        { key: 'path', label: '相对路径', render: (item) => <span className="file-relative mono">{item.relativePath}</span> },
-        { key: 'batch', label: '资料批次', render: (item) => item.materialBatchName
-          ? <span>{item.materialBatchName}{item.materialBatchStatus === 'pending' ? ' · 待确认' : ''}</span>
-          : <span className="muted-text">未归入批次</span> },
-        { key: 'product', label: '产品', render: (item) => item.productId ? <span className="file-product"><strong>{item.sku ?? '待补录'} · {item.model}</strong><small>{item.productCategory}</small></span> : <span className="muted-text">待关联</span> },
+        { key: 'name', label: '文件名', render: (item) => <div className="files-name-row"><span className="file-primary">{item.fileName.replace(/\.pdf$/i, '')}</span></div> },
+        { key: 'batch', label: '资料批次', render: (item) => <span className="files-batch-code">{item.materialBatchName ?? '未归入批次'}</span> },
+        { key: 'batchStatus', label: '批次状态', render: (item) => <FileBatch item={item} batches={batches} /> },
+        { key: 'product', label: '产品', render: (item) => item.productId ? <span className="file-product"><strong>{item.productCategory} · {item.model}</strong><small>SKU：{item.sku ?? '待补录'}</small></span> : <span className="muted-text">待关联</span> },
         { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="file-match matched">
           <span className="code-cell">{item.fullCode}</span>
           {item.classificationWarning && <span className="file-warning">{item.classificationWarning === 'conversion-conflict'
             ? '目录与文件名的转曲标记冲突' : item.classificationWarning}</span>}
         </span>
-          : item.matchStatus === 'pending' ? <span className="file-match pending">待确认 · {item.detectedCodes.join(' / ')} · {item.classificationWarning}</span>
-            : <span className={`file-match ${item.matchStatus}`}>{item.matchStatus === 'conflict' ? '多图号冲突' : '未匹配'}</span> },
+          : item.matchStatus === 'pending' ? <span className="file-match pending">
+            <span className="code-cell">{item.detectedCodes.join(' / ')}</span>
+            {item.classificationWarning && <small className="files-match-reason">{item.classificationWarning}</small>}
+          </span>
+            : <span className="muted-text">—</span> },
+        { key: 'matchStatus', label: '匹配状态', render: item => <span className={`file-match ${item.fullCode ? 'matched' : item.matchStatus}`}>
+          <span className="files-match-badge">{item.fullCode ? '已匹配' : item.matchStatus === 'pending' ? '待确认' : item.matchStatus === 'conflict' ? '多图号冲突' : '未匹配'}</span></span> },
         { key: 'conversion', label: '类型', render: (item) => <span className={`conversion-label ${item.conversionType}`}>{item.conversionType === 'outlined' ? '转曲后' : '转曲前'}</span> },
-        { key: 'size', label: '大小', render: (item) => formatSize(item.sizeBytes) },
-        { key: 'modified', label: '修改时间', render: (item) => new Date(item.modifiedAt).toLocaleString('zh-CN') },
         { key: 'presence', label: '文件状态', render: (item) => <span className={`presence-label ${item.isPresent ? 'present' : 'missing'}`}>{item.isPresent ? '存在' : '缺失'}</span> },
         { key: 'actions', label: '操作', render: (item) => <div className="file-row-actions">
+          <button id={`file-path-toggle-${item.id}`} type="button" className="files-path-button" aria-label={`查看 ${item.fileName} 的完整相对路径`}
+            aria-expanded={expandedPathId === item.id} aria-controls={`file-path-${item.id}`}
+            onClick={() => setExpandedPathId(expandedPathId === item.id ? null : item.id)}>{expandedPathId === item.id ? '收起路径' : '查看路径'}</button>
           <button className="text-button" type="button" disabled={!item.isPresent}
             aria-label={`打开 ${item.fileName} 的位置`} onClick={() => void openLocation(item.id)}>{item.isPresent ? '打开位置' : '文件缺失'}</button>
           {!item.isPresent && <button className="text-button danger" type="button" disabled={cleaning}
@@ -274,5 +314,9 @@ export function FilesPage({ api }: { api: PlannerApi }) {
       <button className="secondary-button" type="button" disabled={loading || page >= pageCount}
         onClick={() => void search(filters, page + 1)}>下一页</button>
     </nav>}
+    <details className="files-index-maintenance"><summary>索引维护</summary><section className="file-cleanup-toolbar" aria-label="资料库索引清空">
+      <div><strong>清空资料库索引</strong><p>影响 PDF、二维码、资料批次与扫描记录；不删除磁盘原始文件，不会释放任何已占用图号。</p></div>
+      <button className="text-button danger" type="button" disabled={scanning || clearingIndex || !settings.configured} onClick={() => void requestIndexClear()}>清空资料库索引</button>
+    </section></details>
   </section>;
 }

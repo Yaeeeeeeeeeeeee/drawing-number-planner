@@ -10,8 +10,9 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
   await expect(page.getByText('图号库尚无记录')).toBeVisible();
 
   await page.getByRole('button', { name: /编码字典/ }).click();
-  await page.getByLabel('编码').fill('02');
-  await page.getByLabel('名称').fill('SAMKYO');
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  await page.getByLabel('编码', { exact: true }).fill('02');
+  await page.getByLabel('名称', { exact: true }).fill('SAMKYO');
   await page.getByRole('button', { name: '新增编码' }).click();
   await expect(page.getByText('SAMKYO')).toBeVisible();
 

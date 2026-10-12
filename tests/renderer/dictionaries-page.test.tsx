@@ -123,6 +123,8 @@ describe('DictionariesPage', () => {
     render(<DictionariesPage api={api as never} />);
     await waitFor(() => expect(api.listDictionaries).toHaveBeenCalledWith('brand', true, false));
 
+    fireEvent.click(await screen.findByRole('button', { name: '新增' }));
+    expect(screen.queryByLabelText('项目明细编码')).toBeNull();
     fireEvent.change(screen.getByLabelText('编码'), { target: { value: '02' } });
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '延迟品牌' } });
     fireEvent.click(screen.getByRole('button', { name: '新增编码' }));
@@ -153,7 +155,7 @@ describe('DictionariesPage', () => {
     fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: '项目明细 · 印刷件类' })).toBeNull());
-    expect(screen.getByText('请在左侧主类别中选择一项，查看并维护对应项目明细。')).toBeVisible();
+    expect(screen.getByText('请在主类别列表中选择一项，查看并维护对应项目明细。')).toBeVisible();
   });
 
   it('filters project details by selected main category ID', async () => {
@@ -178,9 +180,10 @@ describe('DictionariesPage', () => {
     await screen.findByText('印刷件类');
     fireEvent.click(screen.getByRole('button', { name: '查看 印刷件类 的项目明细' }));
 
+    fireEvent.click(screen.getByRole('button', { name: '新增项目明细' }));
     fireEvent.change(screen.getByLabelText('项目明细编码'), { target: { value: '09' } });
     fireEvent.change(screen.getByLabelText('项目明细名称'), { target: { value: '售后卡' } });
-    fireEvent.click(screen.getByRole('button', { name: '新增项目明细' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存项目明细' }));
 
     expect(api.createDictionary).toHaveBeenCalledWith('project_item', { code: '09', name: '售后卡', parentId: 10 });
   });

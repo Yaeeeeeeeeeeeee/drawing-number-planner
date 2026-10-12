@@ -4,8 +4,15 @@ import { ContactsManager } from './outbound/ContactsManager';
 import { EmailComposer } from './outbound/EmailComposer';
 import { PackageBuilder, type OutboundMailContext } from './outbound/PackageBuilder';
 import { TemplateSettings } from './outbound/TemplateSettings';
+import { isOutboundMockEnabled } from './outbound/outbound-mock';
+import { OutboundMockPage } from './outbound/OutboundMockPage';
 
 export function OutboundPage({ api }: { api: PlannerApi }) {
+  return isOutboundMockEnabled() ? <OutboundMockPage /> : <OutboundWorkspace api={api} />;
+}
+
+function OutboundWorkspace({ api }: { api: PlannerApi }) {
+  const [work,setWork]=useState<'package'|'email'>('package');
   const [contactsOpen, setContactsOpen] = useState(false);
   const packageSection = useRef<HTMLElement>(null);
   const emailSection = useRef<HTMLElement>(null);
@@ -13,7 +20,7 @@ export function OutboundPage({ api }: { api: PlannerApi }) {
   const [settings, setSettings] = useState(false);
 
   return (
-    <section className="page-surface page-enter outbound-page">
+    <section className="page-surface page-enter outbound-page outbound-integrated">
       <header className="page-header">
         <div>
           <p className="eyebrow">OUTBOUND WORKSPACE</p>
@@ -23,20 +30,20 @@ export function OutboundPage({ api }: { api: PlannerApi }) {
       </header>
       <nav className="section-tabs" aria-label="外发工作步骤">
         {contactsOpen ? <button type="button" onClick={() => setContactsOpen(false)}>返回外发工作</button> : <>
-          <button type="button" onClick={() => packageSection.current?.scrollIntoView?.({ behavior: 'smooth' })}>资料打包</button>
-          <button type="button" onClick={() => emailSection.current?.scrollIntoView?.({ behavior: 'smooth' })}>邮件撰写</button>
+          <button type="button" aria-pressed={work==='package'} onClick={() => setWork('package')}>资料打包</button>
+          <button type="button" aria-pressed={work==='email'} onClick={() => setWork('email')}>邮件撰写</button>
         </>}
         <button type="button" onClick={() => setContactsOpen(true)}>联系人</button>
       </nav>
       <div hidden={contactsOpen}>
-      <section ref={packageSection} aria-label="资料打包步骤">
+      <section hidden={work !== 'package'} ref={packageSection} aria-label="资料打包步骤">
         <h2>1. 选择资料并打包</h2>
         <PackageBuilder
           api={api}
           onPackage={(_value, context) => setMailContext(context)}
         />
       </section>
-      <section ref={emailSection} aria-label="邮件编辑步骤">
+      <section hidden={work !== 'email'} ref={emailSection} aria-label="邮件编辑步骤">
           <h2>2. 编辑邮件并复制</h2>
           <div className="outbound-settings-toggle">
             <button className="text-button" type="button" onClick={() => setSettings((value) => !value)}>
