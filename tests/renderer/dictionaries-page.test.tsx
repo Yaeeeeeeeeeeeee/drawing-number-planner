@@ -16,7 +16,7 @@ describe('DictionariesPage', () => {
     const api = { listDictionaries: vi.fn((_type, _inactive, deleted) => Promise.resolve(deleted ? [archived] : [])) };
     render(<DictionariesPage api={api as never} />);
     await screen.findByText('当前字典暂无数据');
-    fireEvent.click(screen.getByLabelText('显示已删除字典记录'));
+    fireEvent.click(screen.getByLabelText('显示已删除'));
     expect(await screen.findByText('已删除 · 历史保留')).toBeVisible();
     expect(screen.getByRole('button', {name:'恢复 历史品牌'})).toBeVisible();
     expect(screen.queryByRole('button', {name:'删除 历史品牌'})).not.toBeInTheDocument();
@@ -150,11 +150,11 @@ describe('DictionariesPage', () => {
     fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
     await screen.findByText('印刷件类');
     fireEvent.click(screen.getByRole('button', { name: '查看 印刷件类 的项目明细' }));
-    expect(screen.getByRole('heading', { name: '项目明细 · 印刷件类' })).toBeVisible();
+    expect(screen.getByText('04 印刷件类')).toBeVisible();
     fireEvent.click(screen.getByRole('tab', { name: '品牌' }));
     fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
 
-    await waitFor(() => expect(screen.queryByRole('heading', { name: '项目明细 · 印刷件类' })).toBeNull());
+    await waitFor(() => expect(screen.queryByText('04 印刷件类')).toBeNull());
     expect(screen.getByText('请在主类别列表中选择一项，查看并维护对应项目明细。')).toBeVisible();
   });
 
@@ -207,7 +207,7 @@ describe('DictionariesPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '修改 LOGO' }));
     fireEvent.change(screen.getByLabelText('修改名称'), { target: { value: '新 LOGO' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存名称' }));
+    fireEvent.click(screen.getByRole('button', { name: /^保存$/ }));
     expect(await screen.findByText('新 LOGO')).toBeVisible();
     expect(api.updateDictionaryName).toHaveBeenCalledWith(20, '新 LOGO');
 
@@ -242,9 +242,10 @@ describe('DictionariesPage', () => {
     await screen.findByText('SAMKYO');
 
     fireEvent.click(screen.getByRole('button', { name: '修改 SAMKYO' }));
-    expect(screen.getByText('编码锁定：02')).toBeVisible();
+    expect(screen.getByLabelText('编码')).toHaveValue('02');
+    expect(screen.getByLabelText('编码')).toBeDisabled();
     fireEvent.change(screen.getByLabelText('修改名称'), { target: { value: 'SAMKYO 新名称' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存名称' }));
+    fireEvent.click(screen.getByRole('button', { name: /^保存$/ }));
 
     expect(await screen.findByText('SAMKYO 新名称')).toBeVisible();
     expect(api.updateDictionaryName).toHaveBeenCalledWith(3, 'SAMKYO 新名称');

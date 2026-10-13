@@ -13,6 +13,16 @@ const manual = {
 };
 
 describe('QrCodesPage', () => {
+  it('keeps v2 path disclosure beneath the complete filename without changing file actions', async () => {
+    const api={listQrCodes:vi.fn().mockResolvedValue({items:[manual]}),getQrCode:vi.fn().mockResolvedValue(manual)};
+    render(<QrCodesPage api={api as never} initialQrCodeId={manual.id}/>);
+    await screen.findByRole('heading',{name:manual.name});
+    const toggle=screen.getAllByRole('button',{name:'查看路径'})[0];
+    expect((toggle.closest('td') as HTMLTableCellElement).cellIndex).toBe(0);
+    expect(toggle.closest('td')).toHaveTextContent(manual.files[0].fileName);
+    fireEvent.click(toggle);
+    expect(screen.getByText(manual.files[0].relativePath)).toBeVisible();
+  });
   it('offers nearby create, edit, status, and protected delete controls with separate match status', async () => {
     const created = { ...manual, id: 99, name: 'Q100 新说明书', status: 'inactive' as const };
     const api = { listQrCodes: vi.fn().mockResolvedValue({ items: [manual] }), getQrCode: vi.fn().mockResolvedValue(manual),

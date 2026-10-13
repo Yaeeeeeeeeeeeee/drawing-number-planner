@@ -262,7 +262,7 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   await expect(page.getByRole('cell', { name: '2026-09-17', exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /外发资料/ }).click();
-  await page.getByRole('button', { name: '邮件撰写', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '邮件草稿', exact: true })).toBeVisible();
   await page.getByLabel('收件人 验收联系人').check();
   await page.getByRole('button', { name: '复制收件人' }).click();
   await expect(page.getByText('已复制', { exact: true })).toBeVisible();

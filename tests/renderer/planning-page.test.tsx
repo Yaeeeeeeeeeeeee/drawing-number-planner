@@ -125,6 +125,6 @@ describe('PlanningPage', () => {
       prefix: '02.0404.010.0401', sequence: 1, available: true }] });
 
     await waitFor(() => expect(screen.queryByText('SAMKYO-ZC200白色-LOGO')).not.toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: '确认批量占号' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '确认批量占号' })).toBeDisabled();
   });
 });

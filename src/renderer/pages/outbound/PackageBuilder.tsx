@@ -9,7 +9,8 @@ import type {
   PlannerApi,
   ProductView,
 } from '../../data/client';
-import { chooseOutboundDirectory, openOutboundPackageLocation } from '../../desktop-files';
+import { chooseOutboundDirectory } from '../../desktop-files';
+import { PackageResult } from './PackageResult';
 import { PackageHistory } from './PackageHistory';
 import { materialBatchLabel } from '../../../core/files/material-batch-label';
 
@@ -28,9 +29,11 @@ export interface OutboundMailContext {
 interface PackageBuilderProps {
   api: PlannerApi;
   onPackage(value: CreatedOutboundPackageView, context: OutboundMailContext): void;
+  showResult?: boolean;
+  onResultChange?: (value:CreatedOutboundPackageView|null)=>void;
 }
 
-export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
+export function PackageBuilder({ api, onPackage, showResult=true, onResultChange }: PackageBuilderProps) {
   const [products, setProducts] = useState<ProductView[]>([]);
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
   const [brands, setBrands] = useState<DictionaryItemView[]>([]);
@@ -42,6 +45,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
   const [preview, setPreview] = useState<OutboundPackagePreviewView | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [created, setCreated] = useState<CreatedOutboundPackageView | null>(null);
+  useEffect(()=>{onResultChange?.(created);},[created,onResultChange]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [bomSelections, setBomSelections] = useState<Record<string, number>>({});
@@ -146,14 +150,6 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
     <section className="outbound-panel package-builder">
       <button type="button" className="text-button" onClick={() => setAllHistory((value) => !value)}>{allHistory ? '收起全部外发历史' : '查询全部外发历史（含退出产品）'}</button>
       {allHistory && <PackageHistory api={api} refreshId={created?.id} />}
-      <div className="choice-row" role="group" aria-label="打包模式">
-        <label><input type="radio" aria-label="本次变更资料" checked={mode === 'change_only'} onChange={() => { setMode('change_only'); setPreview(null); }} />本次变更资料</label>
-        <label><input type="radio" aria-label="当前完整包材资料" checked={mode === 'current_complete'} onChange={() => { setMode('current_complete'); setPreview(null); }} />当前完整包材资料</label>
-      </div>
-      <div className="choice-row" role="group" aria-label="资料类型">
-        <label><input type="radio" aria-label="首批资料" checked={materialType === 'initial'} onChange={() => { setMaterialType('initial'); setPreview(null); }} />首批资料</label>
-        <label><input type="radio" aria-label="更新资料" checked={materialType === 'update'} onChange={() => { setMaterialType('update'); setPreview(null); }} />更新资料</label>
-      </div>
       <div className="outbound-selection-grid">
         <label>
           <span>品牌</span>
@@ -173,8 +169,10 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
             <option value="">请选择</option>{batches.map((item) => <option key={item.id} value={item.id}>{materialBatchLabel(item.name)}</option>)}
           </select>
         </label>
-        <button className="primary-button" type="button" disabled={busy || !productId || !batchId} onClick={() => void loadPreview()}>预览文件</button>
+        <label><span>资料类型</span><select aria-label="打包资料类型" value={materialType} onChange={event=>{setMaterialType(event.target.value as OutboundMaterialTypeView);setPreview(null);}}><option value="initial">首批资料</option><option value="update">更新资料</option></select></label>
       </div>
+      <fieldset className="ob-modes" aria-label="打包模式"><legend>打包模式</legend><label><input type="radio" aria-label="本次变更资料" checked={mode === 'change_only'} onChange={() => { setMode('change_only'); setPreview(null); }} />本次变更资料</label><label><input type="radio" aria-label="当前完整包材资料" checked={mode === 'current_complete'} onChange={() => { setMode('current_complete'); setPreview(null); }} />当前完整包材资料</label></fieldset>
+      <div className="ob-section-head outbound-preview-action"><span>核对所选产品及资料批次后预览文件。</span><button className="primary-button" type="button" disabled={busy || !productId || !batchId} onClick={() => void loadPreview()}>预览文件</button></div>
       {chosenProduct && <p className="info-banner">SKU：{chosenProduct.sku ?? '待补录'}　型号：{chosenProduct.model}　产品类别：{chosenProduct.productCategory}</p>}
       {error && <p className="error-banner">{error}</p>}
       {preview && (
@@ -186,14 +184,15 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
               <button className="text-button" type="button" onClick={() => setSelected([])}>取消全选</button>
             </div>
           </div>
-          <div className="outbound-file-list"><table aria-label="外发文件预览"><thead><tr>{['选择','项目','图号','资料批次','文件名','状态','BOM / 说明'].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>
+          <div className="outbound-file-list ob-table"><table aria-label="外发文件预览"><thead><tr>{['选择','文件名','图号','资料批次','来源','文件状态','资料状态','说明'].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>
             {preview.items.map((item, index) => (
               <tr className={!item.selectable ? 'blocked' : ''} key={`${item.slotKey}-${index}`}><td>
                 <input type="checkbox" aria-label={`选择 ${item.projectItemName}`} disabled={!item.selectable || !item.pdfFileId} checked={item.pdfFileId ? selected.includes(item.pdfFileId) : false} onChange={() => item.pdfFileId && setSelected((value) => value.includes(item.pdfFileId!) ? value.filter((id) => id !== item.pdfFileId) : [...value, item.pdfFileId!])} />
-                </td><td><strong>{item.projectItemName}</strong></td>
+                </td><td className="file-primary">{item.fileName ?? `${item.projectItemName} · 转曲后文件已缺失`}</td>
                 <td><span className="mono">{item.fullCode ?? '图号待确认'}</span></td>
                 <td>{materialBatchLabel(item.sourceBatchName)}</td>
-                <td className="file-primary">{item.fileName ?? '转曲后文件已缺失'}</td>
+                <td><span className={`ob-source-badge ${item.sourceBatchId===Number(batchId)?'current':'historical'}`}>{item.sourceBatchId===Number(batchId)?'当前批次':'历史沿用'}</span></td>
+                <td><span className={item.selectable?'ob-good':item.status==='missing'?'ob-error':'ob-muted'}>{item.selectable?'可用':item.status==='missing'?'缺失':'待核实'}</span></td>
                 <td><span className={`outbound-status ${item.status}`}>{statusLabel[item.status]}</span></td><td>
                 {item.bomContext?.status === 'matched' && item.bomContext.changeDetails?.trim()
                   ? <p>修改明细：{item.bomContext.changeDetails}</p>
@@ -227,22 +226,7 @@ export function PackageBuilder({ api, onPackage }: PackageBuilderProps) {
         </>
       )}
       {productId && <PackageHistory api={api} productId={Number(productId)} refreshId={created?.id} />}
-      {created && (
-        <section className="success-banner outbound-result">
-          <strong>压缩包已生成</strong>
-          {created.parts?.length ? created.parts.map((part) => <div key={part.partNumber}>
-            <span>{part.zipRelativePath}</span>
-            <span> · {(part.sizeBytes / 1_000_000).toFixed(2)} MB</span>
-            <button type="button" className="text-button" onClick={async () => {
-              const result = await openOutboundPackageLocation(created.id, part.partNumber);
-              if (!result.ok) setError(result.error?.message ?? '打开位置失败');
-            }}>打开第{part.partNumber}份位置</button>
-          </div>) : <span>{created.packageName}.zip</span>}
-          <span>保存位置：{created.zipRelativePath}</span>
-          <span>文件数量：{created.fileCount}</span>
-          <button className="text-button" type="button" onClick={async () => { const result = await openOutboundPackageLocation(created.id); if (!result.ok) setError(result.error?.message ?? '打开位置失败'); }}>打开位置</button>
-        </section>
-      )}
+      {created && showResult && <PackageResult key={created.id} value={created}/>}
     </section>
   );
 }

@@ -16,6 +16,8 @@ function PlanningWorkspace({ api }: { api: PlannerApi }) {
   const [colors, setColors] = useState<DictionaryItemView[]>([]);
   const [mains, setMains] = useState<DictionaryItemView[]>([]);
   const [projects, setProjects] = useState<DictionaryItemView[]>([]);
+  const [brands, setBrands] = useState<DictionaryItemView[]>([]);
+  const [sizes, setSizes] = useState<DictionaryItemView[]>([]);
   const [productId, setProductId] = useState('');
   const [appearanceId, setAppearanceId] = useState('');
   const [rows, setRows] = useState<DraftRow[]>([blankRow(1)]);
@@ -36,6 +38,14 @@ function PlanningWorkspace({ api }: { api: PlannerApi }) {
     setProducts(productItems); setAppearances(appearanceItems); setColors(colorItems);
     setMains(mainItems); setProjects(projectItems);
   }).catch((reason) => setError(reason instanceof Error ? reason.message : '基础资料加载失败')); }, [api]);
+
+  // Optional display metadata cannot prevent the original five-query planning workflow.
+  useEffect(()=>{
+    let current=true;
+    void api.listDictionaries('brand',false).then(items=>{if(current)setBrands(items??[]);}).catch(()=>{if(current)setBrands([]);});
+    void api.listDictionaries('product_size',false).then(items=>{if(current)setSizes(items??[]);}).catch(()=>{if(current)setSizes([]);});
+    return ()=>{current=false;};
+  },[api]);
 
   const invalidate = () => {
     draftVersion.current += 1;
@@ -96,29 +106,27 @@ function PlanningWorkspace({ api }: { api: PlannerApi }) {
     } finally { setBusy(false); }
   };
 
-  return <section className="page-surface page-enter planning-page planning-real-page">
-    <header className="page-header"><div><h1>图号规划</h1><p>先统一查重预览，再一次性永久占用整批图号。</p></div><span className="record-count">{rows.length} 个项目</span></header>
-    <div className="planning-basics form-grid">
-      <label><span>产品型号</span><select aria-label="产品型号" disabled={busy} value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.map((item) => <option value={item.id} key={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
+  const selectedProduct = products.find(item => item.id === Number(productId));
+  return <section className="page-surface page-enter planning-page planning-real-page pm-plan approved-planning">
+    <header className="page-header"><h1>图号规划</h1></header>
+    <div className="pp-context">
+      <label><span>产品型号</span><select aria-label="产品型号" disabled={busy} value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.map((item) => <option value={item.id} key={item.id}>{item.sku ?? 'SKU待补录'} · {item.model} · {item.brandName}</option>)}</select></label>
       <label><span>外观</span><select aria-label="外观" disabled={busy} value={appearanceId} onChange={(event) => { setAppearanceId(event.target.value); invalidate(); }}><option value="">请选择</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
     </div>
-    {products.find(item => item.id === Number(productId)) && <div className="planning-selection-summary">{products.filter(item => item.id === Number(productId)).map(item => <span key={item.id}>SKU：{item.sku ?? '待补录'} · 品牌：{item.brandName} · 品类尺寸：{item.productSizeName}</span>)}</div>}
-    <div className="batch-toolbar"><h2>批量项目</h2><button className="secondary-button" type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidate(); }}>添加项目</button></div>
-    <div className="planning-rows">{rows.map((row, index) => <article className="planning-row" key={row.clientId}>
-      <div className="planning-row-title"><strong>项目 {index + 1}</strong>{rows.length > 1 && <button className="link-button" aria-label={`删除项目 ${index + 1}`} type="button" disabled={busy} onClick={() => { setRows((current) => current.filter((item) => item.clientId !== row.clientId)); invalidate(); }}>删除</button>}</div>
-      <div className="form-grid planning-row-fields">
+    <div className="pp-derived"><div className="pp-context-fact"><span>品牌</span><strong>{selectedProduct ? `${brands.find(item=>item.id===selectedProduct.brandId)?.code ? brands.find(item=>item.id===selectedProduct.brandId)?.code+' · ' : ''}${selectedProduct.brandName}` : '随产品确定'}</strong></div><div className="pp-context-fact"><span>品类尺寸</span><strong>{selectedProduct ? `${sizes.find(item=>item.id===selectedProduct.productSizeId)?.code ? sizes.find(item=>item.id===selectedProduct.productSizeId)?.code+' · ' : ''}${selectedProduct.productSizeName}` : '随产品确定'}</strong></div><small>完整外观编码参与生成；产品身份及字典关系不改变。</small></div>
+    <div className="pp-toolbar"><strong>规划项目 · {rows.length} 行</strong><button type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidate(); }}>添加项目</button></div>
+    <div className="pp-rows">{rows.map((row, index) => <article className="pp-row" key={row.clientId}>
+      <div className="pp-fields"><span className="pp-row-no" aria-label={`项目 ${index + 1}`}>项目 {index + 1}</span>
         <label><span>主类别</span><select aria-label={`第 ${index + 1} 行主类别`} disabled={busy} value={row.mainCategoryId} onChange={(event) => updateRow(row.clientId, 'mainCategoryId', event.target.value)}><option value="">请选择</option>{mains.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
         <label><span>项目明细</span><select aria-label={`第 ${index + 1} 行项目明细`} disabled={busy || !row.mainCategoryId} value={row.projectItemId} onChange={(event) => updateRow(row.clientId, 'projectItemId', event.target.value)}><option value="">请选择</option>{projects.filter((item) => item.parentId === Number(row.mainCategoryId)).map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
         <label><span>颜色</span><select aria-label={`第 ${index + 1} 行颜色`} disabled={busy} value={row.colorId} onChange={(event) => updateRow(row.clientId, 'colorId', event.target.value)}><option value="">请选择</option>{colors.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
         <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes} onChange={(event) => updateRow(row.clientId, 'notes', event.target.value)} /></label>
+        <button aria-label={`删除项目 ${index + 1}`} type="button" disabled={busy || rows.length === 1} onClick={() => { setRows((current) => current.filter((item) => item.clientId !== row.clientId)); invalidate(); }}>移除</button>
       </div>
-      {projects.find(item => item.id === Number(row.projectItemId)) && <p className="planning-full-name">所选项目明细：{projects.find(item => item.id === Number(row.projectItemId))?.code} · {projects.find(item => item.id === Number(row.projectItemId))?.name}</p>}
+      {preview?.rows.filter(item => item.clientId === row.clientId).map(item => <div className="pp-result" key={item.clientId}><div><small>预计完整图号 · 尚未占号</small><strong className="pp-code">{item.fullCode}</strong><span>推荐流水号 <b>{String(item.sequence).padStart(3, '0')}</b></span><p>{item.displayName} · {row.notes || '无备注'}</p><small><span className="status-text active">可占用</span> · 核对完整图号及资料名称，确认后按原规则永久占号。</small></div></div>)}
     </article>)}</div>
-    <button className="primary-button planning-check" type="button" disabled={!complete || busy} onClick={() => void check()}>{busy ? '处理中…' : needsRefresh ? '重新查重' : '查重并预览'}</button>
+    <div className="pp-bottom"><span>{complete ? '条件完整' : '待完成：产品、外观及各行主类别 / 项目明细 / 颜色'}</span><div><button className="primary-button planning-check" type="button" disabled={!complete || busy} onClick={() => void check()}>{busy ? '处理中…' : needsRefresh ? '重新查重' : '查重并预览'}</button><button className="primary-button" type="button" disabled={!preview || !approvedInput || busy} onClick={() => void reserve()}>确认批量占号</button></div></div>
     {error && <p className="error-banner">{error}</p>}
-    {preview && <section className="planning-preview"><div className="batch-toolbar"><div><h2>预览图号 · 尚未正式保存</h2><p>核对完整图号及资料名称，确认后按原规则永久占号。</p></div><button className="primary-button" type="button" disabled={busy} onClick={() => void reserve()}>确认批量占号</button></div>
-      <table><thead><tr><th>完整预览图号</th><th>对应资料名称</th><th>推荐流水号</th><th>查重</th></tr></thead><tbody>{preview.rows.map((item) => <tr key={item.clientId}><td className="code-cell">{item.fullCode}</td><td>{item.displayName}</td><td>{String(item.sequence).padStart(3, '0')}</td><td><span className="status-text active">可占用</span></td></tr>)}</tbody></table>
-    </section>}
-    {reserved.length > 0 && <section className="success-banner"><strong>已成功占用 {reserved.length} 个图号 · 正式保存</strong><ul>{reserved.map(item => <li key={item.fullCode}><strong>{item.fullCode}</strong></li>)}</ul></section>}
+    {reserved.length > 0 && <section className="pp-saved"><strong>已成功占用 {reserved.length} 个图号 · 正式保存</strong>{reserved.map(item => <p key={item.fullCode}><strong>{item.fullCode}</strong> · {item.displayName}</p>)}</section>}
   </section>;
 }

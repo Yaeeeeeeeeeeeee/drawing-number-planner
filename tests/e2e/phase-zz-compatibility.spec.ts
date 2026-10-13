@@ -31,6 +31,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
     model: 'T40', productCategory: '01.洗碗机',
   } });
   expect(productResponse.ok()).toBeTruthy();
+  const productId=(await productResponse.json()).id as number;
 
   const sourceDir = join(workspaceRoot!, '01.洗碗机', 'SKDWT040JP-T40', '02.未转曲源文件');
   const outlinedDir = join(workspaceRoot!, '01.洗碗机', 'SKDWT040JP-T40',
@@ -62,7 +63,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await expect(page.getByText(/源文件已有.*转曲后已有/)).toBeVisible();
 
   await page.getByRole('button', { name: /图号规划/ }).click();
-  await page.getByLabel('产品型号').selectOption({ label: 'SAMKYO · T40' });
+  await page.getByLabel('产品型号').selectOption(String(productId));
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(projectId));
   await page.getByLabel('第 1 行颜色').selectOption(String(colorId));
@@ -83,7 +84,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await expect(historicalRow.locator('.integrity-missing')).toHaveCount(2);
 
   await page.getByRole('button', { name: /图号规划/ }).click();
-  await page.getByLabel('产品型号').selectOption({ label: 'SAMKYO · T40' });
+  await page.getByLabel('产品型号').selectOption(String(productId));
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(projectId));
   await page.getByLabel('第 1 行颜色').selectOption(String(colorId));

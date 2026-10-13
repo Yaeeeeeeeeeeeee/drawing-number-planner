@@ -47,6 +47,11 @@ for (const folder of ['02.未转曲源文件', '03.量产后的变更文件（�
 }
 const settings = new WorkspaceSettingsStore(join(dataDir, 'settings.json'));
 settings.setWorkspaceRoot(root);
+// Real QR file indexing in disposable data; not a renderer Mock or user library.
+const qrDirectory=join(productDirectory,'二维码'); mkdirSync(qrDirectory);
+const qrPng=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a2s8AAAAASUVORK5CYII=', 'base64');
+writeFileSync(join(qrDirectory,'F60-User Manual（二维码的网址编码）.png'),qrPng);
+writeFileSync(join(qrDirectory,'F60-Warranty（二维码的网址编码）.png'),qrPng);
 const scan = await new FileService(new FileRepository(db), settings).scan();
 const batch = db.prepare('select id from material_batches order by sequence_number desc limit 1').get() as { id: number };
 const assetSource = join(dataDir, '隔离验收图片.png');

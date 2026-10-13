@@ -22,10 +22,11 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
     sku: 'PHASE2-ZC200', brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC200', productCategory: '冰柜',
   } });
   expect(productResponse.ok()).toBeTruthy();
+  const productId=(await productResponse.json()).id as number;
 
   await page.goto('/');
   await page.getByRole('button', { name: /图号规划/ }).click();
-  await page.getByLabel('产品型号').selectOption({ label: 'PHASE2 · ZC200' });
+  await page.getByLabel('产品型号').selectOption(String(productId));
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(itemId));
   await page.getByLabel('第 1 行颜色').selectOption(String(colorId));

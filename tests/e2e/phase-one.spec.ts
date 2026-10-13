@@ -47,6 +47,6 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
   });
   await page.getByRole('button', { name: '开始检查' }).click();
   await expect(page.getByText('发现 4 个问题')).toBeVisible();
-  await expect(page.getByText('DUPLICATE_CODE')).toBeVisible();
-  await expect(page.getByText('DATABASE_CONFLICT').first()).toBeVisible();
+  await expect(page.getByRole('table',{name:'迁移问题工作表'}).getByText('工作簿重复编码')).toBeVisible();
+  await expect(page.getByRole('table',{name:'迁移问题工作表'}).getByText('数据库编码冲突').first()).toBeVisible();
 });

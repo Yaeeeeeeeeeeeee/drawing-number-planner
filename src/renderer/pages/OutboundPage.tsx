@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
-import type { PlannerApi } from '../data/client';
+import { useState } from 'react';
+import type { CreatedOutboundPackageView, PlannerApi } from '../data/client';
+import { PackageResult } from './outbound/PackageResult';
 import { ContactsManager } from './outbound/ContactsManager';
 import { EmailComposer } from './outbound/EmailComposer';
 import { PackageBuilder, type OutboundMailContext } from './outbound/PackageBuilder';
@@ -12,46 +13,34 @@ export function OutboundPage({ api }: { api: PlannerApi }) {
 }
 
 function OutboundWorkspace({ api }: { api: PlannerApi }) {
-  const [work,setWork]=useState<'package'|'email'>('package');
   const [contactsOpen, setContactsOpen] = useState(false);
-  const packageSection = useRef<HTMLElement>(null);
-  const emailSection = useRef<HTMLElement>(null);
   const [mailContext, setMailContext] = useState<OutboundMailContext | null>(null);
   const [settings, setSettings] = useState(false);
+  const [createdPackage,setCreatedPackage] = useState<CreatedOutboundPackageView|null>(null);
 
   return (
-    <section className="page-surface page-enter outbound-page outbound-integrated">
+    <section className="page-surface page-enter outbound-page outbound-integrated outbound-mock-page approved-outbound">
       <header className="page-header">
         <div>
-          <p className="eyebrow">OUTBOUND WORKSPACE</p>
           <h1>外发资料</h1>
-          <p>从当前有效资料生成压缩包，并整理可复制的邮件内容；系统不会发送邮件。</p>
+          <p>核对资料、整理分包与邮件草稿。系统不会发送邮件。</p>
         </div>
+        <div className="ob-actions"><button type="button" className="text-button" onClick={()=>setContactsOpen(!contactsOpen)}>{contactsOpen?'返回外发工作':'联系人维护'}</button><button type="button" className="text-button" onClick={()=>setSettings(!settings)}>{settings?'返回外发工作':'模板与签名'}</button></div>
       </header>
-      <nav className="section-tabs" aria-label="外发工作步骤">
-        {contactsOpen ? <button type="button" onClick={() => setContactsOpen(false)}>返回外发工作</button> : <>
-          <button type="button" aria-pressed={work==='package'} onClick={() => setWork('package')}>资料打包</button>
-          <button type="button" aria-pressed={work==='email'} onClick={() => setWork('email')}>邮件撰写</button>
-        </>}
-        <button type="button" onClick={() => setContactsOpen(true)}>联系人</button>
-      </nav>
-      <div hidden={contactsOpen}>
-      <section hidden={work !== 'package'} ref={packageSection} aria-label="资料打包步骤">
-        <h2>1. 选择资料并打包</h2>
+      {settings && <TemplateSettings api={api} />}
+      <div hidden={contactsOpen || settings}>
+      <section className="ob-step" aria-label="资料打包步骤">
+        <h2>1. 准备外发资料</h2>
         <PackageBuilder
           api={api}
+          showResult={false}
+          onResultChange={setCreatedPackage}
           onPackage={(_value, context) => setMailContext(context)}
         />
       </section>
-      <section hidden={work !== 'email'} ref={emailSection} aria-label="邮件编辑步骤">
-          <h2>2. 编辑邮件并复制</h2>
-          <div className="outbound-settings-toggle">
-            <button className="text-button" type="button" onClick={() => setSettings((value) => !value)}>
-              {settings ? '收起模板设置' : '模板与签名设置'}
-            </button>
-          </div>
-          {settings && <TemplateSettings api={api} />}
-          <div hidden={settings}>
+      <section className="ob-step" aria-label="邮件编辑步骤">
+          <h2>2. 生成外发结果</h2>{createdPackage&&<PackageResult key={createdPackage.id} value={createdPackage}/>}<h3>邮件草稿</h3>
+          <div>
             <EmailComposer api={api} mailContext={mailContext} />
           </div>
       </section>

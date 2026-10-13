@@ -166,13 +166,13 @@ describe('OutboundPage', () => {
     const api = apiFixture();
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('button', { name: '预览文件' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '邮件撰写' }));
+    expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
     expect(screen.getByLabelText('正文')).toBeVisible();
     fireEvent.change(screen.getByLabelText('正文'), { target: { value: '保留草稿' } });
-    fireEvent.click(screen.getByRole('button', { name: '联系人' }));
+    fireEvent.click(screen.getByRole('button', { name: '联系人维护' }));
     fireEvent.click(screen.getByRole('button', { name: '返回外发工作' }));
     expect(screen.getByLabelText('正文')).toHaveValue('保留草稿');
-    fireEvent.click(screen.getByRole('button', { name: '资料打包' }));
+    expect(screen.getByRole('heading', { name: '1. 准备外发资料' })).toBeVisible();
     expect(screen.getByRole('button', { name: '预览文件' })).toBeVisible();
   });
   it('loads a completed package into the mounted composer without mixing it with an existing draft', async () => {
@@ -255,7 +255,7 @@ describe('OutboundPage', () => {
       const showOutboundPackageInFolder = vi.fn().mockResolvedValue({ ok: true });
       window.plannerDesktop = { chooseOutboundDirectory, showOutboundPackageInFolder } as never;
       render(<OutboundPage api={api as never} />);
-      fireEvent.click(await screen.findByLabelText(label));
+      fireEvent.change(await screen.findByLabelText('打包资料类型'), {target:{value:materialType}});
       fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
       fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
       fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
@@ -264,9 +264,9 @@ describe('OutboundPage', () => {
       await waitFor(() => expect(api.createOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({
         materialType, previewToken: 'preview-1', selectedPdfFileIds: [41],
       })));
-      expect(await screen.findByText(`${packageResult.packageName}.zip`)).toBeVisible();
-      expect(screen.getByText(`保存位置：${materialType}.zip`)).toBeVisible();
-      expect(screen.getByText('文件数量：1')).toBeVisible();
+      expect(await screen.findByRole('table',{name:'ZIP 分包结果'})).toBeVisible();
+      expect(screen.getByText(`${materialType}.zip`)).toBeVisible();
+      expect(screen.getByText('1 个文件 · 1 个分包')).toBeVisible();
       fireEvent.click(screen.getByRole('button', { name: '打开位置' }));
       await waitFor(() => expect(showOutboundPackageInFolder).toHaveBeenCalledWith(packageResult.id));
     });
@@ -284,16 +284,16 @@ describe('OutboundPage', () => {
   it('previews both explicit business dimensions and blocks missing materials', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '外发资料' })).toBeVisible();
-    expect(screen.getByRole('button', { name: '资料打包' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '1. 准备外发资料' })).toBeVisible();
     expect(screen.getByLabelText('本次变更资料')).toBeChecked();
     fireEvent.click(screen.getByLabelText('当前完整包材资料'));
-    fireEvent.click(screen.getByLabelText('更新资料'));
+    fireEvent.change(screen.getByLabelText('打包资料类型'), {target:{value:'update'}});
     fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
     fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await waitFor(() => expect(api.previewOutboundPackage).toHaveBeenCalledWith({ productId: 3, selectedMaterialBatchId: 8, materialType: 'update', packageMode: 'current_complete' }));
     expect(await screen.findByText('铭牌（转曲）.pdf')).toBeVisible();
-    expect(screen.getByText('缺失')).toBeVisible();
+    expect(screen.getAllByText('缺失').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '全选可用文件' })).toBeVisible();
     expect(screen.getByRole('button', { name: '生成压缩包' })).toBeDisabled();
     expect(screen.getByText('存在缺失、冲突或待确认资料，处理后才能打包。')).toBeVisible();
@@ -314,7 +314,7 @@ describe('OutboundPage', () => {
   it('generates editable email text from contacts, blocks and signature and copies labelled fields', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined); Object.assign(navigator, { clipboard: { writeText } });
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '邮件撰写' }));
+    expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
     fireEvent.click(await screen.findByLabelText('收件人 王经理'));
     fireEvent.click(screen.getByLabelText('附加段落 METI 后更新'));
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
@@ -332,14 +332,15 @@ describe('OutboundPage', () => {
     const api = apiFixture(); api.previewOutboundPackage.mockResolvedValue({ ...preview, items: [preview.items[0]] });
     window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true, path: 'D:\\temp' }), showOutboundPackageInFolder: vi.fn() } as never;
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByLabelText('更新资料'));
+    fireEvent.change(await screen.findByLabelText('打包资料类型'),{target:{value:'update'}});
     fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
     fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('铭牌（转曲）.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
     await screen.findByText('压缩包已生成');
-    fireEvent.click(screen.getByRole('button', { name: '邮件撰写' }));
+    expect(screen.getByRole('table',{name:'ZIP 分包结果'})).toBeVisible();
+    expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
     fireEvent.change(await screen.findByLabelText('本次变更内容'), { target: { value: '铭牌文字修正' } });
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
     await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalledWith(2, expect.objectContaining({
@@ -355,7 +356,7 @@ describe('OutboundPage', () => {
     api.createOutboundPackage.mockResolvedValue({ id: 93, packageName: 'A包', zipRelativePath: 'A包.zip', fileCount: 1, createdAt: '' });
     window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true, path: 'D:\\temp' }), showOutboundPackageInFolder: vi.fn() } as never;
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByLabelText('更新资料'));
+    fireEvent.change(await screen.findByLabelText('打包资料类型'),{target:{value:'update'}});
     fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
     fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
@@ -366,7 +367,7 @@ describe('OutboundPage', () => {
     fireEvent.click(screen.getByLabelText('当前完整包材资料'));
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('B说明书.pdf');
-    fireEvent.click(screen.getByRole('button', { name: '邮件撰写' }));
+    expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
     expect(await screen.findByLabelText('主题')).toHaveValue('A包');
     fireEvent.click(await screen.findByRole('button', { name: '生成邮件内容' }));
     await waitFor(() => expect(api.renderOutboundTemplate).toHaveBeenCalledWith(2, expect.objectContaining({
@@ -378,7 +379,7 @@ describe('OutboundPage', () => {
   it('keeps email input and shows a local error when rendering fails', async () => {
     const api = apiFixture(); api.renderOutboundTemplate.mockRejectedValue(new Error('模板变量缺失'));
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '邮件撰写' }));
+    expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
     fireEvent.change(await screen.findByLabelText('本次变更内容'), { target: { value: '保留此内容' } });
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
     expect(await screen.findByText('模板变量缺失')).toBeVisible();
@@ -392,7 +393,7 @@ describe('OutboundPage', () => {
       template,
     ]);
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '邮件撰写' }));
+    expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
     fireEvent.change(await screen.findByLabelText('邮件资料类型'), { target: { value: 'initial' } });
     expect(screen.queryByLabelText('本次变更内容')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
@@ -401,7 +402,7 @@ describe('OutboundPage', () => {
 
   it('creates and toggles contacts nearby', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '联系人' }));
+    fireEvent.click(await screen.findByRole('button', { name: '联系人维护' }));
     fireEvent.click(screen.getByRole('button', { name: '新增联系人' }));
     const form = screen.getByRole('form', { name: '联系人编辑' });
     fireEvent.change(within(form).getByLabelText('公司'), { target: { value: '供应商乙' } });
@@ -416,7 +417,7 @@ describe('OutboundPage', () => {
   it('shows a nearby contact status error without discarding the open edit form', async () => {
     const api = apiFixture(); api.deactivateOutboundContact.mockRejectedValue(new Error('联系人已被引用'));
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '联系人' }));
+    fireEvent.click(await screen.findByRole('button', { name: '联系人维护' }));
     fireEvent.click(await screen.findByRole('button', { name: '编辑' }));
     fireEvent.change(screen.getByLabelText('备注'), { target: { value: '未保存备注' } });
     fireEvent.click(screen.getByRole('button', { name: '停用 王经理' }));
@@ -426,8 +427,8 @@ describe('OutboundPage', () => {
 
   it('keeps template blocks and signatures maintainable from the email settings area', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '邮件撰写' }));
-    fireEvent.click(screen.getByRole('button', { name: '模板与签名设置' }));
+    expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '模板与签名' }));
     expect(await screen.findByRole('button', { name: '编辑模板 更新资料' })).toBeVisible();
     fireEvent.click(screen.getByText('附加段落'));
     expect(screen.getByRole('button', { name: '新增附加段落到 更新资料' })).toBeVisible();
@@ -445,8 +446,8 @@ describe('OutboundPage', () => {
   it('keeps template editing open with its input when save fails', async () => {
     const api = apiFixture(); api.updateOutboundTemplate.mockRejectedValue(new Error('模板编码冲突'));
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '邮件撰写' }));
-    fireEvent.click(screen.getByRole('button', { name: '模板与签名设置' }));
+    expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '模板与签名' }));
     fireEvent.click(await screen.findByRole('button', { name: '编辑模板 更新资料' }));
     fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '未保存模板名' } });
     fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
@@ -457,8 +458,8 @@ describe('OutboundPage', () => {
   it('creates templates and signatures and edits existing optional blocks', async () => {
     const api = apiFixture();
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '邮件撰写' }));
-    fireEvent.click(screen.getByRole('button', { name: '模板与签名设置' }));
+    expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '模板与签名' }));
 
     fireEvent.click(await screen.findByRole('button', { name: '新增邮件模板' }));
     fireEvent.change(screen.getByLabelText('模板编码'), { target: { value: 'initial_extra' } });
@@ -485,8 +486,8 @@ describe('OutboundPage', () => {
     const api = apiFixture();
     api.createOutboundSignature.mockRejectedValue(new Error('签名名称已存在'));
     render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '邮件撰写' }));
-    fireEvent.click(screen.getByRole('button', { name: '模板与签名设置' }));
+    expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '模板与签名' }));
     fireEvent.click(await screen.findByRole('button', { name: '新增邮件签名' }));
     fireEvent.change(screen.getByLabelText('签名名称'), { target: { value: '保留的新签名' } });
     fireEvent.change(screen.getByLabelText('签名内容'), { target: { value: '未保存内容' } });

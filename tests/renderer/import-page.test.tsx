@@ -48,7 +48,7 @@ describe('ImportPage', () => {
 
     expect(await screen.findByText('可导入 2 条')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
-    fireEvent.click(screen.getByRole('button', { name: '全选可导入项' }));
+    fireEvent.click(screen.getByRole('button', { name: '全选可导入项（含筛选外）' }));
     expect(screen.getByText('已选择 2 条')).toBeVisible();
     expect(screen.getByLabelText('选择 SAMKYO')).toBeChecked();
     expect(screen.getByLabelText('选择 白色')).toBeChecked();
@@ -114,7 +114,7 @@ describe('ImportPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
     expect(await screen.findByText('可导入 1 条')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
-    fireEvent.click(screen.getByRole('button', { name: '全选可导入项' }));
+    fireEvent.click(screen.getByRole('button', { name: '全选可导入项（含筛选外）' }));
     fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
 
     expect(await screen.findByText('导入被拒绝')).toBeVisible();
@@ -147,7 +147,7 @@ describe('ImportPage', () => {
 
     expect(screen.getByLabelText('选择 SAMKYO')).toBeDisabled();
     expect(screen.getByLabelText('选择 白色')).toBeDisabled();
-    expect(screen.getByRole('button', { name: '全选可导入项' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '全选可导入项（含筛选外）' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消全选' })).toBeDisabled();
     fireEvent.click(screen.getByLabelText('选择 白色'));
     expect(screen.getByText('已选择 1 条')).toBeVisible();
