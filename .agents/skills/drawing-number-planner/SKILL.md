@@ -38,3 +38,11 @@ Read the topic reference needed for the task:
 - Do not merge branches, start a new phase, or operate on real user data unless the request explicitly authorizes it.
 
 When a task changes a rule, update the classification and supporting reference only after the user has confirmed the new behavior.
+
+
+<!-- drawing-number-planner-ui-baseline-20261013 -->
+## UI baseline and acceptance evidence
+
+For UI, desktop delivery, acceptance claims, or changes affecting confirmed rules, read [the UI baseline and acceptance supplement](references/ui-and-acceptance.md#ui-baseline-and-acceptance-supplement-2026-10-13) and the project documents `docs/approved-ui-alignment-20261013.md` and `docs/desktop-acceptance-20261013.md`. These are dated evidence, not blanket authorization or proof of final acceptance.
+
+Preserve confirmed module layouts and real business safeguards. Keep candidate UI, automated verification, conditional acceptance, manual desktop acceptance, and final release acceptance separate. Before concluding future work, check whether it changes a Current rule, a module UI principle, a deprecated design, or an acceptance boundary; update only affected Skill guidance when a confirmed rule actually changes. Report missing evidence and unresolved discrepancies rather than promoting a candidate or test result to human approval.
