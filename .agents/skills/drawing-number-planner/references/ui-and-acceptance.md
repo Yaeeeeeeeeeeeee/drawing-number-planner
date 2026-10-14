@@ -76,7 +76,7 @@ Before delivering a future change, identify affected modules and compare against
 
 ### Sources, classification and authority
 
-Read [confirmed design and phases](../../../../docs/minimal-engineering-workspace-design-20261014.md) and [Windows acceptance standard](../../../../docs/minimal-engineering-workspace-acceptance-20261014.md). Current design is unified grayscale, module-specific workspaces and auxiliary panels folded by actual available CSS width. P0 is confirmed; P1–P5 are not implemented. Current authorization is documentation updates only; do not start P1 without explicit user authorization. Do not request renewed approval for the decisions already confirmed below.
+Read [confirmed design and phases](../../../../docs/minimal-engineering-workspace-design-20261014.md) and [Windows acceptance standard](../../../../docs/minimal-engineering-workspace-acceptance-20261014.md). Current design is unified grayscale, module-specific workspaces and auxiliary panels folded by actual available CSS width. P0 is confirmed. Its documentation-only gate records that earlier stage; the user later explicitly authorized P1. Read `docs/p1-minimal-workspace-20261014.md` for implementation evidence and current limitations. Authorization and validation for P1 do not authorize P2–P5. Do not request renewed approval for the decisions already confirmed below.
 
 The 2026-10-13 section remains dated evidence. New confirmed visual decisions override conflicting layout/color constraints for future work, not historical results, business behavior or acceptance gates. Read both dated sources and preserve originals. No merge, real-data or recovery-command authorization follows from these documents.
 

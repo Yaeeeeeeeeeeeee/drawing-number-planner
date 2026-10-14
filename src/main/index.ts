@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { LocalServiceController } from './local-service-controller.js';
+import { minimumOuterSize } from './window-layout.js';
 import { loadDesktopSurface } from './desktop-startup.js';
 import { createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
 import { createChooseOutboundDirectoryHandler, createShowOutboundPackageHandler } from './outbound-file-actions.js';
@@ -29,9 +30,9 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1080,
-    minHeight: 720,
-    backgroundColor: '#f3f6fa',
+    minWidth: 720,
+    minHeight: 600,
+    backgroundColor: '#FFFFFF',
     show: false,
     webPreferences: {
       contextIsolation: true,
@@ -39,6 +40,24 @@ async function createWindow() {
       sandbox: true,
       preload: fileURLToPath(new URL('./preload.cjs', import.meta.url)),
     },
+  });
+
+  // Calibrate only window geometry after the renderer exists. No IPC or recovery changes.
+  const windowForLayout = mainWindow;
+  const calibrateMinimum = () => {
+    void windowForLayout.webContents.executeJavaScript('[window.innerWidth, window.innerHeight]')
+      .then((viewport: [number, number]) => {
+        if (windowForLayout.isDestroyed()) return;
+        const [width, height] = windowForLayout.getSize();
+        const size = minimumOuterSize({ outer: [width, height], viewport,
+          zoom: windowForLayout.webContents.getZoomFactor() });
+        if (size) windowForLayout.setMinimumSize(...size);
+      }).catch(error => console.error('[main] minimum viewport measurement failed', error));
+  };
+  windowForLayout.webContents.on('did-finish-load', calibrateMinimum);
+  windowForLayout.webContents.on('zoom-changed', () => {
+    // Wait for the new renderer zoom before measuring CSS-to-native dimensions.
+    setTimeout(() => { if (!windowForLayout.isDestroyed()) calibrateMinimum(); }, 0);
   });
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import { App } from './App';
+import './workspace-theme.css';
 import './styles.css';
 import './batch2-ui.css';
 import './integrated-ui.css';

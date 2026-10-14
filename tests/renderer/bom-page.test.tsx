@@ -321,7 +321,10 @@ describe('BomPage product-level BOM', () => {
 
   it('overrides the global table nowrap rule for long BOM attachment paths', () => {
     const style = document.createElement('style');
-    style.textContent = readFileSync('src/renderer/styles.css', 'utf8');
+    // jsdom does not evaluate cascade layers; test the preserved legacy declaration here.
+    // Production Chromium verification covers the real layered cascade.
+    style.textContent = readFileSync('src/renderer/styles.css', 'utf8')
+      .replace(/^@layer legacy \{\n/, '').replace(/\n\}\n$/, '');
     document.head.append(style);
     const table = document.createElement('table');
     table.innerHTML = '<tbody><tr><td><small class="bom-asset-path">very/long/path/file.png</small></td></tr></tbody>';
