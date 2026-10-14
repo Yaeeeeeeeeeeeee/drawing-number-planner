@@ -69,3 +69,28 @@ Report acceptance as separate fields: confirmed UI choices; candidate scope; aut
 ### Future Skill impact check
 
 Before delivering a future change, identify affected modules and compare against Current rules, confirmed UI principles, Deprecated designs and acceptance gates. Verify against the actual implementation and newest dated evidence; distinguish a new confirmed decision from a proposal or implementation accident. If a confirmed policy changed, update only affected Skill text and supporting source/classification. If none changed, report “Skill impact checked: no rule update needed.” Do not silently rewrite historical evidence, remove unresolved acceptance items, grant merge/real-data authorization, or change Schema/API/core algorithms as part of a UI/Skill maintenance task.
+
+
+<!-- drawing-number-planner-workspace-20261014 -->
+## Minimal Engineering Workspace supplement (2026-10-14)
+
+### Sources, classification and authority
+
+Read [confirmed design and phases](../../../../docs/minimal-engineering-workspace-design-20261014.md) and [Windows acceptance standard](../../../../docs/minimal-engineering-workspace-acceptance-20261014.md). Current design is unified grayscale, module-specific workspaces and auxiliary panels folded by actual available CSS width. P0 is confirmed; P1–P5 are not implemented. Current authorization is documentation updates only; do not start P1 without explicit user authorization. Do not request renewed approval for the decisions already confirmed below.
+
+The 2026-10-13 section remains dated evidence. New confirmed visual decisions override conflicting layout/color constraints for future work, not historical results, business behavior or acceptance gates. Read both dated sources and preserve originals. No merge, real-data or recovery-command authorization follows from these documents.
+
+### Current confirmed changes
+
+- Drawing library may replace inline expanded detail with a right-side drawing detail panel, using a drawer when narrow. Preserve full details, historical relationships, occupancy explanation, dangerous actions, Escape/close/focus behavior. Batch checkboxes and detail selection are independent; PDF preview is not the default detail.
+- Navigation, tables, buttons, typography, spacing and panels may adopt grayscale even in previously frozen modules. Retain confirmed BOM, QR, dictionary and outbound information structures and interactions, plus small text-backed success/warning/error/activation/deletion colors. Do not gray out all semantic distinctions or restore excluded designs.
+- PDF center scope is product/batch navigation, file list and real file details using existing interfaces. General embedded PDF preview is excluded this round: no fake preview. Future preview requires separate API/security/performance evaluation and authorization.
+- Minimum complete desktop workflow target is 720×600 CSS px, both dimensions. All auxiliary areas may fold or become drawers. Core actions, full drawing-code viewing/copying, confirmations and dialogs must remain reachable; internal scrolling is allowed, whole-page horizontal overflow is not.
+- Breakpoints use measured CSS viewport/container width and table budget, not physical screen resolution. Document breakpoint numbers are initial tuning values, not domain rules. Fold panels before compromising codes. At 4K increase useful information rather than magnifying everything; no global CSS zoom.
+- Future window changes are limited to minimum dimensions and necessary background color. Measure outer window/content/CSS viewport differences; never equate Electron minWidth/minHeight directly to 720×600. Main recovery, IPC, security and unrelated desktop behavior remain out of scope. No configuration is changed by this documentation update.
+- P1–P2 use fixed widths and automatic folding. P4 adds product-navigation/detail resizing constrained by usable table width, keyboard support and reset-to-default. No width persistence this round; resizing is not business authorization.
+- Windows acceptance covers 1920×1080, 2560×1440, 3840×2160 with supported 100%/125%/150%/200% combinations; measure width AND height in maximized/windowed/half-screen/narrow modes and after moving between differently scaled monitors. Sub-720×600 cases are not complete-workflow passes; missing device evidence stays unverified.
+
+### Remaining gates and impact
+
+Keep business rules, schema/migrations/API, original files, occupancy, history and reference safeguards unchanged. UI approval does not close late-response/auxiliary-retry TODOs, old Mock failures or full recovery/production permissions/stability gates. Future results require actual versioned evidence; old counts and screenshots are not new runs. Skill impact checked: only confirmed UI direction and acceptance guidance updated; no business-rule update.
