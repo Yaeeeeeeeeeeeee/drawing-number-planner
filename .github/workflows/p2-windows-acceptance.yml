@@ -36,7 +36,8 @@ jobs:
         run: node scripts/verify-p1-windows.cjs "$pwd/p2-source" "$pwd/P2-Windows-c74f469/图号规划器验收版.exe"
       - name: Record startup outcome
         shell: pwsh
-        run: '${{ steps.smoke.outcome }}' | Set-Content P2-Windows-c74f469/Windows-smoke-outcome.txt
+        run: |
+          '${{ steps.smoke.outcome }}' | Set-Content P2-Windows-c74f469/Windows-smoke-outcome.txt
       - uses: actions/upload-artifact@v4
         with:
           name: P2-Windows-x64-c74f469
