@@ -77,3 +77,13 @@ git -C $source rev-parse HEAD
 云端成功推送P1精确SHA；Windows Electron43.4.1 zip的官方SHA256为 `c2ef9a5f65472c34d14bd3e67b7d14e66b0c01f124aba45263d6a4232160e13a`。SQLite13.0.3带N-API跨平台预编译文件；Windows包必须含win32-x64.node的PE x64 DLL，不混用Linux二进制。
 
 云端可跨平台组装目录包、检查文件／数据库及版本，不可在Linux宣称Windowsexe已启动。实际CI或本机结果另行记录。P1既有17项基线单元失败、2项平台相关E2E失败、完整恢复／生产权限／稳定性门禁保持，不因交付操作关闭。
+
+## 本次 Windows CI 交付结果
+
+2026-10-14 GitHub Actions Windows Server2025 x64、Node24.21.0 上，固定7d9e7b7源码完成类型检查、Renderer/Main编译、隔离样例打包及实际Electron启动烟测。运行：https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38519259615 。
+
+可下载目录包：https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38519259615/artifacts/11873321296 。大小165847702字节（约158MiB），保留到2026-10-28。ZIP SHA256：`25d17d512d5053f7fe21f61ea4e7f9c443b7eea8c2ce46056473d6e7eef51ee9`。
+
+启动验证断言：标题含7d9e7b7、实际userData隔离且版本标记一致、样例产品PREVIEWF60存在、健康接口HTTP200；对720×600、1080×800、1920×1000 CSS目标按实际视口差异校准外窗，确认内容视口不小于目标且整页无横向溢出。具体测量及截图在包内windows-verification.json、Windows启动烟测.png。
+
+这只是Windows CI启动与初始页面烟测，不代替所有模块弹窗、业务交互、Windows10/11、1080P/2K/4K不同宽高与100%/125%/150%/200%缩放、半屏及跨不同缩放显示器的人工验收。应用源码提交不变；独立交付工具提交为f211d37。
