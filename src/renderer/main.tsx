@@ -7,6 +7,7 @@ import './styles.css';
 import './batch2-ui.css';
 import './integrated-ui.css';
 import './approved-ui.css';
+import './module-workspace.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

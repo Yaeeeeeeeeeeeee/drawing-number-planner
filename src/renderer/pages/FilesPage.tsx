@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
 
+import { ModuleWorkspace } from '../components/ModuleWorkspace';
 import { DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
 import type { FileIndexClearPreviewView, FileScanChangesView, MaterialBatchView, PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
@@ -10,7 +11,7 @@ import { createFilesMockApi, filesScenarios, initialFilesScenario, isFilesMockEn
 const initialFilters = { keyword: '', productId: '', materialBatchId: '', matchStatus: '', conversionType: '', presence: 'present' };
 const pageSize = 50;
 
-function FilePath({ path, name, onClose }: { path: string; name: string; onClose: () => void }) {
+function FilePath({ path, name, onClose }: { path: string; name: string; onClose?: () => void }) {
   const [feedback, setFeedback] = useState('');
   const copy = async () => {
     try {
@@ -20,7 +21,7 @@ function FilePath({ path, name, onClose }: { path: string; name: string; onClose
   };
   return <div className="files-path-row"><span className="files-path-full">{path}</span>
       <div className="files-path-actions"><button type="button" className="text-button" aria-label={`复制 ${name} 的完整相对路径`} onClick={() => void copy()}>复制路径</button>
-      <button type="button" className="text-button" onClick={onClose}>收起路径</button>
+      {onClose && <button type="button" className="text-button" onClick={onClose}>收起路径</button>}
       {feedback && <small role="status">{feedback}</small>}</div>
   </div>;
 }
@@ -53,6 +54,7 @@ export function FilesPage({ api }: { api: PlannerApi }) {
 }
 
 function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
+  const [detailFile, setDetailFile] = useState<PdfFileView | null>(null);
   const [expandedPathId, setExpandedPathId] = useState<number | null>(null);
   const [settings, setSettings] = useState<WorkspaceSettingsView>({ workspaceRoot: null, configured: false, available: false });
   const [rootInput, setRootInput] = useState(''); const [files, setFiles] = useState<PdfFileView[]>([]);
@@ -77,6 +79,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
       const result = await api.searchPdfFiles(searchInput(values, requestedPage));
       if (request !== searchRequest.current) return;
       setFiles(result.items); setTotal(result.total); setPage(result.page);
+      setDetailFile(current => current ? result.items.find(item => item.id === current.id) ?? null : null);
     } catch (reason) {
       if (request === searchRequest.current) setError(reason instanceof Error ? reason.message : 'PDF 文件加载失败');
     } finally { if (request === searchRequest.current) setLoading(false); }
@@ -169,6 +172,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
       const result = await api.clearFileIndex(indexClearPhrase);
       const nextFilters = { ...filters, materialBatchId: '' };
       setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); setSelectedIds([]); setPendingCleanupIds(null);
+      setDetailFile(null); setExpandedPathId(null);
       setFilters(nextFilters);
       setFiles([]); setTotal(0); setBatches([]); setPage(1);
       setSummary(null); setScanChanges(null); setShowChanges(false);
@@ -184,6 +188,42 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
     if (!result.ok) setError(result.error?.message ?? '打开文件位置失败');
   };
 
+  const navigate = (productId: string, materialBatchId = '') => {
+    const next = { ...filters, productId, materialBatchId }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1);
+  };
+  const navigation = <nav aria-label="资料导航"><h2>产品与批次</h2>
+    <button className="secondary-button" type="button" aria-pressed={!filters.productId && !filters.materialBatchId} onClick={() => navigate('')}>全部产品／批次</button>
+    {products.map(product => <details key={product.id} open={filters.productId === String(product.id)}>
+      <summary>{product.productCategory || '未分类'} · {product.model}</summary>
+      <button className="secondary-button" type="button" aria-label={`产品 ${product.sku ?? '待补录'} · ${product.model}`} aria-pressed={filters.productId === String(product.id) && !filters.materialBatchId}
+        onClick={() => navigate(String(product.id))}>{product.sku ?? '待补录'} · {product.model}</button>
+      {batches.filter(batch => batch.productId === product.id).map(batch => <button className="secondary-button" type="button" key={batch.id}
+        aria-pressed={filters.materialBatchId === String(batch.id)} onClick={() => navigate(String(product.id), String(batch.id))}>{materialBatchLabel(batch.name)} · {batch.recognitionStatus === 'pending' ? '待确认' : batch.currentState === 'current' ? '当前使用' : batch.currentState === 'historical' ? '历史使用' : '未确定'}</button>)}
+    </details>)}
+    <details><summary>其他／待关联批次</summary>{batches.filter(batch => !products.some(product => product.id === batch.productId)).map(batch => <button className="secondary-button" type="button" key={batch.id}
+      aria-pressed={filters.materialBatchId === String(batch.id)} onClick={() => navigate('', String(batch.id))}>{materialBatchLabel(batch.name)} · {batch.recognitionStatus === 'pending' ? '待确认' : '未关联产品'}</button>)}</details>
+    <button className="secondary-button" type="button" onClick={() => { const next = { ...initialFilters, presence: 'all', matchStatus: 'pending' }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1); }}>待确认文件</button>
+    <button className="secondary-button" type="button" onClick={() => { const next = { ...initialFilters, presence: 'all' }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); setMessage('现有接口不支持精确筛选未关联产品／未归入批次；已打开全部文件，请核对产品与批次列。'); void search(next, 1); }}>未关联／未归批次核对</button>
+    <p className="muted-text">未关联产品、未归入批次的文件保留在全部列表；按“匹配状态”核对。导航不显示推测的文件总数。</p>
+  </nav>;
+  const detail = detailFile ? <aside className="file-detail" aria-label="文件详情">
+    <button className="secondary-button panel-close" type="button" onClick={() => { setDetailFile(null); document.getElementById(`file-detail-toggle-${detailFile.id}`)?.focus(); }}>关闭文件详情</button>
+    <h2>文件详情</h2><p className="file-primary">{detailFile.fileName}</p>
+    {error && <p className="error-banner" role="alert">{error}</p>}
+    <dl>{[
+      ['完整图号', detailFile.fullCode ?? detailFile.historicalFullCode ?? '未可靠匹配'],
+      ['产品', detailFile.productId ? `${detailFile.sku ?? '待补录'} · ${detailFile.model}` : '待关联'],
+      ['资料批次', detailFile.materialBatchName ? materialBatchLabel(detailFile.materialBatchName) : '未归入批次'],
+      ['转曲类型', detailFile.conversionType === 'outlined' ? '转曲后' : '转曲前'],
+      ['文件状态', detailFile.isPresent ? '存在' : '缺失'],
+      ['匹配状态', detailFile.matchStatus === 'matched' ? '已匹配' : detailFile.matchStatus === 'pending' ? '待确认' : detailFile.matchStatus === 'conflict' ? '冲突' : '未匹配'],
+      ['文件大小', `${detailFile.sizeBytes} B`], ['修改时间', detailFile.modifiedAt], ['索引扫描时间', detailFile.scannedAt],
+    ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    {detailFile.classificationWarning && <p className="info-banner">{detailFile.classificationWarning}</p>}
+    <h3>完整相对路径</h3><FilePath key={detailFile.id} path={detailFile.relativePath} name={detailFile.fileName} />
+    <button className="secondary-button" type="button" disabled={!detailFile.isPresent} onClick={() => void openLocation(detailFile.id)}>打开文件位置</button>
+    {!detailFile.isPresent && <p className="muted-text">文件已缺失，不能定位；索引清理仍使用列表中的独立确认操作。</p>}
+  </aside> : null;
   return <section className="page-surface page-enter files-page">
     <header className="page-header"><div><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
       <span className="record-count">{total} 个索引文件</span></header>
@@ -199,7 +239,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
         <span>{settings.configured ? '保存后请手动扫描以更新索引' : '输入资源管理器中的完整目录路径'}</span>
       </div>
     </section>
-    {error && <p className="error-banner" role="alert">{error}</p>}{message && <p className="success-banner" role="status"><strong>{message}</strong></p>}
+    {error && !detailFile && <p className="error-banner" role="alert">{error}</p>}{message && <p className="success-banner" role="status"><strong>{message}</strong></p>}
     {mock && scanning && <section className="scan-comparison" role="status"><span>正在模拟扫描 · 仅处理内存样例，不读取文件</span><button type="button" className="secondary-button" onClick={() => void api.listLocalTasks().then(tasks => { const task = tasks.find(item => item.status === 'running'); if (task) return api.cancelLocalTask(task.id); }).catch(reason => setError(String(reason)))}>取消模拟扫描</button></section>}
     {summary && <>
       <section className="scan-summary" aria-label="当前资料库状态"><strong>当前索引统计</strong><span>{summary.currentTotal} 个索引文件（PDF / 二维码）</span>
@@ -232,6 +272,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
         <option value="present">当前存在</option><option value="missing">已缺失</option><option value="all">全部</option></select></label>
       <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
     </form>
+    <ModuleWorkspace navigation={navigation} detail={detail} detailLabel="文件详情" detailIdentity={detailFile?.id} onCloseDetail={() => { setDetailFile(null); }}>
     <p className="files-selection-note">仅缺失记录可选，存在文件的选择控件已禁用。{mock && ' Mock：选择与清理仅作用于内存预览。'}</p>
     {missingOnPage.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
       <span>本页有 {missingOnPage.length} 条缺失索引记录</span>
@@ -279,7 +320,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
         { key: 'select', label: '选择', render: (item) => <input type="checkbox"
           aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning || item.isPresent}
           onChange={() => toggleSelection(item.id)} /> },
-        { key: 'name', label: '文件名', render: (item) => <div className="files-name-row"><span className="file-primary">{item.fileName.replace(/\.pdf$/i, '')}</span></div> },
+        { key: 'name', label: '文件名', render: (item) => <div className="files-name-row"><button id={`file-detail-toggle-${item.id}`} className="files-name-button" type="button" aria-label={`文件详情 ${item.fileName}`} aria-expanded={detailFile?.id === item.id} onClick={() => setDetailFile(item)}><span className="file-primary">{item.fileName.replace(/\.pdf$/i, '')}</span></button></div> },
         { key: 'batch', label: '资料批次', render: (item) => <span className="files-batch-code">{item.materialBatchName ?? '未归入批次'}</span> },
         { key: 'batchStatus', label: '批次状态', render: (item) => <FileBatch item={item} batches={batches} /> },
         { key: 'product', label: '产品', render: (item) => item.productId ? <span className="file-product"><strong>{item.productCategory} · {item.model}</strong><small>SKU：{item.sku ?? '待补录'}</small></span> : <span className="muted-text">待关联</span> },
@@ -314,6 +355,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
       <button className="secondary-button" type="button" disabled={loading || page >= pageCount}
         onClick={() => void search(filters, page + 1)}>下一页</button>
     </nav>}
+    </ModuleWorkspace>
     <details className="files-index-maintenance"><summary>索引维护</summary><section className="file-cleanup-toolbar" aria-label="资料库索引清空">
       <div><strong>清空资料库索引</strong><p>影响 PDF、二维码、资料批次与扫描记录；不删除磁盘原始文件，不会释放任何已占用图号。</p></div>
       <button className="text-button danger" type="button" disabled={scanning || clearingIndex || !settings.configured} onClick={() => void requestIndexClear()}>清空资料库索引</button>

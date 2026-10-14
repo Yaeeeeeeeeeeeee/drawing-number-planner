@@ -12,6 +12,7 @@ import type {
   PdfFileView,
   PlannerApi,
 } from '../data/client';
+import { ModuleWorkspace } from '../components/ModuleWorkspace';
 import { DataTable } from '../components/DataTable';
 import { QueryFeedback, type QueryState } from '../components/QueryFeedback';
 import { EmptyState } from '../components/EmptyState';
@@ -25,6 +26,9 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
   const mockMode = isDrawingLibraryMockEnabled();
   const api = useMemo(() => mockMode ? createDrawingLibraryMockApi() : realApi, [mockMode, realApi]);
   const disclosureButtons = useRef(new Map<number, HTMLButtonElement>());
+  const detailRequest = useRef(0);
+  const pdfRequest = useRef(0);
+  useEffect(() => () => { detailRequest.current++; }, []);
   const [view, setView] = useState<'drawing' | 'batch'>('drawing');
   const [filters, setFilters] = useState(emptyFilters);
   const [options, setOptions] = useState<Record<string, DictionaryItemView[]>>({});
@@ -87,18 +91,31 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
   };
   const loadPdfCandidates = async (keyword = '') => {
     if (!api.searchPdfFiles) return;
-    const result = await api.searchPdfFiles({ keyword, presence: 'present', page: 1, pageSize: 100 });
-    setPdfCandidates(result.items); setSelectedPdfId(String(result.items[0]?.id ?? ''));
+    const request = ++pdfRequest.current, detail = detailRequest.current;
+    try {
+      const result = await api.searchPdfFiles({ keyword, presence: 'present', page: 1, pageSize: 100 });
+      if (request !== pdfRequest.current || detail !== detailRequest.current) return;
+      setPdfCandidates(result.items); setSelectedPdfId(String(result.items[0]?.id ?? ''));
+    } catch (reason) { if (request === pdfRequest.current && detail === detailRequest.current) throw reason; }
   };
   const openDetail = async (item: DrawingView) => {
+    const request = ++detailRequest.current;
+    pdfRequest.current++;
     try {
-      setError(''); const detail = await api.getDrawing(item.id); setSelected(detail); setPdfKeyword(''); setSelectedPdfId('');
+      setError(''); const detail = await api.getDrawing(item.id);
+      if (request !== detailRequest.current) return;
+      setSelected(detail); setPdfKeyword(''); setSelectedPdfId('');
       setDeletionPreview(null); setDeletionMode('retain_occupied'); setDeletionReason(''); setDeletionConfirmation('');
-      if (!detail.readOnly) await loadPdfCandidates(); else setPdfCandidates([]);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : '详情加载失败'); }
+      setPdfCandidates([]);
+      if (!detail.readOnly && api.searchPdfFiles) {
+        const candidateRequest = ++pdfRequest.current;
+        const result = await api.searchPdfFiles({ keyword: '', presence: 'present', page: 1, pageSize: 100 });
+        if (request === detailRequest.current && candidateRequest === pdfRequest.current) { setPdfCandidates(result.items); setSelectedPdfId(String(result.items[0]?.id ?? '')); }
+      }
+    } catch (reason) { if (request === detailRequest.current) setError(reason instanceof Error ? reason.message : '详情加载失败'); }
   };
   const refreshDetail = async (id: number) => {
-    const detail = await api.getDrawing(id); setSelected(detail);
+    const detail = await api.getDrawing(id); setSelected(current => current?.id === id ? detail : current);
     setItems((current) => current.map((item) => item.id === id ? { ...item, ...detail } : item));
   };
   const changeStatus = async (target: 'active' | 'voided') => {
@@ -128,9 +145,14 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
   };
   const beginDrawingDeletion = async () => {
     if (!selected) return;
+    const request = detailRequest.current;
     setMaintaining(true); setError('');
-    try { setDeletionPreview(await api.getDrawingDeletionPreview(selected.id)); if (selected.deletedAt) setDeletionMode('release'); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '删除引用检查失败'); }
+    try {
+      const preview = await api.getDrawingDeletionPreview(selected.id);
+      if (request !== detailRequest.current) return;
+      setDeletionPreview(preview); if (selected.deletedAt) setDeletionMode('release');
+    }
+    catch (reason) { if (request === detailRequest.current) setError(reason instanceof Error ? reason.message : '删除引用检查失败'); }
     finally { setMaintaining(false); }
   };
   const confirmDrawingDeletion = async () => {
@@ -193,6 +215,16 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
   const visiblePages = [...new Set([1, page - 1, page, page + 1, totalPages].filter((value) => value >= 1 && value <= totalPages))].sort((left, right) => left - right);
   const goToPage = (nextPage: number) => void search(filters, nextPage, pageSize);
 
+  const detailPanel = selected ? <DrawingDetailPanel selected={selected} errorMessage={error} previewOnly={mockMode} maintaining={maintaining || mockMode}
+        pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
+        setSelectedPdfId={setSelectedPdfId} onClose={() => { detailRequest.current++; setSelected(null); disclosureButtons.current.get(selected.id)?.focus(); }} onStatus={changeStatus} onOpen={openLocation}
+        onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus}
+        onBeginDelete={beginDrawingDeletion} deletionPreview={deletionPreview}
+        deletionMode={deletionMode} setDeletionMode={setDeletionMode} deletionReason={deletionReason}
+        setDeletionReason={setDeletionReason} deletionConfirmation={deletionConfirmation}
+        setDeletionConfirmation={setDeletionConfirmation} onConfirmDelete={confirmDrawingDeletion}
+        onCancelDelete={() => setDeletionPreview(null)} onRestore={restoreDrawing} onError={setError} /> : null;
+
   return <section className="page-surface page-enter drawing-library-page">
     <header className="page-header"><div><p className="eyebrow">DRAWING LIBRARY</p><h1>图号库</h1><p>统一检索正式规划与历史扫描图号，并核对文件完整性。</p></div><span className="record-count">{total} 条记录</span></header>
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
@@ -201,7 +233,7 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
       <button type="button" aria-selected={view === 'batch'} onClick={() => { setView('batch'); setSelected(null); setPage(1); }}>按资料批次</button>
       <button type="button" aria-selected={view === 'drawing' && filters.deletionState.startsWith('deleted')} onClick={() => { const next = { ...emptyFilters, deletionState: 'deleted-retained' }; setFilters(next); setView('drawing'); setSelected(null); setSelectedBatch(null); setMoreFilters(true); setPage(1); void search(next, 1, pageSize); }}>回收站</button>
     </nav>
-    {error && <p className="error-banner">{error}</p>}
+    {error && !selected && <p className="error-banner" role="alert">{error}</p>}
     {view === 'drawing' ? <>
     <form className="filter-bar filter-grid" onSubmit={submit}>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
@@ -224,6 +256,7 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
       {mockMode ? <section className="drawing-batch-delete" aria-label="批量删除图号"><button className="text-button danger" type="button" disabled title="Mock 仅用于只读预览">批量删除（已选 {checkedIds.length} 项）</button></section>
         : <DrawingBatchDeletion ids={checkedIds} api={api} onComplete={async () => { setCheckedIds([]); setSelected(null); await search(filters, page, pageSize); }} />}
     </div>
+    <ModuleWorkspace detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => { detailRequest.current++; setSelected(null); if (selected) disclosureButtons.current.get(selected.id)?.focus(); }}>
     {queryState !== 'ready' ? <QueryFeedback state={queryState} error={queryError} onRetry={() => void search(queriedValues, page, pageSize)}/> : items.length === 0 ? <EmptyState title={Object.entries(queriedValues).some(([key,value]) => value !== emptyFilters[key as keyof typeof emptyFilters]) ? '没有符合查询条件的图号' : '图号库尚无记录'} description="可调整查询条件后重新检索；新增图号请使用图号规划。" /> :
       <DataTable items={items} onRowClick={(item) => void openDetail(item)} columns={[
         { key: 'select', label: '选择', render: (item) => <input type="checkbox" aria-label={`选择图号 ${item.fullCode}`} disabled={Boolean(item.deletedAt)} checked={checkedIds.includes(item.id)}
@@ -239,21 +272,14 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
         { key: 'batchUsage', label: '资料使用', render: (item) => item.batchUsage
           ? <span className={`usage-summary ${item.batchUsage.state}`} title={`${usageLabel(item.batchUsage.state)} · 出现于 ${item.batchUsage.occurrenceCount} 个资料批次`}><span>{usageLabel(item.batchUsage.state)}</span> · <span>{item.batchUsage.occurrenceCount}批次</span></span> : <span className="usage-summary">未建立批次关系</span> },
         { key: 'status', label: '状态', render: (item) => <span className="drawing-status-summary"><span className={`status-text ${item.status}`}>{statusLabel(item.origin, item.status)}</span>{item.deletedAt && <span className="mapping-warning">{item.deletionMode === 'retain_occupied' ? '删除·保留占号' : '删除·已释放'}</span>}</span> },
-      ]} renderExpandedRow={(item) => selected?.id === item.id ? <DrawingDetailPanel selected={selected} previewOnly={mockMode} maintaining={maintaining || mockMode}
-        pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
-        setSelectedPdfId={setSelectedPdfId} onClose={() => { setSelected(null); disclosureButtons.current.get(item.id)?.focus(); }} onStatus={changeStatus} onOpen={openLocation}
-        onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus}
-        onBeginDelete={beginDrawingDeletion} deletionPreview={deletionPreview}
-        deletionMode={deletionMode} setDeletionMode={setDeletionMode} deletionReason={deletionReason}
-        setDeletionReason={setDeletionReason} deletionConfirmation={deletionConfirmation}
-        setDeletionConfirmation={setDeletionConfirmation} onConfirmDelete={confirmDrawingDeletion}
-        onCancelDelete={() => setDeletionPreview(null)} onRestore={restoreDrawing} onError={setError} /> : null} />}
+      ]} />}
     {queryState === 'ready' && !loading && total > 0 && <nav className="drawing-pagination" aria-label="图号分页"><span>共 {total} 条 · 第 {page} / {totalPages} 页</span>
       <button className="secondary-button" type="button" disabled={page <= 1} onClick={() => goToPage(page - 1)}>上一页</button>
       <span className="page-number-list">{visiblePages.map((value, index) => <span key={value}>{index > 0 && value - visiblePages[index - 1] > 1 && <i>…</i>}<button type="button" className={value === page ? 'current' : ''} aria-current={value === page ? 'page' : undefined} onClick={() => goToPage(value)}>{value}</button></span>)}</span>
       <button className="secondary-button" type="button" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>下一页</button>
       <label><span>每页条数</span><select aria-label="每页条数" value={pageSize} onChange={(event) => { const nextSize = Number(event.target.value); setPageSize(nextSize); setPage(1); void search(filters, 1, nextSize); }}><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label>
     </nav>}
+    </ModuleWorkspace>
     </> : <BatchBrowser key={selectedBatch?.id ?? 'none'} search={batchSearch} setSearch={setBatchSearch} loading={loading} batches={batches}
       selected={selectedBatch} materials={batchMaterials} onSearch={searchBatches} onSelect={openBatch} onOpen={openLocation} />}
   </section>;
@@ -266,11 +292,11 @@ const statusLabel = (origin: DrawingView['origin'], status: DrawingView['status'
 const usageLabel = (status: 'current' | 'historical' | 'unbatched' | 'indeterminate') =>
   status === 'current' ? '当前使用' : status === 'historical' ? '历史使用' : status === 'indeterminate' ? '待确认' : '未归入批次';
 
-function DrawingDetailPanel({ selected, previewOnly = false, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
+function DrawingDetailPanel({ selected, errorMessage, previewOnly = false, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
   setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus,
   onBeginDelete, deletionPreview, deletionMode, setDeletionMode, deletionReason, setDeletionReason,
   deletionConfirmation, setDeletionConfirmation, onConfirmDelete, onCancelDelete, onRestore, onError }: {
-  selected: DrawingDetailView; previewOnly?: boolean; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
+  selected: DrawingDetailView; errorMessage: string; previewOnly?: boolean; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
   pdfCandidates: PdfFileView[]; selectedPdfId: string; setSelectedPdfId(value: string): void; onClose(): void;
   onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
   onSearchPdf(keyword: string): Promise<void>; onAssociate(type: 'source' | 'outlined'): Promise<void>;
@@ -282,9 +308,10 @@ function DrawingDetailPanel({ selected, previewOnly = false, maintaining, pdfKey
   onConfirmDelete(): Promise<void>; onCancelDelete(): void; onRestore(): Promise<void>;
   onError(message: string): void;
 }) {
-  return <aside id={`drawing-detail-${selected.id}`} className="drawing-maintenance inline-drawing-detail panel-enter" aria-label="图号详情"
+  return <aside id={`drawing-detail-${selected.id}`} className="drawing-maintenance workspace-drawing-detail panel-enter" aria-label="图号详情"
     onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}><button className="panel-close" onClick={onClose} type="button">关闭</button>
-    <h2>{selected.fullCode}</h2><p className="detail-name">{selected.displayName}</p>
+    <h2>{selected.fullCode}</h2><CopyDrawingCode key={selected.fullCode} code={selected.fullCode} /><p className="detail-name">{selected.displayName}</p>
+    {errorMessage && <p className="error-banner" role="alert">{errorMessage}</p>}
     <dl className="drawing-detail-attributes">
       <div><dt>SKU</dt><dd>{selected.sku ?? '待补录'}</dd></div><div><dt>品牌</dt><dd>{selected.brandName}</dd></div><div><dt>型号</dt><dd>{selected.model}</dd></div>
       <div><dt>产品类别</dt><dd>{selected.productCategory}</dd></div><div><dt>主类别</dt><dd>{selected.mainCategoryName}</dd></div><div><dt>项目</dt><dd>{selected.projectItemName}</dd></div>
@@ -445,4 +472,12 @@ function FileSection({ title, present, files, onOpen, previewOnly = false }: { t
       <button className="text-button" type="button" disabled={previewOnly || !file.isPresent} title={previewOnly ? 'Mock 不支持磁盘操作' : undefined}
         aria-label={`打开${title} ${file.fileName} 的位置`} onClick={() => void onOpen(file.pdfIndexId)}>{file.isPresent ? '打开位置' : '文件缺失'}</button>
     </li>)}</ul>}</section>;
+}
+
+function CopyDrawingCode({ code }: { code: string }) {
+  const [feedback, setFeedback] = useState('');
+  return <div><button type="button" className="secondary-button" onClick={() => {
+    void (async () => { try { await navigator.clipboard.writeText(code); setFeedback('已复制完整图号'); }
+      catch { setFeedback('复制不可用，请选中完整图号复制'); } })();
+  }}>复制完整图号</button>{feedback && <p role="status">{feedback}</p>}</div>;
 }

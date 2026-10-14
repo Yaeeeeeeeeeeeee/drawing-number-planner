@@ -94,3 +94,7 @@ The 2026-10-13 section remains dated evidence. New confirmed visual decisions ov
 ### Remaining gates and impact
 
 Keep business rules, schema/migrations/API, original files, occupancy, history and reference safeguards unchanged. UI approval does not close late-response/auxiliary-retry TODOs, old Mock failures or full recovery/production permissions/stability gates. Future results require actual versioned evidence; old counts and screenshots are not new runs. Skill impact checked: only confirmed UI direction and acceptance guidance updated; no business-rule update.
+
+### Later authorized P1 feedback and P2
+
+User explicitly authorized P1 narrow-layout fixes followed directly by P2 and combined acceptance. Product/dictionary row actions stay on one line, text columns may yield width and tables may scroll internally; PDF filenames align left. P2 uses fixed auxiliary widths, automatically folded by actual container width, and preserves independent checkbox/detail selection, complete detail safeguards and modal keyboard/error feedback. Evidence is in `docs/p2-workspaces-20261014.md`. Existing APIs do not expose an exact null-product/null-batch file filter: preserve a clearly labelled full-list checking entry rather than inventing an API or filtering only the current page as if global. No new business rule, P3 authorization or human Windows pass is inferred.

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../src/renderer/data/client';
@@ -45,6 +45,28 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('keeps a file-location failure visible inside the file detail drawer', async () => {
+    delete window.plannerDesktop;
+    render(<FilesPage api={apiFixture(true) as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: `文件详情 ${file.fileName}` }));
+    const detail = await screen.findByRole('complementary', { name: '文件详情' });
+    fireEvent.click(within(detail).getByRole('button', { name: '打开文件位置' }));
+    expect(await within(detail).findByRole('alert')).toHaveTextContent('请在 Windows 桌面版打开文件位置');
+  });
+  it('navigates with real product IDs and shows indexed file details separately from cleanup selection', async () => {
+    const api = apiFixture(true);
+    render(<FilesPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '产品 SKDZC100JP · ZC100' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9, page: 1 })));
+    fireEvent.click(screen.getByRole('button', { name: `文件详情 ${file.fileName}` }));
+    const detail = await screen.findByRole('complementary', { name: '文件详情' });
+    expect(detail.closest('table')).toBeNull();
+    expect(detail.textContent).toContain(file.relativePath);
+    expect(detail.textContent).toContain('1024 B');
+    expect(screen.getByRole('checkbox', { name: `选择 ${file.fileName}` })).not.toBeChecked();
+    expect(api.scanPdfFiles).not.toHaveBeenCalled();
+    expect(api.cleanupPdfFiles).not.toHaveBeenCalled();
+  });
   it('keeps legal cross-batch instances visible and explains that they are not scan duplicates', async () => {
     const first = { ...file, id: 71, relativePath: 'T40\\00.首批大货\\same.pdf',
       materialBatchId: 1, materialBatchName: '00.首批大货', materialBatchStatus: 'recognized' };

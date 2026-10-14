@@ -1,9 +1,72 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
 describe('DrawingLibraryPage', () => {
+  it('does not replace a new drawings PDF candidates with an old manual search response', async () => {
+    const first = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active', model: 'T40', displayName: '第一记录', readOnly: false, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
+    const second = { ...first, id: 2, fullCode: '02.0209.010.0501002', displayName: '第二记录' };
+    let resolveSearch!: (value: unknown) => void;
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [first, second], total: 2 }), listDictionaries: vi.fn().mockResolvedValue([]),
+      getDrawing: vi.fn().mockImplementation((id: number) => Promise.resolve(id === 1 ? first : second)),
+      searchPdfFiles: vi.fn().mockResolvedValueOnce({ items: [{ id: 10, fileName: 'A.pdf', relativePath: 'A.pdf' }] })
+        .mockImplementationOnce(() => new Promise(resolve => { resolveSearch = resolve; }))
+        .mockResolvedValue({ items: [{ id: 20, fileName: 'B.pdf', relativePath: 'B.pdf' }] }) };
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: first.fullCode }));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '现有 PDF 索引' })).toHaveValue('10'));
+    fireEvent.change(screen.getByLabelText('搜索现有 PDF'), { target: { value: 'old-search' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜索 PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: second.fullCode }));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '现有 PDF 索引' })).toHaveValue('20'));
+    await act(async () => resolveSearch({ items: [{ id: 11, fileName: 'late-A.pdf', relativePath: 'A.pdf' }] }));
+    expect(screen.getByRole('combobox', { name: '现有 PDF 索引' })).toHaveValue('20');
+    expect(screen.queryByRole('option', { name: /late-A/ })).not.toBeInTheDocument();
+  });
+  it('does not apply an earlier deletion preflight to a newly selected drawing', async () => {
+    const first = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active', model: 'T40', displayName: '第一记录', readOnly: true, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
+    const second = { ...first, id: 2, fullCode: '02.0209.010.0501002', displayName: '第二记录' };
+    let resolvePreview!: (value: unknown) => void;
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [first, second], total: 2 }), listDictionaries: vi.fn().mockResolvedValue([]),
+      getDrawing: vi.fn().mockImplementation((id: number) => Promise.resolve(id === 1 ? first : second)),
+      getDrawingDeletionPreview: vi.fn().mockImplementation(() => new Promise(resolve => { resolvePreview = resolve; })) };
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: first.fullCode }));
+    fireEvent.click(await screen.findByRole('button', { name: '删除图号' }));
+    fireEvent.click(screen.getByRole('button', { name: second.fullCode }));
+    await screen.findByText('第二记录');
+    await act(async () => resolvePreview({ fullCode: first.fullCode, origin: 'planned', deletable: true, references: {}, blockers: [] }));
+    expect(within(screen.getByRole('complementary', { name: '图号详情' })).queryByText(first.fullCode)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '确认删除' })).not.toBeInTheDocument();
+  });
+  it('ignores a late response for an earlier drawing selection', async () => {
+    const first = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active', model: 'T40', displayName: '旧详情', readOnly: true, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
+    const second = { ...first, id: 2, fullCode: '02.0209.010.0501002', displayName: '最新详情' };
+    let resolveFirst!: (value: unknown) => void;
+    const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [first, second], total: 2 }), listDictionaries: vi.fn().mockResolvedValue([]),
+      getDrawing: vi.fn().mockImplementation((id: number) => id === 1 ? new Promise(resolve => { resolveFirst = resolve; }) : Promise.resolve(second)) };
+    render(<DrawingLibraryPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: first.fullCode }));
+    fireEvent.click(screen.getByRole('button', { name: second.fullCode }));
+    expect(await screen.findByText('最新详情')).toBeVisible();
+    await act(async () => resolveFirst(first));
+    await waitFor(() => expect(within(screen.getByRole('complementary', { name: '图号详情' })).getByText('最新详情')).toBeVisible());
+    expect(within(screen.getByRole('complementary', { name: '图号详情' })).queryByText('旧详情')).not.toBeInTheDocument();
+  });
+  it('opens details outside the table without selecting batch checkboxes', async () => {
+    window.history.replaceState({}, '', '/?mock=drawing-library');
+    render(<DrawingLibraryPage api={{} as never} />);
+    const trigger = await screen.findByRole('button', { name: '02.0209.010.0501001' });
+    const checkbox = screen.getByRole('checkbox', { name: '选择图号 02.0209.010.0501001' });
+    fireEvent.click(checkbox);
+    expect(screen.queryByRole('complementary', { name: '图号详情' })).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    const detail = await screen.findByRole('complementary', { name: '图号详情' });
+    expect(detail.closest('table')).toBeNull();
+    expect(checkbox).toBeChecked();
+    expect(within(detail).getByRole('button', { name: '复制完整图号' })).toBeVisible();
+  });
   afterEach(() => window.history.replaceState({}, '', '/'));
   it('keeps detail attributes, state actions and file maintenance grouped without losing information', async () => {
     window.history.replaceState({}, '', '/?mock=drawing-library');

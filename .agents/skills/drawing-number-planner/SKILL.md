@@ -52,3 +52,7 @@ Preserve confirmed module layouts and real business safeguards. Keep candidate U
 ## Current UI direction (2026-10-14)
 
 For future UI work, also read [the current workspace supplement](references/ui-and-acceptance.md#minimal-engineering-workspace-supplement-2026-10-14), `docs/minimal-engineering-workspace-design-20261014.md` and `docs/minimal-engineering-workspace-acceptance-20261014.md`. These confirmed decisions supersede conflicting earlier visual constraints only; preserve the 2026-10-13 historical evidence and all business protections. P0 design approval alone does not authorize implementation. Check the latest explicit phase authorization; the 2026-10-14 P1 authorization and evidence are routed by `docs/p1-minimal-workspace-20261014.md`. P1 does not authorize P2 or later phases.
+
+### Later P2 authorization and P1 feedback
+
+The user subsequently gave preliminary approval to P1 and explicitly authorized fixing narrow product/dictionary action wrapping and left-aligning PDF filenames, then continuing directly into P2 for combined acceptance. Read `docs/p2-workspaces-20261014.md` and `docs/superpowers/plans/2026-10-14-p2-workspaces.md` for that scope and fresh evidence. This does not authorize P3–P5, merge, production data, embedded PDF preview or draggable widths. Preliminary P1 approval is not full Windows/DPI or release acceptance.

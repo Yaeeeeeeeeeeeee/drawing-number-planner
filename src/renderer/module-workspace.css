@@ -1,0 +1,61 @@
+@layer workspace {
+  /* P1 feedback: reserve operation width before allocating text columns. */
+  .products-integrated > .table-wrap > table { table-layout: fixed; }
+  .products-integrated > .table-wrap tr:not(.expanded-table-row) > :is(th,td):nth-child(-n+6) { width: auto; }
+  .products-integrated > .table-wrap tr:not(.expanded-table-row) > :is(th,td):first-child { width: 120px; }
+  .products-integrated > .table-wrap tr:not(.expanded-table-row) > :is(th,td):last-child { width: 142px; }
+  .products-integrated > .table-wrap .row-actions,
+  .dictionaries-real-page .dm-actions { flex-wrap: nowrap; width: max-content; gap: 8px; }
+  .products-integrated > .table-wrap .row-actions > button,
+  .dictionaries-real-page .dm-actions > button { flex-shrink: 0; white-space: nowrap; }
+  .dictionaries-real-page .table-wrap tr:not(.expanded-table-row) > :is(th,td):last-child { width: 172px; }
+  .files-page :is(th,td):nth-child(2), .files-page .files-name-row { text-align: left; justify-content: flex-start; }
+  .module-workspace { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; min-width: 0; position: relative; align-items: start; }
+  .module-workspace.detail-docked { grid-template-columns: minmax(0,1fr) 340px; }
+  .module-workspace.navigation-docked { grid-template-columns: 200px minmax(0,1fr); }
+  .module-workspace.navigation-docked.detail-docked { grid-template-columns: 200px minmax(0,1fr) 340px; }
+  .module-list { min-width: 0; grid-column: 1; }
+  .navigation-docked .module-list { grid-column: 2; grid-row: 1; }
+  .module-navigation { grid-column: 1; grid-row: 1; padding: 12px; border: 1px solid var(--ws-line); border-radius: 8px; background: var(--ws-panel); min-width: 0; max-height: calc(100dvh - 86px); overflow: auto; }
+  .module-navigation[hidden] { display: none; }
+  .module-navigation nav { display: grid; gap: 8px; }
+  .module-navigation button { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+  .module-navigation button[aria-pressed=true] { background: var(--ws-hover); border-color: var(--ws-text); font-weight: 600; }
+  .module-navigation details { border-top: 1px solid var(--ws-line); padding-top: 8px; }
+  .module-navigation summary { cursor: pointer; overflow-wrap: anywhere; }
+  .module-navigation-toggle { justify-self: start; }
+  .module-workspace:has(.module-navigation-toggle) > .module-navigation-toggle { grid-column: 1 / -1; grid-row: 1; }
+  .module-workspace:has(.module-navigation-toggle) > :is(.module-list,.module-detail:not(.module-drawer)) { grid-row: 2; }
+  .module-detail { grid-column: 2; grid-row: 1; position: sticky; top: 16px; max-height: calc(100dvh - 86px); overflow: auto; min-width: 0; border: 1px solid var(--ws-line); border-radius: 8px; background: white; }
+  .navigation-docked .module-detail { grid-column: 3; }
+  .module-backdrop { position: fixed; inset: 0; border: 0; background: #00000038; z-index: 100; cursor: default; }
+  .module-workspace .module-drawer { position: fixed; top: 16px; bottom: 16px; right: 16px; left: auto; width: min(440px,calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: none; z-index: 101; overflow: auto; box-shadow: 0 4px 16px #00000014; }
+  .module-detail > .drawing-maintenance, .module-detail > .file-detail { position: static; width: auto; margin: 0; padding: 16px; border: 0; background: white; box-shadow: none; }
+  .module-detail .panel-close { position: static; display: block; margin: 0 0 12px auto; }
+  .module-detail h2 { overflow-wrap: anywhere; user-select: text; }
+  .module-detail .drawing-detail-attributes, .module-detail .file-detail dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .module-detail dd { margin: 4px 0 0; overflow-wrap: anywhere; white-space: normal; user-select: text; }
+  .module-detail .drawing-detail-columns { display: block; }
+  .module-detail .danger-compact { display: block; }
+  .module-detail .pdf-search { display: flex; flex-wrap: wrap; }
+  .module-detail .pdf-search input { min-width: 0; flex: 1 1 160px; }
+  .module-detail .drawing-actions, .module-detail .file-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .module-detail .drawing-file-row { display: grid; gap: 8px; }
+  .module-detail .drawing-file-row span, .module-detail .files-path-full { overflow-wrap: anywhere; min-width: 0; }
+  .module-detail .file-path-copy { white-space: normal; overflow-wrap: anywhere; }
+  .module-list .table-wrap { max-width: 100%; overflow: auto; }
+  .module-list tr:has(button[aria-expanded=true]) { background: var(--ws-panel); }
+  .drawing-library-page .module-list > .table-wrap > table { min-width: 1040px; }
+  .drawing-library-page .module-list :is(th,td):nth-child(2) { width: 230px; white-space: nowrap; }
+  .drawing-library-page .module-list .link-button { white-space: nowrap; user-select: text; }
+  .files-page .module-list > .table-wrap > table { min-width: 1120px; table-layout: fixed; }
+  .files-page .module-list :is(th,td) { text-align: left; padding: 8px; white-space: normal; overflow-wrap: anywhere; }
+  .files-page .module-list :is(th,td):first-child { width: 40px; }
+  .files-page .module-list :is(th,td):nth-child(2) { width: 260px; }
+  .files-page .module-list :is(th,td):nth-child(6) { width: 210px; }
+  .files-page .module-list :is(th,td):last-child { width: 150px; }
+  .files-page .module-list .file-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .files-page .file-detail { text-align: left; }
+  .file-detail .file-primary { overflow-wrap: anywhere; user-select: text; }
+  .files-name-button { padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+}
