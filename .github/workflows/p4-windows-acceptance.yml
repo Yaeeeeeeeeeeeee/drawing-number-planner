@@ -23,6 +23,17 @@ jobs:
         with:
           ref: 8dc2112b596cebc045a121f6e5126c8059a6c4e0
           path: p4-source
+      - name: Parse delivery script with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $pwd 'scripts/build-p1-windows.ps1'), [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List Message,Extent
+            throw 'Windows PowerShell 5.1 cannot parse the delivery script'
+          }
+          Write-Host "Windows PowerShell $($PSVersionTable.PSVersion) parser passed"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
