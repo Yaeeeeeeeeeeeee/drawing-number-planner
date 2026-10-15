@@ -1,3 +1,8 @@
+## P4本地构建后续排障：PS5.1原生参数引号
+- Node24已正确安装；旧node -p表达式的引号被5.1剥离，不能让用户重装Node。
+- 完整5.1构建CI38706094312已RED复现；a2f3472改为node --version+PowerShell解析，已通过CI38706227976完整5.1构建和实际exe启动烟测。
+- 应用仍8dc2112，保持隔离数据及旧版，不合并、不进入P5。下方保留历史记录。
+
 ## P4本地构建排障：Windows PowerShell5.1编码
 - 用户截图为ParserError/乱码；真实5.1 CI已RED复现，脚本BOM修复9a9b5da已通过真实Windows5.1解析GREEN，应用8dc2112不变。
 - 更新工具后继续原固定SHA构建；不改业务、系统安全机制，不合并master、不进入P5。

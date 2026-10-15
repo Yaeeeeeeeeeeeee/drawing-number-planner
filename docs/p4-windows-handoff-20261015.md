@@ -51,3 +51,16 @@ cd D:\Codex验收\P4-build-tools
 - Windows PowerShell运行脚本被策略拦截与编码错误是两个独立问题；不永久修改系统策略，不使用Bypass/全局Unrestricted。
 
 复测：CI[38705216259](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38705216259)的真实Windows PowerShell5.1解析检查已通过（GREEN）；脚本正文与原文件逐字节相同，仅增加EF BB BF。进度文档专项3/3通过。本地最终构建/启动仍以用户实际执行结果为准。
+
+## Windows PowerShell5.1版本检测运行错误（后续本地反馈）
+
+Node.js已安装v24.22.0，但`node -p`中嵌套双引号被Windows PowerShell5.1传原生程序参数时移除，实际Node输入变成`process.versions.node.split(.)[0]`。表达式SyntaxError导致空输出被转为0，从而误报需Node24。与前面的文件编码问题不同；用户不用重装Node。
+
+原5.1只做ParseFile，完整构建仍由pwsh执行，未覆盖该运行时差异。本次将完整构建步骤切为Windows PowerShell5.1复现，再将版本检测改为`node --version`并在PowerShell内解析主版本，检查原生命令退出码；不改变Node24最低要求、P4应用SHA8dc2112、数据隔离或业务。
+
+本次运行证据：
+
+- RED：[38706094312](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38706094312)，完整Windows PowerShell5.1构建在版本检测处复现`process.versions.node.split(.)[0]`和错误版本提示。
+- 修复：`a2f3472`，保留UTF-8 BOM，改用`node --version`，校验退出码并在PowerShell内解析主版本；仍拒绝小于24或无法读取的版本。
+- GREEN：[38706227976](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38706227976)，Windows PowerShell5.1完整构建成功，实际Electron启动/隔离数据/文件详情及40图号烟测通过；不再只有语法解析。进度文档专项3/3通过。
+- P4应用仍固定`8dc2112b596cebc045a121f6e5126c8059a6c4e0`；未修改应用、API、数据库、IPC或系统策略。Skill影响检查：无业务或验收规则变更，不需改Skill。
