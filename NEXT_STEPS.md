@@ -1,3 +1,8 @@
+## P4本地构建排障：Windows PowerShell5.1编码
+- 用户截图为ParserError/乱码；真实5.1 CI已RED复现，脚本BOM修复9a9b5da已通过真实Windows5.1解析GREEN，应用8dc2112不变。
+- 更新工具后继续原固定SHA构建；不改业务、系统安全机制，不合并master、不进入P5。
+- 交付说明docs/p4-windows-handoff-20261015.md追加故障与证据；旧阶段记录保留。
+
 ## 最新交付：P4已完成，等待用户验收
 - 应用8dc2112；独立分支codex/p4-workspace-refinement-20261015；WindowsCI实际构建/启动/PDF覆盖/固定导航/调宽及40图号检查通过。
 - 下载与回退：docs/p4-windows-handoff-20261015.md；范围、证据与人工清单：docs/p4-workspace-refinement-20261015.md。

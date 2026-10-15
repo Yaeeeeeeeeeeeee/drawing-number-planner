@@ -40,3 +40,14 @@ cd D:\Codex验收\P4-build-tools
 - 工作流：[38697339387](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38697339387)。Windows构建与实际Electron启动、健康检查/隔离路径/标题版本、三组实测CSS尺寸及PDF布局、键盘调宽、图号40条检查通过。
 - 包内`Windows-P4文件详情.png`、`Windows-P4图号详情.png`、`Windows启动烟测.png`与`windows-verification.json`提供实际Windows证据。完整系统DPI/跨屏人工验收尚未执行。
 - 制品ZIP摘要：`sha256:0da09a979761e561ceafe50e1f06642fd1e964c9a9e4ad231458d198c50f94bd`。
+
+## Windows PowerShell 5.1构建兼容修正（本地反馈）
+
+用户本地执行策略处理后出现中文乱码与连续ParserError，构建尚未开始。根因：含中文的`build-p1-windows.ps1`以UTF-8无BOM保存，Windows PowerShell 5.1按系统旧代码页读取，中文字节被误解读为引号等语法字符。原WindowsCI使用pwsh（PowerShell7），不能证明系统自带5.1可解析。
+
+- 回归提交`897512b`：在真实Windows PowerShell5.1调用Parser.ParseFile，CI38705100274失败，复现Unexpected token与乱码；保留RED证据。
+- 修复提交`9a9b5da`：仅给构建脚本增加UTF-8 BOM，脚本文本与行为不变；不改应用8dc2112，不改执行策略、安全机制或正式数据。
+- 原源码目录中更新工具：`git pull --ff-only origin codex/p4-workspace-refinement-20261015`，成功后再执行原固定SHA构建命令。不强制重置或覆盖本地修改。
+- Windows PowerShell运行脚本被策略拦截与编码错误是两个独立问题；不永久修改系统策略，不使用Bypass/全局Unrestricted。
+
+复测：CI[38705216259](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38705216259)的真实Windows PowerShell5.1解析检查已通过（GREEN）；脚本正文与原文件逐字节相同，仅增加EF BB BF。进度文档专项3/3通过。本地最终构建/启动仍以用户实际执行结果为准。
