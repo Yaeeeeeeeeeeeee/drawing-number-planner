@@ -5,7 +5,9 @@ $ErrorActionPreference = 'Stop'
 $repository = 'https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner.git'
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw '请先安装 Git for Windows' }
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw '请先安装 Node.js 24 或更新兼容版本' }
-if ([int](& node -p 'process.versions.node.split(".")[0]') -lt 24) { throw '需要 Node.js 24 或更高版本' }
+$nodeVersion = & node --version
+if ($LASTEXITCODE -ne 0 -or -not ($nodeVersion -match '^v([0-9]+)\.')) { throw '无法读取 Node.js 版本，请检查安装' }
+if ([int]$Matches[1] -lt 24) { throw '需要 Node.js 24 或更高版本' }
 $toolRoot = Split-Path $PSScriptRoot -Parent
 if (-not $Source) {
   $Source = Join-Path $toolRoot ('work\acceptance-source-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
