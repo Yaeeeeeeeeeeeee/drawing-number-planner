@@ -1,3 +1,9 @@
+## 最新交付：P4已完成，等待用户验收
+- 应用8dc2112；独立分支codex/p4-workspace-refinement-20261015；WindowsCI实际构建/启动/PDF覆盖/固定导航/调宽及40图号检查通过。
+- 下载与回退：docs/p4-windows-handoff-20261015.md；范围、证据与人工清单：docs/p4-workspace-refinement-20261015.md。
+- 98专项、437布局与3项额外生产检查通过；903/920全量17基线失败不变，E2E6/8。完整Windows系统DPI/跨屏仍待人工；未覆盖旧记录。
+- 停止在P4，不进入P5，不合并master，不发布。下方保留历史阶段快照。
+
 ## 当前：P4实施与验证（最新用户授权）
 - 分支codex/p4-workspace-refinement-20261015；计划docs/superpowers/plans/2026-10-15-p4-workspace-refinement.md。
 - 中央文件表格滑轨，固定产品/批次，覆盖文件详情；规划/外发阶段与布局；直接二维码；面板调宽、键盘及恢复默认。

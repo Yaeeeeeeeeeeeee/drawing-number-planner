@@ -169,5 +169,21 @@
   "isolatedSamples": {
     "drawings": 40,
     "PDFs": 81
+  },
+  "applicationRevision": "8dc2112b596cebc045a121f6e5126c8059a6c4e0",
+  "windowsCI": {
+    "runId": 38697339387,
+    "startupAndP4Smoke": "passed",
+    "artifactId": 11955251774,
+    "manualDpiCrossMonitor": "pending"
+  },
+  "extraReadOnlyBrowserChecks": {
+    "treeIndentationX": [
+      239,
+      251,
+      267
+    ],
+    "detailCheckboxIndependent": true,
+    "fileNameActionsSeparate": true
   }
 }
