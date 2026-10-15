@@ -6,6 +6,10 @@
 
 当前云端`/workspace/library-files`、`/workspace/shared/downloads`未找到业务资料；`work/runtime-data/planner.db`为已存在空库（2026-10-13），使用better-sqlite3 readonly+query_only读取，产品/正式图号/历史图号/PDF/批次/BOM/二维码/字典/外发计数均0。/tmp及旧包中的数据库属于测试/验收样例，不冒充当前业务数据。本轮不生成、复制或扩写业务记录来铺满。云端截图只能证明该现有空库的真实空状态与CSS几何，不能证明Windows已有业务数据大列表验收通过。
 
+## 交付版本
+
+应用与验证工具提交：`b15773bb1e5d07434bd5796b8c071ee9b39b05cb`；后续交付记录提交仅更新文档。未合并master、未创建PR或发布。
+
 ## 已检查的问题
 
 | 页面/组件 | 实际依据 | 问题与方案 |

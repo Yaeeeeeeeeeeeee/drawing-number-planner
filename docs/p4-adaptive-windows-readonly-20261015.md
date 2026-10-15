@@ -1,6 +1,6 @@
 # P4 本机已有数据只读验收指引（2026-10-15）
 
-本轮代码在独立分支`codex/p4-adaptive-data-workspaces-20261015`，不是旧`8dc2112`的相同UI。不要继续用旧8dc2112验收本轮布局。应用代码及工具提交在完成验证后写入主记录；不合并master，不进入P5。
+本轮代码在独立分支`codex/p4-adaptive-data-workspaces-20261015`，不是旧`8dc2112`的相同UI。不要继续用旧8dc2112验收本轮布局。应用与工具提交`b15773bb1e5d07434bd5796b8c071ee9b39b05cb`，后续仅有交付记录更新；不合并master，不进入P5。
 
 ## 本轮证据边界
 
@@ -15,6 +15,8 @@
 ```powershell
 git clone --single-branch --branch codex/p4-adaptive-data-workspaces-20261015 https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner.git C:\Users\Administrator\Desktop\UI修正\P4-adaptive-readonly
 cd C:\Users\Administrator\Desktop\UI修正\P4-adaptive-readonly
+git show --no-patch --oneline b15773bb1e5d07434bd5796b8c071ee9b39b05cb
+git log -1 --oneline -- src/renderer
 npx.cmd --yes pnpm@11.25.0 install --frozen-lockfile --ignore-scripts
 node node_modules/vite/bin/vite.js build
 ```

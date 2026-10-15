@@ -445,5 +445,6 @@
     "Windows system DPI and cross-monitor",
     "original PDF files not mounted",
     "real migration report layout with existing report source"
-  ]
+  ],
+  "applicationRevision": "b15773bb1e5d07434bd5796b8c071ee9b39b05cb"
 }

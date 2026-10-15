@@ -1,5 +1,5 @@
 ## 最新：P4全页面自适应已实施，等待Windows已有数据验收
-- 分支codex/p4-adaptive-data-workspaces-20261015；说明/截图docs/p4-adaptive-data-workspaces-20261015.md；本机只读步骤docs/p4-adaptive-windows-readonly-20261015.md。
+- 应用提交b15773bb1e5d07434bd5796b8c071ee9b39b05cb；分支codex/p4-adaptive-data-workspaces-20261015；说明/截图docs/p4-adaptive-data-workspaces-20261015.md；本机只读步骤docs/p4-adaptive-windows-readonly-20261015.md。
 - 最终908/925，17旧失败不变；相关154、520现有空库几何/67结构断言通过，E2E6/8；类型/构建通过。
 - 云端主要业务表0条（基础配置保留），只读前后全表摘要及DB哈希一致；不是Windows真实业务数据铺满验收，原PDF/物理4K/原生窗口/DPI/跨屏未验证。
 - 停止在P4，不合并、不发布、不进入P5。下方保留过程与历史记录。
@@ -8,7 +8,7 @@
 - 独立分支codex/p4-adaptive-data-workspaces-20261015，基线3f100fe。
 - 先完成检查/实施方案：docs/p4-adaptive-data-workspaces-20261015.md；随后修改代码。
 - 宽屏PDF并列不遮挡、实际剩余高度、数据区解除限宽、表单合理尺寸；不写真实库/原文件，不造样例铺满。
-- 云端现有库各表0条，真实业务数据大列表与WindowsDPI留本机验收，不能用旧40样例冒充。
+- 云端现有库主要业务表0条（原有基础配置保留），真实业务数据大列表与WindowsDPI留本机验收，不能用旧40样例冒充。
 - 本轮仍P4，不进入P5、不合并master。下方为历史记录。
 
 ## P4本地构建后续排障：PS5.1原生参数引号
