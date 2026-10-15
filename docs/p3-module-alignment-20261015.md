@@ -36,3 +36,7 @@
 ## 最终云端结果
 
 14组视口／DPR、380项布局／键盘检查0失败、0业务写请求；覆盖项目1/2/3、已选父类别对齐、实际标题说明可见、横滚键盘及长列表详情／滚动条。最新8相关文件111测试通过，类型和两端生产构建通过。没有未处理的Critical／Important；审查Minor产品说明隐藏已修正。完整Windows系统DPI与人工验收尚未完成。
+
+## Windows交付
+
+应用提交`930615f5a79753ac9a23be84cec387c8e561f2de`；独立分支`codex/p3-module-alignment-20261015`。WindowsCI实际启动和PDF列对齐／保持列表宽度通过：https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38691184443。下载、新目录与回退步骤见`docs/p3-windows-handoff-20261015.md`。没有合并master、PR或正式发布；停止在P3等待人工验收。
