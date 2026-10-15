@@ -2,7 +2,7 @@ name: P3 Windows isolated acceptance package
 on:
   workflow_dispatch:
   push:
-    branches: [codex/p3-workspaces-20261014]
+    branches: [codex/p3-module-alignment-20261015]
     paths:
       - .github/workflows/p3-windows-acceptance.yml
       - scripts/build-p1-windows.ps1
