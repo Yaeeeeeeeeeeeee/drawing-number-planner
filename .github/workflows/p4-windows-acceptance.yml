@@ -1,0 +1,50 @@
+name: P4 Windows isolated acceptance package
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/p4-workspace-refinement-20261015]
+    paths:
+      - .github/workflows/p4-windows-acceptance.yml
+      - scripts/build-p1-windows.ps1
+      - scripts/prepare-p1-delivery.mjs
+      - scripts/verify-p1-windows.cjs
+permissions:
+  contents: read
+env:
+  PLANNER_ACCEPTANCE_REVISION: 8dc2112b596cebc045a121f6e5126c8059a6c4e0
+  PLANNER_ACCEPTANCE_PHASE: P4
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 8dc2112b596cebc045a121f6e5126c8059a6c4e0
+          path: p4-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build pinned P4 with isolated sample
+        shell: pwsh
+        run: ./scripts/build-p1-windows.ps1 -Source "$pwd/p4-source" -Output "$pwd/P4-Windows-8dc2112" -Revision $env:PLANNER_ACCEPTANCE_REVISION -Phase P4
+      - name: Verify actual Windows startup and file detail
+        id: smoke
+        continue-on-error: true
+        shell: pwsh
+        run: node scripts/verify-p1-windows.cjs "$pwd/p4-source" "$pwd/P4-Windows-8dc2112/图号规划器验收版.exe"
+      - name: Record startup outcome
+        shell: pwsh
+        run: |
+          '${{ steps.smoke.outcome }}' | Set-Content P4-Windows-8dc2112/Windows-smoke-outcome.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: P4-Windows-x64-8dc2112
+          path: P4-Windows-8dc2112/
+          include-hidden-files: true
+          retention-days: 14
+      - name: Report smoke failure
+        if: steps.smoke.outcome != 'success'
+        shell: pwsh
+        run: throw 'Package uploaded, but actual Windows smoke did not pass; inspect artifact.'
