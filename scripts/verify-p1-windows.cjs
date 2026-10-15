@@ -29,11 +29,16 @@ const {_electron}=dep('@playwright/test');
    measurements.push(measured);if(measured.width<width||measured.height<height||measured.overflow)throw Error('Minimum content layout failed');
   }
   const directory=path.dirname(path.resolve(executable));await page.screenshot({path:path.join(directory,'Windows启动烟测.png')});
-  if(process.env.PLANNER_ACCEPTANCE_PHASE==='P2') {
+  if(['P2','P3'].includes(process.env.PLANNER_ACCEPTANCE_PHASE)) {
    await page.locator('.sidebar nav').getByRole('button',{name:'PDF 文件中心',exact:true}).click();
-   const file=page.locator('.files-name-button').first();await file.waitFor();await file.click();
+   const file=page.locator('.files-name-button').first();await file.waitFor();const before=await page.locator('.module-list').boundingBox();await file.click();
    await page.getByRole('complementary',{name:'文件详情'}).waitFor();
-   await page.screenshot({path:path.join(directory,'Windows-P2文件详情.png')});
+   if(process.env.PLANNER_ACCEPTANCE_PHASE==='P3'){
+    const after=await page.locator('.module-list').boundingBox();if(Math.abs(before.width-after.width)>1)throw Error('P3 file list compressed');
+    const cells=await page.locator('.module-list tbody > tr').first().evaluate(row=>[...row.children].map((el,i)=>({i,align:getComputedStyle(el).textAlign,space:getComputedStyle(el).whiteSpace})));
+    if(!cells.every(c=>c.align===(c.i===1?'left':'center'))||cells[2].space!=='nowrap'||cells[3].space!=='nowrap')throw Error('P3 PDF alignment failed');
+   }
+   await page.screenshot({path:path.join(directory,`Windows-${process.env.PLANNER_ACCEPTANCE_PHASE}文件详情.png`)});
   }
   fs.writeFileSync(path.join(directory,'windows-verification.json'),JSON.stringify({revision,root,title,health,measurements,scope:'Windows CI startup only; human DPI/cross-monitor acceptance pending'},null,2));
  }finally{await app.close();}

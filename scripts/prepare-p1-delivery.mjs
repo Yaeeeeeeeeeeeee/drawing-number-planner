@@ -5,7 +5,7 @@ import os from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 const revision=process.env.PLANNER_ACCEPTANCE_REVISION ?? '7d9e7b74ee1222c9b789946dd69d94f89704bfe7';
 const phase=process.env.PLANNER_ACCEPTANCE_PHASE ?? 'P1';
-if(!/^[0-9a-f]{40}$/.test(revision)||!['P1','P2'].includes(phase))throw Error('Explicit full SHA and P1/P2 phase required');
+if(!/^[0-9a-f]{40}$/.test(revision)||!['P1','P2','P3'].includes(phase))throw Error('Explicit full SHA and P1/P2/P3 phase required');
 const [sourceArg, outputArg]=process.argv.slice(2);
 if(!sourceArg||!outputArg)throw Error('Usage: node prepare-p1-delivery.mjs <clean pinned source> <new output>');
 const source=fs.realpathSync.native(sourceArg), output=path.resolve(outputArg);

@@ -1,6 +1,6 @@
 param([string]$Source, [string]$Output,
   [ValidatePattern('^[0-9a-f]{40}$')][string]$Revision = '7d9e7b74ee1222c9b789946dd69d94f89704bfe7',
-  [ValidateSet('P1','P2')][string]$Phase = 'P1')
+  [ValidateSet('P1','P2','P3')][string]$Phase = 'P1')
 $ErrorActionPreference = 'Stop'
 $repository = 'https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner.git'
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw '请先安装 Git for Windows' }
@@ -10,7 +10,7 @@ $toolRoot = Split-Path $PSScriptRoot -Parent
 if (-not $Source) {
   $Source = Join-Path $toolRoot ('work\acceptance-source-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
   if (Test-Path $Source) { throw '目标源码目录已存在，不覆盖' }
-  $sourceBranch = if ($Phase -eq 'P1') { 'codex/p1-minimal-workspace-20261014' } else { 'codex/p2-workspaces-20261014' }
+  $sourceBranch = if ($Phase -eq 'P1') { 'codex/p1-minimal-workspace-20261014' } elseif ($Phase -eq 'P2') { 'codex/p2-workspaces-20261014' } else { 'codex/p3-module-alignment-20261015' }
   & git clone --no-checkout --single-branch --branch $sourceBranch $repository $Source
   if ($LASTEXITCODE -ne 0) { throw '获取源码失败' }
   & git -C $Source checkout --detach $Revision
