@@ -273,7 +273,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
         <option value="present">当前存在</option><option value="missing">已缺失</option><option value="all">全部</option></select></label>
       <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
     </form>
-    <ModuleWorkspace fileOverlay resizable navigation={navigation} detail={detail} detailLabel="文件详情" detailIdentity={detailFile?.id} onCloseDetail={() => { setDetailFile(null); }}>
+    <ModuleWorkspace fileWorkspace resizable navigation={navigation} detail={detail} detailLabel="文件详情" detailIdentity={detailFile?.id} onCloseDetail={() => { setDetailFile(null); }}>
     <p className="files-selection-note">仅缺失记录可选，存在文件的选择控件已禁用。{mock && ' Mock：选择与清理仅作用于内存预览。'}</p>
     {missingOnPage.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
       <span>本页有 {missingOnPage.length} 条缺失索引记录</span>

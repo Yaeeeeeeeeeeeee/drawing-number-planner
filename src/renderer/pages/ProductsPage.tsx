@@ -193,7 +193,7 @@ function ProductsWorkspace({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id:
     </section>}
     {error && <p className="error-banner">{error}</p>}
     {queryState !== 'ready' ? <QueryFeedback state={queryState} error={queryError} onRetry={() => initialLoaded ? void load(queriedFilters) : loadInitial()}/> : items.length === 0 ? <EmptyState title={Object.entries(queriedFilters).some(([key,value]) => key === 'status' ? value !== 'all' : Boolean(value)) ? '没有符合筛选条件的产品' : '还没有产品档案'} description="先完成编码字典，再创建首个产品型号。" symbol="品" /> :
-      <DataTable items={items} columns={[
+      <DataTable fillViewport items={items} columns={[
         { key: 'sku', label: 'SKU', render: (item) => <strong>{item.sku ?? '待补录'}</strong> },
         { key: 'model', label: '型号', render: (item) => item.model },
         { key: 'brand', label: '品牌', render: (item) => item.brandName },

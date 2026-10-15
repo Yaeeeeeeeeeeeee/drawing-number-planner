@@ -1,0 +1,449 @@
+{
+  "scope": "P4 adaptive layouts; existing cloud DB has zero principal business records; NOT Windows populated-data acceptance",
+  "unit": {
+    "passed": 908,
+    "total": 925,
+    "relatedFiles": 12,
+    "relatedPassed": 154,
+    "baselineFailuresUnchanged": true,
+    "failures": [
+      {
+        "file": "core/indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace"
+      },
+      {
+        "file": "core/outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path"
+      },
+      {
+        "file": "core/qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace"
+      },
+      {
+        "file": "core/workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances"
+      },
+      {
+        "file": "renderer/outbound-mock.test.tsx",
+        "test": "outbound isolated UI mock routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers"
+      },
+      {
+        "file": "renderer/recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API"
+      },
+      {
+        "file": "server/application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart"
+      }
+    ]
+  },
+  "e2e": {
+    "passed": 6,
+    "total": 8,
+    "remaining": [
+      "phase-real-usage-outbound: tar.exe ENOENT on Linux",
+      "phase-z-four: Windows backslash assertion on Linux"
+    ]
+  },
+  "productionBuild": {
+    "typecheck": "passed",
+    "renderer": "passed; existing >500kB chunk warning",
+    "main": "passed"
+  },
+  "browser": {
+    "checks": 520,
+    "failures": 0,
+    "blockedUnexpectedWrites": [],
+    "source": "Existing work/runtime-data/planner.db, all business counts zero; not a populated business-data acceptance",
+    "cases": [
+      [
+        720,
+        600,
+        1
+      ],
+      [
+        1024,
+        720,
+        1
+      ],
+      [
+        1366,
+        768,
+        1
+      ],
+      [
+        1920,
+        1080,
+        1
+      ],
+      [
+        2560,
+        1440,
+        1
+      ],
+      [
+        3840,
+        2160,
+        1
+      ],
+      [
+        1093,
+        614,
+        1.25
+      ],
+      [
+        1536,
+        864,
+        1.25
+      ],
+      [
+        1280,
+        720,
+        1.5
+      ],
+      [
+        960,
+        540,
+        2
+      ],
+      [
+        3072,
+        1728,
+        1.25
+      ],
+      [
+        2560,
+        1440,
+        1.5
+      ],
+      [
+        1920,
+        1080,
+        2
+      ],
+      [
+        2048,
+        1152,
+        1.25
+      ],
+      [
+        1706,
+        960,
+        1.5
+      ],
+      [
+        1280,
+        720,
+        2
+      ]
+    ]
+  },
+  "structureProbe": {
+    "checks": 67,
+    "failures": 0,
+    "scope": "Structural component probe, blank dimensions only; NOT populated business-data or Windows desktop acceptance"
+  },
+  "existingDatabaseAudit": {
+    "scope": "Read-only existing data; no migrations, seed or business writes",
+    "before": {
+      "databasePath": "/workspace/drawing-number-planner/work/runtime-data/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_current": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_versions": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dictionary_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_changes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_runs": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "dcba8d8fa85c6fd9d913ed8c49dd3941f70224bc2f0b26c015b3546379f9590b"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "03356787e156cc69a02c97d53beae655b72aaf981c6a8f7c313e344ee9e16573"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "products": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_code_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "3e516b8cc3a77e2f47969dbf08a19897b1a6df64adf65a0a8c0b43e04170b8d7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "83c1b44ae89b6c93ca668b9504d78525cbe17750bef8be49681e374b6a301511"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "ed0ce3ddaa4b1e1b51394cba720b16b721f57c5ad26e0f236589757d5eb2c528"
+        }
+      }
+    },
+    "after": {
+      "databasePath": "/workspace/drawing-number-planner/work/runtime-data/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_current": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_versions": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dictionary_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_changes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_runs": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "dcba8d8fa85c6fd9d913ed8c49dd3941f70224bc2f0b26c015b3546379f9590b"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "03356787e156cc69a02c97d53beae655b72aaf981c6a8f7c313e344ee9e16573"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "products": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_code_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "3e516b8cc3a77e2f47969dbf08a19897b1a6df64adf65a0a8c0b43e04170b8d7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "83c1b44ae89b6c93ca668b9504d78525cbe17750bef8be49681e374b6a301511"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "ed0ce3ddaa4b1e1b51394cba720b16b721f57c5ad26e0f236589757d5eb2c528"
+        }
+      }
+    },
+    "databaseHashBefore": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "databaseHashAfter": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "unchanged": true
+  },
+  "unverified": [
+    "Windows actual business data density/large histories",
+    "physical 4K and Electron native window",
+    "Windows system DPI and cross-monitor",
+    "original PDF files not mounted",
+    "real migration report layout with existing report source"
+  ]
+}

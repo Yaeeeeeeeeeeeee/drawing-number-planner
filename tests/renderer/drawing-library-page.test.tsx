@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
 
+it('requests enough initial drawing records for a tall workspace without truncating the result', async () => {
+  const api = { searchDrawings: vi.fn().mockResolvedValue({ items: [], total: 0 }), listDictionaries: vi.fn().mockResolvedValue([]) };
+  render(<DrawingLibraryPage api={api as never} />);
+  await waitFor(() => expect(api.searchDrawings).toHaveBeenCalledWith(expect.objectContaining({ page: 1, pageSize: 50 })));
+});
+
 describe('DrawingLibraryPage', () => {
   it('does not replace a new drawings PDF candidates with an old manual search response', async () => {
     const first = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active', model: 'T40', displayName: '第一记录', readOnly: false, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
@@ -614,6 +620,8 @@ describe('DrawingLibraryPage', () => {
     };
 
     render(<DrawingLibraryPage api={api as never} />);
+    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 50 })));
+    fireEvent.change(screen.getByRole('combobox', { name: '每页条数' }), { target: { value: '20' } });
     await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 20 })));
     fireEvent.click(screen.getByRole('button', { name: '下一页' }));
     await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));

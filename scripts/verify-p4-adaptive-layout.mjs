@@ -1,0 +1,29 @@
+// Existing-data viewer only. No Mock queries, cloned records, seed or business writes.
+import { chromium } from '@playwright/test';
+import fs from 'node:fs';
+const url=process.env.PLANNER_UI_CHECK_URL;
+if(!url||!/^http:\/\/127\.0\.0\.1:\d+$/.test(url))throw Error('Set the URL of scripts/readonly-workspace.ts');
+const directory='work/p4-adaptive/layout';fs.mkdirSync(directory,{recursive:true});
+const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+const results=[],failures=[],blockedWrites=[];
+const sizes=[[720,600,1],[1024,720,1],[1366,768,1],[1920,1080,1],[2560,1440,1],[3840,2160,1],[1093,614,1.25],[1536,864,1.25],[1280,720,1.5],[960,540,2],[3072,1728,1.25],[2560,1440,1.5],[1920,1080,2],[2048,1152,1.25],[1706,960,1.5],[1280,720,2]];
+const check=(ok,name,size,evidence)=>{const r={ok,name,size,evidence};results.push(r);if(!ok)failures.push(r);};
+try{for(const size of sizes){const [width,height,dpr]=size;const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr});const page=await context.newPage();page.setDefaultTimeout(8000);
+page.on('pageerror',error=>failures.push({size,error:error.message}));
+await page.route('**/api/**',r=>{const p=new URL(r.request().url()).pathname;if(['GET','HEAD'].includes(r.request().method())||p==='/api/session')return r.continue();blockedWrites.push(p);return r.abort();});
+await page.goto(url);await page.locator('.page-header').waitFor();
+async function nav(name){const t=page.getByRole('button',{name:/^(展开|收起)导航$/});if(await t.getAttribute('aria-expanded')==='false')await t.click();await page.locator('.sidebar nav').getByRole('button',{name,exact:true}).click();await page.locator('.page-header').waitFor();await page.waitForTimeout(260);}
+const pages=[['图号规划 / 更新包材','planning'],['BOM 管理','bom-add'],['外发资料','outbound'],['二维码管理','qr'],['图号库','drawings'],['产品档案','products'],['PDF 文件中心','files'],['编码字典','dictionary'],['迁移检查','migration']];
+async function inspect(key){const m=await page.evaluate(()=>{const w=document.querySelector('.workspace'),s=w.querySelector('.page-surface');return {viewport:[innerWidth,innerHeight],pageOverflow:document.documentElement.scrollWidth>innerWidth,workspaceOverflow:w.scrollWidth>w.clientWidth+1,width:w.clientWidth,contentWidth:s.getBoundingClientRect().width,padding:parseFloat(getComputedStyle(w).paddingLeft)+parseFloat(getComputedStyle(w).paddingRight),errors:[...s.querySelectorAll('[role=alert]')].map(e=>e.textContent)};});check(!m.pageOverflow&&!m.workspaceOverflow,'no-horizontal-page-overflow-'+key,size,m);check(Math.abs(m.contentWidth-(m.width-m.padding))<2,'page-uses-available-width-'+key,size,m);
+if(dpr===1&&[1024,1366,1920,3840].includes(width)){await page.locator('.workspace').evaluate(e=>e.scrollTop=0);await page.screenshot({path:`${directory}/${key}-${width}-existing-empty.png`});}}
+for(const [name,key] of pages){await nav(name);await inspect(key);
+if(key==='planning'){const stage=await page.locator('.planning-stage').first().boundingBox();const parent=await page.locator('.page-surface').boundingBox();check(stage.width>=parent.width-2,'planning-stages-not-capped',size,{stage:stage.width,parent:parent.width});const select=await page.getByLabel('产品型号',{exact:true}).boundingBox();check(select.width<=450,'planning-controls-reasonable',size,select);}
+if(key==='bom-add'){check((await page.locator('.bom-basics').boundingBox()).width<=1100,'bom-product-controls-capped',size);await page.getByRole('button',{name:'查询 BOM',exact:true}).click();await page.waitForTimeout(100);await inspect('bom-query');}
+if(key==='outbound'){const e=await page.locator('.email-composer').boundingBox();const p=await page.locator('.page-surface').boundingBox();check(e.width>=p.width-2,'email-workspace-not-capped',size,{email:e.width,page:p.width});const filters=await page.locator('.outbound-selection-grid').boundingBox();check(filters.width<=1040,'outbound-controls-not-stretched',size,filters);}
+if(key==='files'||key==='drawings'){const root=page.locator('.adaptive-data-workspace');await root.waitFor();const m=await root.evaluate(e=>{const w=document.querySelector('.workspace'),b=e.getBoundingClientRect(),host=w.getBoundingClientRect();return {height:b.height,bottom:b.bottom,hostBottom:host.bottom,contentTop:b.top-host.top+w.scrollTop,expected:w.clientHeight-(b.top-host.top+w.scrollTop)-parseFloat(getComputedStyle(w).paddingBottom)-8};});check(Math.abs(m.height-Math.max(240,Math.floor(m.expected)))<2,'measured-remaining-height-'+key,size,m);if(m.expected>=240)check(m.bottom<=m.hostBottom,'workspace-bottom-reachable-'+key,size,m);
+const before=m.height;await page.locator('.workspace').evaluate(e=>e.scrollTop=100);await page.waitForTimeout(80);const after=(await root.boundingBox()).height;check(Math.abs(before-after)<2,'scroll-does-not-grow-region-'+key,size,{before,after});await page.locator('.workspace').evaluate(e=>e.scrollTop=0);
+if(key==='drawings'){const toggle=page.getByRole('button',{name:'更多筛选',exact:true});await toggle.click();await page.waitForTimeout(100);const expanded=(await root.boundingBox()).height;check(expanded<=before,'expanded-filters-yield-height',size,{before,expanded});await page.getByRole('button',{name:'收起筛选',exact:true}).click();await page.waitForTimeout(100);check(Math.abs((await root.boundingBox()).height-before)<2,'collapsed-filters-restore-height',size);}}
+}
+await context.close();}}
+finally{await browser.close();fs.writeFileSync(directory+'/results.json',JSON.stringify({source:'Existing work/runtime-data/planner.db, all business counts zero; not a populated business-data acceptance',scope:'Chromium CSS viewport and DPR checks only; not actual Windows DPI or native 4K desktop',results,failures,blockedWrites},null,2));console.log(JSON.stringify({checks:results.length,failures:failures.length,blockedWrites,first:failures.slice(0,12)}));}
+if(failures.length||blockedWrites.length)process.exitCode=1;

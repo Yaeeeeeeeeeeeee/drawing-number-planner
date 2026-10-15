@@ -35,7 +35,7 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
   const [options, setOptions] = useState<Record<string, DictionaryItemView[]>>({});
   const [items, setItems] = useState<DrawingView[]>([]); const [total, setTotal] = useState(0);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
-  const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(50);
   useEffect(() => { setCheckedIds([]); }, [filters, page, pageSize, view]);
   const [productCategories, setProductCategories] = useState<string[]>([]);
   const [materialBatchOptions, setMaterialBatchOptions] = useState<MaterialBatchView[]>([]);

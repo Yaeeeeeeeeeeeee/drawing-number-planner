@@ -10,6 +10,7 @@ import './approved-ui.css';
 import './module-workspace.css';
 import './p3-module-alignment.css';
 import './p4-workspace-refinement.css';
+import './p4-adaptive-data.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
