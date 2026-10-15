@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: '24'
       - name: Build pinned P4 with isolated sample
-        shell: pwsh
+        shell: powershell
         run: ./scripts/build-p1-windows.ps1 -Source "$pwd/p4-source" -Output "$pwd/P4-Windows-8dc2112" -Revision $env:PLANNER_ACCEPTANCE_REVISION -Phase P4
       - name: Verify actual Windows startup and file detail
         id: smoke
