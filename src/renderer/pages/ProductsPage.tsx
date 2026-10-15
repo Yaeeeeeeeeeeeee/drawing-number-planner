@@ -15,7 +15,7 @@ const blankHistorical = { brandId: '', productSizeId: '', defaultAppearanceId: '
 const sameCandidate = (left: HistoricalProductCandidateView, right: HistoricalProductCandidateView) =>
   left.productCategory === right.productCategory && left.sku === right.sku && left.model === right.model;
 
-const qrLabel = (item: ProductQrCodeView) => ({ user_manual: '说明书', warranty: '售后', recipe: '菜谱' }[item.key] ?? item.displayName);
+const qrLabel = (item: ProductQrCodeView) => ({ user_manual: '说明书', warranty: '售后卡', recipe: '菜谱' }[item.key] ?? item.displayName);
 
 export function ProductsPage({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id: number) => void }) {
   return isProductsMockEnabled() ? new URLSearchParams(window.location.search).get('flow') === 'bom' ? <ProductBomRoundtripMock/> : <ProductsMockPage/> : <ProductsWorkspace api={api} onOpenQr={onOpenQr}/>;
@@ -201,7 +201,7 @@ function ProductsWorkspace({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id:
         { key: 'status', label: '状态', render: (item) => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span> },
         { key: 'qr', label: '关联资料', render: (item) => {
           const records = qrCodes.filter((code) => code.productId === item.id);
-          return records.length === 0 ? '—' : <details className="product-qr-summary"><summary>二维码 {records.length} 项</summary>{records.map(code=><button className="text-button" key={code.id} type="button" aria-label={`${qrLabel(code)} · ${code.status === 'active' ? '启用中' : '已停用'}`} onClick={()=>onOpenQr?.(code.id)} disabled={!onOpenQr}><span>{qrLabel(code)}</span><span className={`status-text ${code.status}`}>{code.status==='active'?'启用中':'已停用'}</span></button>)}</details>;
+          return records.length === 0 ? '—' : <div className="product-qr-direct" role="group" aria-label="关联二维码">{records.map(code => <button className="text-button" key={code.id} type="button" aria-label={`${qrLabel(code)} · ${code.status === 'active' ? '已启用' : '已停用'}`} onClick={() => onOpenQr?.(code.id)} disabled={!onOpenQr}><span>{qrLabel(code)}</span><span className={`status-text ${code.status}`}>{code.status === 'active' ? '已启用' : '已停用'}</span></button>)}</div>;
         } },
         { key: 'actions', label: '操作', render: (item) => <div className="row-actions"><button className="text-button" type="button" aria-label={`详情 ${item.model}`} onClick={() => { setDetailId(detailId === item.id ? null : item.id); setCleanupId(null); setEditorOpen(false); }}>详情</button><button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button>{item.status === 'active'
           ? <button className="text-button product-stop" aria-label={`停用 ${item.model}`} onClick={() => void deactivate(item)} type="button">停用</button>

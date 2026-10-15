@@ -60,3 +60,7 @@ The user subsequently gave preliminary approval to P1 and explicitly authorized 
 ### P3 authorization (2026-10-15)
 
 The user explicitly authorized P3 and included PDF/dictionary/planning feedback. Read `docs/p3-module-alignment-20261015.md`: module headings use one Chinese title and one Chinese description, without English eyebrows; PDF table columns center except the filename, with single-line batch and batch state; opening file detail preserves list width with local scrolling; dictionary columns align with their toolbar; planning item numbers remain single-line. P3 preserves all confirmed information structures, business actions, semantic colors and historical evidence. No P4 resizing, merge or production-data authorization follows.
+
+### P4 authorization and current refinements (2026-10-15)
+
+User explicitly authorized P4 including latest feedback. Read `docs/p4-workspace-refinement-20261015.md` and the P4 plan. PDF now scrolls only its central file table; product/batch navigation stays fixed and file detail overlays that central workspace, with the narrow modal preserved. Product QR entry is a direct list of real purposes/states rather than a count disclosure. P4 permits constrained, keyboard-accessible panel resizing and reset without persistence; planning/outbound gain visual stage grouping while keeping existing business actions, validation and manual-draft protection. Historical P3 scroll and QR disclosure requirements are superseded only by these confirmed UI changes. No P5/merge/production-data authorization follows.

@@ -192,13 +192,13 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
   const navigate = (productId: string, materialBatchId = '') => {
     const next = { ...filters, productId, materialBatchId }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1);
   };
-  const navigation = <nav aria-label="资料导航"><h2>产品与批次</h2>
+  const navigation = <nav className="file-product-tree" aria-label="资料导航"><h2>产品与批次</h2>
     <button className="secondary-button" type="button" aria-pressed={!filters.productId && !filters.materialBatchId} onClick={() => navigate('')}>全部产品／批次</button>
-    {products.map(product => <details key={product.id} open={filters.productId === String(product.id)}>
+    {products.map(product => <details className="file-tree-group" key={product.id} open={filters.productId === String(product.id)}>
       <summary>{product.productCategory || '未分类'} · {product.model}</summary>
-      <button className="secondary-button" type="button" aria-label={`产品 ${product.sku ?? '待补录'} · ${product.model}`} aria-pressed={filters.productId === String(product.id) && !filters.materialBatchId}
+      <button className="secondary-button file-tree-product" type="button" aria-label={`产品 ${product.sku ?? '待补录'} · ${product.model}`} aria-pressed={filters.productId === String(product.id) && !filters.materialBatchId}
         onClick={() => navigate(String(product.id))}>{product.sku ?? '待补录'} · {product.model}</button>
-      {batches.filter(batch => batch.productId === product.id).map(batch => <button className="secondary-button" type="button" key={batch.id}
+      {batches.filter(batch => batch.productId === product.id).map(batch => <button className="secondary-button file-tree-batch" type="button" key={batch.id}
         aria-pressed={filters.materialBatchId === String(batch.id)} onClick={() => navigate(String(product.id), String(batch.id))}>{materialBatchLabel(batch.name)} · {batch.recognitionStatus === 'pending' ? '待确认' : batch.currentState === 'current' ? '当前使用' : batch.currentState === 'historical' ? '历史使用' : '未确定'}</button>)}
     </details>)}
     <details><summary>其他／待关联批次</summary>{batches.filter(batch => !products.some(product => product.id === batch.productId)).map(batch => <button className="secondary-button" type="button" key={batch.id}
@@ -273,7 +273,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
         <option value="present">当前存在</option><option value="missing">已缺失</option><option value="all">全部</option></select></label>
       <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
     </form>
-    <ModuleWorkspace preserveListWidth navigation={navigation} detail={detail} detailLabel="文件详情" detailIdentity={detailFile?.id} onCloseDetail={() => { setDetailFile(null); }}>
+    <ModuleWorkspace fileOverlay resizable navigation={navigation} detail={detail} detailLabel="文件详情" detailIdentity={detailFile?.id} onCloseDetail={() => { setDetailFile(null); }}>
     <p className="files-selection-note">仅缺失记录可选，存在文件的选择控件已禁用。{mock && ' Mock：选择与清理仅作用于内存预览。'}</p>
     {missingOnPage.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
       <span>本页有 {missingOnPage.length} 条缺失索引记录</span>

@@ -27,7 +27,7 @@ function OutboundWorkspace({ api }: { api: PlannerApi }) {
       {settings && <TemplateSettings api={api} />}
       <div hidden={contactsOpen || settings}>
       <section className="ob-step" aria-label="资料打包步骤">
-        <h2>1. 准备外发资料</h2>
+        <h2><span aria-hidden="true">01</span> 选择外发范围</h2>
         <PackageBuilder
           api={api}
           showResult={false}
@@ -35,8 +35,10 @@ function OutboundWorkspace({ api }: { api: PlannerApi }) {
           onPackage={(_value, context) => setMailContext(context)}
         />
       </section>
-      <section className="ob-step" aria-label="邮件编辑步骤">
-          <h2>2. 生成外发结果</h2>{createdPackage&&<PackageResult key={createdPackage.id} value={createdPackage}/>}<h3>邮件草稿</h3>
+      <section className="ob-step" aria-label="外发生成结果">
+          <h2><span aria-hidden="true">02</span> 生成外发结果</h2>{createdPackage ? <PackageResult key={createdPackage.id} value={createdPackage}/> : <p className="muted-text">完成预览并打包后，在此核对真实生成结果。</p>}
+      </section>
+      <section className="ob-step" aria-label="邮件编辑步骤"><h2><span aria-hidden="true">03</span> 邮件草稿</h2>
           <div>
             <EmailComposer api={api} mailContext={mailContext} />
           </div>

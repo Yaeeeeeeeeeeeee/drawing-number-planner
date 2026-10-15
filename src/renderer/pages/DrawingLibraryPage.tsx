@@ -257,7 +257,7 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
       {mockMode ? <section className="drawing-batch-delete" aria-label="批量删除图号"><button className="text-button danger" type="button" disabled title="Mock 仅用于只读预览">批量删除（已选 {checkedIds.length} 项）</button></section>
         : <DrawingBatchDeletion ids={checkedIds} api={api} onComplete={async () => { setCheckedIds([]); setSelected(null); await search(filters, page, pageSize); }} />}
     </div>
-    <ModuleWorkspace detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => { detailRequest.current++; setSelected(null); if (selected) disclosureButtons.current.get(selected.id)?.focus(); }}>
+    <ModuleWorkspace resizable detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => { detailRequest.current++; setSelected(null); if (selected) disclosureButtons.current.get(selected.id)?.focus(); }}>
     {queryState !== 'ready' ? <QueryFeedback state={queryState} error={queryError} onRetry={() => void search(queriedValues, page, pageSize)}/> : items.length === 0 ? <EmptyState title={Object.entries(queriedValues).some(([key,value]) => value !== emptyFilters[key as keyof typeof emptyFilters]) ? '没有符合查询条件的图号' : '图号库尚无记录'} description="可调整查询条件后重新检索；新增图号请使用图号规划。" /> :
       <DataTable items={items} onRowClick={(item) => void openDetail(item)} columns={[
         { key: 'select', label: '选择', render: (item) => <input type="checkbox" aria-label={`选择图号 ${item.fullCode}`} disabled={Boolean(item.deletedAt)} checked={checkedIds.includes(item.id)}
@@ -469,7 +469,7 @@ function CurrentOutlinedFiles({ selected, onOpen, previewOnly = false }: { selec
 function FileSection({ title, present, files, onOpen, previewOnly = false }: { title: string; present: boolean; files: DrawingFileView[]; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
   return <section className="drawing-detail-section"><h3>{title}<span className={`presence-label ${present ? 'present' : 'missing'}`}>{present ? '已有' : '缺失'}</span></h3>
     {files.length === 0 ? <p className="muted-text">暂无索引记录</p> : <ul>{files.map((file) => <li key={file.pdfIndexId} className="drawing-file-row">
-      <span>{file.fileName}<small>{file.relativePath} · {file.isPresent ? '当前存在' : '当前缺失'}</small></span>
+      <span className="drawing-file-identity"><strong className="drawing-file-name">{file.fileName}</strong><small>{file.relativePath} · {file.isPresent ? '当前存在' : '当前缺失'}</small></span>
       <button className="text-button" type="button" disabled={previewOnly || !file.isPresent} title={previewOnly ? 'Mock 不支持磁盘操作' : undefined}
         aria-label={`打开${title} ${file.fileName} 的位置`} onClick={() => void onOpen(file.pdfIndexId)}>{file.isPresent ? '打开位置' : '文件缺失'}</button>
     </li>)}</ul>}</section>;

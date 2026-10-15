@@ -169,6 +169,8 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
           if (window.confirm('使用新压缩包将替换当前邮件主题和修改明细，并清空正文。是否继续？')) adoptContext(pendingContext);
         }}>使用新压缩包资料</button>
       </div>}
+      <div className="email-workspace">
+      <section className="email-generation-settings" aria-label="邮件生成设置"><h3>生成设置</h3>
       <div className="email-settings-row">
         <label>
           <span>资料类型</span>
@@ -229,6 +231,8 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
         </fieldset>
       ) : null}
       <button className="secondary-button" type="button" disabled={!templateId} onClick={() => void generate()}>生成邮件内容</button>
+      </section>
+      <section className="email-draft-content" aria-label="邮件草稿内容"><h3>草稿内容</h3>
       {!filterRecipients && <><label><span>收件人</span><input aria-label="收件人文本" readOnly value={toText} /></label>
       <button className="text-button" type="button" onClick={() => void copyField('toText', toText)}>复制收件人{filterRecipients && copyFeedback.toText && <span className="ob-copy-feedback" role="status">{copyFeedback.toText}</span>}</button>
       <label><span>抄送</span><input aria-label="抄送文本" readOnly value={ccText} /></label>
@@ -238,6 +242,7 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
       <label><span>正文</span><textarea aria-label="正文" rows={14} value={body} onChange={(event) => { setBody(event.target.value); setManuallyEdited(true); }} /></label>
       <button className="text-button" type="button" onClick={() => void copyField('body', body)}>复制正文{filterRecipients && copyFeedback.body && <span className="ob-copy-feedback" role="status">{copyFeedback.body}</span>}</button>
       {!filterRecipients && <button className="primary-button" type="button" onClick={() => void copy(`收件人：${toText}\n抄送：${ccText}\n主题：${subject}\n正文：\n${body}`, setMessage)}>全部复制</button>}
+      </section></div>
       {message && <p className={message === '已复制' ? 'muted-text' : 'error-banner'}>{message}</p>}
     </section>
   );

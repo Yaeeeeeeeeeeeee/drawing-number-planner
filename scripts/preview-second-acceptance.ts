@@ -45,6 +45,17 @@ for (const folder of ['02.未转曲源文件', '03.量产后的变更文件（�
     writeFileSync(join(directory, `${drawing.fullCode}-验收样例-F60白色-${items[index].name}${folder.startsWith('02.') ? '' : '（转曲）'}.pdf`), '%PDF-1.4\n% disposable acceptance fixture');
   }
 }
+// P4 acceptance density: 40 actual planned drawing records, created only in this new temporary DB.
+for (let index = 0; index < 36; index++) {
+  const extraInput = { productId: product.id, rows: [{ ...input.rows[0], clientId: `density-${index}` }] };
+  const extraPreview = planning.preview(extraInput);
+  const drawing = planning.reserve({ ...extraInput, rows: [{ ...extraInput.rows[0], expectedFullCode: extraPreview.rows[0].fullCode }] })[0];
+  for (const folder of ['02.未转曲源文件', '03.量产后的变更文件（已量产的产品看最新日期）/01.20260928']) {
+    writeFileSync(join(productDirectory, folder, `${drawing.fullCode}-验收样例-F60白色-说明书-补充${index + 1}${folder.startsWith('02.') ? '' : '（转曲）'}.pdf`), '%PDF-1.4\n% disposable density fixture');
+  }
+}
+const sampleDrawingCount = (db.prepare('select count(*) as count from drawing_numbers').get() as { count: number }).count;
+if (sampleDrawingCount !== 40) throw new Error('P4 isolated sample must contain exactly 40 drawings');
 const settings = new WorkspaceSettingsStore(join(dataDir, 'settings.json'));
 settings.setWorkspaceRoot(root);
 // Real QR file indexing in disposable data; not a renderer Mock or user library.
@@ -64,5 +75,5 @@ new BomService(db, () => root).saveVersion({ productId: product.id, businessChan
     ...(index === 0 ? { assets: [{ role: 'image' as const, assetId: sampleAsset.id }, { role: 'diagram' as const, assetId: sampleAsset.id }] } : {}) })) });
 db.close();
 const server = await startServer({ port: 5187, dataDir, rendererDir: resolve('dist/renderer') });
-console.log(JSON.stringify({ preview: server.url, dataDir, scan, note: '隔离样例数据，不是用户真实资料库' }));
+console.log(JSON.stringify({ preview: server.url, dataDir, scan, sampleDrawingCount, note: '隔离样例数据，不是用户真实资料库' }));
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, async () => { await server.close(); process.exit(0); });

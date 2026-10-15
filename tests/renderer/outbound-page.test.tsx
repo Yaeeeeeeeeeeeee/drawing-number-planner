@@ -172,7 +172,7 @@ describe('OutboundPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '联系人维护' }));
     fireEvent.click(screen.getByRole('button', { name: '返回外发工作' }));
     expect(screen.getByLabelText('正文')).toHaveValue('保留草稿');
-    expect(screen.getByRole('heading', { name: '1. 准备外发资料' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '选择外发范围' })).toBeVisible();
     expect(screen.getByRole('button', { name: '预览文件' })).toBeVisible();
   });
   it('loads a completed package into the mounted composer without mixing it with an existing draft', async () => {
@@ -284,7 +284,7 @@ describe('OutboundPage', () => {
   it('previews both explicit business dimensions and blocks missing materials', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '外发资料' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: '1. 准备外发资料' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '选择外发范围' })).toBeVisible();
     expect(screen.getByLabelText('本次变更资料')).toBeChecked();
     fireEvent.click(screen.getByLabelText('当前完整包材资料'));
     fireEvent.change(screen.getByLabelText('打包资料类型'), {target:{value:'update'}});

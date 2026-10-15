@@ -1,3 +1,9 @@
+## 当前：P4实施与验证（最新用户授权）
+- 分支codex/p4-workspace-refinement-20261015；计划docs/superpowers/plans/2026-10-15-p4-workspace-refinement.md。
+- 中央文件表格滑轨，固定产品/批次，覆盖文件详情；规划/外发阶段与布局；直接二维码；面板调宽、键盘及恢复默认。
+- 40个隔离样例图号；完成验证及Windows交付后停止P4，不进入P5、不合并master。
+- 下方为历史阶段快照，不作为当前授权限制。
+
 ## 最新交付：P3完成，等待用户验收
 - 应用930615f，独立分支codex/p3-module-alignment-20261015；Windows实际启动及PDF对齐/批次单行/列表不缩窄通过。
 - 下载与回退：docs/p3-windows-handoff-20261015.md；实现与范围：docs/p3-module-alignment-20261015.md。
