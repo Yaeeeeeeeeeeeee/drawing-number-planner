@@ -1,4 +1,4 @@
-param([string]$Source, [string]$Output,
+﻿param([string]$Source, [string]$Output,
   [ValidatePattern('^[0-9a-f]{40}$')][string]$Revision = '7d9e7b74ee1222c9b789946dd69d94f89704bfe7',
   [ValidateSet('P1','P2','P3','P4')][string]$Phase = 'P1')
 $ErrorActionPreference = 'Stop'
