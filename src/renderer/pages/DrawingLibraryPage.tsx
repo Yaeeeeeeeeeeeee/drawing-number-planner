@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
 
@@ -226,7 +227,7 @@ export function DrawingLibraryPage({ api: realApi }: { api: PlannerApi }) {
         onCancelDelete={() => setDeletionPreview(null)} onRestore={restoreDrawing} onError={setError} /> : null;
 
   return <section className="page-surface page-enter drawing-library-page">
-    <header className="page-header"><div><p className="eyebrow">DRAWING LIBRARY</p><h1>图号库</h1><p>统一检索正式规划与历史扫描图号，并核对文件完整性。</p></div><span className="record-count">{total} 条记录</span></header>
+    <PageHeader title="图号库" description="统一检索正式规划与历史扫描图号，并核对文件完整性。"><span className="record-count">{total} 条记录</span></PageHeader>
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     <nav className="segmented-tabs" aria-label="图号库查看方式">
       <button type="button" aria-selected={view === 'drawing' && filters.deletionState === 'normal'} onClick={() => { const next = { ...filters, deletionState: 'normal' }; setFilters(next); setView('drawing'); setSelected(null); setSelectedBatch(null); setPage(1); void search(next, 1, pageSize); }}>按图号</button>

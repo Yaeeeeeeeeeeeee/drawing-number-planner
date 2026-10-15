@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/PageHeader';
 import { useEffect, useState, type FormEvent } from 'react';
 
 import type { DictionaryItemView, HistoricalProductCandidateView, PlannerApi, ProductQrCodeView, ProductView } from '../data/client';
@@ -161,9 +162,9 @@ function ProductsWorkspace({ api, onOpenQr }: { api: PlannerApi; onOpenQr?: (id:
 
   const productFacts = (item:ProductView) => <><dl>{[['品类尺寸',item.productSizeName],['默认外观',item.defaultAppearanceName ?? '不指定'],['参考型号',item.referenceProductModel ?? '不指定']].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><table className="product-detail-qr"><thead><tr><th>用途</th><th>业务状态</th><th>文件状态</th></tr></thead><tbody>{qrCodes.filter(code=>code.productId===item.id).map(code=>{const files=code.files??[];return <tr key={code.id}><td>{qrLabel(code)}</td><td><span className={`status-text ${code.status}`}>{code.status==='active'?'启用中':'已停用'}</span></td><td>{!files.length?'未关联文件':files.every(file=>file.isPresent)?'文件可用':files.some(file=>file.isPresent)?'部分文件缺失':'文件已缺失'}</td></tr>;})}</tbody></table></>;
   return <section className="page-surface page-enter products-integrated">
-    <header className="page-header"><div><p className="eyebrow">PRODUCT ARCHIVE</p><h1>产品档案</h1><p>产品档案是图号、BOM 与 PDF 记录共用的产品身份来源。</p></div>
+    <PageHeader title="产品档案" description="产品档案是图号、BOM 与 PDF 记录共用的产品身份来源。">
       <div className="header-actions"><button className="secondary-button" onClick={() => void openHistoricalCandidates()} type="button">从资料库识别历史产品</button><button className="primary-button" onClick={openCreate} type="button">新建产品</button></div>
-    </header>
+    </PageHeader>
     <form className="filter-bar" onSubmit={(event) => { event.preventDefault(); void load({ search, status, ...(brandFilter ? { brandId: Number(brandFilter) } : {}), ...(categoryFilter ? { productCategory: categoryFilter } : {}) }); }}>
       <label><span>搜索产品</span><input aria-label="搜索产品" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
       <label><span>品牌</span><select aria-label="筛选品牌" value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}><option value="">全部</option>{brands.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>

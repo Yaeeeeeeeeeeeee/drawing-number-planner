@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /** Presentation only: folding never changes the selected record or business state. */
-export function ModuleWorkspace({ children, navigation, detail, detailLabel, detailIdentity, onCloseDetail }: {
+export function ModuleWorkspace({ children, navigation, detail, detailLabel, detailIdentity, onCloseDetail, preserveListWidth = false }: {
   children: ReactNode; navigation?: ReactNode; detail?: ReactNode; detailLabel: string;
-  detailIdentity?: number | string; onCloseDetail(): void;
+  detailIdentity?: number | string; onCloseDetail(): void; preserveListWidth?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null), panel = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -18,7 +18,13 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   }, []);
   // Reserve 800px for the list before adding a 340px detail or a 200px navigation.
   const detailDocked = width >= 1156;
-  const navigationDocked = width >= (detail && detailDocked ? 1372 : 1016);
+  const navigationDocked = width >= (!preserveListWidth && detail && detailDocked ? 1372 : 1016);
+  const scrollDetails = preserveListWidth && detail && detailDocked;
+  const listWidth = Math.max(800, width - (navigation && navigationDocked ? 216 : 0));
+  useEffect(() => {
+    if (!preserveListWidth || !root.current) return;
+    root.current.scrollLeft = detail && detailDocked ? root.current.scrollWidth - root.current.clientWidth : 0;
+  }, [preserveListWidth, detailIdentity, detailDocked, width, Boolean(detail)]);
   const detailModal = Boolean(detail) && !detailDocked;
   const navigationModal = Boolean(navigation) && navigationOpen && !navigationDocked && !detailModal;
   const modal = detailModal ? 'detail' : navigationModal ? 'navigation' : null;
@@ -55,7 +61,10 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
     };
   }, [modal, detailIdentity]);
   const navVisible = navigationDocked || navigationModal;
-  return <div ref={root} className={`module-workspace ${detail && detailDocked ? 'detail-docked' : ''} ${navigation && navigationDocked ? 'navigation-docked' : ''}`}>
+  return <div ref={root} className={`module-workspace-viewport ${preserveListWidth ? 'preserve-file-list' : ''}`}
+    role={preserveListWidth ? 'region' : undefined} aria-label={preserveListWidth ? '文件工作区，可横向和纵向滚动' : undefined} tabIndex={preserveListWidth ? 0 : undefined}>
+    <div className={`module-workspace ${detail && detailDocked ? 'detail-docked' : ''} ${navigation && navigationDocked ? 'navigation-docked' : ''}`}
+      style={scrollDetails ? { width: width + 356, gridTemplateColumns: `${navigation && navigationDocked ? '200px ' : ''}${listWidth}px 340px` } : undefined}>
     {navigation && !navigationDocked && <button ref={toggle} className="secondary-button module-navigation-toggle" type="button"
       aria-expanded={navigationModal} onClick={() => setNavigationOpen(true)}>产品／批次导航</button>}
     <div className="module-list">{children}</div>
@@ -67,5 +76,5 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
     </div>}
     {detail && <div ref={detailModal ? panel : undefined} className={`module-detail ${detailModal ? 'module-drawer' : ''}`}
       role={detailModal ? 'dialog' : undefined} aria-modal={detailModal || undefined} aria-label={`${detailLabel}窗口`} tabIndex={-1}>{detail}</div>}
-  </div>;
+  </div></div>;
 }

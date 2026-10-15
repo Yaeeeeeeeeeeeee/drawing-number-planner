@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BomCandidateView, BomDiffView, BomDrawingReferenceView, BomEntryModeView, BomItemAssetView, BomItemView, BomQrCandidateView, BomVersionSummaryView, BomVersionView, DictionaryItemView, MaterialBatchView, PlannerApi, ProductView } from '../data/client';
@@ -131,7 +132,7 @@ export function BomPage({ api: realApi }: { api: PlannerApi }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : '整型号 BOM 删除失败'); } finally { setBusy(false); }
   };
 
-  return <section className="page-surface page-enter bom-page"><header className="page-header"><div><p className="eyebrow">BILL OF MATERIALS</p><h1>BOM 管理</h1><p>按产品维护项目、图号、资料批次与附件；查询并编辑所选 BOM 记录。</p></div>{mode === 'add' && <span className="record-count">{base ? `${editingId !== null ? '正在编辑所选 BOM' : '当前 BOM'} · 业务日期 ${base.businessChangeDateLabel}` : '尚无当前 BOM'}</span>}</header><nav className="segmented-tabs" aria-label="BOM 管理方式"><button type="button" aria-selected={mode === 'add'} onClick={() => { setEditingId(null); setMode('add'); }}>添加 BOM</button><button type="button" aria-selected={mode === 'query'} onClick={() => { setMode('query'); void query(); }}>查询 BOM</button></nav>
+  return <section className="page-surface page-enter bom-page"><PageHeader title="BOM 管理" description="按产品维护项目、图号、资料批次与附件；查询并编辑所选 BOM 记录。">{mode === 'add' && <span className="record-count">{base ? `${editingId !== null ? '正在编辑所选 BOM' : '当前 BOM'} · 业务日期 ${base.businessChangeDateLabel}` : '尚无当前 BOM'}</span>}</PageHeader><nav className="segmented-tabs" aria-label="BOM 管理方式"><button type="button" aria-selected={mode === 'add'} onClick={() => { setEditingId(null); setMode('add'); }}>添加 BOM</button><button type="button" aria-selected={mode === 'query'} onClick={() => { setMode('query'); void query(); }}>查询 BOM</button></nav>
     {previewOnly && <div className="bom-mock-toolbar" role="region" aria-label="BOM 开发预览"><p><strong>开发预览 Mock</strong> · 仅内存样例，不连接数据库或附件服务。上传、删除、归档和文件位置均禁用；移除 URL 中的 ?mock=bom 退出。</p><label><span>压力场景</span><select aria-label="BOM Mock 场景" value={scenario} onChange={(event) => { const next = event.target.value as BomScenario; setScenario(next); setProductId(next === 'unselected' ? '' : '-101'); setEditingId(null); setEntryMode('current'); setHistoryDetail(null); setQueryResults([]); setMode('add'); setBusy(false); }}>{Object.entries(bomScenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>}
     {busy && <p role="status" className="bom-loading">正在加载 BOM…</p>}
     {mode === 'add' && !productId && <p className="bom-empty">请选择产品型号，查看或维护 BOM。</p>}

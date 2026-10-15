@@ -56,3 +56,7 @@ For future UI work, also read [the current workspace supplement](references/ui-a
 ### Later P2 authorization and P1 feedback
 
 The user subsequently gave preliminary approval to P1 and explicitly authorized fixing narrow product/dictionary action wrapping and left-aligning PDF filenames, then continuing directly into P2 for combined acceptance. Read `docs/p2-workspaces-20261014.md` and `docs/superpowers/plans/2026-10-14-p2-workspaces.md` for that scope and fresh evidence. This does not authorize P3–P5, merge, production data, embedded PDF preview or draggable widths. Preliminary P1 approval is not full Windows/DPI or release acceptance.
+
+### P3 authorization (2026-10-15)
+
+The user explicitly authorized P3 and included PDF/dictionary/planning feedback. Read `docs/p3-module-alignment-20261015.md`: module headings use one Chinese title and one Chinese description, without English eyebrows; PDF table columns center except the filename, with single-line batch and batch state; opening file detail preserves list width with local scrolling; dictionary columns align with their toolbar; planning item numbers remain single-line. P3 preserves all confirmed information structures, business actions, semantic colors and historical evidence. No P4 resizing, merge or production-data authorization follows.

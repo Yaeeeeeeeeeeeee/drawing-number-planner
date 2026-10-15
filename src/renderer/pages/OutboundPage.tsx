@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/PageHeader';
 import { useState } from 'react';
 import type { CreatedOutboundPackageView, PlannerApi } from '../data/client';
 import { PackageResult } from './outbound/PackageResult';
@@ -20,13 +21,9 @@ function OutboundWorkspace({ api }: { api: PlannerApi }) {
 
   return (
     <section className="page-surface page-enter outbound-page outbound-integrated outbound-mock-page approved-outbound">
-      <header className="page-header">
-        <div>
-          <h1>外发资料</h1>
-          <p>核对资料、整理分包与邮件草稿。系统不会发送邮件。</p>
-        </div>
+      <PageHeader title="外发资料" description="核对资料、整理分包与邮件草稿。系统不会发送邮件。">
         <div className="ob-actions"><button type="button" className="text-button" onClick={()=>setContactsOpen(!contactsOpen)}>{contactsOpen?'返回外发工作':'联系人维护'}</button><button type="button" className="text-button" onClick={()=>setSettings(!settings)}>{settings?'返回外发工作':'模板与签名'}</button></div>
-      </header>
+      </PageHeader>
       {settings && <TemplateSettings api={api} />}
       <div hidden={contactsOpen || settings}>
       <section className="ob-step" aria-label="资料打包步骤">

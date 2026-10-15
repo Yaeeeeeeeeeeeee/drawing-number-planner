@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
 
@@ -225,8 +226,8 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
     {!detailFile.isPresent && <p className="muted-text">文件已缺失，不能定位；索引清理仍使用列表中的独立确认操作。</p>}
   </aside> : null;
   return <section className="page-surface page-enter files-page">
-    <header className="page-header"><div><h1>PDF 文件中心</h1><p>只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。</p></div>
-      <span className="record-count">{total} 个索引文件</span></header>
+    <PageHeader title="PDF 文件中心" description="只读扫描本地资料库，可靠图号自动登记，异常候选留待确认。">
+      <span className="record-count">{total} 个索引文件</span></PageHeader>
     <p className="info-banner">同一图号出现在不同资料批次属于正常历史快照；只有规范化后的同一相对路径重复建立索引才是扫描重复。</p>
     <section className="workspace-strip" aria-label="资料根目录设置">
       <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
@@ -272,7 +273,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
         <option value="present">当前存在</option><option value="missing">已缺失</option><option value="all">全部</option></select></label>
       <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
     </form>
-    <ModuleWorkspace navigation={navigation} detail={detail} detailLabel="文件详情" detailIdentity={detailFile?.id} onCloseDetail={() => { setDetailFile(null); }}>
+    <ModuleWorkspace preserveListWidth navigation={navigation} detail={detail} detailLabel="文件详情" detailIdentity={detailFile?.id} onCloseDetail={() => { setDetailFile(null); }}>
     <p className="files-selection-note">仅缺失记录可选，存在文件的选择控件已禁用。{mock && ' Mock：选择与清理仅作用于内存预览。'}</p>
     {missingOnPage.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
       <span>本页有 {missingOnPage.length} 条缺失索引记录</span>
