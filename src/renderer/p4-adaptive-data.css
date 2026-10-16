@@ -15,9 +15,6 @@
   .adaptive-data-workspace .table-wrap th, .viewport-region table th { position: sticky; top: 0; z-index: 1; }
   .viewport-region { min-width: 0; max-width: 100%; max-height: var(--data-region-height); overflow: auto; scrollbar-gutter: stable; }
   .viewport-region > table { width: 100%; }
-  .drawing-library-page > .filter-grid { grid-template-columns: repeat(4,minmax(160px,280px)) auto; justify-content: start; gap: 10px 12px; }
-  .drawing-library-page > .filter-grid > .drawing-advanced-filters { grid-template-columns: repeat(4,minmax(150px,280px)); }
-  .files-page .files-filter { grid-template-columns: repeat(5,minmax(130px,240px)) auto; justify-content: start; }
   .files-page .workspace-strip > label { max-width: 1200px; }
   .files-page .module-list .file-primary, .drawing-library-page .module-list .code-cell { user-select: text; }
   .files-page .module-list > .table-wrap > table { min-width: 1430px; width: 100%; }
@@ -45,7 +42,6 @@
   .approved-outbound .email-draft-content textarea { min-height: clamp(280px,38dvh,820px); }
   .approved-outbound .outbound-preview-region > .outbound-file-list { overflow: visible; max-height: none; }
   .approved-outbound .contacts-manager form, .approved-outbound .template-settings form { max-width: 1300px; }
-  .qr-page .qr-filter { grid-template-columns: minmax(180px,320px) repeat(4,minmax(140px,220px)) auto; justify-content: start; }
   .qr-page :is(.qr-code-create,.qr-purpose-create,.editor-strip) { max-width: 1300px; }
   .qr-detail-page .qr-detail-meta { grid-template-columns: repeat(auto-fit,minmax(150px,240px)); justify-content: start; }
   .qr-page .qr-files-table { max-width: 100%; }
@@ -61,12 +57,6 @@
     .planning-stage .pp-row { grid-template-columns: minmax(0,1fr) 320px; }
     .planning-stage .pp-fields, .planning-stage .pp-row:not(:has(.pp-result)) .pp-fields { grid-template-columns: 64px repeat(2,minmax(0,1fr)); }
   }
-  @container (max-width: 1250px) {
-    .drawing-library-page > .filter-grid { grid-template-columns: repeat(2,minmax(0,280px)) auto; }
-    .drawing-library-page > .filter-grid > .drawing-advanced-filters { grid-template-columns: repeat(2,minmax(0,280px)); }
-    .files-page .files-filter { grid-template-columns: repeat(3,minmax(0,240px)); }
-    .qr-page .qr-filter { grid-template-columns: repeat(3,minmax(0,260px)); }
-  }
   @container (max-width: 1200px) {
     .planning-stage .pp-row { grid-template-columns: minmax(0,1fr); }
     .planning-stage .pp-result { margin-left: 74px; }
@@ -76,8 +66,36 @@
     .bom-page .bom-comparison-heading, .bom-page .bom-comparison-row { grid-template-columns: minmax(0,1fr); }
     .bom-page > .bom-basics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   }
-  @container (max-width: 760px) {
+  /* P4 local acceptance feedback: tracks follow workspace width, not capped form width. */
+  .drawing-library-page > .filter-grid { grid-template-columns: repeat(4,minmax(0,1fr)) auto; justify-content: stretch; }
+  .drawing-library-page > .filter-grid > label:not(.check-field) > input { max-width: 420px; width: 100%; }
+  .drawing-library-page > .filter-grid > .drawing-advanced-filters { width: 100%; justify-self: stretch; grid-column: 1 / -1; grid-row: auto; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); gap: 10px 12px; }
+  .drawing-library-page .drawing-advanced-filters select { max-width: 360px; }
+  .files-page .files-filter { grid-template-columns: repeat(6,minmax(0,1fr)) auto; justify-content: stretch; gap: 10px 12px; }
+  .files-page .files-filter > label:first-child { grid-column: auto; grid-row: auto; }
+  .files-page .files-filter > button { grid-column: auto; grid-row: auto; width: auto; justify-self: end; }
+  .files-page .files-filter :is(input,select) { max-width: 420px; }
+  .qr-page .qr-filter { grid-template-columns: repeat(5,minmax(0,1fr)) auto; justify-content: stretch; }
+  .qr-page .qr-filter :is(input,select) { max-width: 420px; }
+  .qr-page .qr-filter > button { justify-self: end; }
+  .approved-outbound .ob-step { padding-bottom: 16px; margin-bottom: 16px; }
+  .approved-outbound .ob-step > h2 { margin-bottom: 14px; }
+  .approved-outbound .outbound-selection-grid { max-width: none; }
+  .approved-outbound .outbound-selection-grid select { max-width: 480px; }
+  .approved-outbound :is(.ob-modes,.outbound-preview-action) { max-width: none; }
+  @container (min-width: 1500px) {
+    .approved-outbound .outbound-workflow:not([hidden]) { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); column-gap: 24px; align-items: start; }
+    .approved-outbound .outbound-workflow > [aria-label="邮件编辑步骤"] { grid-column: 1 / -1; }
+  }
+  @container (max-width: 1250px) {
+    .files-page .files-filter, .qr-page .qr-filter { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  }
+  @container (max-width: 1000px) {
     .drawing-library-page > .filter-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .drawing-library-page > .filter-grid > .primary-button { grid-column: auto; grid-row: auto; }
+  }
+  @container (max-width: 760px) {
     .files-page .files-filter, .qr-page .qr-filter { grid-template-columns: repeat(2,minmax(0,1fr)); }
   }
+
 }

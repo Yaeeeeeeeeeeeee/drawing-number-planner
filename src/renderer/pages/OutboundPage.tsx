@@ -25,7 +25,7 @@ function OutboundWorkspace({ api }: { api: PlannerApi }) {
         <div className="ob-actions"><button type="button" className="text-button" onClick={()=>setContactsOpen(!contactsOpen)}>{contactsOpen?'返回外发工作':'联系人维护'}</button><button type="button" className="text-button" onClick={()=>setSettings(!settings)}>{settings?'返回外发工作':'模板与签名'}</button></div>
       </PageHeader>
       {settings && <TemplateSettings api={api} />}
-      <div hidden={contactsOpen || settings}>
+      <div className="outbound-workflow" hidden={contactsOpen || settings}>
       <section className="ob-step" aria-label="资料打包步骤">
         <h2><span aria-hidden="true">01</span> 选择外发范围</h2>
         <PackageBuilder

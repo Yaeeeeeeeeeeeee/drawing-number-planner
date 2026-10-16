@@ -1,0 +1,3520 @@
+{
+  "date": "2026-10-16",
+  "baseline": "5651ef8",
+  "unit": {
+    "passed": 908,
+    "total": 925,
+    "baselineFailuresUnchanged": true,
+    "failures": [
+      {
+        "file": "indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace"
+      },
+      {
+        "file": "outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs"
+      },
+      {
+        "file": "outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit"
+      },
+      {
+        "file": "outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link"
+      },
+      {
+        "file": "outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path"
+      },
+      {
+        "file": "qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file"
+      },
+      {
+        "file": "workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it"
+      },
+      {
+        "file": "workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace"
+      },
+      {
+        "file": "workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances"
+      },
+      {
+        "file": "application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart"
+      },
+      {
+        "file": "outbound-mock.test.tsx",
+        "test": "outbound isolated UI mock routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls"
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check"
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return"
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded"
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers"
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears"
+      },
+      {
+        "file": "recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API"
+      }
+    ],
+    "restrictedSandboxExtraFailures": 12,
+    "restrictedSandboxExtraReason": "listen EPERM 127.0.0.1; absent after rerun with loopback network"
+  },
+  "related": {
+    "files": 4,
+    "passed": 90
+  },
+  "filters": {
+    "scope": "Existing cloud DB empty business tables; CSS browser regression, not Windows populated-data acceptance",
+    "results": [
+      {
+        "ok": true,
+        "name": "drawing-expanded-no-page-overflow",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "width": 688,
+          "pageWidth": 688,
+          "columns": 3,
+          "rows": 4,
+          "labels": [
+            {
+              "x": 16,
+              "y": 455,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 455,
+              "w": 221.328125
+            },
+            {
+              "x": 482.65625,
+              "y": 455,
+              "w": 221.328125
+            },
+            {
+              "x": 16,
+              "y": 519,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 519,
+              "w": 221.328125
+            },
+            {
+              "x": 482.65625,
+              "y": 519,
+              "w": 221.328125
+            },
+            {
+              "x": 16,
+              "y": 583,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 583,
+              "w": 221.328125
+            },
+            {
+              "x": 482.65625,
+              "y": 583,
+              "w": 221.328125
+            },
+            {
+              "x": 16,
+              "y": 647,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 647,
+              "w": 221.328125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-uses-available-width",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "width": 688,
+          "pageWidth": 688,
+          "columns": 3,
+          "rows": 4,
+          "labels": [
+            {
+              "x": 16,
+              "y": 455,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 455,
+              "w": 221.328125
+            },
+            {
+              "x": 482.65625,
+              "y": 455,
+              "w": 221.328125
+            },
+            {
+              "x": 16,
+              "y": 519,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 519,
+              "w": 221.328125
+            },
+            {
+              "x": 482.65625,
+              "y": 519,
+              "w": 221.328125
+            },
+            {
+              "x": 16,
+              "y": 583,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 583,
+              "w": 221.328125
+            },
+            {
+              "x": 482.65625,
+              "y": 583,
+              "w": 221.328125
+            },
+            {
+              "x": 16,
+              "y": 647,
+              "w": 221.328125
+            },
+            {
+              "x": 249.328125,
+              "y": 647,
+              "w": 221.328125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-no-page-overflow",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "width": 688,
+          "pageWidth": 688,
+          "columns": 2,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 16,
+              "y": 357,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 357,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 426,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 426,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 495,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 495,
+              "w": 338
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-uses-available-width",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "width": 688,
+          "pageWidth": 688,
+          "columns": 2,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 16,
+              "y": 357,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 357,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 426,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 426,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 495,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 495,
+              "w": 338
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-no-page-overflow",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "width": 688,
+          "pageWidth": 688,
+          "columns": 2,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 16,
+              "y": 190,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 190,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 261,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 261,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 332,
+              "w": 338
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-uses-available-width",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "width": 688,
+          "pageWidth": 688,
+          "columns": 2,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 16,
+              "y": 190,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 190,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 261,
+              "w": 338
+            },
+            {
+              "x": 366,
+              "y": 261,
+              "w": 338
+            },
+            {
+              "x": 16,
+              "y": 332,
+              "w": 338
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-action-at-workspace-edge",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "right": 704,
+          "button": 704
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-no-page-overflow",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "range": {
+            "x": 16,
+            "y": 174,
+            "w": 688
+          },
+          "result": {
+            "x": 16,
+            "y": 534,
+            "w": 688
+          },
+          "mail": {
+            "x": 16,
+            "y": 638.5,
+            "w": 688
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-narrow-stages-stack",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "range": {
+            "x": 16,
+            "y": 174,
+            "w": 688
+          },
+          "result": {
+            "x": 16,
+            "y": 534,
+            "w": 688
+          },
+          "mail": {
+            "x": 16,
+            "y": 638.5,
+            "w": 688
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-no-page-overflow",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "width": 992,
+          "pageWidth": 992,
+          "columns": 4,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 16,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 267,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 518,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 769,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 16,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 267,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 518,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 769,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 16,
+              "y": 583,
+              "w": 239
+            },
+            {
+              "x": 267,
+              "y": 583,
+              "w": 239
+            },
+            {
+              "x": 518,
+              "y": 583,
+              "w": 239
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-uses-available-width",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "width": 992,
+          "pageWidth": 992,
+          "columns": 4,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 16,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 267,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 518,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 769,
+              "y": 455,
+              "w": 239
+            },
+            {
+              "x": 16,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 267,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 518,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 769,
+              "y": 519,
+              "w": 239
+            },
+            {
+              "x": 16,
+              "y": 583,
+              "w": 239
+            },
+            {
+              "x": 267,
+              "y": 583,
+              "w": 239
+            },
+            {
+              "x": 518,
+              "y": 583,
+              "w": 239
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-no-page-overflow",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "width": 992,
+          "pageWidth": 992,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 16,
+              "y": 357,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 357,
+              "w": 322.671875
+            },
+            {
+              "x": 685.328125,
+              "y": 357,
+              "w": 322.65625
+            },
+            {
+              "x": 16,
+              "y": 426,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 426,
+              "w": 322.671875
+            },
+            {
+              "x": 685.328125,
+              "y": 426,
+              "w": 322.65625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-uses-available-width",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "width": 992,
+          "pageWidth": 992,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 16,
+              "y": 357,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 357,
+              "w": 322.671875
+            },
+            {
+              "x": 685.328125,
+              "y": 357,
+              "w": 322.65625
+            },
+            {
+              "x": 16,
+              "y": 426,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 426,
+              "w": 322.671875
+            },
+            {
+              "x": 685.328125,
+              "y": 426,
+              "w": 322.65625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-no-page-overflow",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "width": 992,
+          "pageWidth": 992,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 16,
+              "y": 190,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 190,
+              "w": 322.671875
+            },
+            {
+              "x": 685.328125,
+              "y": 190,
+              "w": 322.65625
+            },
+            {
+              "x": 16,
+              "y": 261,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 261,
+              "w": 322.671875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-uses-available-width",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "width": 992,
+          "pageWidth": 992,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 16,
+              "y": 190,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 190,
+              "w": 322.671875
+            },
+            {
+              "x": 685.328125,
+              "y": 190,
+              "w": 322.65625
+            },
+            {
+              "x": 16,
+              "y": 261,
+              "w": 322.65625
+            },
+            {
+              "x": 350.65625,
+              "y": 261,
+              "w": 322.671875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-action-at-workspace-edge",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "right": 1008,
+          "button": 1007.984375
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-no-page-overflow",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "range": {
+            "x": 16,
+            "y": 174,
+            "w": 992
+          },
+          "result": {
+            "x": 16,
+            "y": 534,
+            "w": 992
+          },
+          "mail": {
+            "x": 16,
+            "y": 638.5,
+            "w": 992
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-narrow-stages-stack",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "range": {
+            "x": 16,
+            "y": 174,
+            "w": 992
+          },
+          "result": {
+            "x": 16,
+            "y": 534,
+            "w": 992
+          },
+          "mail": {
+            "x": 16,
+            "y": 638.5,
+            "w": 992
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-no-page-overflow",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "width": 1118,
+          "pageWidth": 1118,
+          "columns": 4,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 506.5,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 789,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 1071.5,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 506.5,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 789,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 1071.5,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 224,
+              "y": 477,
+              "w": 270.5
+            },
+            {
+              "x": 506.5,
+              "y": 477,
+              "w": 270.5
+            },
+            {
+              "x": 789,
+              "y": 477,
+              "w": 270.5
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-uses-available-width",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "width": 1118,
+          "pageWidth": 1118,
+          "columns": 4,
+          "rows": 3,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 506.5,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 789,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 1071.5,
+              "y": 349,
+              "w": 270.5
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 506.5,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 789,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 1071.5,
+              "y": 413,
+              "w": 270.5
+            },
+            {
+              "x": 224,
+              "y": 477,
+              "w": 270.5
+            },
+            {
+              "x": 506.5,
+              "y": 477,
+              "w": 270.5
+            },
+            {
+              "x": 789,
+              "y": 477,
+              "w": 270.5
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-no-page-overflow",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "width": 1118,
+          "pageWidth": 1118,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 288,
+              "w": 364.671875
+            },
+            {
+              "x": 977.328125,
+              "y": 288,
+              "w": 364.65625
+            },
+            {
+              "x": 224,
+              "y": 357,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 357,
+              "w": 364.671875
+            },
+            {
+              "x": 977.328125,
+              "y": 357,
+              "w": 364.65625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-uses-available-width",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "width": 1118,
+          "pageWidth": 1118,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 288,
+              "w": 364.671875
+            },
+            {
+              "x": 977.328125,
+              "y": 288,
+              "w": 364.65625
+            },
+            {
+              "x": 224,
+              "y": 357,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 357,
+              "w": 364.671875
+            },
+            {
+              "x": 977.328125,
+              "y": 357,
+              "w": 364.65625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-no-page-overflow",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "width": 1118,
+          "pageWidth": 1118,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 190,
+              "w": 364.671875
+            },
+            {
+              "x": 977.328125,
+              "y": 190,
+              "w": 364.65625
+            },
+            {
+              "x": 224,
+              "y": 261,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 261,
+              "w": 364.671875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-uses-available-width",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "width": 1118,
+          "pageWidth": 1118,
+          "columns": 3,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 190,
+              "w": 364.671875
+            },
+            {
+              "x": 977.328125,
+              "y": 190,
+              "w": 364.65625
+            },
+            {
+              "x": 224,
+              "y": 261,
+              "w": 364.65625
+            },
+            {
+              "x": 600.65625,
+              "y": 261,
+              "w": 364.671875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-action-at-workspace-edge",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "right": 1342,
+          "button": 1341.984375
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-no-page-overflow",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 1118
+          },
+          "result": {
+            "x": 224,
+            "y": 534,
+            "w": 1118
+          },
+          "mail": {
+            "x": 224,
+            "y": 638.5,
+            "w": 1118
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-narrow-stages-stack",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 1118
+          },
+          "result": {
+            "x": 224,
+            "y": 534,
+            "w": 1118
+          },
+          "mail": {
+            "x": 224,
+            "y": 638.5,
+            "w": 1118
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-no-page-overflow",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1186.28125,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 1426.84375,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1667.421875,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 413,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 413,
+              "w": 228.578125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-uses-available-width",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1186.28125,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 1426.84375,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1667.421875,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 413,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 413,
+              "w": 228.578125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-compact-wide-rows",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1186.28125,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 1426.84375,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1667.421875,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 413,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 413,
+              "w": 228.578125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-wide-at-least-six-columns",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1186.28125,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 1426.84375,
+              "y": 349,
+              "w": 228.578125
+            },
+            {
+              "x": 1667.421875,
+              "y": 349,
+              "w": 228.5625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 464.5625,
+              "y": 413,
+              "w": 228.578125
+            },
+            {
+              "x": 705.140625,
+              "y": 413,
+              "w": 228.5625
+            },
+            {
+              "x": 945.703125,
+              "y": 413,
+              "w": 228.578125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-no-page-overflow",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 488.78125,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 753.578125,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1018.359375,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 1283.15625,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1547.9375,
+              "y": 288,
+              "w": 252.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-uses-available-width",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 488.78125,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 753.578125,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1018.359375,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 1283.15625,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1547.9375,
+              "y": 288,
+              "w": 252.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-compact-wide-rows",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 488.78125,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 753.578125,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1018.359375,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 1283.15625,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1547.9375,
+              "y": 288,
+              "w": 252.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-wide-single-row",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 488.78125,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 753.578125,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1018.359375,
+              "y": 288,
+              "w": 252.796875
+            },
+            {
+              "x": 1283.15625,
+              "y": 288,
+              "w": 252.78125
+            },
+            {
+              "x": 1547.9375,
+              "y": 288,
+              "w": 252.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-no-page-overflow",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 311.1875
+            },
+            {
+              "x": 547.1875,
+              "y": 190,
+              "w": 311.203125
+            },
+            {
+              "x": 870.390625,
+              "y": 190,
+              "w": 311.1875
+            },
+            {
+              "x": 1193.578125,
+              "y": 190,
+              "w": 311.203125
+            },
+            {
+              "x": 1516.78125,
+              "y": 190,
+              "w": 311.1875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-uses-available-width",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 311.1875
+            },
+            {
+              "x": 547.1875,
+              "y": 190,
+              "w": 311.203125
+            },
+            {
+              "x": 870.390625,
+              "y": 190,
+              "w": 311.1875
+            },
+            {
+              "x": 1193.578125,
+              "y": 190,
+              "w": 311.203125
+            },
+            {
+              "x": 1516.78125,
+              "y": 190,
+              "w": 311.1875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-compact-wide-rows",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "width": 1672,
+          "pageWidth": 1672,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 311.1875
+            },
+            {
+              "x": 547.1875,
+              "y": 190,
+              "w": 311.203125
+            },
+            {
+              "x": 870.390625,
+              "y": 190,
+              "w": 311.1875
+            },
+            {
+              "x": 1193.578125,
+              "y": 190,
+              "w": 311.203125
+            },
+            {
+              "x": 1516.78125,
+              "y": 190,
+              "w": 311.1875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-action-at-workspace-edge",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "right": 1896,
+          "button": 1896
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-no-page-overflow",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 931.46875
+          },
+          "result": {
+            "x": 1179.46875,
+            "y": 174,
+            "w": 716.515625
+          },
+          "mail": {
+            "x": 224,
+            "y": 534,
+            "w": 1671.984375
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-wide-range-result-side-by-side",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 931.46875
+          },
+          "result": {
+            "x": 1179.46875,
+            "y": 174,
+            "w": 716.515625
+          },
+          "mail": {
+            "x": 224,
+            "y": 534,
+            "w": 1671.984375
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-no-page-overflow",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 10,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 456.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 688.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 921.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1153.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 1385.984375,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1618.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1850.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 2083.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 2315.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 220.390625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-uses-available-width",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 10,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 456.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 688.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 921.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1153.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 1385.984375,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1618.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1850.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 2083.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 2315.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 220.390625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-compact-wide-rows",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 10,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 456.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 688.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 921.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1153.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 1385.984375,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1618.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1850.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 2083.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 2315.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 220.390625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-wide-at-least-six-columns",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 10,
+          "rows": 2,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 456.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 688.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 921.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1153.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 1385.984375,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1618.390625,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 1850.796875,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 2083.1875,
+              "y": 349,
+              "w": 220.40625
+            },
+            {
+              "x": 2315.59375,
+              "y": 349,
+              "w": 220.390625
+            },
+            {
+              "x": 224,
+              "y": 413,
+              "w": 220.390625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-no-page-overflow",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 595.453125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 966.90625,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1338.359375,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1709.8125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 2081.265625,
+              "y": 288,
+              "w": 359.453125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-uses-available-width",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 595.453125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 966.90625,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1338.359375,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1709.8125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 2081.265625,
+              "y": 288,
+              "w": 359.453125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-compact-wide-rows",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 595.453125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 966.90625,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1338.359375,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1709.8125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 2081.265625,
+              "y": 288,
+              "w": 359.453125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-wide-single-row",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 595.453125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 966.90625,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1338.359375,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 1709.8125,
+              "y": 288,
+              "w": 359.453125
+            },
+            {
+              "x": 2081.265625,
+              "y": 288,
+              "w": 359.453125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-no-page-overflow",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 439.1875
+            },
+            {
+              "x": 675.1875,
+              "y": 190,
+              "w": 439.203125
+            },
+            {
+              "x": 1126.390625,
+              "y": 190,
+              "w": 439.1875
+            },
+            {
+              "x": 1577.578125,
+              "y": 190,
+              "w": 439.203125
+            },
+            {
+              "x": 2028.78125,
+              "y": 190,
+              "w": 439.1875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-uses-available-width",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 439.1875
+            },
+            {
+              "x": 675.1875,
+              "y": 190,
+              "w": 439.203125
+            },
+            {
+              "x": 1126.390625,
+              "y": 190,
+              "w": 439.1875
+            },
+            {
+              "x": 1577.578125,
+              "y": 190,
+              "w": 439.203125
+            },
+            {
+              "x": 2028.78125,
+              "y": 190,
+              "w": 439.1875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-compact-wide-rows",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "width": 2312,
+          "pageWidth": 2312,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 439.1875
+            },
+            {
+              "x": 675.1875,
+              "y": 190,
+              "w": 439.203125
+            },
+            {
+              "x": 1126.390625,
+              "y": 190,
+              "w": 439.1875
+            },
+            {
+              "x": 1577.578125,
+              "y": 190,
+              "w": 439.203125
+            },
+            {
+              "x": 2028.78125,
+              "y": 190,
+              "w": 439.1875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-action-at-workspace-edge",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "right": 2536,
+          "button": 2536
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-no-page-overflow",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 1293.203125
+          },
+          "result": {
+            "x": 1541.203125,
+            "y": 174,
+            "w": 994.796875
+          },
+          "mail": {
+            "x": 224,
+            "y": 534,
+            "w": 2312
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-wide-range-result-side-by-side",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 1293.203125
+          },
+          "result": {
+            "x": 1541.203125,
+            "y": 174,
+            "w": 994.796875
+          },
+          "mail": {
+            "x": 224,
+            "y": 534,
+            "w": 2312
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-no-page-overflow",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 15,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 551.625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 879.265625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1206.90625,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 1534.53125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1862.171875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2189.8125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2517.453125,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 2845.078125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3172.71875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3500.359375,
+              "y": 349,
+              "w": 315.625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-uses-available-width",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 15,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 551.625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 879.265625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1206.90625,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 1534.53125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1862.171875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2189.8125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2517.453125,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 2845.078125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3172.71875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3500.359375,
+              "y": 349,
+              "w": 315.625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-expanded-compact-wide-rows",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 15,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 551.625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 879.265625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1206.90625,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 1534.53125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1862.171875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2189.8125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2517.453125,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 2845.078125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3172.71875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3500.359375,
+              "y": 349,
+              "w": 315.625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "drawing-wide-at-least-six-columns",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 15,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 551.625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 879.265625,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1206.90625,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 1534.53125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 1862.171875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2189.8125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 2517.453125,
+              "y": 349,
+              "w": 315.625
+            },
+            {
+              "x": 2845.078125,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3172.71875,
+              "y": 349,
+              "w": 315.640625
+            },
+            {
+              "x": 3500.359375,
+              "y": 349,
+              "w": 315.625
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-no-page-overflow",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 808.78125,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 1393.578125,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 1978.359375,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 2563.15625,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 3147.9375,
+              "y": 288,
+              "w": 572.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-uses-available-width",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 808.78125,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 1393.578125,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 1978.359375,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 2563.15625,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 3147.9375,
+              "y": 288,
+              "w": 572.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-filter-compact-wide-rows",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 808.78125,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 1393.578125,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 1978.359375,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 2563.15625,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 3147.9375,
+              "y": 288,
+              "w": 572.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "pdf-wide-single-row",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 7,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 808.78125,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 1393.578125,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 1978.359375,
+              "y": 288,
+              "w": 572.796875
+            },
+            {
+              "x": 2563.15625,
+              "y": 288,
+              "w": 572.78125
+            },
+            {
+              "x": 3147.9375,
+              "y": 288,
+              "w": 572.796875
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-no-page-overflow",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 695.1875
+            },
+            {
+              "x": 931.1875,
+              "y": 190,
+              "w": 695.203125
+            },
+            {
+              "x": 1638.390625,
+              "y": 190,
+              "w": 695.1875
+            },
+            {
+              "x": 2345.578125,
+              "y": 190,
+              "w": 695.203125
+            },
+            {
+              "x": 3052.78125,
+              "y": 190,
+              "w": 695.203125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-uses-available-width",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 695.1875
+            },
+            {
+              "x": 931.1875,
+              "y": 190,
+              "w": 695.203125
+            },
+            {
+              "x": 1638.390625,
+              "y": 190,
+              "w": 695.1875
+            },
+            {
+              "x": 2345.578125,
+              "y": 190,
+              "w": 695.203125
+            },
+            {
+              "x": 3052.78125,
+              "y": 190,
+              "w": 695.203125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-filter-compact-wide-rows",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "width": 3592,
+          "pageWidth": 3592,
+          "columns": 6,
+          "rows": 1,
+          "labels": [
+            {
+              "x": 224,
+              "y": 190,
+              "w": 695.1875
+            },
+            {
+              "x": 931.1875,
+              "y": 190,
+              "w": 695.203125
+            },
+            {
+              "x": 1638.390625,
+              "y": 190,
+              "w": 695.1875
+            },
+            {
+              "x": 2345.578125,
+              "y": 190,
+              "w": 695.203125
+            },
+            {
+              "x": 3052.78125,
+              "y": 190,
+              "w": 695.203125
+            }
+          ],
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "qr-action-at-workspace-edge",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "right": 3816,
+          "button": 3816
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-no-page-overflow",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 2016.6875
+          },
+          "result": {
+            "x": 2264.6875,
+            "y": 174,
+            "w": 1551.296875
+          },
+          "mail": {
+            "x": 224,
+            "y": 534,
+            "w": 3591.984375
+          },
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "outbound-wide-range-result-side-by-side",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "range": {
+            "x": 224,
+            "y": 174,
+            "w": 2016.6875
+          },
+          "result": {
+            "x": 2264.6875,
+            "y": 174,
+            "w": 1551.296875
+          },
+          "mail": {
+            "x": 224,
+            "y": 534,
+            "w": 3591.984375
+          },
+          "overflow": false
+        }
+      }
+    ],
+    "failures": []
+  },
+  "matrix": {
+    "cases": 16,
+    "checks": 518,
+    "failures": 0,
+    "blockedWrites": 0
+  },
+  "readonlyAudit": {
+    "scope": "Read-only existing data; no migrations, seed or business writes",
+    "before": {
+      "databasePath": "/workspace/drawing-number-planner/work/runtime-data/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_current": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_versions": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dictionary_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_changes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_runs": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "dcba8d8fa85c6fd9d913ed8c49dd3941f70224bc2f0b26c015b3546379f9590b"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "03356787e156cc69a02c97d53beae655b72aaf981c6a8f7c313e344ee9e16573"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "products": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_code_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "3e516b8cc3a77e2f47969dbf08a19897b1a6df64adf65a0a8c0b43e04170b8d7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "83c1b44ae89b6c93ca668b9504d78525cbe17750bef8be49681e374b6a301511"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "ed0ce3ddaa4b1e1b51394cba720b16b721f57c5ad26e0f236589757d5eb2c528"
+        }
+      }
+    },
+    "after": {
+      "databasePath": "/workspace/drawing-number-planner/work/runtime-data/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_current": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_versions": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dictionary_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_changes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_runs": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "dcba8d8fa85c6fd9d913ed8c49dd3941f70224bc2f0b26c015b3546379f9590b"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "03356787e156cc69a02c97d53beae655b72aaf981c6a8f7c313e344ee9e16573"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "products": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_code_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "3e516b8cc3a77e2f47969dbf08a19897b1a6df64adf65a0a8c0b43e04170b8d7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "83c1b44ae89b6c93ca668b9504d78525cbe17750bef8be49681e374b6a301511"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "ed0ce3ddaa4b1e1b51394cba720b16b721f57c5ad26e0f236589757d5eb2c528"
+        }
+      }
+    },
+    "databaseHashBefore": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "databaseHashAfter": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "unchanged": true
+  },
+  "build": {
+    "typecheck": true,
+    "renderer": true,
+    "main": true,
+    "warning": "existing chunk >500kB"
+  },
+  "e2e": "Not rerun this feedback patch",
+  "unverified": [
+    "Windows populated sample data and business data",
+    "physical 4K, OS DPI, cross-monitor and native Electron"
+  ]
+}
