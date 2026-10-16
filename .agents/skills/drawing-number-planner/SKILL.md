@@ -72,3 +72,7 @@ Read `docs/p4-adaptive-data-workspaces-20261015.md` for the user's later all-pag
 ### Latest P4 BOM query history refinement (2026-10-16)
 
 For the later explicit query-only history comparison request, read `docs/p4-bom-history-comparison-20261016.md` and the matching supplement in `references/ui-and-acceptance.md`. This authorizes summaries, reliable matching, changed-field filtering, project folding and verified historical attachments only in query details. Earlier path hiding is superseded here only by on-demand disclosure; all data safety and manual Windows acceptance boundaries remain.
+
+### P4 historical edit and detail corrections (latest 2026-10-16)
+
+Read `docs/p4-bom-edit-corrections-20261016.md` and the matching business/UI reference supplements. The latest user request explicitly protects original record identity/date/submission time and count on edits, separates batch metadata from field cells, puts copy icons beside values, and removes QR from BOM query fields/diff counting without deleting relationships. This supersedes preceding date-correction/inline-batch-details presentation only; no duplicate-data cleanup, Schema/merge or production write authorization follows.

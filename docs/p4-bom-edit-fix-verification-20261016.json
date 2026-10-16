@@ -1,0 +1,163 @@
+{
+  "date": "2026-10-16",
+  "at": "2026-10-16T16:06:59.597540+08:00",
+  "branch": "codex/p4-bom-edit-corrections-20261016",
+  "baseline": "b02bb94",
+  "related": {
+    "files": 9,
+    "passed": 140
+  },
+  "unit": {
+    "total": 964,
+    "passed": 947,
+    "failed": 17,
+    "newFailures": 0,
+    "failures": [
+      {
+        "file": "core/indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path",
+        "baseline": true
+      },
+      {
+        "file": "core/qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file",
+        "baseline": true
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it",
+        "baseline": true
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace",
+        "baseline": true
+      },
+      {
+        "file": "core/workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances",
+        "baseline": true
+      },
+      {
+        "file": "renderer/outbound-mock.test.tsx",
+        "test": "outbound isolated UI mock routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears",
+        "baseline": true
+      },
+      {
+        "file": "renderer/recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API",
+        "baseline": true
+      },
+      {
+        "file": "server/application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart",
+        "baseline": true
+      }
+    ]
+  },
+  "typecheck": "passed",
+  "rendererBuild": "passed",
+  "mainBuild": "passed",
+  "review": "Important findings fixed; independent page/archive recheck 38/38; no remaining important findings",
+  "browserGeometry": [
+    {
+      "width": 3840,
+      "source": "existing developer Mock, not real business-data acceptance",
+      "pass": true,
+      "overflow": false,
+      "qrRows": 0,
+      "batchMetadataInCells": 0,
+      "badCopies": []
+    },
+    {
+      "width": 1920,
+      "source": "existing developer Mock, not real business-data acceptance",
+      "pass": true,
+      "overflow": false,
+      "qrRows": 0,
+      "batchMetadataInCells": 0,
+      "badCopies": []
+    },
+    {
+      "width": 1366,
+      "source": "existing developer Mock, not real business-data acceptance",
+      "pass": true,
+      "overflow": false,
+      "qrRows": 0,
+      "batchMetadataInCells": 0,
+      "badCopies": []
+    },
+    {
+      "width": 1100,
+      "source": "existing developer Mock, not real business-data acceptance",
+      "pass": true,
+      "overflow": false,
+      "qrRows": 0,
+      "batchMetadataInCells": 0,
+      "badCopies": []
+    },
+    {
+      "width": 720,
+      "source": "existing developer Mock, not real business-data acceptance",
+      "pass": true,
+      "overflow": false,
+      "qrRows": 0,
+      "batchMetadataInCells": 0,
+      "badCopies": []
+    }
+  ],
+  "dataSafety": {
+    "productionDataWritten": false,
+    "duplicatesDeleted": false,
+    "schemaChanged": false,
+    "runtimeDbSha256": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "threeToThree": "Isolated real service/API tests, not user business data; exact IDs/dates/createdAt/predecessors/neighbors/current-pointer preserved",
+    "nullDateAttachments": "Unchanged managed associations retained; explicit new/replacements verified with existing safe preview checks"
+  },
+  "windows": "New fixed-revision executable build pending; physical 4K/maximize not yet verified"
+}

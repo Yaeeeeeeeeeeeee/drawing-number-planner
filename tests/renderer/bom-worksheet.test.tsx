@@ -60,7 +60,7 @@ it('retains complete query fields and independent attachment roles in all-fields
   await screen.findByText(/对照上一条记录 #-202/);
   const project = screen.getByRole('button', { name: /项目 1 · 说明书/ }).closest('article')!;
   fireEvent.click(within(project).getByRole('button', { name: '全部字段' }));
-  for (const field of ['主类别','项目明细','图号','生效批次','材质','尺寸','位置','修改明细','备注','数量','引用白色图号','二维码关联'])
+  for (const field of ['主类别','项目明细','图号','生效批次','材质','尺寸','位置','修改明细','备注','数量','引用白色图号'])
     expect(within(project).getByRole('rowheader', {name: field})).toBeVisible();
   expect(project).toHaveTextContent('02.0209.010.0501001');
   expect(project).toHaveTextContent('说明书-图片.png');

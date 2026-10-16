@@ -344,7 +344,7 @@ export interface PlannerApi {
   archiveBomAssetLink(linkId: number): Promise<{ linkId: number; status: 'archived' | 'unchanged' }>;
   relinkBomMaterialBatch(id: number): Promise<{ relinked: number }>;
   saveBomVersion(input: SaveBomView): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
-  updateBomVersion(id: number, input: SaveBomView, expectedRevision: number): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
+  updateBomVersion(id: number, input: Omit<SaveBomView, 'businessChangeDate'> & { businessChangeDate?: string }, expectedRevision: number): Promise<{ version: BomVersionView; diff: BomDiffView[] }>;
   getWorkspaceSettings(): Promise<WorkspaceSettingsView>;
   updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
   scanPdfFiles(): Promise<PdfScanSummaryView>;

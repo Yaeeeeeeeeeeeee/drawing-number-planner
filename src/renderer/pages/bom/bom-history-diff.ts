@@ -13,7 +13,6 @@ export const bomFields = [
   { key: 'position', label: '位置', value: (item: BomItemView) => item.position },
   { key: 'changeDetails', label: '修改明细', value: (item: BomItemView) => item.changeDetails },
   { key: 'notes', label: '备注', value: (item: BomItemView) => item.notes },
-  { key: 'qr', label: '二维码关联', value: (item: BomItemView) => item.qrCodes.map(code => code.id).sort((a, b) => a - b) },
 ] as const;
 export type BomFieldKey = typeof bomFields[number]['key'];
 export type AssetRole = BomItemAssetView['role'];

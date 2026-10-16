@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BomItemAssetView } from '../../data/client';
-import { CopyButton } from '../../components/CopyButton';
+import { BomValueCopy } from './BomValueCopy';
 import { BomAssetPreview } from './BomAssetPreview';
 import { isBomMockEnabled } from './bom-mock';
 
-export function HistoryCopy({ value, label }: { value: string; label: string }) {
-  const [message, setMessage] = useState('');
-  return <><CopyButton label={label} onClick={() => { void navigator.clipboard?.writeText(value).then(() => setMessage('已复制')).catch(() => setMessage('复制失败，请手动选择文本')); if (!navigator.clipboard) setMessage('复制不可用，请手动选择文本'); }} /><small role="status">{message}</small></>;
-}
 const errors: Record<string, string> = {
   ASSET_NOT_FOUND: '附件记录不存在，或文件缺失／不可读取',
   ASSET_PATH_INVALID: '附件路径无效',
@@ -39,7 +35,7 @@ export function BomHistoryAsset({ asset, onOpen, previewOnly }: { asset: BomItem
       <small role="status">{state.label}</small>
       {state.failed && <button type="button" className="text-button" onClick={() => { request.current?.abort(); setState({ available: false, failed: false, label: '正在重新核验并预览附件…' }); }}>重试预览</button>}
     </>}
-    <button type="button" className="text-button" disabled={previewOnly || mock || !state.available} aria-label={`打开附件位置 ${asset.originalFileName}`} onClick={() => onOpen(asset.assetId)}>打开位置</button>
-    <details><summary>查看完整路径</summary><span>{asset.relativePath}</span><HistoryCopy value={asset.relativePath} label={`复制附件路径 ${asset.originalFileName}`} /></details>
+    <button type="button" className="text-button" disabled={previewOnly || mock || !state.available} title={previewOnly || mock ? '开发预览不执行文件操作' : !state.available ? state.label : '打开此历史附件所在位置'} aria-label={`打开附件位置 ${asset.originalFileName}`} onClick={() => onOpen(asset.assetId)}>打开位置</button>
+    <details><summary>查看完整路径</summary><BomValueCopy value={asset.relativePath} label={`复制附件路径 ${asset.originalFileName}`} /></details>
   </div>;
 }

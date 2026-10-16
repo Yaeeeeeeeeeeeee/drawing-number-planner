@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
@@ -76,15 +76,15 @@ it('archives attachments during BOM save when a workspace is configured', () => 
   expect(f.bom.getVersion(f.version.id).items[0].assets[0].assetId).toBe(f.asset.id);
   expect(readFileSync(join(root, f.asset.relativePath))).toEqual(f.content);
 });
-it('creates a new dated copy on date correction without changing the previous archived file', () => {
+it('rejects editing the original business date without creating a new dated attachment or changing history', () => {
   const f = fixture(); const service = new BomService(db, () => root);
   const first = service.saveVersion({ ...f.input, expectedCurrentVersionId: f.version.id }).version;
   const old = first.items[0].assets[0];
-  const edited = service.updateVersion(first.id, { ...f.input, businessChangeDate: '2026-09-24',
-    items: [{ ...f.input.items[0], assets: [{ assetId: old.assetId, role: 'image' }] }] }, 0).version;
-  expect(edited.items[0].assets[0].relativePath).toBe(join('BOM附件', 'M', '20260924', '铭牌-20260924.png'));
+  expect(() => service.updateVersion(first.id, { ...f.input, businessChangeDate: '2026-09-24',
+    items: [{ ...f.input.items[0], assets: [{ assetId: old.assetId, role: 'image' }] }] }, 0)).toThrow(/不能更改.*业务变更日期/);
+  expect(service.getVersion(first.id)).toEqual(first);
   expect(readFileSync(join(root, old.relativePath))).toEqual(f.content);
-  expect(edited.createdAt).toBe(first.createdAt);
+  expect(existsSync(join(root, 'BOM附件', 'M', '20260924', '铭牌-20260924.png'))).toBe(false);
 });
 it('does not save a new BOM when an attachment cannot be verified', () => {
   const f = fixture(); const service = new BomService(db, () => root);
@@ -100,4 +100,18 @@ it('does not silently skip required attachment archiving when the configured wor
   expect(service.getCurrent(f.input.productId)?.id).toBe(f.version.id);
   expect(db.prepare('select count(*) as n from bom_versions').get()).toEqual({ n: 1 });
   expect(readFileSync(join(root, f.asset.relativePath))).toEqual(f.content);
+});
+it('edits a legacy NULL-date record with real attachments without inventing a date or re-archiving original files',()=>{
+ const f=fixture();db.prepare('update bom_versions set business_change_date=null where id=?').run(f.version.id);
+ const service=new BomService(db,()=>root);const before=service.getVersion(f.version.id);
+ const edited=service.updateVersion(before.id,{...f.input,businessChangeDate:undefined,items:[{...f.input.items[0],material:'历史文字修订'}]},before.editRevision).version;
+ expect(edited.businessChangeDate).toBeNull();expect(edited.createdAt).toBe(before.createdAt);expect(edited.items[0].material).toBe('历史文字修订');
+ expect(edited.items[0].assets).toEqual(before.items[0].assets);expect(readFileSync(join(root,f.asset.relativePath))).toEqual(f.content);expect(service.listVersions(f.input.productId)).toHaveLength(1);
+});
+it('still verifies an explicitly replaced attachment on a NULL-date history and rolls back corrupted bytes',()=>{
+ const f=fixture();db.prepare('update bom_versions set business_change_date=null where id=?').run(f.version.id);const service=new BomService(db,()=>root);const before=service.getVersion(f.version.id);
+ const source=join(root,'replacement.png');writeFileSync(source,Buffer.concat([f.content,Buffer.from('replacement')]));const asset=new BomAssetService(db,root).import({sku:'SKU',model:'M',sourcePath:source});
+ writeFileSync(join(root,asset.relativePath),'changed-after-upload');
+ expect(()=>service.updateVersion(before.id,{...f.input,businessChangeDate:undefined,items:[{...f.input.items[0],assets:[{role:'image',assetId:asset.id}]}]},before.editRevision)).toThrow(/内容/);
+ expect(service.getVersion(before.id)).toEqual(before);expect(readFileSync(join(root,f.asset.relativePath))).toEqual(f.content);
 });

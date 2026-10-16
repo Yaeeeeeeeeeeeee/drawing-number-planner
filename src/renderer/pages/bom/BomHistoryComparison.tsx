@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import type { BomItemView, BomVersionView, DictionaryItemView, MaterialBatchView } from '../../data/client';
 import { materialBatchLabel } from '../../../core/files/material-batch-label';
 import { BomRecordNotices } from './BomRecordNotices';
-import { BomHistoryAsset, HistoryCopy } from './BomHistoryAsset';
+import { BomHistoryAsset } from './BomHistoryAsset';
+import { BomValueCopy } from './BomValueCopy';
 import { assetRoles, bomFields, compareBomItems, snapshotItems } from './bom-history-diff';
 import type { BomFieldKey, HistoryItem } from './bom-history-diff';
 import './bom-history-comparison.css';
@@ -17,14 +18,18 @@ function FieldValue({ item, field, context }: { item: BomItemView; field: BomFie
   switch (field) {
     case 'main': value = context.mainCategories.find(c => c.id === context.projects.find(p => p.id === item.projectItemId)?.parentId)?.name ?? '—'; break;
     case 'project': value = item.projectItemName; break;
-    case 'drawing': return <><strong className="code-cell">{item.fullCode || '—'}</strong>{item.fullCode && <HistoryCopy value={item.fullCode} label={`复制图号 ${item.fullCode}`} />}</>;
-    case 'batch': value = <>{item.effectiveBatchName ? materialBatchLabel(item.effectiveBatchName) : '—'}<details><summary>查看批次快照</summary><span>关联编号：{item.effectiveMaterialBatchId ?? '未记录'}</span><br/><span>原始名称：{item.effectiveBatchName ?? '未记录'}</span>{item.effectiveBatchRelativePath && <><span className="bom-history-path">{item.effectiveBatchRelativePath}</span><HistoryCopy value={item.effectiveBatchRelativePath} label="复制批次快照路径"/></>}</details></>; break;
+    case 'drawing': return item.fullCode ? <BomValueCopy value={item.fullCode} label={`复制图号 ${item.fullCode}`} code/> : <>—</>;
+    case 'batch': return item.effectiveBatchName ? <BomValueCopy value={materialBatchLabel(item.effectiveBatchName)} label="复制生效批次"/> : <>—</>;
     case 'quantity': value = (item as BomItemView & {quantity?: number}).quantity ?? '未记录'; break;
     case 'white': value = item.usesWhiteMaterial ? '是' : '否'; break;
-    case 'qr': value = item.qrCodes.length ? item.qrCodes.map(q => `${q.purposeDisplayName} · ${q.name}（#${q.id}）`).join('；') : '未关联'; break;
     default: value = item[field] || '—';
   }
   return <>{value}</>;
+}
+function BatchDetails({ row }: { row: HistoryItem }) {
+  const sides = row.previous && row.selected ? [{ label: '上一条记录', item: row.previous }, { label: '所选记录', item: row.selected }] : [{ label: row.selected ? '所选记录' : '上一条记录', item: row.selected ?? row.previous! }];
+  if (!sides.some(side => side.item.effectiveBatchName || side.item.effectiveBatchRelativePath || side.item.effectiveMaterialBatchId !== null)) return null;
+  return <details className="bom-history-batch-details"><summary>批次详情</summary><div className="bom-history-batch-snapshots">{sides.map(({ label, item }) => <section key={label} aria-label={`${label}批次详情`}><strong>{label}</strong><dl><dt>名称</dt><dd>{item.effectiveBatchName ? <BomValueCopy value={item.effectiveBatchName} label={`复制${label}批次原始名称`}/> : '未记录'}</dd><dt>关联编号</dt><dd>{item.effectiveMaterialBatchId ?? '未记录'}</dd><dt>完整路径</dt><dd>{item.effectiveBatchRelativePath ? <BomValueCopy value={item.effectiveBatchRelativePath} label={`复制${label}批次路径`}/> : '未记录'}</dd></dl></section>)}</div></details>;
 }
 function Project({ row, index, expanded, toggle, context, currentDate, previousDate }: { row: HistoryItem; index: number; expanded: boolean; toggle(): void; context: Context; currentDate: string; previousDate?: string }) {
   const id = useId(); const [allFields, setAllFields] = useState(false);
@@ -42,6 +47,7 @@ function Project({ row, index, expanded, toggle, context, currentDate, previousD
       {row.kind === 'removed' && <p>所选记录已移除此项目；以下保留上一条记录完整资料。</p>}
       <div className="bom-history-field-toolbar"><strong>字段{paired ? '差异' : '资料'}</strong>{paired && <div><button className="text-button" type="button" aria-pressed={!allFields} onClick={() => setAllFields(false)}>仅变化项</button><button className="text-button" type="button" aria-pressed={allFields} onClick={() => setAllFields(true)}>全部字段</button></div>}</div>
       {paired && !allFields && !fields.length ? <p className="muted-text">没有已确认的字段变化，可切换全部字段查看。</p> : <div className="bom-history-table-scroll"><table className="bom-history-fields"><colgroup><col className="bom-history-label-col"/>{paired && <col/>}<col/></colgroup><thead><tr><th>字段</th>{paired && <th>上一条记录<small>{previousDate}</small></th>}<th>{row.selected ? '所选记录' : '上一条记录'}<small>{row.selected ? currentDate : previousDate}</small></th></tr></thead><tbody>{fields.map(f => <tr key={f.key} data-changed={paired && row.changedFields.includes(f.key)}><th scope="row" aria-label={f.label}>{f.label}{f.key === 'drawing' && paired && row.changedFields.includes('drawing') && <small title={`上一条：${row.previous!.origin} #${row.previous!.origin === 'planned' ? row.previous!.drawingId : row.previous!.historicalDrawingId}；所选：${row.selected!.origin} #${row.selected!.origin === 'planned' ? row.selected!.drawingId : row.selected!.historicalDrawingId}`}>图号或其关联变更</small>}</th>{paired && <td><FieldValue item={row.previous!} field={f.key} context={context}/></td>}<td><FieldValue item={row.selected ?? row.previous!} field={f.key} context={context}/></td></tr>)}</tbody></table></div>}
+      <BatchDetails row={row}/>
       <h4>附件{paired ? '对比' : '资料'}</h4>
       <div className="bom-history-table-scroll"><table className="bom-history-fields"><colgroup><col className="bom-history-label-col"/>{paired && <col/>}<col/></colgroup><thead><tr><th>附件类型</th>{paired && <th>上一条记录</th>}<th>{row.selected ? '所选记录' : '上一条记录'}</th></tr></thead><tbody>{assetRoles.map(role => <tr key={role} data-changed={paired && row.attachments[role].changed}><th scope="row">{role === 'image' ? '图片' : '位置示意图'}{paired && <small>{row.attachments[role].label}</small>}</th>{(paired ? [row.previous!, row.selected!] : [item]).map((side, sideIndex) => <td key={sideIndex}>{side.assets.filter(a => a.role === role).map(a => <BomHistoryAsset key={`${a.assetId}:${a.id}:${a.relativePath}`} asset={a} previewOnly={context.previewOnly} onOpen={context.onOpenAsset}/>)}{!side.assets.some(a => a.role === role) && <span className="muted-text">未关联</span>}</td>)}</tr>)}</tbody></table></div>
     </div>}
@@ -70,7 +76,7 @@ export function BomHistoryComparison({ detail, readVersion, ...context }: Contex
     <div className="bom-history-basic"><h3>{detail.model}｜{date(detail)}</h3><span>提交时间：{time(detail.createdAt)}</span>{detail.notes && <p>记录备注：{detail.notes}</p>}</div>
     <section className="bom-history-summary" aria-label="BOM 变更摘要"><h4>BOM 变更摘要</h4><p>所选记录 #{detail.id} · 项目总数 {detail.items.length}</p>
       {first ? <p role="status">首次记录，无历史版本可对照</p> : previous ? <><p>对照上一条记录 #{previous.id} · {date(previous)} · {previous.items.length} 个项目</p><div className="bom-history-counts">{(['added','removed','modified','unchanged','pending'] as const).map(kind => <span key={kind}>{labels[kind]} {comparison!.counts[kind]} 项</span>)}</div></> : <p role="status">{current?.error ?? '正在读取上一条记录…'} 变更统计暂不可用。</p>}
-      <small>主类别、项目名称及二维码名称来自当前字典，不作为历史名称变化判断依据。附件摘要表示记录内容，磁盘状态需展开核验。</small>
+      <small>主类别、项目名称来自当前字典，不作为历史名称变化判断依据。附件摘要表示记录内容，磁盘状态需展开核验。</small>
     </section>
     <ProjectList key={`${detail.id}:${detail.editRevision}:${detail.updatedAt}:${previous ? 'ready' : first ? 'first' : 'pending'}`} rows={rows} context={context} currentDate={date(detail)} previousDate={previous ? date(previous) : undefined}/>
   </div>;

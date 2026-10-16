@@ -73,7 +73,7 @@ describe('BomPage product-level BOM', () => {
     fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
     expect(await screen.findByText('改为哑光')).toBeVisible();
     expect(screen.getByText('PET')).toBeVisible();
-    expect(screen.getByText('20260928')).toBeVisible();
+    expect(screen.getByRole('rowheader',{name:'生效批次'}).closest('tr')).toHaveTextContent('20260928');
     const drawingField = screen.getByRole('button', { name: `复制图号 ${candidate.fullCode}` }).closest('td')!;
     expect(drawingField).toHaveTextContent(candidate.fullCode);
     expect(drawingField).not.toHaveTextContent('正式图号');
@@ -353,4 +353,40 @@ describe('BomPage product-level BOM', () => {
 
     fetchRequest.mockRestore();
   });
+});
+
+it('keeps selected historical edit intent when clicking its active editor tab and never creates a record', async () => {
+  const record = { ...activeCurrent, editRevision: 2, updatedAt: activeCurrent.createdAt };
+  const api = { ...apiFixture(), updateBomVersion: vi.fn().mockResolvedValue({ version: record, diff: [] }) };
+  api.queryBomVersions.mockResolvedValue([record, { ...record, id: 21 }, { ...record, id: 22 }]); api.getBomVersion.mockResolvedValue(record);
+  render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', {name:'查询 BOM'}));
+  fireEvent.click(await screen.findByRole('button', {name:'编辑 BOM 20'}));await screen.findByLabelText('第 1 行材质');
+  const activeTab=screen.getByRole('navigation',{name:'BOM 管理方式'}).querySelector('button[aria-selected="true"]')!;
+  fireEvent.click(activeTab);expect(screen.getByRole('button',{name:'保存修改'})).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('第 1 行材质'),{target:{value:'修订纸张'}});fireEvent.click(screen.getByRole('button',{name:'保存修改'}));
+  await waitFor(()=>expect(api.updateBomVersion).toHaveBeenCalledWith(20,expect.objectContaining({businessChangeDate:record.businessChangeDate}),2));
+  expect(api.saveBomVersion).not.toHaveBeenCalled();await screen.findByLabelText('所选 BOM 记录');expect(screen.getByText('3 条记录')).toBeVisible();
+});
+it('does not permit changing the original business date while editing and refreshes selected details after save',async()=>{
+  const record={...activeCurrent,editRevision:1,updatedAt:activeCurrent.createdAt};
+  const updated={...record,editRevision:2,items:[{...record.items[0],material:'新材质'}]};
+  const api={...apiFixture(),updateBomVersion:vi.fn().mockResolvedValue({version:updated,diff:[]})};api.queryBomVersions.mockResolvedValue([record]);api.getBomVersion.mockResolvedValue(record);
+  render(<BomPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查询 BOM'}));fireEvent.click(await screen.findByRole('button',{name:'编辑 BOM 20'}));await screen.findByLabelText('第 1 行材质');
+  expect(screen.getByLabelText('业务变更日期')).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'保存修改'}));
+  expect(await screen.findByLabelText('所选 BOM 记录')).toHaveTextContent('新材质');expect(api.saveBomVersion).not.toHaveBeenCalled();
+});
+it('fails closed on a mismatched selected history response rather than falling back to create',async()=>{
+ const api=apiFixture();api.queryBomVersions.mockResolvedValue([{...activeCurrent,editRevision:1}]);api.getBomVersion.mockResolvedValue({...activeCurrent,id:999,editRevision:1});
+ render(<BomPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查询 BOM'}));fireEvent.click(await screen.findByRole('button',{name:'编辑 BOM 20'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('所选 BOM 记录不匹配');expect(screen.queryByRole('button',{name:'保存当前 BOM'})).toBeNull();expect(api.saveBomVersion).not.toHaveBeenCalled();
+});
+it('reopens the editor using saved archived asset identities rather than replaying pre-save upload IDs',async()=>{
+ let stored={...activeCurrent,editRevision:1,updatedAt:activeCurrent.createdAt};
+ const api={...apiFixture(),updateBomVersion:vi.fn().mockImplementation(async(_id:number,_input:{items:Array<{assets?:Array<{role:string;assetId?:number}>}>},_revision:number)=>{stored={...stored,editRevision:stored.editRevision+1,items:[{...stored.items[0],assets:[{...asset,id:42,assetId:42,role:'image' as const,inheritedFromBomItemAssetId:null}]}]};return{version:stored,diff:[]};})};
+ api.getBomVersion.mockImplementation(async()=>stored);api.queryBomVersions.mockImplementation(async()=>[stored]);api.uploadBomAsset.mockResolvedValue({...asset,id:41});
+ render(<BomPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查询 BOM'}));fireEvent.click(await screen.findByRole('button',{name:'编辑 BOM 20'}));await screen.findByLabelText('第 1 行图片');
+ fireEvent.change(screen.getByLabelText('第 1 行图片'),{target:{files:[new File(['image'],'替换.png',{type:'image/png'})]}});await waitFor(()=>expect(screen.getByRole('button',{name:'保存修改'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'保存修改'}));await screen.findByLabelText('所选 BOM 记录');fireEvent.click(screen.getByRole('button',{name:'编辑 BOM'}));
+ fireEvent.change(await screen.findByLabelText('第 1 行备注'),{target:{value:'仅改备注'}});fireEvent.click(screen.getByRole('button',{name:'保存修改'}));
+ await waitFor(()=>expect(api.updateBomVersion).toHaveBeenCalledTimes(2));expect(api.updateBomVersion.mock.calls[1][1].items[0].assets).toEqual([{role:'image',assetId:42}]);expect(api.saveBomVersion).not.toHaveBeenCalled();
 });

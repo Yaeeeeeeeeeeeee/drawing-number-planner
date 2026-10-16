@@ -58,6 +58,10 @@ describe('BOM history presentation diff',()=>{
  });
  it('does not mutate or sort the loaded snapshots in place',()=>{
   const a=[item(2),item(1)],b=[item(1)];const before=JSON.stringify([a,b]);compareBomItems(a,b);expect(JSON.stringify([a,b])).toBe(before);
-  expect(bomFields.map(x=>x.key)).toEqual(expect.arrayContaining(['drawing','batch','material','dimensions','position','changeDetails','notes','qr','quantity','white']));
+  expect(bomFields.map(x=>x.key)).toEqual(expect.arrayContaining(['drawing','batch','material','dimensions','position','changeDetails','notes','quantity','white']));
  });
+});
+it('excludes independent QR associations from BOM history change counts without altering the snapshots',()=>{
+ const before=item(1,{qrCodes:[{id:5,name:'A',purposeDisplayName:'说明书',status:'active'}]}),after=item(1,{qrCodes:[{id:9,name:'B',purposeDisplayName:'售后卡',status:'active'}]});
+ const result=compareBomItems([after],[before]);expect(result.counts.modified).toBe(0);expect(result.counts.unchanged).toBe(1);expect(after.qrCodes[0].id).toBe(9);expect(before.qrCodes[0].id).toBe(5);
 });

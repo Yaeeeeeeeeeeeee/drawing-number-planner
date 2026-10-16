@@ -195,7 +195,7 @@ export class BomService {
       if (previous.productId !== input.productId) throw new BomError('DRAWING_WRONG_PRODUCT', '不能改变 BOM 所属产品');
       this.validateProduct(input.productId);
       if (previous.editRevision !== expectedRevision) throw new BomError('BOM_STALE', '该记录已被修改，请重新加载后编辑');
-      if (!input.businessChangeDate || !validBusinessDate(input.businessChangeDate)) throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '业务变更日期无效');
+      if (input.businessChangeDate !== undefined && input.businessChangeDate !== previous.businessChangeDate) throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '编辑已有 BOM 不能更改原业务变更日期');
       if (!input.items.length) throw new BomError('INVALID_BOM_ITEM_COUNT', 'BOM 至少需要一个项目');
       const projects = new Set<number>();
       const validated = input.items.map((item) => {
@@ -218,8 +218,8 @@ export class BomService {
         return validatedItem;
       });
       const now = new Date().toISOString();
-      this.db.prepare(`update bom_versions set business_change_date = ?, updated_at = ?, edit_revision = edit_revision + 1,
-        notes = ? where id = ?`).run(input.businessChangeDate, now, input.notes === undefined ? previous.notes : normalizedNotes(input.notes), id);
+      this.db.prepare(`update bom_versions set updated_at = ?, edit_revision = edit_revision + 1,
+        notes = ? where id = ?`).run(now, input.notes === undefined ? previous.notes : normalizedNotes(input.notes), id);
       this.db.prepare('update bom_items set deleted_at = ? where bom_version_id = ?').run(now, id);
       validated.forEach((item, index) => {
         const existing = this.db.prepare('select id from bom_items where bom_version_id = ? and project_item_id = ?')
@@ -239,7 +239,15 @@ export class BomService {
           this.saveItemAssets(itemId, item.projectItemId, previous.previousVersionId, item.assets);
         }
       });
-      archive(id);
+      // A legacy NULL date is immutable: retain managed associations without inventing a dated archive.
+      if (previous.businessChangeDate !== null) archive(id);
+      else if (this.workspaceRoot) {
+        // Unchanged legacy links may be missing, but explicit new associations still require original integrity checks.
+        for (const item of this.getVersion(id).items) {
+          const original = previous.items.find(old => old.projectItemId === item.projectItemId);
+          for (const asset of item.assets) if (!original?.assets.some(old => old.role === asset.role && old.assetId === asset.assetId)) this.previewAsset(asset.assetId);
+        }
+      }
       const version = this.getVersion(id);
       return { version, diff: buildDiff(previous, version) };
     });

@@ -40,5 +40,13 @@ it('exposes changed raw batch snapshots on demand when normalized labels look id
  const a=item(1),b={...a,effectiveMaterialBatchId:9,effectiveBatchName:'01.20260928',effectiveBatchRelativePath:'old/path'},c={...b,effectiveBatchName:'02.20260928',effectiveBatchRelativePath:'new/path'};
  render(<BomHistoryComparison {...props} detail={version(2,[c],1)} readVersion={vi.fn().mockResolvedValue(version(1,[b]))}/>);
  expect(await screen.findByText('修改 1 项')).toBeVisible();expect(screen.getByText('old/path')).not.toBeVisible();
- fireEvent.click(screen.getAllByText('查看批次快照')[0]);expect(screen.getByText('old/path')).toBeVisible();expect(screen.getByText(/原始名称：01.20260928/)).toBeVisible();
+ fireEvent.click(screen.getByText('批次详情'));expect(screen.getByText('old/path')).toBeVisible();expect(screen.getByText('01.20260928')).toBeVisible();
+ const field=screen.getByRole('rowheader',{name:'生效批次'}).closest('tr')!;expect(field).not.toHaveTextContent('old/path');expect(field).not.toHaveTextContent('关联编号');
+});
+it('keeps effective batch values compact and moves raw snapshot information outside BOM field cells',()=>{
+ const b={...item(1),effectiveBatchName:'01.20260928',effectiveBatchRelativePath:'完整/目录',effectiveMaterialBatchId:9};
+ render(<BomHistoryComparison {...props} detail={version(1,[b])}/>);
+ const row=screen.getByRole('rowheader',{name:'生效批次'}).closest('tr')!;
+ expect(row).toHaveTextContent('20260928');expect(row.querySelector('details')).toBeNull();expect(row).not.toHaveTextContent('关联编号');expect(row).not.toHaveTextContent('原始名称');
+ expect(screen.queryByRole('rowheader',{name:'二维码关联'})).toBeNull();expect(screen.getByRole('button',{name:'复制图号 '+b.fullCode}).closest('.bom-value-copy')).toHaveTextContent(b.fullCode);
 });
