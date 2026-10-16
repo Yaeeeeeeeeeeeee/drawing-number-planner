@@ -1379,7 +1379,13 @@
   "e2e": "existing broad E2E suite not rerun; focused Chromium matrix recorded separately",
   "applicationRevision": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5",
   "delivery": {
-    "status": "local branch committed; remote push blocked by automatic approval review",
-    "reason": "Branch includes isolated-sample/developer-mock screenshots and verification documentation; explicit destination/scope authorization requested."
+    "status": "pushed to existing GitHub repository on independent P4 branch",
+    "authorization": "User explicitly replied 允许 to uploading this code, isolated-sample/developer-mock screenshots and verification documents.",
+    "branch": "codex/p4-bom-history-comparison-20261016",
+    "applicationRevision": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5",
+    "pushedEvidenceRevision": "2c96447",
+    "recordedAt": "2026-10-16T14:31:48.905629+08:00",
+    "merged": false,
+    "next": "Windows read-only manual acceptance remains pending."
   }
 }
