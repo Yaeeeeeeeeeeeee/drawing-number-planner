@@ -1,3 +1,4 @@
+import { CopyButton } from '../../components/CopyButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   OutboundContactView,
@@ -216,11 +217,11 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
         </label>
       )}
       {fileList && <p className="muted-text">邮件文件清单将使用当前打包预览中已勾选的文件。</p>}
-{filterRecipients ? <section className="ob-recipient-group"><h4>收件人</h4><div className="ob-recipient-branch"><RecipientPicker label="收件人" contacts={contacts} selected={to} onChange={setTo}/><div className="ob-recipient-address"><label><span>收件人地址</span><div className="ob-address-display" role="textbox" aria-label="收件人文本" aria-readonly="true" aria-multiline="true" tabIndex={0}>{toText}</div></label><button className="text-button" type="button" onClick={() => void copyField('toText', toText)}>复制收件人{filterRecipients && copyFeedback.toText && <span className="ob-copy-feedback" role="status">{copyFeedback.toText}</span>}</button></div></div></section> : <fieldset>
+{filterRecipients ? <section className="ob-recipient-group"><h4>收件人</h4><div className="ob-recipient-branch"><RecipientPicker label="收件人" contacts={contacts} selected={to} onChange={setTo}/><div className="ob-recipient-address"><label><span>收件人地址</span><div className="ob-address-display" role="textbox" aria-label="收件人文本" aria-readonly="true" aria-multiline="true" tabIndex={0}>{toText}</div></label><CopyButton label="复制收件人" className="text-button email-copy-button" type="button" aria-label="复制收件人" title="复制收件人" onClick={() => void copyField('toText', toText)}>{filterRecipients && copyFeedback.toText && <span className="ob-copy-feedback" role="status">{copyFeedback.toText}</span>}</CopyButton></div></div></section> : <fieldset>
         <legend>收件人</legend>
         {contacts.map((item) => <label key={`to-${item.id}`}><input type="checkbox" aria-label={`收件人 ${item.contactName}`} checked={to.includes(item.id)} onChange={() => toggle(to, item.id, setTo)} />{item.company} · {item.contactName} · {item.email}</label>)}
       </fieldset>}
-      {filterRecipients ? <section className="ob-recipient-group"><h4>抄送</h4><div className="ob-recipient-branch"><RecipientPicker label="抄送" contacts={contacts} selected={cc} onChange={setCc}/><div className="ob-recipient-address"><label><span>抄送地址</span><div className="ob-address-display" role="textbox" aria-label="抄送文本" aria-readonly="true" aria-multiline="true" tabIndex={0}>{ccText}</div></label><button className="text-button" type="button" onClick={() => void copyField('ccText', ccText)}>复制抄送{filterRecipients && copyFeedback.ccText && <span className="ob-copy-feedback" role="status">{copyFeedback.ccText}</span>}</button></div></div></section> : <fieldset>
+      {filterRecipients ? <section className="ob-recipient-group"><h4>抄送</h4><div className="ob-recipient-branch"><RecipientPicker label="抄送" contacts={contacts} selected={cc} onChange={setCc}/><div className="ob-recipient-address"><label><span>抄送地址</span><div className="ob-address-display" role="textbox" aria-label="抄送文本" aria-readonly="true" aria-multiline="true" tabIndex={0}>{ccText}</div></label><CopyButton label="复制抄送" className="text-button email-copy-button" type="button" aria-label="复制抄送" title="复制抄送" onClick={() => void copyField('ccText', ccText)}>{filterRecipients && copyFeedback.ccText && <span className="ob-copy-feedback" role="status">{copyFeedback.ccText}</span>}</CopyButton></div></div></section> : <fieldset>
         <legend>抄送</legend>
         {contacts.map((item) => <label key={`cc-${item.id}`}><input type="checkbox" aria-label={`抄送 ${item.contactName}`} checked={cc.includes(item.id)} onChange={() => toggle(cc, item.id, setCc)} />{item.company} · {item.contactName} · {item.email}</label>)}
       </fieldset>}
@@ -234,14 +235,14 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
       </section>
       <section className="email-draft-content" aria-label="邮件草稿内容"><h3>草稿内容</h3>
       {!filterRecipients && <><label><span>收件人</span><input aria-label="收件人文本" readOnly value={toText} /></label>
-      <button className="text-button" type="button" onClick={() => void copyField('toText', toText)}>复制收件人{filterRecipients && copyFeedback.toText && <span className="ob-copy-feedback" role="status">{copyFeedback.toText}</span>}</button>
+      <CopyButton label="复制收件人" className="text-button email-copy-button" type="button" aria-label="复制收件人" title="复制收件人" onClick={() => void copyField('toText', toText)}>{filterRecipients && copyFeedback.toText && <span className="ob-copy-feedback" role="status">{copyFeedback.toText}</span>}</CopyButton>
       <label><span>抄送</span><input aria-label="抄送文本" readOnly value={ccText} /></label>
-      <button className="text-button" type="button" onClick={() => void copyField('ccText', ccText)}>复制抄送{filterRecipients && copyFeedback.ccText && <span className="ob-copy-feedback" role="status">{copyFeedback.ccText}</span>}</button></>}
+      <CopyButton label="复制抄送" className="text-button email-copy-button" type="button" aria-label="复制抄送" title="复制抄送" onClick={() => void copyField('ccText', ccText)}>{filterRecipients && copyFeedback.ccText && <span className="ob-copy-feedback" role="status">{copyFeedback.ccText}</span>}</CopyButton></>}
       <label><span>主题</span><input aria-label="主题" value={subject} onChange={(event) => { setSubject(event.target.value); setManuallyEdited(true); }} /></label>
-      <button className="text-button" type="button" onClick={() => void copyField('subject', subject)}>复制主题{filterRecipients && copyFeedback.subject && <span className="ob-copy-feedback" role="status">{copyFeedback.subject}</span>}</button>
+      <CopyButton label="复制主题" className="text-button email-copy-button" type="button" aria-label="复制主题" title="复制主题" onClick={() => void copyField('subject', subject)}>{filterRecipients && copyFeedback.subject && <span className="ob-copy-feedback" role="status">{copyFeedback.subject}</span>}</CopyButton>
       <label><span>正文</span><textarea aria-label="正文" rows={14} value={body} onChange={(event) => { setBody(event.target.value); setManuallyEdited(true); }} /></label>
-      <button className="text-button" type="button" onClick={() => void copyField('body', body)}>复制正文{filterRecipients && copyFeedback.body && <span className="ob-copy-feedback" role="status">{copyFeedback.body}</span>}</button>
-      {!filterRecipients && <button className="primary-button" type="button" onClick={() => void copy(`收件人：${toText}\n抄送：${ccText}\n主题：${subject}\n正文：\n${body}`, setMessage)}>全部复制</button>}
+      <CopyButton label="复制正文" className="text-button email-copy-button" type="button" aria-label="复制正文" title="复制正文" onClick={() => void copyField('body', body)}>{filterRecipients && copyFeedback.body && <span className="ob-copy-feedback" role="status">{copyFeedback.body}</span>}</CopyButton>
+      {!filterRecipients && <CopyButton label="全部复制" className="primary-button" type="button" onClick={() => void copy(`收件人：${toText}\n抄送：${ccText}\n主题：${subject}\n正文：\n${body}`, setMessage)} />}
       </section></div>
       {message && <p className={message === '已复制' ? 'muted-text' : 'error-banner'}>{message}</p>}
     </section>

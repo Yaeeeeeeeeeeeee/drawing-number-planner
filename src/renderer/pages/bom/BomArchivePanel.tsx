@@ -1,3 +1,4 @@
+import { CopyButton } from '../../components/CopyButton';
 import { useEffect, useRef, useState } from 'react';
 import type { BomArchiveCandidateView, PlannerApi } from '../../data/client';
 export function BomArchivePanel({ api, previewOnly = false }: { api: PlannerApi; previewOnly?: boolean }) {
@@ -29,7 +30,7 @@ export function BomArchivePanel({ api, previewOnly = false }: { api: PlannerApi;
     <p>复制 → 校验 → 更新关联。保留原文件；缺少业务日期或文件的项目不会切换关联。</p>
     <button type="button" disabled={busy || previewOnly} onClick={() => void inspect()}>检查旧附件归档</button>
     {items.length > 0 && <><ul>{items.map((item) => <li key={item.linkId}>{item.model} · {item.businessDate ?? '日期未补录'} · {item.project}<div style={{ overflowWrap: 'anywhere' }}>{item.relativePath}</div></li>)}</ul>
-      <button type="button" disabled={busy || previewOnly} onClick={() => void migrate()}>开始复制并归档 {items.length} 项</button></>}
+      <CopyButton kind="files" label={`开始复制并归档 ${items.length} 项`} disabled={busy || previewOnly} onClick={() => void migrate()} /></>}
     {busy && running.current && <button type="button" onClick={() => { cancelled.current = true; }}>取消剩余迁移</button>}
     {message && <p role="status">{message}</p>}
   </details>;

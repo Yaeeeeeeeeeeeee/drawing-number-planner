@@ -1,3 +1,4 @@
+import { CopyButton } from '../components/CopyButton';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
@@ -477,8 +478,8 @@ function FileSection({ title, present, files, onOpen, previewOnly = false }: { t
 
 function CopyDrawingCode({ code }: { code: string }) {
   const [feedback, setFeedback] = useState('');
-  return <div><button type="button" className="secondary-button" onClick={() => {
+  return <div><CopyButton label="复制完整图号" type="button" className="secondary-button" onClick={() => {
     void (async () => { try { await navigator.clipboard.writeText(code); setFeedback('已复制完整图号'); }
       catch { setFeedback('复制不可用，请选中完整图号复制'); } })();
-  }}>复制完整图号</button>{feedback && <p role="status">{feedback}</p>}</div>;
+  }} />{feedback && <p role="status">{feedback}</p>}</div>;
 }

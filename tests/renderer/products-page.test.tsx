@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProductsPage } from '../../src/renderer/pages/ProductsPage';
@@ -21,6 +21,14 @@ describe('ProductsPage', () => {
 
     await screen.findByRole('button', { name: '说明书 · 已启用' });
     expect(screen.queryByText(/二维码 \d+ 项/)).not.toBeInTheDocument();
+    const headers = screen.getAllByRole('columnheader').map(header => header.textContent);
+    expect(headers).not.toContain('关联资料');
+    expect(headers.slice(5, 8)).toEqual(['说明书', '售后卡', '菜谱']);
+    const normalCells = within(screen.getByText('SKU-N').closest('tr')!).getAllByRole('cell');
+    expect(within(normalCells[5]).getByRole('button', { name: '说明书 · 已启用' })).toBeVisible();
+    expect(within(normalCells[6]).getByRole('button', { name: '售后卡 · 已停用' })).toBeVisible();
+    expect(normalCells[7]).toHaveTextContent('—');
+
     expect(screen.getByRole('button', { name: '说明书 · 已启用' })).toBeVisible();
     expect(screen.getByRole('button', { name: '售后卡 · 已停用' })).toBeVisible();
     expect(screen.getByRole('button', { name: '菜谱 · 已停用' })).toBeVisible();

@@ -1,3 +1,4 @@
+import { CopyButton } from '../components/CopyButton';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
@@ -21,7 +22,7 @@ function FilePath({ path, name, onClose }: { path: string; name: string; onClose
     } catch { setFeedback('复制不可用，请选中完整路径复制'); }
   };
   return <div className="files-path-row"><span className="files-path-full">{path}</span>
-      <div className="files-path-actions"><button type="button" className="text-button" aria-label={`复制 ${name} 的完整相对路径`} onClick={() => void copy()}>复制路径</button>
+      <div className="files-path-actions"><CopyButton label="复制路径" type="button" className="text-button" aria-label={`复制 ${name} 的完整相对路径`} onClick={() => void copy()} />
       {onClose && <button type="button" className="text-button" onClick={onClose}>收起路径</button>}
       {feedback && <small role="status">{feedback}</small>}</div>
   </div>;

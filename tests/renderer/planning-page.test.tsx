@@ -63,6 +63,8 @@ describe('PlanningPage', () => {
   it('adds and removes batch rows without allowing an incomplete preview', async () => {
     const api = apiFixture(); render(<PlanningPage api={api as never} />);
     expect(await screen.findAllByText('项目 1')).toHaveLength(1);
+    expect(screen.getByText('项目 1').closest('.pp-fields')).toBeNull();
+    expect(screen.getByText('项目 1').closest('.pp-row')).toBeNull();
     expect(screen.getByRole('button', { name: '查重并预览' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '添加项目' }));
     expect(screen.getByText('项目 2')).toBeVisible();

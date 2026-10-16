@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { BomPage } from '../../src/renderer/pages/BomPage';
 import { BomAssetPreview } from '../../src/renderer/pages/bom/BomAssetPreview';
@@ -64,7 +64,8 @@ it('retains old-record editing and distinguishes historical drawing references',
   await screen.findByLabelText('第 1 行图号');
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -202' }));
-  expect(await screen.findByText('历史图号 · 已停用')).toBeInTheDocument();
+  await waitFor(() => expect(document.querySelectorAll('.bom-code-field')[1]).toHaveTextContent('02.0209.010.0501002'));
+  expect(screen.queryByText('历史图号 · 已停用')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '编辑 BOM -202' }));
   expect(await screen.findByLabelText('第 2 行图号')).toHaveValue('historical:-602');
   expect(screen.getByLabelText('第 2 行材质')).toBeEnabled();

@@ -322,6 +322,14 @@ describe('OutboundPage', () => {
     await waitFor(() => expect((screen.getByLabelText('正文') as HTMLTextAreaElement).value).toContain('王经理，您好！'));
     expect(screen.getByLabelText('主题')).toHaveValue(''); // No package has been created in this flow.
     fireEvent.change(screen.getByLabelText('正文'), { target: { value: '人工修改后的正文' } });
+    for (const label of ['复制收件人', '复制抄送', '复制主题', '复制正文']) {
+      const button = screen.getByRole('button', { name: label });
+      expect(button).toHaveAttribute('title', label);
+      expect(button.querySelector('svg')).not.toBeNull();
+      expect(button).not.toHaveTextContent(label);
+    }
+    fireEvent.click(screen.getByRole('button', { name: '复制正文' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('人工修改后的正文'));
     fireEvent.click(screen.getByRole('button', { name: '全部复制' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('收件人：wang@example.com')));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('正文：\n人工修改后的正文'));

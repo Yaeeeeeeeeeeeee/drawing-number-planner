@@ -1,3 +1,4 @@
+import { CopyButton } from '../../components/CopyButton';
 import { Fragment, useMemo, useState } from 'react';
 import type { OutboundPackageModeView } from '../../data/client';
 import { EmailComposer } from './EmailComposer';
@@ -10,7 +11,7 @@ const labels={normal:'正常',carried_forward:'历史沿用',missing:'缺失',co
 const displayFileName = (name: string) => name.replace(/\.pdf$/i, '');
 function CopyValue({value,label}:{value:string;label:string}) {
   const [feedback,setFeedback]=useState('');
-  return <div className="ob-path"><span>{value}</span><div className="ob-path-copy"><button className="text-button" type="button" onClick={async()=>{try{await navigator.clipboard.writeText(value);setFeedback('已复制');}catch{setFeedback('请选中文本复制');}}}>{label}</button><small role="status">{feedback}</small></div></div>;
+  return <div className="ob-path"><span>{value}</span><div className="ob-path-copy"><CopyButton label={label} className="text-button" type="button" onClick={async()=>{try{await navigator.clipboard.writeText(value);setFeedback('已复制');}catch{setFeedback('请选中文本复制');}}} /><small role="status">{feedback}</small></div></div>;
 }
 function PartsTable({value}:{value:MockPackage}) {
   const [message,setMessage]=useState('');

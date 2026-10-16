@@ -43,11 +43,12 @@ it('compares the explicit predecessor and clears it when selecting the first rec
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
   const previous = await screen.findByLabelText('项目 2 上一条记录 · 图号');
-  await waitFor(() => expect(previous).toHaveTextContent('历史图号 · 已停用'));
+  await waitFor(() => expect(previous).toHaveTextContent('02.0209.010.0501002'));
+  expect(previous).not.toHaveTextContent('历史图号 · 已停用');
   expect(screen.getAllByText(/上一条记录 · 业务日期 2026-09-01/).length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('button', { name: '查看 BOM -202' }));
   expect(await screen.findByText('无上一条记录')).toBeVisible();
-  expect(screen.getByLabelText('项目 2 上一条记录 · 图号')).not.toHaveTextContent('历史图号 · 已停用');
+  expect(screen.getByLabelText('项目 2 上一条记录 · 图号')).not.toHaveTextContent('02.0209.010.0501002');
 });
 it('uses vertical query layout without losing record fields or attachment roles', async () => {
   await preview();

@@ -65,7 +65,7 @@ describe('BomPage product-level BOM', () => {
   it('shows query details as separate business fields and keeps model-wide deletion collapsed', async () => {
     const api = apiFixture();
     const record = { ...activeCurrent, editRevision: 1, updatedAt: '2026-09-03T10:00:00Z', items: [{
-      ...activeCurrent.items[0], material: 'PET', dimensions: '20×10', position: '正面', changeDetails: '改为哑光',
+      ...activeCurrent.items[0], material: 'PET', dimensions: '20×10', position: '正面', changeDetails: '改为哑光', effectiveBatchName: '20260928', effectiveBatchRelativePath: 'batch-path-should-not-be-displayed',
     }] };
     api.queryBomVersions.mockResolvedValue([record]); api.getBomVersion.mockResolvedValue(record);
     render(<BomPage api={api as never} />);
@@ -73,6 +73,12 @@ describe('BomPage product-level BOM', () => {
     fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
     expect(await screen.findByText('改为哑光')).toBeVisible();
     expect(screen.getByText('PET')).toBeVisible();
+    expect(screen.getByText('20260928')).toBeVisible();
+    const drawingField = document.querySelector('.bom-code-field')!;
+    expect(drawingField).toHaveTextContent(candidate.fullCode);
+    expect(drawingField).not.toHaveTextContent('正式图号');
+    expect(drawingField).not.toHaveTextContent('使用中');
+    expect(screen.queryByText('batch-path-should-not-be-displayed')).not.toBeInTheDocument();
     expect(screen.getByText('20×10')).toBeVisible();
     expect(screen.getByText('正面')).toBeVisible();
     expect(screen.queryByRole('columnheader', { name: '版本' })).not.toBeInTheDocument();
@@ -302,7 +308,7 @@ describe('BomPage product-level BOM', () => {
     confirmation.mockRestore();
   });
 
-  it('shows complete wrapping attachment paths and opens their location through the desktop shell', async () => {
+  it('hides attachment paths while retaining filenames and desktop location actions', async () => {
     const api = apiFixture(); const desktopAction = vi.fn().mockResolvedValue({ ok: true });
     window.plannerDesktop = { showBomAssetInFolder: desktopAction } as never;
     api.queryBomVersions.mockResolvedValue([activeCurrent]);
@@ -312,8 +318,8 @@ describe('BomPage product-level BOM', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '查询' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
-    const path = await screen.findByText(/一段非常长但必须完整显示/);
-    expect(path).toHaveClass('bom-asset-path');
+    expect(await screen.findByText('客户示意图.png')).toBeVisible();
+    expect(screen.queryByText(/一段非常长但必须完整显示/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '打开附件位置 客户示意图.png' }));
     await waitFor(() => expect(desktopAction).toHaveBeenCalledWith(31));
     delete window.plannerDesktop;
