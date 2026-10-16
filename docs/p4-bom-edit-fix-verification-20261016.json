@@ -159,6 +159,18 @@
     "threeToThree": "Isolated real service/API tests, not user business data; exact IDs/dates/createdAt/predecessors/neighbors/current-pointer preserved",
     "nullDateAttachments": "Unchanged managed associations retained; explicit new/replacements verified with existing safe preview checks"
   },
-  "windows": "New fixed-revision executable build pending; physical 4K/maximize not yet verified",
+  "windows": {
+    "run": 38871626380,
+    "conclusion": "success",
+    "artifactId": 12032783823,
+    "artifactName": "P4-BOM-Fix-Windows-x64-823bfe1",
+    "bytes": 166108837,
+    "sha256": "3d882b5711c5c534ffadee95b0283f8d2a3d9741923723b5636dfaec242adc4c",
+    "expires": "2026-10-30T08:09:06Z",
+    "nativeExeChecks": "Controlled isolated existing sample edit 1→1; one PUT/no POST; original ID/date/createdAt preserved; full clipboard and inline copy geometry; six native content window sizes passed",
+    "physical4kMaximized": "Not verified here; actual display report included in ZIP, user Windows physical 4K/DPI acceptance pending",
+    "screenshots": "ZIP: Windows-BOM-3840.png, Windows-BOM-1920.png, Windows-BOM-1100.png, Windows-BOM-最大化.png",
+    "realBusinessData": "Unavailable; not tested or modified"
+  },
   "applicationRevision": "823bfe1e02e523dd7ad3e1c2a38e7b81635aebed"
 }
