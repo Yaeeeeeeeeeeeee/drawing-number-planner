@@ -1,3 +1,9 @@
+## 当前：P4 BOM Windows免安装交付（2026-10-16）
+- 用户需要直接双击验收，不再要求用户Git更新/Node构建。
+- 固定应用d4a6359；新增交付工具和WindowsCI复用旧P4制品11955251774的运行环境/原有隔离样例，不生成新记录，不改应用/API/Schema。
+- 包装后验证原样例文件逐一哈希不变，再实际启动Windows exe检查BOM查询、折叠、附件状态、六种窗口及数据全表前后不变。
+- 旧样例只有一版BOM，多版本真实数据验收仍未完成；不冒充，不合并master。下方保留已有实现和历史交付记录。
+
 ## 当前交付：P4 BOM查询历史对照（2026-10-16）
 - 独立分支codex/p4-bom-history-comparison-20261016，基线5d55e48；仅查询详情，编辑/API/Schema/IPC均未修改。
 - 说明、文件清单与截图：docs/p4-bom-history-comparison-20261016.md；结构证据：docs/p4-bom-history-verification-20261016.json。
