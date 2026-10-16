@@ -1387,5 +1387,18 @@
     "recordedAt": "2026-10-16T14:31:48.905629+08:00",
     "merged": false,
     "next": "Windows read-only manual acceptance remains pending."
+  },
+  "windowsDelivery": {
+    "applicationRevision": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5",
+    "deliveryToolsRevision": "7520429d39465775ed9138cc426ae856a8851e66",
+    "runId": 38864217262,
+    "conclusion": "success",
+    "artifactId": 12030701034,
+    "sizeBytes": 166093819,
+    "sha256": "1cb3d717b995f441b4d54d3af3a7896e7de827af57599537da4e20f5bdc401ab",
+    "expiresAt": "2026-10-30T06:59:17Z",
+    "scope": "Actual Windows Electron first-record BOM query/folding/attachment-state/native-window checks; unchanged pre-existing isolated sample files and table snapshots. Not real multi-version user history or physical DPI acceptance.",
+    "dataCreation": "No new sample records; reuse previous delivered isolated sample. Original package/seed unchanged.",
+    "chatDownloadFileId": "file_000000009b1c820eaeb4ea9ccabb336b"
   }
 }
