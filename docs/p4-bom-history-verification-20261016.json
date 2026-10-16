@@ -1376,5 +1376,10 @@
     "Windows OS display scaling 125/150/200 percent",
     "native window resize and cross-monitor behavior"
   ],
-  "e2e": "existing broad E2E suite not rerun; focused Chromium matrix recorded separately"
+  "e2e": "existing broad E2E suite not rerun; focused Chromium matrix recorded separately",
+  "applicationRevision": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5",
+  "delivery": {
+    "status": "local branch committed; remote push blocked by automatic approval review",
+    "reason": "Branch includes isolated-sample/developer-mock screenshots and verification documentation; explicit destination/scope authorization requested."
+  }
 }
