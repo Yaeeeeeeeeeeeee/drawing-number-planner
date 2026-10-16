@@ -11,7 +11,7 @@ permissions:
   contents: read
   actions: read
 env:
-  PLANNER_ACCEPTANCE_REVISION: 823bfe1e02e523dd7ad3e1c2a38e7b81635aebed
+  PLANNER_ACCEPTANCE_REVISION: eb5da2273cc4c8049ff78ca9cb330ca8e6a17ca5
 jobs:
   package:
     runs-on: windows-latest
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          ref: 823bfe1e02e523dd7ad3e1c2a38e7b81635aebed
+          ref: eb5da2273cc4c8049ff78ca9cb330ca8e6a17ca5
           path: bom-source
           fetch-depth: 0
       - uses: actions/setup-node@v4
@@ -47,14 +47,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Main build failed' }
       - name: Package fixed BOM application with unchanged original sample and runtime
         shell: pwsh
-        run: node scripts/repack-p4-bom-windows.mjs bom-source existing-p4 P4-BOM-Windows-823bfe1
+        run: node scripts/repack-p4-bom-windows.mjs bom-source existing-p4 P4-BOM-Windows-eb5da22
       - name: Verify actual Windows startup, BOM details and unchanged sample
         shell: pwsh
-        run: node scripts/verify-p4-bom-windows.cjs bom-source "P4-BOM-Windows-823bfe1/图号规划器验收版.exe"
+        run: node scripts/verify-p4-bom-windows.cjs bom-source "P4-BOM-Windows-eb5da22/图号规划器验收版.exe"
       - uses: actions/upload-artifact@v4
         with:
-          name: P4-BOM-Fix-Windows-x64-823bfe1
-          path: P4-BOM-Windows-823bfe1/
+          name: P4-BOM-Fix-Windows-x64-eb5da22
+          path: P4-BOM-Windows-eb5da22/
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
