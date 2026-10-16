@@ -150,3 +150,7 @@ Later in the same session the user extends icon-only presentation to **all exist
 ### Latest BOM copy-control removal (2026-10-16)
 
 The user subsequently requested no copy buttons in BOM details. BOM query first/history fields, batch disclosures, historical attachment path disclosures and edit comparison display complete selectable text without copy controls. This supersedes the preceding inline-copy requirement only within BOM; retain copy actions in other modules and all business/data protections.
+
+### Product archive table and purpose navigation (2026-10-16)
+
+Latest explicit request: see docs/p4-products-list-20261016.md. The real product archive uses exactly eight combined identity/specification/status/purpose/action columns, with only Edit in row actions. No inline detail/edit expansion; lifecycle and protected cleanup remain in the separate product editor. Standard purpose status links use product identity and stable purpose keys; missing, single and multiple records have distinct navigation without automatic writes. Returning preserves filters/scroll and refreshes QR business states; file availability does not infer business state. This supersedes earlier product expansion/dynamic-purpose-column UI rules only. User explicitly paused Windows-package delivery pending further requests; do not package automatically. Preserve Schema, uniqueness, inactive-product creation restrictions and all data safeguards.

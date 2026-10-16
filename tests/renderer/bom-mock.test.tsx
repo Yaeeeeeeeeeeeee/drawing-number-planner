@@ -64,7 +64,8 @@ it('retains old-record editing and distinguishes historical drawing references',
   await screen.findByLabelText('第 1 行图号');
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -202' }));
-  expect(await screen.findByRole('button', { name: '复制图号 02.0209.010.0501002' })).toBeVisible();
+  expect(await screen.findByText('02.0209.010.0501002')).toBeVisible();
+  expect(screen.queryByRole('button', { name: '复制图号 02.0209.010.0501002' })).toBeNull();
   expect(screen.queryByText('历史图号 · 已停用')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '编辑 BOM -202' }));
   expect(await screen.findByLabelText('第 2 行图号')).toHaveValue('historical:-602');

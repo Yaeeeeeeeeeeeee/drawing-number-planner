@@ -120,3 +120,24 @@
   .page-surface .copy-icon-button.primary-button:hover:not(:disabled) { color: white; background: #404040; }
 
 }
+
+/* Product archive: eight compact columns; scrolling belongs to the table. */
+@layer workspace {
+  .products-page-host { min-width:0; width:100%; }
+  .products-page-host[hidden] { display:none; }
+  .products-compact { width:100%; max-width:none; min-width:0; }
+  .products-compact > .filter-bar { grid-template-columns:minmax(180px,1.4fr) repeat(3,minmax(120px,1fr)) auto; gap:8px 12px; padding:10px 12px; margin:10px 0; }
+  .products-compact > .filter-bar :is(input,select) { max-width:420px; height:34px; }
+  .products-compact > .table-wrap { width:100%; overflow:auto; }
+  .products-compact > .table-wrap > table { width:100%; min-width:1080px; table-layout:auto; }
+  .products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td) { padding:8px 12px; width:auto; overflow-wrap:anywhere; }
+  .products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(-n+3) { min-width:180px; }
+  .products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(n+4) { min-width:88px; white-space:nowrap; }
+  .products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):last-child { position:sticky; right:0; background:var(--ws-surface,#fff); z-index:1; min-width:76px; box-shadow:-1px 0 var(--ws-line); }
+  .products-compact > .table-wrap > table > thead > tr > th:last-child { z-index:3; background:var(--ws-panel,#f6f6f6); }
+  .products-compact .product-purpose-link { min-height:28px; padding:2px 0; font-weight:400; }
+  .products-compact .product-purpose-link small { color:var(--ws-muted); }
+  .products-compact .product-maintenance { padding:16px 0; border-top:1px solid var(--ws-line); }
+  .products-compact.product-editor-page > .editor-strip { max-width:none; }
+  @container (max-width:760px) { .products-compact > .filter-bar { display:flex; flex-wrap:wrap; } .products-compact > .filter-bar > label { flex:1 1 160px; min-width:0; } }
+}

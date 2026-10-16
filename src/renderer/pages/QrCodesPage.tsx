@@ -1,3 +1,4 @@
+import type { ProductQrTarget } from './products/product-qr-navigation';
 import { CopyButton } from '../components/CopyButton';
 import { ViewportRegion } from '../components/ViewportRegion';
 import { PageHeader } from '../components/PageHeader';
@@ -48,13 +49,13 @@ const groupByProduct = (items: ProductQrCodeView[]): QrProductGroup[] => {
   return [...groups.values()];
 };
 
-export function QrCodesPage(props: { api: PlannerApi; initialQrCodeId?: number | null; onOpened?: () => void }) {
+export function QrCodesPage(props: { api: PlannerApi; initialQrCodeId?: number | null; onOpened?: () => void; productTarget?: ProductQrTarget | null; onReturnProducts?: () => void }) {
   const mock = isQrMockEnabled();
   const mockApi = useMemo(() => mock ? createQrMockApi() : null, [mock]);
   return <>{mock && <p className="info-banner">开发预览 Mock · 仅内存数据；不连接真实 API、数据库、附件或桌面文件系统。</p>}<QrWorkspace {...props} api={mockApi ?? props.api} mock={mock} /></>;
 }
-function QrWorkspace({ api, initialQrCodeId, onOpened, mock = false }: {
-  api: PlannerApi; initialQrCodeId?: number | null; onOpened?: () => void; mock?: boolean;
+function QrWorkspace({ api, initialQrCodeId, onOpened, productTarget, onReturnProducts, mock = false }: {
+  api: PlannerApi; initialQrCodeId?: number | null; onOpened?: () => void; productTarget?: ProductQrTarget | null; onReturnProducts?: () => void; mock?: boolean;
 }) {
   const [queryState, setQueryState] = useState<QueryState>('idle');
   const [queryError, setQueryError] = useState('');
@@ -88,7 +89,7 @@ function QrWorkspace({ api, initialQrCodeId, onOpened, mock = false }: {
   };
   const load = async (filters: ProductQrCodeFilters = {}, setFilterVocabulary = false) => {
     setQueryState('loading'); setQueryError(''); setQueriedFilters(filters);
-    try { setError(''); const result = await api.listQrCodes(filters); setItems(result.items); setQueryState('ready'); if (setFilterVocabulary) setVocabulary(result.items); }
+    try { setError(''); const result = await api.listQrCodes({ ...filters, ...(productTarget ? { productId: productTarget.productId } : {}) }); setItems(productTarget ? result.items.filter(item => item.productId === productTarget.productId && item.key === productTarget.purposeKey) : result.items); setQueryState('ready'); if (setFilterVocabulary) setVocabulary(result.items); }
     catch (reason) { setQueryState('failed'); setQueryError(reason instanceof Error ? reason.message : '二维码记录加载失败'); }
   };
   const open = async (id: number) => {
@@ -97,11 +98,45 @@ function QrWorkspace({ api, initialQrCodeId, onOpened, mock = false }: {
   };
 
   useEffect(() => {
+    if (productTarget) return;
     void load({}, true);
     if (typeof api.listQrPurposes === 'function') void api.listQrPurposes().then((result) => setPurposeOptions(result.items)).catch(() => undefined);
     if (typeof api.listProducts === 'function') void api.listProducts({ status: 'active' }).then(setProducts).catch(() => undefined);
   }, []);
-  useEffect(() => { if (initialQrCodeId != null) void open(initialQrCodeId); }, [initialQrCodeId]);
+  useEffect(() => { if (initialQrCodeId != null && !productTarget) void open(initialQrCodeId); }, [initialQrCodeId]);
+  useEffect(() => {
+    if (!productTarget) return;
+    let cancelled = false;
+    setSelected(null); setCreating(false); setQueryState('loading'); setQueryError('');
+    void (async () => {
+      try {
+        const [purposeResult, productResult] = await Promise.all([api.listQrPurposes(), api.listProducts({ status: 'all' })]);
+        if (cancelled) return;
+        const purpose = purposeResult.items.find(item => item.key === productTarget.purposeKey);
+        const product = productResult.find(item => item.id === productTarget.productId);
+        if (!product) throw new Error('目标产品不存在或已退出当前业务，请返回产品档案核对。');
+        setProducts([product]); setPurposeOptions(purposeResult.items);
+        const filters = { productId: productTarget.productId, ...(purpose ? { purposeId: purpose.id } : {}), status: 'all' as const };
+        const result = await api.listQrCodes(filters);
+        if (cancelled) return;
+        const matches = result.items.filter(item => item.productId === productTarget.productId && item.key === productTarget.purposeKey);
+        setItems(matches); setVocabulary(matches); setQueriedFilters(filters); setPurposeId(purpose ? String(purpose.id) : '');
+        setSearch(productTarget.sku ?? productTarget.model); setExpandedProductId(productTarget.productId); setQueryState('ready');
+        setCreateProductId(String(productTarget.productId)); setCreatePurposeId(purpose ? String(purpose.id) : '');
+        if (!matches.length) {
+          if (purpose?.status === 'active') { setCreating(true); setCreateName(`${product.model} ${productTarget.purposeLabel}`); }
+          else setError(purpose ? '此资料用途已停用，不能新增；现有业务规则保持不变。' : '对应资料用途尚未建立，请先核对用途配置，系统未自动创建。');
+        } else if (matches.length === 1) {
+          const detail = await api.getQrCode(matches[0].id);
+          if (!cancelled) {
+            if (detail.productId !== productTarget.productId || detail.key !== productTarget.purposeKey) throw new Error('二维码记录与目标产品或资料类型不匹配。');
+            replace(detail);
+          }
+        }
+      } catch (reason) { if (!cancelled) { setQueryState('failed'); setQueryError(reason instanceof Error ? reason.message : '目标资料加载失败'); } }
+    })();
+    return () => { cancelled = true; };
+  }, [productTarget]);
   useEffect(() => {
     if (!creating || typeof api.listPendingQrFiles !== 'function') return;
     const productId = Number(createProductId || products[0]?.id || groups[0]?.id);
@@ -114,7 +149,7 @@ function QrWorkspace({ api, initialQrCodeId, onOpened, mock = false }: {
 
   const submitFilters = (event: FormEvent) => {
     event.preventDefault(); setSelected(null); setPreview(null); setExpandedProductId(null);
-    void load({ ...(search.trim() ? { search: search.trim() } : {}), ...(category ? { productCategory: category } : {}),
+    void load({ ...(!productTarget && search.trim() ? { search: search.trim() } : {}), ...(category ? { productCategory: category } : {}),
       ...(purposeId ? { purposeId: Number(purposeId) } : {}), status, fileStatus });
   };
   const save = async (event: FormEvent) => {
@@ -134,6 +169,7 @@ function QrWorkspace({ api, initialQrCodeId, onOpened, mock = false }: {
   };
   const createCode = async (event: FormEvent) => {
     event.preventDefault(); setError(''); setMessage('');
+    if (productTarget && (!createProductId || !createPurposeId || products.find(product => product.id === productTarget.productId)?.status !== 'active')) { setError('目标产品或资料用途未就绪，或产品已停用，不能保存。'); return; }
     const productId = Number(createProductId || products[0]?.id || groups[0]?.id);
     const availablePurposes = purposeOptions.length ? purposeOptions : purposes.map((item) => ({ ...item,
       defaultForAll: false, productCategories: [] }));
@@ -169,12 +205,13 @@ function QrWorkspace({ api, initialQrCodeId, onOpened, mock = false }: {
     if (result.previewDataUrl) setPreview(result.previewDataUrl);
   };
 
+  const returnProducts = productTarget && <button className="secondary-button" type="button" onClick={onReturnProducts}>返回产品档案</button>;
   if (selected) return <section className="page-surface page-enter qr-page qr-detail-page">
     <PageHeader title={selected.name} description={<>{selected.sku ?? 'SKU 待补录'} · {selected.model} · {selected.productCategory} · {selected.displayName}</>}>
-      <div className="header-actions"><button className="secondary-button" type="button" onClick={() => { setSelected(null); setPreview(null); }}>返回列表</button>
+      <div className="header-actions">{returnProducts}<button className="secondary-button" type="button" onClick={() => { setSelected(null); setPreview(null); }}>返回列表</button>
 
         </div></PageHeader>
-    {error && <p className="error-banner">{error}</p>}{message && <p className="success-banner">{message}</p>}
+    {productTarget && <p className="info-banner">{productTarget.sku ?? 'SKU 待补录'} · {productTarget.model} · {productTarget.purposeLabel}（{productTarget.purposeEnglishName}）</p>}{error && <p className="error-banner">{error}</p>}{message && <p className="success-banner">{message}</p>}
     <div className="qr-detail-meta"><div><span>SKU</span><strong>{selected.sku ?? '待补录'}</strong></div><div><span>型号</span><strong>{selected.model}</strong></div><div><span>产品类别</span><strong>{selected.productCategory}</strong></div><div><span>用途</span><strong>{purposeLabels[selected.key] ?? selected.displayName}</strong></div><div><span>业务状态</span><strong>{<BusinessStatus status={selected.status}/>}</strong></div><div><span>文件状态</span><strong>{fileLabel(selected.files)}</strong></div><div><span>扫描匹配状态</span><strong>{matchLabel(selected)}</strong></div><div><span>创建时间</span><strong>{formatTime(selected.createdAt)}</strong></div><div><span>更新时间</span><strong>{formatTime(selected.updatedAt)}</strong></div>
     {selected.targetUrl && <details className="qr-path qr-url"><summary>查看完整网址</summary><div className="qr-path-panel"><span>{selected.targetUrl}</span><CopyButton label="复制网址" type="button" className="text-button" onClick={async()=>{try {await navigator.clipboard.writeText(selected.targetUrl!);setUrlCopyFeedback('已复制');}catch {setUrlCopyFeedback('复制不可用，请选中网址复制');}}} /><small role="status">{urlCopyFeedback}</small></div></details>}
     </div>
@@ -191,10 +228,10 @@ function QrWorkspace({ api, initialQrCodeId, onOpened, mock = false }: {
   const availablePurposes = purposeOptions.length ? purposeOptions : purposes.map((item) => ({ id: item.purposeId,
     key: item.key, englishName: item.englishName, displayName: item.displayName, status: item.purposeStatus,
     defaultForAll: false, productCategories: [] }));
-  return <section className="page-surface page-enter qr-page"><PageHeader title="二维码管理" description="集中维护产品二维码用途、网址、业务状态与资料文件状态。"><div className="header-actions"><button className="secondary-button" type="button" onClick={() => setManagingPurposes((value) => !value)}>新增用途</button><button className="primary-button" type="button" onClick={() => setCreating((value) => !value)}>新增二维码</button></div></PageHeader>{error && <p className="error-banner">{error}</p>}{message && <p className="success-banner">{message}</p>}
+  return <section className="page-surface page-enter qr-page"><PageHeader title="二维码管理" description="集中维护产品二维码用途、网址、业务状态与资料文件状态。"><div className="header-actions">{returnProducts}<button className="secondary-button" type="button" onClick={() => setManagingPurposes((value) => !value)}>新增用途</button><button className="primary-button" type="button" disabled={Boolean(productTarget && (!createProductId || !createPurposeId || !purposeOptions.some(purpose => purpose.id === Number(createPurposeId) && purpose.status === 'active')))} onClick={() => setCreating((value) => !value)}>新增二维码</button></div></PageHeader>{productTarget && <p className="info-banner">{productTarget.sku ?? 'SKU 待补录'} · {productTarget.model} · {productTarget.purposeLabel}（{productTarget.purposeEnglishName}）</p>}{error && <p className="error-banner">{error}</p>}{message && <p className="success-banner">{message}</p>}
     {managingPurposes && <form className="editor-strip panel-enter qr-purpose-create" onSubmit={createPurpose}><div className="form-grid"><label><span>用途编码</span><input aria-label="用途编码" value={newPurposeKey} onChange={(event) => setNewPurposeKey(event.target.value)} required /></label><label><span>用途英文</span><input aria-label="用途英文" value={newPurposeEnglish} onChange={(event) => setNewPurposeEnglish(event.target.value)} required /></label><label><span>用途名称</span><input aria-label="用途名称" value={newPurposeDisplay} onChange={(event) => setNewPurposeDisplay(event.target.value)} required /></label></div><div className="form-actions"><button className="primary-button" type="submit">保存新增用途</button><button className="secondary-button" type="button" onClick={() => setManagingPurposes(false)}>取消</button></div></form>}
-    {creating && <form className="editor-strip panel-enter qr-code-create" onSubmit={createCode}><div className="form-grid"><label><span>产品</span><select aria-label="新增二维码产品" value={createProductId || String(availableProducts[0]?.id ?? '')} onChange={(event) => setCreateProductId(event.target.value)}>{availableProducts.map((product) => <option key={product.id} value={product.id}>{product.sku ?? '待补录'} · {product.model}</option>)}</select></label><label><span>二维码用途</span><select aria-label="新增二维码用途" value={createPurposeId || String(availablePurposes[0]?.id ?? '')} onChange={(event) => setCreatePurposeId(event.target.value)}>{availablePurposes.filter((purpose) => purpose.status === 'active').map((purpose) => <option key={purpose.id} value={purpose.id}>{purpose.displayName}</option>)}</select></label><label><span>业务状态</span><select aria-label="新增二维码状态" value={createStatus} onChange={(event) => setCreateStatus(event.target.value as typeof createStatus)}><option value="inactive">未启用</option><option value="active">启用</option></select></label><label><span>待确认关联文件</span><select aria-label="待确认关联文件" value={createQrFileId} onChange={(event) => setCreateQrFileId(event.target.value)}><option value="">暂不关联</option>{pendingCreateFiles.map((file) => <option key={file.id} value={file.id}>{file.fileName}</option>)}</select></label><label><span>二维码名称</span><input aria-label="二维码名称" value={createName} onChange={(event) => setCreateName(event.target.value)} required /></label><label><span>目标网址</span><input aria-label="新增二维码网址" value={createUrl} onChange={(event) => setCreateUrl(event.target.value)} placeholder="可留空" /></label></div><div className="form-actions"><button className="primary-button" type="submit">保存新增二维码</button><button className="secondary-button" type="button" onClick={() => setCreating(false)}>取消</button></div></form>}
-    <form className="filter-bar qr-filter" onSubmit={submitFilters}><label><span>SKU / 型号</span><input aria-label="SKU / 型号" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label><span>产品类别</span><select aria-label="产品类别" value={category} onChange={(event) => setCategory(event.target.value)}><option value="">全部</option>{categories.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label><span>用途</span><select aria-label="用途" value={purposeId} onChange={(event) => setPurposeId(event.target.value)}><option value="">全部</option>{purposes.map((purpose) => <option key={purpose.purposeId} value={purpose.purposeId}>{purposeLabels[purpose.key] ?? purpose.displayName}</option>)}</select></label><label><span>业务状态</span><select aria-label="业务状态" value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">全部</option><option value="active">启用中</option><option value="inactive">已停用</option></select></label><label><span>文件状态</span><select aria-label="文件状态" value={fileStatus} onChange={(event) => setFileStatus(event.target.value as typeof fileStatus)}><option value="all">全部</option><option value="present">文件可用</option><option value="missing">文件已缺失</option><option value="none">未关联文件</option></select></label><button className="primary-button" type="submit">筛选</button></form>
+    {creating && <form className="editor-strip panel-enter qr-code-create" onSubmit={createCode}>{productTarget && products.find(product => product.id === productTarget.productId)?.status !== 'active' && <p className="info-banner">此产品已停用；按现有业务规则，须在产品编辑中重新启用后才能新建二维码。</p>}<div className="form-grid"><label><span>产品</span><select aria-label="新增二维码产品" disabled={Boolean(productTarget)} value={createProductId || String(availableProducts[0]?.id ?? '')} onChange={(event) => setCreateProductId(event.target.value)}>{availableProducts.map((product) => <option key={product.id} value={product.id}>{product.sku ?? '待补录'} · {product.model}</option>)}</select></label><label><span>二维码用途</span><select aria-label="新增二维码用途" disabled={Boolean(productTarget)} value={createPurposeId || String(availablePurposes[0]?.id ?? '')} onChange={(event) => setCreatePurposeId(event.target.value)}>{availablePurposes.filter((purpose) => purpose.status === 'active').map((purpose) => <option key={purpose.id} value={purpose.id}>{purpose.displayName}</option>)}</select></label><label><span>业务状态</span><select aria-label="新增二维码状态" value={createStatus} onChange={(event) => setCreateStatus(event.target.value as typeof createStatus)}><option value="inactive">未启用</option><option value="active">启用</option></select></label><label><span>待确认关联文件</span><select aria-label="待确认关联文件" value={createQrFileId} onChange={(event) => setCreateQrFileId(event.target.value)}><option value="">暂不关联</option>{pendingCreateFiles.map((file) => <option key={file.id} value={file.id}>{file.fileName}</option>)}</select></label><label><span>二维码名称</span><input aria-label="二维码名称" value={createName} onChange={(event) => setCreateName(event.target.value)} required /></label><label><span>目标网址</span><input aria-label="新增二维码网址" value={createUrl} onChange={(event) => setCreateUrl(event.target.value)} placeholder="可留空" /></label></div><div className="form-actions"><button className="primary-button" type="submit" disabled={Boolean(productTarget && products.find(product => product.id === productTarget.productId)?.status !== 'active')}>保存新增二维码</button><button className="secondary-button" type="button" onClick={() => setCreating(false)}>取消</button></div></form>}
+    <form className="filter-bar qr-filter" onSubmit={submitFilters}><label><span>SKU / 型号</span><input aria-label="SKU / 型号" readOnly={Boolean(productTarget)} value={search} onChange={(event) => setSearch(event.target.value)} /></label><label><span>产品类别</span><select aria-label="产品类别" value={category} onChange={(event) => setCategory(event.target.value)}><option value="">全部</option>{categories.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label><span>用途</span><select aria-label="用途" disabled={Boolean(productTarget)} value={purposeId} onChange={(event) => setPurposeId(event.target.value)}><option value="">全部</option>{purposes.map((purpose) => <option key={purpose.purposeId} value={purpose.purposeId}>{purposeLabels[purpose.key] ?? purpose.displayName}</option>)}</select></label><label><span>业务状态</span><select aria-label="业务状态" value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">全部</option><option value="active">启用中</option><option value="inactive">已停用</option></select></label><label><span>文件状态</span><select aria-label="文件状态" value={fileStatus} onChange={(event) => setFileStatus(event.target.value as typeof fileStatus)}><option value="all">全部</option><option value="present">文件可用</option><option value="missing">文件已缺失</option><option value="none">未关联文件</option></select></label><button className="primary-button" type="submit">筛选</button></form>
     {queryState !== 'ready' ? <QueryFeedback state={queryState} error={queryError} onRetry={() => void load(queriedFilters, Object.keys(queriedFilters).length === 0)}/> : groups.length === 0 ? <EmptyState title={Object.values(queriedFilters).some(value => value !== 'all' && value !== '') ? '没有符合筛选条件的二维码' : '还没有二维码记录'} description="建立产品档案后，适用的二维码用途会显示在这里。" symbol="二" /> : <DataTable fillViewport items={groups} columns={[
       {key:'product',label:'产品 · SKU / 型号',render:g=><span className="qr-product">{g.sku ?? '待补录'} · {g.model} · {g.productCategory}</span>},
       {key:'count',label:'二维码用途',render:g=>`${g.codes.length} 项`},
