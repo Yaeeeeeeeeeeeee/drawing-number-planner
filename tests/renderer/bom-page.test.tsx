@@ -74,11 +74,11 @@ describe('BomPage product-level BOM', () => {
     expect(await screen.findByText('改为哑光')).toBeVisible();
     expect(screen.getByText('PET')).toBeVisible();
     expect(screen.getByText('20260928')).toBeVisible();
-    const drawingField = document.querySelector('.bom-code-field')!;
+    const drawingField = screen.getByRole('button', { name: `复制图号 ${candidate.fullCode}` }).closest('td')!;
     expect(drawingField).toHaveTextContent(candidate.fullCode);
     expect(drawingField).not.toHaveTextContent('正式图号');
     expect(drawingField).not.toHaveTextContent('使用中');
-    expect(screen.queryByText('batch-path-should-not-be-displayed')).not.toBeInTheDocument();
+    expect(screen.getByText('batch-path-should-not-be-displayed')).not.toBeVisible();
     expect(screen.getByText('20×10')).toBeVisible();
     expect(screen.getByText('正面')).toBeVisible();
     expect(screen.queryByRole('columnheader', { name: '版本' })).not.toBeInTheDocument();
@@ -308,7 +308,7 @@ describe('BomPage product-level BOM', () => {
     confirmation.mockRestore();
   });
 
-  it('hides attachment paths while retaining filenames and desktop location actions', async () => {
+  it('hides paths by default and opens verified historical attachment locations', async () => {
     const api = apiFixture(); const desktopAction = vi.fn().mockResolvedValue({ ok: true });
     window.plannerDesktop = { showBomAssetInFolder: desktopAction } as never;
     api.queryBomVersions.mockResolvedValue([activeCurrent]);
@@ -319,7 +319,9 @@ describe('BomPage product-level BOM', () => {
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
     expect(await screen.findByText('客户示意图.png')).toBeVisible();
-    expect(screen.queryByText(/一段非常长但必须完整显示/)).not.toBeInTheDocument();
+    expect(screen.getByText(/一段非常长但必须完整显示/)).not.toBeVisible();
+    expect(screen.getByRole('button', { name: '打开附件位置 客户示意图.png' })).toBeDisabled();
+    fireEvent.load(screen.getByRole('img', { name: '客户示意图.png' }));
     fireEvent.click(screen.getByRole('button', { name: '打开附件位置 客户示意图.png' }));
     await waitFor(() => expect(desktopAction).toHaveBeenCalledWith(31));
     delete window.plannerDesktop;

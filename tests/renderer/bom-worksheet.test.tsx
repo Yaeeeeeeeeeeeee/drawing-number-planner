@@ -42,28 +42,31 @@ it('compares the explicit predecessor and clears it when selecting the first rec
   await preview();
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
-  const previous = await screen.findByLabelText('项目 2 上一条记录 · 图号');
-  await waitFor(() => expect(previous).toHaveTextContent('02.0209.010.0501002'));
-  expect(previous).not.toHaveTextContent('历史图号 · 已停用');
-  expect(screen.getAllByText(/上一条记录 · 业务日期 2026-09-01/).length).toBeGreaterThan(0);
+  await screen.findByText(/对照上一条记录 #-202/);
+  const project = screen.getByRole('button', { name: /项目 2 · 包装箱/ }).closest('article')!;
+  fireEvent.click(within(project).getByRole('button', { name: '全部字段' }));
+  const drawing = within(project).getByRole('rowheader', { name: '图号' }).closest('tr')!;
+  expect(drawing.cells[1]).toHaveTextContent('02.0209.010.0501002');
+  expect(drawing.cells[1]).not.toHaveTextContent('历史图号 · 已停用');
   fireEvent.click(screen.getByRole('button', { name: '查看 BOM -202' }));
-  expect(await screen.findByText('无上一条记录')).toBeVisible();
-  expect(screen.getByLabelText('项目 2 上一条记录 · 图号')).not.toHaveTextContent('02.0209.010.0501002');
+  expect(await screen.findByText('首次记录，无历史版本可对照')).toBeVisible();
+  expect(screen.queryByText(/对照上一条记录/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: '上一条记录' })).not.toBeInTheDocument();
 });
-it('uses vertical query layout without losing record fields or attachment roles', async () => {
+it('retains complete query fields and independent attachment roles in all-fields mode', async () => {
   await preview();
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
-  const detail = await screen.findByLabelText('所选 BOM 记录');
-  expect(detail).toHaveClass('bom-query-vertical');
-  const record = detail.querySelector('.bom-query-record')!;
-  expect(Array.from(record.querySelectorAll('.bom-field-label')).map((label) => label.textContent)).toEqual([
-    '主类别', '项目', '图号', '生效批次', '材质', '尺寸', '图片', '位置', '位置示意图', '修改明细', '备注',
-  ]);
-  expect(record).toHaveTextContent('02.0209.010.0501001');
-  expect(record).toHaveTextContent('说明书-图片.png');
-  expect(record).toHaveTextContent('说明书-位置示意图.png');
+  await screen.findByText(/对照上一条记录 #-202/);
+  const project = screen.getByRole('button', { name: /项目 1 · 说明书/ }).closest('article')!;
+  fireEvent.click(within(project).getByRole('button', { name: '全部字段' }));
+  for (const field of ['主类别','项目明细','图号','生效批次','材质','尺寸','位置','修改明细','备注','数量','引用白色图号','二维码关联'])
+    expect(within(project).getByRole('rowheader', {name: field})).toBeVisible();
+  expect(project).toHaveTextContent('02.0209.010.0501001');
+  expect(project).toHaveTextContent('说明书-图片.png');
+  expect(project).toHaveTextContent('说明书-位置示意图.png');
 });
+
 it('keeps loaded baseline unchanged when editing a field or changing project identity', async () => {
   await preview();
   const record = screen.getByRole('article', { name: 'BOM 项目 1' });
@@ -128,8 +131,8 @@ it('query details inherit exception summaries and show content rather than disab
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
   const detail = await screen.findByLabelText('所选 BOM 记录');
   expect(within(detail).getByLabelText('项目 1 提示')).toHaveTextContent('图号作废');
-  expect(detail.querySelectorAll('.bom-query-record input')).toHaveLength(0);
-  expect(detail.querySelectorAll('.bom-query-record textarea')).toHaveLength(0);
+  expect(detail.querySelectorAll('.bom-history-project input')).toHaveLength(0);
+  expect(detail.querySelectorAll('.bom-history-project textarea')).toHaveLength(0);
 });
 it('locates drawing exceptions at the field without a repeated project footer', async () => {
   await preview('references');

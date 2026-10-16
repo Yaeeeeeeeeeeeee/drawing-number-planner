@@ -1,3 +1,11 @@
+## 当前交付：P4 BOM查询历史对照（2026-10-16）
+- 独立分支codex/p4-bom-history-comparison-20261016，基线5d55e48；仅查询详情，编辑/API/Schema/IPC均未修改。
+- 说明、文件清单与截图：docs/p4-bom-history-comparison-20261016.md；结构证据：docs/p4-bom-history-verification-20261016.json。
+- 摘要/可靠业务身份匹配/新增删除/折叠/差异模式/附件原关联及真实状态重试完成；路径默认隐藏，按需展开。
+- 专项86通过（新增历史25项）；全量936/953，17既有失败，无新增；类型/两端构建、18组CSS/DPR通过。三轮评审问题已修复。
+- 已有P1样例仅1版3项，只读前后全表摘要/主库SHA相同；真实业务库/原附件/Windows系统DPI及原生窗口未验收，开发Mock截图不冒充真实验收。
+- 等待Windows本机只读验收；不合并master、不写真实数据、不进入P5。下方保留旧交付与故障记录。
+
 ## 最新：Windows无法连接GitHub，离线更新交付
 - 应用固定b0333c3；仅增加离线bundle CI和交付文档，不改应用/数据库。
 - docs/p4-offline-update-20261016.md：下载并解压附件后从本地bundle快进，拒绝本地修改，不联网pull。

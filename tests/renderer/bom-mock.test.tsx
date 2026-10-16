@@ -21,8 +21,8 @@ it('isolates BOM preview from every real API, including initial reads', async ()
   expect(await screen.findByLabelText('所选 BOM 记录')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '删除 BOM -201' })).toBeDisabled();
   const desktop = vi.fn(); window.plannerDesktop = { showBomAssetInFolder: desktop } as never;
-  const location = screen.getByRole('button', { name: '打开附件位置 说明书-图片.png' });
-  expect(location).toBeDisabled(); fireEvent.click(location);
+  const locations = screen.getAllByRole('button', { name: '打开附件位置 说明书-图片.png' });
+  for (const location of locations) { expect(location).toBeDisabled(); fireEvent.click(location); }
   fireEvent.change(screen.getByLabelText('输入型号确认删除整个 BOM'), { target: { value: 'MOCK-T40' } });
   expect(screen.getByRole('button', { name: '删除整个型号 BOM' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '检查旧附件归档', hidden: true })).toBeDisabled();
@@ -64,7 +64,7 @@ it('retains old-record editing and distinguishes historical drawing references',
   await screen.findByLabelText('第 1 行图号');
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -202' }));
-  await waitFor(() => expect(document.querySelectorAll('.bom-code-field')[1]).toHaveTextContent('02.0209.010.0501002'));
+  expect(await screen.findByRole('button', { name: '复制图号 02.0209.010.0501002' })).toBeVisible();
   expect(screen.queryByText('历史图号 · 已停用')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '编辑 BOM -202' }));
   expect(await screen.findByLabelText('第 2 行图号')).toHaveValue('historical:-602');

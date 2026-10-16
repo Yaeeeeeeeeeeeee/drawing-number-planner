@@ -68,3 +68,7 @@ User explicitly authorized P4 including latest feedback. Read `docs/p4-workspace
 ### Latest P4 existing-data adaptive layout (2026-10-15)
 
 Read `docs/p4-adaptive-data-workspaces-20261015.md` for the user's later all-page width/height refinement. It supersedes the earlier P4 wide PDF overlay: dock detail beside the primary list when the measured width budget permits, use a drawer when narrow, and preserve independent scrolling, resizing, focus and selection. Data regions may use full available width/height while controls remain bounded; preserve complete pagination and all record/history semantics. For this refinement, use existing data read-only and do not create/clone records or run the old 40-record seed to simulate density. Earlier sample evidence remains historical, not real-data acceptance. Explicitly report missing populated data, physical 4K/Windows DPI and native-window evidence. No P5/merge/production write authorization follows.
+
+### Latest P4 BOM query history refinement (2026-10-16)
+
+For the later explicit query-only history comparison request, read `docs/p4-bom-history-comparison-20261016.md` and the matching supplement in `references/ui-and-acceptance.md`. This authorizes summaries, reliable matching, changed-field filtering, project folding and verified historical attachments only in query details. Earlier path hiding is superseded here only by on-demand disclosure; all data safety and manual Windows acceptance boundaries remain.
