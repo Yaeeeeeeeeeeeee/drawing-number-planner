@@ -1,3 +1,8 @@
+## 最新：Windows无法连接GitHub，离线更新交付
+- 应用固定b0333c3；仅增加离线bundle CI和交付文档，不改应用/数据库。
+- docs/p4-offline-update-20261016.md：下载并解压附件后从本地bundle快进，拒绝本地修改，不联网pull。
+- 完整bundle验证及两个旧版本快进/未提交保护通过，CI附件待生成；不合并、不发布、不进入P5。
+
 ## 最新：2026-10-16 P4明细与全系统复制反馈
 - 产品三用途列、规划编号框外且字段横向/窄窗局部滚动、BOM明细不显示路径与图号小字、全系统复制图标、PDF文件名表头居中/正文左对齐。
 - 说明/最新截图：docs/p4-product-purpose-columns-20261016.md；证据：docs/p4-detail-feedback-verification-20261016.json。

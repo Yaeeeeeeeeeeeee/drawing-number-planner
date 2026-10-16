@@ -1,0 +1,35 @@
+name: P4 pinned offline source update
+on:
+  push:
+    branches: [codex/p4-adaptive-data-workspaces-20261015]
+    paths: [.github/workflows/p4-offline-update.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b0333c3505d34d64deca83c29757b9f1b124c5c5
+          fetch-depth: 0
+      - name: Build complete offline Git bundle pinned to the accepted UI revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision=b0333c3505d34d64deca83c29757b9f1b124c5c5
+          mkdir delivery
+          git update-ref refs/heads/offline-p4-b0333c3 "$revision"
+          git bundle create delivery/P4-offline-b0333c3.bundle refs/heads/offline-p4-b0333c3
+          git bundle verify delivery/P4-offline-b0333c3.bundle
+          test "$(git bundle list-heads delivery/P4-offline-b0333c3.bundle refs/heads/offline-p4-b0333c3 | cut -d' ' -f1)" = "$revision"
+          (cd delivery && sha256sum P4-offline-b0333c3.bundle > SHA256SUMS.txt)
+          printf '%s\n' 'P4 offline source update, revision b0333c3505d34d64deca83c29757b9f1b124c5c5.' 'Contains a complete Git source bundle only. No EXE, database, sample creation, or user documents.' 'Update only the existing P4 adaptive checkout with a clean working tree and --ff-only. Keep master and the old acceptance package unchanged.' 'Use the local bundle reference refs/heads/offline-p4-b0333c3. Build with the already installed local Node dependencies. This does not require a Windows GitHub connection.' > delivery/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: P4-offline-update-b0333c3
+          path: delivery/
+          retention-days: 14
+          if-no-files-found: error
