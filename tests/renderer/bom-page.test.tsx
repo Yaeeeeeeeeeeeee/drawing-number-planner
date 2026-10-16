@@ -74,7 +74,7 @@ describe('BomPage product-level BOM', () => {
     expect(await screen.findByText('改为哑光')).toBeVisible();
     expect(screen.getByText('PET')).toBeVisible();
     expect(screen.getByRole('rowheader',{name:'生效批次'}).closest('tr')).toHaveTextContent('20260928');
-    const drawingField = screen.getByRole('button', { name: `复制图号 ${candidate.fullCode}` }).closest('td')!;
+    const drawingField = screen.getByRole('rowheader', { name: '图号' }).closest('tr')!.querySelector('td')!;
     expect(drawingField).toHaveTextContent(candidate.fullCode);
     expect(drawingField).not.toHaveTextContent('正式图号');
     expect(drawingField).not.toHaveTextContent('使用中');

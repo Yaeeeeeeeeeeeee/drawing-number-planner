@@ -31,13 +31,9 @@
 @media(max-width:900px) { .bom-page .bom-history-comparison .bom-history-fields col.bom-history-label-col { width:92px; } }
 .bom-page .bom-history-comparison .bom-history-fields :is(th,td) { height:auto; }
 /* Shared read-only BOM values: full text and icon stay side by side. */
-.bom-page .bom-value-copy { display:inline-flex; align-items:flex-start; gap:6px; max-width:100%; min-width:0; vertical-align:top; white-space:normal; }
-.bom-page .bom-value-copy .bom-value-text { min-width:0; flex:0 1 auto; overflow-wrap:anywhere; white-space:pre-wrap; }
-.bom-page .bom-value-copy .bom-copy-action { display:inline-flex; flex:0 0 auto; align-items:center; }
-.bom-page .bom-value-copy .copy-icon-button { flex:none; margin:0; }
-.bom-page .bom-copy-feedback { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .bom-history-comparison .bom-history-batch-details { margin:10px 0; font-size:12px; }
 .bom-history-comparison .bom-history-batch-snapshots { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:16px; padding:8px; border:1px solid #e5e5e5; }
 .bom-history-comparison .bom-history-batch-snapshots section { min-width:0; }
 .bom-history-comparison .bom-history-batch-snapshots dl { display:grid; grid-template-columns:80px minmax(0,1fr); gap:6px; }
 .bom-history-comparison .bom-history-batch-snapshots :is(dt,dd) { margin:0; min-width:0; overflow-wrap:anywhere; }
+.bom-page .bom-value-text { overflow-wrap:anywhere; white-space:pre-wrap; }

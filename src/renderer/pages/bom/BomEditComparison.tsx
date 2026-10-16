@@ -1,6 +1,6 @@
 import { Children, type ReactNode } from 'react';
 import type { BomItemView, DictionaryItemView } from '../../data/client';
-import { BomValueCopy } from './BomValueCopy';
+import { BomValue } from './BomValue';
 import { materialBatchLabel } from '../../../core/files/material-batch-label';
 
 const fields = ['主类别', '项目', '图号', '生效批次', '材质', '尺寸', '图片', '位置', '位置示意图', '修改明细', '备注'];
@@ -15,8 +15,8 @@ export function BomEditComparison({ index, original, mainCategories, projects, c
   const values: ReactNode[] = original ? [
     mainCategories.find((category) => category.id === projects.find((project) => project.id === original.projectItemId)?.parentId)?.name,
     original.projectItemName,
-    <BomValueCopy value={original.fullCode} label={`复制修改前图号 ${original.fullCode}`} code/>,
-    original.effectiveBatchName ? <BomValueCopy value={materialBatchLabel(original.effectiveBatchName)} label="复制修改前生效批次"/> : '未选择',
+    <BomValue value={original.fullCode} code/>,
+    original.effectiveBatchName ? <BomValue value={materialBatchLabel(original.effectiveBatchName)}/> : '未选择',
     original.material, original.dimensions,
     original.assets.some((asset) => asset.role === 'image') ? attachments('image') : '未关联图片',
     original.position,

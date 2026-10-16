@@ -33,9 +33,8 @@ it('ignores old verification completion after a successful image retry',async()=
  await vi.waitFor(()=>expect(cancel).toHaveBeenCalled());fireEvent.click(screen.getByRole('button',{name:'重试预览'}));fireEvent.load(screen.getByRole('img'));await act(async()=>finish());
  await vi.waitFor(()=>expect(screen.getByText('文件存在 · 预览可用')).toBeVisible());expect(screen.getByRole('img')).toBeVisible();
 });
-it('copies the complete value with the icon grouped beside its text',async()=>{
- const {BomValueCopy}=await import('../../src/renderer/pages/bom/BomValueCopy');const writeText=vi.fn().mockResolvedValue(undefined);vi.stubGlobal('navigator',{clipboard:{writeText}});
- const text='02.0404.010.0401001-完整长图号-不可截断';render(<BomValueCopy value={text} label="复制完整值" code/>);
- const button=screen.getByRole('button',{name:'复制完整值'});expect(button.closest('.bom-value-copy')).toHaveTextContent(text);fireEvent.click(button);
- await vi.waitFor(()=>expect(writeText).toHaveBeenCalledWith(text));expect(await screen.findByRole('status')).toHaveTextContent('已复制');
+it('shows the complete selectable BOM value without copy controls',async()=>{
+ const {BomValue}=await import('../../src/renderer/pages/bom/BomValue');
+ const text='02.0404.010.0401001-完整长图号-不可截断';render(<BomValue value={text} code/>);
+ expect(screen.getByText(text)).toBeVisible();expect(screen.queryByRole('button')).toBeNull();
 });

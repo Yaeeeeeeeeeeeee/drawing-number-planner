@@ -48,5 +48,6 @@ it('keeps effective batch values compact and moves raw snapshot information outs
  render(<BomHistoryComparison {...props} detail={version(1,[b])}/>);
  const row=screen.getByRole('rowheader',{name:'生效批次'}).closest('tr')!;
  expect(row).toHaveTextContent('20260928');expect(row.querySelector('details')).toBeNull();expect(row).not.toHaveTextContent('关联编号');expect(row).not.toHaveTextContent('原始名称');
- expect(screen.queryByRole('rowheader',{name:'二维码关联'})).toBeNull();expect(screen.getByRole('button',{name:'复制图号 '+b.fullCode}).closest('.bom-value-copy')).toHaveTextContent(b.fullCode);
+ expect(screen.queryByRole('rowheader',{name:'二维码关联'})).toBeNull();expect(screen.getByText(b.fullCode)).toBeVisible();expect(screen.queryAllByRole('button',{name:/复制/})).toHaveLength(0);
+ fireEvent.click(screen.getByText('批次详情'));expect(screen.getByText('完整/目录')).toBeVisible();expect(screen.queryAllByRole('button',{name:/复制/})).toHaveLength(0);
 });

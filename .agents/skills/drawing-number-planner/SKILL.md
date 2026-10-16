@@ -76,3 +76,7 @@ For the later explicit query-only history comparison request, read `docs/p4-bom-
 ### P4 historical edit and detail corrections (latest 2026-10-16)
 
 Read `docs/p4-bom-edit-corrections-20261016.md` and the matching business/UI reference supplements. The latest user request explicitly protects original record identity/date/submission time and count on edits, separates batch metadata from field cells, puts copy icons beside values, and removes QR from BOM query fields/diff counting without deleting relationships. This supersedes preceding date-correction/inline-batch-details presentation only; no duplicate-data cleanup, Schema/merge or production write authorization follows.
+
+### Latest BOM copy-control removal (2026-10-16)
+
+The user subsequently requested no copy buttons in BOM details. BOM query first/history fields, batch disclosures, historical attachment path disclosures and edit comparison display complete selectable text without copy controls. This supersedes the preceding inline-copy requirement only within BOM; retain copy actions in other modules and all business/data protections.

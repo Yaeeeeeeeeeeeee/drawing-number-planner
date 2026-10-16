@@ -40,9 +40,8 @@ const seedFile=path.join(directory,'resources/app/acceptance-seed/planner.db');c
  if(await page.getByRole('rowheader',{name:'二维码关联',exact:true}).count())throw Error('QR row remains in BOM detail');
  const batchRows=await page.getByRole('rowheader',{name:'生效批次',exact:true}).evaluateAll(nodes=>nodes.map(n=>({details:n.parentElement.querySelectorAll('details').length,text:n.parentElement.textContent})));
  if(batchRows.some(row=>row.details||/关联编号|原始名称|完整路径/.test(row.text)))throw Error('Batch field is not compact');
- const copy=page.getByRole('button',{name:'复制图号 '+saved.items[0].fullCode,exact:true}).first();await copy.click();
- await page.waitForFunction(()=>[...document.querySelectorAll('.bom-copy-feedback')].some(n=>n.textContent==='已复制'));
- const copied=await app.evaluate(({clipboard})=>clipboard.readText());if(copied!==saved.items[0].fullCode)throw Error('Full drawing code copy failed');
+ if(await page.getByRole('button',{name:/复制/}).count())throw Error('BOM copy controls must be absent');
+ await page.getByText(saved.items[0].fullCode,{exact:true}).first().waitFor();
  const display=await app.evaluate(({screen,BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];const d=screen.getDisplayMatching(w.getBounds());w.maximize();return{bounds:d.bounds,workArea:d.workArea,scaleFactor:d.scaleFactor};});await page.waitForTimeout(300);
  const maximized=await page.evaluate(()=>({width:innerWidth,height:innerHeight,dpr:devicePixelRatio}));maximized.isMaximized=await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].isMaximized());
  await page.locator('[aria-label="所选 BOM 记录"]').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(directory,'Windows-BOM-最大化.png')});

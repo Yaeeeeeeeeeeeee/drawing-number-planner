@@ -4,7 +4,7 @@ import type { BomItemView, BomVersionView, DictionaryItemView, MaterialBatchView
 import { materialBatchLabel } from '../../../core/files/material-batch-label';
 import { BomRecordNotices } from './BomRecordNotices';
 import { BomHistoryAsset } from './BomHistoryAsset';
-import { BomValueCopy } from './BomValueCopy';
+import { BomValue } from './BomValue';
 import { assetRoles, bomFields, compareBomItems, snapshotItems } from './bom-history-diff';
 import type { BomFieldKey, HistoryItem } from './bom-history-diff';
 import './bom-history-comparison.css';
@@ -18,8 +18,8 @@ function FieldValue({ item, field, context }: { item: BomItemView; field: BomFie
   switch (field) {
     case 'main': value = context.mainCategories.find(c => c.id === context.projects.find(p => p.id === item.projectItemId)?.parentId)?.name ?? '—'; break;
     case 'project': value = item.projectItemName; break;
-    case 'drawing': return item.fullCode ? <BomValueCopy value={item.fullCode} label={`复制图号 ${item.fullCode}`} code/> : <>—</>;
-    case 'batch': return item.effectiveBatchName ? <BomValueCopy value={materialBatchLabel(item.effectiveBatchName)} label="复制生效批次"/> : <>—</>;
+    case 'drawing': return item.fullCode ? <BomValue value={item.fullCode} code/> : <>—</>;
+    case 'batch': return item.effectiveBatchName ? <BomValue value={materialBatchLabel(item.effectiveBatchName)}/> : <>—</>;
     case 'quantity': value = (item as BomItemView & {quantity?: number}).quantity ?? '未记录'; break;
     case 'white': value = item.usesWhiteMaterial ? '是' : '否'; break;
     default: value = item[field] || '—';
@@ -29,7 +29,7 @@ function FieldValue({ item, field, context }: { item: BomItemView; field: BomFie
 function BatchDetails({ row }: { row: HistoryItem }) {
   const sides = row.previous && row.selected ? [{ label: '上一条记录', item: row.previous }, { label: '所选记录', item: row.selected }] : [{ label: row.selected ? '所选记录' : '上一条记录', item: row.selected ?? row.previous! }];
   if (!sides.some(side => side.item.effectiveBatchName || side.item.effectiveBatchRelativePath || side.item.effectiveMaterialBatchId !== null)) return null;
-  return <details className="bom-history-batch-details"><summary>批次详情</summary><div className="bom-history-batch-snapshots">{sides.map(({ label, item }) => <section key={label} aria-label={`${label}批次详情`}><strong>{label}</strong><dl><dt>名称</dt><dd>{item.effectiveBatchName ? <BomValueCopy value={item.effectiveBatchName} label={`复制${label}批次原始名称`}/> : '未记录'}</dd><dt>关联编号</dt><dd>{item.effectiveMaterialBatchId ?? '未记录'}</dd><dt>完整路径</dt><dd>{item.effectiveBatchRelativePath ? <BomValueCopy value={item.effectiveBatchRelativePath} label={`复制${label}批次路径`}/> : '未记录'}</dd></dl></section>)}</div></details>;
+  return <details className="bom-history-batch-details"><summary>批次详情</summary><div className="bom-history-batch-snapshots">{sides.map(({ label, item }) => <section key={label} aria-label={`${label}批次详情`}><strong>{label}</strong><dl><dt>名称</dt><dd>{item.effectiveBatchName ? <BomValue value={item.effectiveBatchName}/> : '未记录'}</dd><dt>关联编号</dt><dd>{item.effectiveMaterialBatchId ?? '未记录'}</dd><dt>完整路径</dt><dd>{item.effectiveBatchRelativePath ? <BomValue value={item.effectiveBatchRelativePath}/> : '未记录'}</dd></dl></section>)}</div></details>;
 }
 function Project({ row, index, expanded, toggle, context, currentDate, previousDate }: { row: HistoryItem; index: number; expanded: boolean; toggle(): void; context: Context; currentDate: string; previousDate?: string }) {
   const id = useId(); const [allFields, setAllFields] = useState(false);
