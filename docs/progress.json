@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-10-16T16:06:59.597540+08:00",
+  "updatedAt": "2026-10-16T16:07:37.189825+08:00",
   "branch": "codex/p4-bom-edit-corrections-20261016",
-  "lastCommit": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5（BOM查询历史对照应用）",
+  "lastCommit": "823bfe1e02e523dd7ad3e1c2a38e7b81635aebed（历史编辑/详情修正应用）",
   "execution": "上次记录的执行状态：P4 BOM历史查询候选已完成实施与自动验证；等待Windows真实业务数据人工验收。静态快照不检测执行器在线。",
-  "current": "P4 BOM历史编辑P0及详情P1修正实施中，未清理重复记录或真实数据。",
+  "current": "P4 BOM历史编辑与详情修正应用823bfe1已本地提交，准备Windows固定包验收。",
   "recent": "历史编辑与P1展示完成；独立评审NULL附件、显式替换完整性、归档ID回写均修复；相关140通过，5组浏览器横排几何通过。",
   "next": "提交固定应用SHA并运行Windows真实exe编辑/查询/复制/4K内容窗口与桌面最大化检查，生成新版可下载ZIP。",
   "blockers": [

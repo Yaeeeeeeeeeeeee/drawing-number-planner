@@ -159,5 +159,6 @@
     "threeToThree": "Isolated real service/API tests, not user business data; exact IDs/dates/createdAt/predecessors/neighbors/current-pointer preserved",
     "nullDateAttachments": "Unchanged managed associations retained; explicit new/replacements verified with existing safe preview checks"
   },
-  "windows": "New fixed-revision executable build pending; physical 4K/maximize not yet verified"
+  "windows": "New fixed-revision executable build pending; physical 4K/maximize not yet verified",
+  "applicationRevision": "823bfe1e02e523dd7ad3e1c2a38e7b81635aebed"
 }
