@@ -1,3 +1,4 @@
+# Final explicit-batch navigation and compact empty-state candidate.
 name: P4 integrated UI Windows acceptance
 on:
   push:

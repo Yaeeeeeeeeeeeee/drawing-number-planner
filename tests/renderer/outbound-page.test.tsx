@@ -167,6 +167,8 @@ describe('OutboundPage', () => {
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('button', { name: '预览文件' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    expect(screen.getByLabelText('正文')).not.toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     expect(screen.getByLabelText('正文')).toBeVisible();
     fireEvent.change(screen.getByLabelText('正文'), { target: { value: '保留草稿' } });
     fireEvent.click(screen.getByRole('button', { name: '邮件配置' }));
@@ -316,6 +318,7 @@ describe('OutboundPage', () => {
     const writeText = vi.fn().mockResolvedValue(undefined); Object.assign(navigator, { clipboard: { writeText } });
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.click(await screen.findByLabelText('收件人 王经理'));
     fireEvent.click(screen.getByLabelText('附加段落 METI 后更新'));
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
@@ -389,6 +392,7 @@ describe('OutboundPage', () => {
     const api = apiFixture(); api.renderOutboundTemplate.mockRejectedValue(new Error('模板变量缺失'));
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.change(await screen.findByLabelText('本次变更内容'), { target: { value: '保留此内容' } });
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
     expect(await screen.findByText('模板变量缺失')).toBeVisible();
@@ -403,6 +407,7 @@ describe('OutboundPage', () => {
     ]);
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.change(await screen.findByLabelText('邮件资料类型'), { target: { value: 'initial' } });
     expect(screen.queryByLabelText('本次变更内容')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '生成邮件内容' }));
@@ -441,6 +446,7 @@ describe('OutboundPage', () => {
   it('keeps template blocks and signatures maintainable from the email settings area', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.click(screen.getByRole('button', { name: '邮件配置' }));
     expect(await screen.findByRole('button', { name: '编辑模板 更新资料' })).toBeVisible();
     fireEvent.click(screen.getByText('附加段落'));
@@ -462,6 +468,7 @@ describe('OutboundPage', () => {
     const api = apiFixture(); api.updateOutboundTemplate.mockRejectedValue(new Error('模板编码冲突'));
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.click(screen.getByRole('button', { name: '邮件配置' }));
     fireEvent.click(await screen.findByRole('button', { name: '编辑模板 更新资料' }));
     fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '未保存模板名' } });
@@ -474,6 +481,7 @@ describe('OutboundPage', () => {
     const api = apiFixture();
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.click(screen.getByRole('button', { name: '邮件配置' }));
 
     fireEvent.click(await screen.findByRole('button', { name: '新增邮件模板' }));
@@ -506,6 +514,7 @@ describe('OutboundPage', () => {
     api.createOutboundSignature.mockRejectedValue(new Error('签名名称已存在'));
     render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '邮件草稿' })).toBeVisible();
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.click(screen.getByRole('button', { name: '邮件配置' }));
     fireEvent.click(screen.getByRole('tab', { name: '邮件签名' }));
     fireEvent.click(await screen.findByRole('button', { name: '新增邮件签名' }));

@@ -42,3 +42,4 @@
 .drawing-library-page .module-list table {min-width:940px;}
 .drawing-library-page .module-list th:last-child,.drawing-library-page .module-list td:last-child {position:sticky;right:0;background:#fff;white-space:nowrap;}
 .drawing-library-page .module-list th:last-child {background:#f6f6f6;}
+.product-batch-navigation > h2 {font-size:16px;margin:0 0 4px;}

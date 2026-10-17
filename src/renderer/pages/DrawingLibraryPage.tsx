@@ -269,7 +269,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
     <ModuleWorkspace drawingWorkspace resizable navigation={<ProductBatchNavigation products={products} batches={navigationBatches} scope={scope} onSelect={navigateScope} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
-    <h2 className="drawing-scope-title">{scope.title}</h2>
+    <h2 className="drawing-scope-title">{scope.title}</h2>{scope.kind === 'batch' && <p className="muted-text">{(() => {const batch=navigationBatches.find(item=>item.id===scope.batchId);const state=scope.productId ? batch?.usageProducts.find(item=>item.productId===scope.productId)?.state : batch?.currentState;return state==='current'?'当前批次实际使用图号':state==='historical'?'历史批次实际使用图号':'该批次实际使用图号；当前使用关系未确定';})()}</p>}
     <form className="filter-bar filter-grid" onSubmit={submit}>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
