@@ -519,6 +519,7 @@ describe('OutboundPage', () => {
   it('keeps one editor and refuses dirty cancel, replacement, tab changes and return', async () => {
     const api = apiFixture(); const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<OutboundPage api={api as never} />);
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.change(await screen.findByLabelText('正文'), { target: { value: '保留工作草稿' } });
     fireEvent.click(screen.getByRole('button', { name: '邮件配置' }));
     fireEvent.click(await screen.findByRole('button', { name: '编辑模板 更新资料' }));
@@ -589,6 +590,7 @@ describe('OutboundPage', () => {
   it('refreshes composer choices on configuration return and keeps manual text', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     fireEvent.click(await screen.findByLabelText('收件人 王经理'));
+    fireEvent.click(screen.getByText('编辑邮件草稿', {selector:'summary'}));
     fireEvent.change(screen.getByLabelText('主题'), { target: { value: '手工主题' } });
     fireEvent.change(screen.getByLabelText('正文'), { target: { value: '手工正文' } });
     fireEvent.click(screen.getByLabelText('附加段落 METI 后更新'));

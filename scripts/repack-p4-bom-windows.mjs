@@ -43,13 +43,28 @@ for(const entry of ['main','service'])await build({entryPoints:[path.join(source
 fs.rmSync(path.join(app,'dist/renderer'),{recursive:true,force:true});
 fs.cpSync(path.join(source,'dist/renderer'),path.join(app,'dist/renderer'),{recursive:true});
 fs.copyFileSync(path.join(source,'dist/main/preload.cjs'),path.join(app,'dist/main/preload.cjs'));
-const title='图号规划器 P4 BOM 验收版 · '+revision.slice(0,7);
+const title='图号规划器 P4 整合验收版 · '+revision.slice(0,7);
 const entry=fs.readFileSync(path.join(source,'scripts/acceptance-entry.cjs'),'utf8').replace('const version=',`app.on('browser-window-created', (_event, window) => {\n window.on('page-title-updated', event => { event.preventDefault(); window.setTitle(${JSON.stringify(title)}); });\n window.once('ready-to-show', () => window.setTitle(${JSON.stringify(title)}));\n});\nconst version=`);
 fs.writeFileSync(path.join(app,'acceptance-entry.cjs'),entry);
 fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,workspace:originalVersion.workspace},null,2));
 const afterSeed=files(path.join(app,'acceptance-seed'));
 if(JSON.stringify(beforeSeed)!==JSON.stringify(afterSeed)||JSON.stringify(beforeSeed)!==JSON.stringify(files(oldSeed)))throw Error('Existing sample changed; refusing delivery');
-const instructions=`P4 BOM Windows x64 免安装测试包\r\n应用版本：${revision}\r\n\r\n1. 关闭旧测试版，完整解压到新文件夹，不覆盖正式版或旧测试目录。\r\n2. 双击 图号规划器验收版.exe，不需要Git、Node或开发服务器。不能只移动exe。\r\n3. 标题应为 ${title}。进入 BOM管理 → 查询BOM → 查看 2026-09-28 的记录。\r\n4. 记下记录数、业务日期和原提交时间，编辑一个项目并保存，核对记录数不增加、内容更新、原日期/提交时间不变。点击当前编辑标签不得转成新增。再核对批次只显名称、BOM详情无复制按钮、无二维码关联行，以及最大化/缩小布局。\r\n\r\n数据说明：复用旧P4交付中的原有隔离样例，未新增/复制业务记录制造效果。原样例仅有一版BOM，因此新增/删除/修改差异无法用此样例完整验收，不把首条记录冒充多版本对照。\r\n本包不打开正式数据库；首次复制原有隔离样例到AppData\\DrawingNumberPlannerAcceptance\\${revision.slice(0,7)}。旧测试版、正式版及旧数据不覆盖。可以编辑本包专属运行目录内的隔离样例进行验收；不要选择正式数据库或正式资料目录，不扫描、清理、删除或打包。修复不会自动删除用户已有重复记录。\r\n本包为未签名目录包，不是安装器或正式发布。WindowsCI结果见 windows-verification.json，不代表Windows系统DPI/跨屏及真实业务数据验收。\r\n如浏览器拦截下载，不关闭安全防护；请提供拦截详情以核对。\r\n`;
+const instructions=`P4 Windows x64 整合验收包
+版本：${revision}
+
+完整解压到新文件夹，双击 图号规划器验收版.exe。无需Git、Node或开发服务器；保留整个目录，不能仅移动exe。
+
+验收范围：
+1. BOM管理→查询BOM：编辑原记录，确认总数、原业务日期/提交时间不变，修改正确保存；详情无复制按钮/二维码关联行，批次仅显名称。
+2. 产品档案：八列紧凑表格，资料状态跳转对应产品/用途，返回保留筛选，编辑中保留原管理能力。
+3. 图号库：产品与批次导航、实际使用范围、回收站；点击图号查看紧凑抽屉，管理图号在同抽屉编辑，取消暂存PDF不写入。历史批次不以当前文件替代；未记录版本不伪造。
+4. 外发资料：邮件配置的模板/签名/联系人互斥列表，新建/编辑/保存/取消；未保存切换拒绝/确认；返回工作台刷新选择项且保留手工邮件。原文件核对、打包、命名及历史规则不变。
+5. 4K最大化/普通/窄窗口核对，无重叠、不可达按钮或整页溢出；物理Windows系统DPI/跨屏需本机人工核对。
+
+复用原已交付P4隔离样例，未增加记录制造密度。样例只有一版BOM，多版本变更需在另外明确选定的隔离数据中验收；不要将首次记录冒充修改。
+首次复制包内样例到AppData\\DrawingNumberPlannerAcceptance\\${revision.slice(0,7)}，不打开正式数据库，不覆盖旧测试版。仅在本包专属隔离数据中验收；不要选择正式资料目录。已存在重复BOM不会被自动清理。
+本包未签名，是免安装目录包，不是正式发布。自动化报告与Windows截图在包内；不代表真实业务数据或物理4K/DPI人工验收完成。
+`;
 fs.writeFileSync(path.join(output,'先看这里-验收说明.txt'),instructions);
 fs.writeFileSync(path.join(output,'验收说明.txt'),instructions);
 fs.writeFileSync(path.join(output,'sample-reuse-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:11955251774,unchanged:true,files:afterSeed,note:'Unmodified pre-existing isolated sample. No new records or synthetic density; one BOM version only.'},null,2));

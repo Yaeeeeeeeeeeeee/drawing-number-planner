@@ -31,3 +31,4 @@
 .outbound-integrated .outbound-workflow .ob-step:has(> .muted-text) { min-height: 0; }
 @media (max-width: 800px) { .outbound-page.outbound-integrated .ob-mail-configuration .template-settings .settings-columns > section > article { grid-template-columns: minmax(0, 1fr) auto; } .outbound-page.outbound-integrated .ob-mail-configuration .settings-columns article > div { grid-column: 1 / -1; } }
 @media (max-width: 640px) { .outbound-page.outbound-integrated .ob-mail-configuration .ob-config-editor fieldset { grid-template-columns: minmax(0, 1fr); } }
+.outbound-integrated .ob-workbench-mail > summary {cursor:pointer;margin:8px 0;color:#444;font-weight:600;}

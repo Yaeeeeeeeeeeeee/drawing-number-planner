@@ -13,7 +13,7 @@ const seedFile=path.join(directory,'resources/app/acceptance-seed/planner.db');c
  const page=await app.firstWindow();await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:30000});
  const root=await app.evaluate(({app})=>app.getPath('userData'));
  if(path.basename(root)!==revision.slice(0,7)||!root.includes('DrawingNumberPlannerAcceptance')||fs.readFileSync(path.join(root,'.acceptance-version'),'utf8')!==revision)throw Error('Incorrect isolation/version');
- const title=await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].getTitle());if(!title.includes('P4 BOM')||!title.includes(revision.slice(0,7)))throw Error('Incorrect visible package identity');
+ const title=await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].getTitle());if(!title.includes('P4 整合')||!title.includes(revision.slice(0,7)))throw Error('Incorrect visible package identity');
  const health=await page.evaluate(async()=>(await fetch('/api/health')).status);if(health!==200)throw Error('Service health failed');
  const writes=[];page.on('request',request=>{if(request.url().includes('/api/')&&!['GET','HEAD'].includes(request.method())&&!request.url().endsWith('/api/session'))writes.push(request.method()+' '+request.url());});
  if(await page.getByRole('button',{name:'展开导航',exact:true}).isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();
@@ -53,6 +53,32 @@ const seedFile=path.join(directory,'resources/app/acceptance-seed/planner.db');c
   if(m.width!==width||m.height!==height||m.overflow||m.outside||m.copyBelow)throw Error('Actual Windows content viewport failed: '+JSON.stringify(m));measurements.push(m);
   if([3840,1920,1100].includes(width)){await page.locator('[aria-label="所选 BOM 记录"]').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(directory,`Windows-BOM-${width}.png`)});}
  }
+
+ // Integrated UI checks read existing sample only; no data fixtures or new records.
+ async function navigate(name){const t=page.getByRole('button',{name:'展开导航',exact:true});if(await t.isVisible())await t.click();await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true}).click();}
+ await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1920,1080));
+ await navigate('产品档案');await page.locator('.products-compact tbody tr').first().waitFor();
+ const productHeaders=await page.locator('.products-compact thead th').allTextContents();
+ if(productHeaders.join('|')!=='SKU / 型号|品牌 / 类别|产品规格|状态|说明书|售后卡|菜谱|操作')throw Error('Product columns invalid');
+ await page.screenshot({path:path.join(directory,'Windows-产品档案-1920.png')});
+ await navigate('图号库');await page.getByRole('heading',{name:'图号库',exact:true}).waitFor();
+ if(await page.getByRole('button',{name:'按图号',exact:true}).count()||await page.getByRole('columnheader',{name:'资料使用',exact:true}).count())throw Error('Obsolete drawing modes/column');
+ const drawingNavigation=await page.evaluate(async()=>{const r=await fetch('/api/drawings/navigation');if(!r.ok)throw Error('Navigation API failed');return r.json();});
+ if(!Array.isArray(drawingNavigation.batches))throw Error('Navigation missing');
+ const drawingList=await page.evaluate(async()=>(await fetch('/api/drawings?page=1&pageSize=50')).json());
+ await page.getByRole('button',{name:drawingList.items[0].fullCode,exact:true}).first().click();await page.getByRole('button',{name:'管理图号',exact:true}).waitFor();
+ const drawingMeasurements=[];
+ for(const [width,height] of [[3840,2160],[1920,1080],[1100,760],[720,600]]){
+   await app.evaluate(({BrowserWindow},size)=>BrowserWindow.getAllWindows()[0].setContentSize(...size),[width,height]);await page.waitForTimeout(300);
+   const m=await page.evaluate(()=>({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth+1}));if(m.overflow)throw Error('Drawing overflow '+JSON.stringify(m));drawingMeasurements.push(m);
+   if(width!==720)await page.screenshot({path:path.join(directory,`Windows-图号详情-${width}.png`)});
+ }
+ await page.getByRole('button',{name:'管理图号',exact:true}).click();await page.getByRole('button',{name:'取消编辑',exact:true}).click();await page.getByRole('button',{name:'管理图号',exact:true}).waitFor();await page.getByRole('button',{name:'关闭图号详情',exact:true}).click();
+ await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1920,1080));await navigate('外发资料');await page.getByRole('button',{name:'邮件配置',exact:true}).click();
+ for(const tab of ['邮件模板','邮件签名','联系人']){await page.getByRole('tab',{name:tab,exact:true}).click();await page.getByRole('button',{name:tab==='联系人'?'新增联系人':`新增${tab}`,exact:true}).waitFor();if(await page.locator('.ob-mail-configuration form:visible').count())throw Error('Default configuration editor visible');await page.screenshot({path:path.join(directory,`Windows-邮件配置-${tab}-1920.png`)});}
+ await page.getByRole('button',{name:'新增联系人',exact:true}).click();await page.getByLabel('公司',{exact:true}).fill('未保存保护验收');let refused=false;page.once('dialog',async d=>{refused=true;await d.dismiss();});await page.getByRole('tab',{name:'邮件模板',exact:true}).click();if(!refused||await page.getByLabel('公司',{exact:true}).inputValue()!=='未保存保护验收')throw Error('Dirty config lost');
+ page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'返回外发工作台',exact:true}).click();await page.getByRole('button',{name:'预览文件',exact:true}).waitFor();
+ fs.writeFileSync(path.join(directory,'windows-integrated-verification.json'),JSON.stringify({revision,productHeaders,drawingMeasurements,navigationBatchCount:drawingNavigation.batches.length,manageCancel:true,dirtyConfigProtection:true,scope:'Actual Windows Electron, original existing isolated sample; no new records. Physical user 4K/DPI/cross-monitor and real data remain manual.'},null,2));
  const after=snapshot(path.join(root,'planner.db'));for(const name of Object.keys(before))if(!['bom_versions','bom_items'].includes(name)&&JSON.stringify(before[name])!==JSON.stringify(after[name]))throw Error('Unrelated table changed: '+name);
  for(const name of Object.keys(before))if(before[name].count!==after[name].count)throw Error('Record count changed: '+name);
  if(JSON.stringify(before)!==JSON.stringify(snapshot(seedFile)))throw Error('Packaged original sample changed');if(writes.length!==1||!writes[0].includes('PUT ')||!writes[0].endsWith('/api/boms/versions/1'))throw Error('Unexpected writes or creation request: '+JSON.stringify(writes));

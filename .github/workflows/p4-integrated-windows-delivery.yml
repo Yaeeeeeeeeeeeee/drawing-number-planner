@@ -1,0 +1,59 @@
+name: P4 integrated UI Windows acceptance
+on:
+  push:
+    branches: [codex/p4-integrated-ui-20261017]
+    paths:
+      - .github/workflows/p4-integrated-windows-delivery.yml
+      - scripts/repack-p4-bom-windows.mjs
+      - scripts/verify-p4-bom-windows.cjs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  PLANNER_ACCEPTANCE_REVISION: ${{ github.sha }}
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: app-source
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: P4-Windows-x64-8dc2112
+          run-id: 38697339387
+          github-token: ${{ github.token }}
+          path: existing-p4
+      - name: Build exact integrated source
+        shell: pwsh
+        working-directory: app-source
+        run: |
+          npx --yes pnpm@11.25.0 install --frozen-lockfile --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { throw 'Install failed' }
+          node node_modules/typescript/bin/tsc --noEmit
+          if ($LASTEXITCODE -ne 0) { throw 'Typecheck failed' }
+          node node_modules/vite/bin/vite.js build
+          if ($LASTEXITCODE -ne 0) { throw 'Renderer build failed' }
+          node node_modules/typescript/bin/tsc -p tsconfig.main.json
+          if ($LASTEXITCODE -ne 0) { throw 'Main build failed' }
+      - name: Preserve original sample and runtime, repack integrated UI
+        shell: pwsh
+        run: node scripts/repack-p4-bom-windows.mjs app-source existing-p4 P4-Windows-Integrated
+      - name: Native Windows isolated verification
+        shell: pwsh
+        run: node scripts/verify-p4-bom-windows.cjs app-source "P4-Windows-Integrated/图号规划器验收版.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: P4-Integrated-Windows-x64-${{ github.sha }}
+          path: P4-Windows-Integrated/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

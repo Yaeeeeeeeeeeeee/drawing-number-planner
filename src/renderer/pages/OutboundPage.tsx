@@ -47,9 +47,11 @@ function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard }: { ap
           <h2><span aria-hidden="true">02</span> 生成外发结果</h2>{createdPackage ? <PackageResult key={createdPackage.id} value={createdPackage}/> : <p className="muted-text">完成预览并打包后，在此核对真实生成结果。</p>}
       </section>
       <section className="ob-step" aria-label="邮件编辑步骤"><h2><span aria-hidden="true">03</span> 邮件草稿</h2>
-          <div>
+          {!mailContext && <p className="muted-text">生成外发包后显示邮件草稿；需要时可先展开编辑。</p>}
+          <details className="ob-workbench-mail" open={mailContext !== null}>
+            <summary>编辑邮件草稿</summary>
             <EmailComposer api={api} mailContext={mailContext} refreshRevision={refreshRevision} />
-          </div>
+          </details>
       </section>
       </div>
     </section>
