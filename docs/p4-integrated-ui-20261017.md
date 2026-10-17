@@ -45,3 +45,17 @@ Windows目录包复用原已交付P4隔离样例和运行时；不新增记录�
 
 
 回收站边界补充：正常导航继续仅统计未删除图号；精确图号详情从原始明确业务关系读取，已删除/释放身份仍保留其历史批次关联，不将关联转移给复用同码的新身份。34项相关核心/API测试及只读query_only/序列化一致性断言通过。
+
+
+## 最终验证与交付
+
+- 应用修订：`d00e5c100eb40264246ab47957cdbaea2d51958c`，独立P4分支，不合并master。
+- 界面专项102/102；最后回收站只读核心/API34/34；进度3/3；类型检查、Renderer和Main/Service编译通过。既有>500kB资源提示保留。
+- 全量b2b06ec修订974/990，16项与历史记录同名的既有失败，无新增失败；最后单项只读修正另以34项验证，不把此前全量冒充最后修订重跑。整套E2E未重跑，既有失败未关闭。
+- 六种浏览器视口3840/2560/1920/1366/1100/720通过；截图明确标注接口夹具，未连接用户业务数据库。
+- 最终原生Windows流程 [39006283189](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39006283189) 成功。实际EXE启动、BOM隔离修改及不新增记录、产品八列、图号抽屉/取消、配置互斥及未保存保护通过。Windows截图和机器报告在验收包内。
+- [最终验收包备用下载](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39006283189/artifacts/12091356645)（登录既有仓库账号；保留14天）。完整解压后双击 `图号规划器验收版.exe`，无需更新命令。
+- ZIP大小166754972字节，SHA256：`319118fad1f0ec844e39ba12a82410ce020402f397bbf40053f3aa6393244726`。
+- 原隔离样例未新增记录、原始包内数据库未修改；不打开正式数据。物理Windows4K/DPI/跨屏、真实多版本业务数据及完整恢复/生产稳定性仍待人工验收。
+
+完整变更文件及测试失败名称见 [机器可读验证报告](p4-integrated-ui-verification-20261017.json)。主要改动为图号Repository/Service/Route，DrawingLibraryPage、共享ProductBatchNavigation/ModuleWorkspace、FilesPage/AppShell导航，OutboundPage、MailConfiguration/TemplateSettings/ContactsManager/EmailComposer及编辑保护Hook，配套CSS、专项测试和Windows构建验证工具。Schema、Main与依赖文件保持不变。
