@@ -96,5 +96,14 @@
   },
   "applicationChanged": false,
   "mergeAuthorization": "用户已确认本版，并明确要求合并master后更新GitHub；已披露16项失败保留，不宣称全绿。",
-  "pr": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/pull/1"
+  "pr": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/pull/1",
+  "merge": {
+    "merged": true,
+    "sha": "e3d0e63bd67ea66461db8e24d30d02631209adb2",
+    "remoteBranch": "master",
+    "verifiedAt": "2026-10-17T13:18:28.139959+00:00",
+    "comparedWith": "46cbf1b879bc107064d41f582cb386ab9a683144",
+    "fileDiffCount": 0,
+    "localMasterSynced": true
+  }
 }
