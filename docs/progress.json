@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-10-17T13:50:38.449960+00:00",
+  "updatedAt": "2026-10-17T13:55:48.319113+00:00",
   "branch": "master",
   "lastCommit": "e3d0e63bd67ea66461db8e24d30d02631209adb2（P4已确认版本合并提交）",
-  "execution": "上次记录的执行状态：用户要求在GitHub添加可下载EXE，正在包装原已确认Windows程序并验证安装；静态快照不检测执行器在线。",
-  "current": "向GitHub Releases提供P4安装EXE和完整免安装ZIP，不修改应用代码或真实业务数据。",
-  "recent": "已核对现有包为fc236a6；发布流程固定源Artifact及SHA256、安装逐文件核对并原生运行验证，通过后才公开发布。",
-  "next": "运行Windows安装封装与验证，确认Release资产可下载后在README放置固定入口。",
+  "execution": "上次记录的执行状态：GitHub Release已公开，Windows安装及原生EXE验证通过；静态快照不检测执行器在线。",
+  "current": "GitHub Release p4-2026.10.17已提供安装EXE和完整ZIP，仓库首页增加直接下载入口。",
+  "recent": "Windows流程39038271017全部通过：固定ZIP校验、安装后逐文件一致及原生EXE验证。安装EXE146122936字节，已公开；应用仍为fc236a6。",
+  "next": "从README或Releases下载Setup.exe安装并通过桌面入口启动；保留已知16项失败与真实数据/物理DPI证据边界。",
   "blockers": [
     "用户真实业务数据和物理4K最大化、Windows系统DPI/跨显示器仍待人工验收",
     "完整回归16项既有失败及既有E2E问题保留；本次复核无新增失败，用户已确认应用并明确要求合并。",
@@ -377,6 +377,10 @@
     }
   ],
   "log": [
+    {
+      "at": "2026-10-17T13:55:48.319113+00:00",
+      "message": "Windows流程39038271017全部通过：固定ZIP校验、安装后逐文件一致及原生EXE验证。安装EXE146122936字节，已公开；应用仍为fc236a6。"
+    },
     {
       "at": "2026-10-17T13:50:38.449960+00:00",
       "message": "向GitHub Releases提供P4安装EXE和完整免安装ZIP，不修改应用代码或真实业务数据。"

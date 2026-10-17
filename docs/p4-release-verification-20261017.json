@@ -1,0 +1,34 @@
+{
+  "recordedAt": "2026-10-17",
+  "applicationRevision": "fc236a67bdf94a08494c29784b8eb92caad7c4a1",
+  "releaseUrl": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/p4-2026.10.17",
+  "releaseId": 415830097,
+  "tag": "p4-2026.10.17",
+  "publishedAt": "2026-10-17T13:53:33Z",
+  "workflow": {
+    "id": 39038271017,
+    "conclusion": "success",
+    "nativeWindowsInstallation": true,
+    "allInstalledPackageFilesMatch": true,
+    "installedExeVerification": "passed"
+  },
+  "assets": [
+    {
+      "name": "DrawingNumberPlanner-P4-Windows-x64-Setup.exe",
+      "size": 146122936,
+      "digest": "sha256:93c9510f620e648a001b5a6138939363b23da7c714ee061b2e45f292e1555028",
+      "url": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/p4-2026.10.17/DrawingNumberPlanner-P4-Windows-x64-Setup.exe",
+      "state": "uploaded"
+    },
+    {
+      "name": "DrawingNumberPlanner-P4-Windows-x64.zip",
+      "size": 167014096,
+      "digest": "sha256:98a45ebc4b755a2bd3cba9560252ef40d3d791ec9f23b409ea44a2c47d0d0cba",
+      "url": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/p4-2026.10.17/DrawingNumberPlanner-P4-Windows-x64.zip",
+      "state": "uploaded"
+    }
+  ],
+  "sourceUnchanged": true,
+  "productionDataTouched": false,
+  "scope": "Windows installer wrapper for unchanged confirmed isolated acceptance package; existing full-suite failures and physical DPI/real-data limits remain."
+}

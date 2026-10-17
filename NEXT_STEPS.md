@@ -1,3 +1,7 @@
+# 已完成：GitHub提供P4安装EXE（2026-10-17）
+
+Release p4-2026.10.17已公开，Setup.exe安装版和原始完整ZIP均可下载；Windows流程39038271017安装逐文件核对与原生应用验证通过。README有固定下载入口。应用代码仍为fc236a6，不改变真实数据或既有验收边界。详见docs/p4-release-verification-20261017.json。
+
 # 当前：GitHub提供P4安装EXE（2026-10-17）
 
 用户要求GitHub增加EXE下载。只包装已确认fc236a6完整运行文件；Windows CI逐文件校验并启动安装后应用，成功后才公开Release p4-2026.10.17。现有应用/Schema/数据不变。

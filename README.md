@@ -2,7 +2,17 @@
 
 面向单人长期使用的 Windows 公司内部工具。当前版本已把真实 Excel 编码规则、SKU、历史资料只读扫描、永久占号、文件完整性、外发资料和桌面安全恢复接入同一套本地工作流，并可用同一套真实数据在 Windows 桌面窗口或浏览器中运行。
 
-## 启动
+## Windows 软件下载
+
+日常使用无需安装 Git、Node 或下载源码：
+
+- **[下载安装版 EXE](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/p4-2026.10.17/DrawingNumberPlanner-P4-Windows-x64-Setup.exe)**：双击安装，完成后从桌面“图号规划器 P4”启动。
+- [下载免安装 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/p4-2026.10.17/DrawingNumberPlanner-P4-Windows-x64.zip)：完整解压到新文件夹，再双击“图号规划器验收版.exe”；不要仅移动 EXE。
+- [版本说明、校验码与全部下载文件](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/p4-2026.10.17)
+
+二者都是已确认的 P4 应用版本 `fc236a6`，沿用独立隔离样例，不自动导入正式业务数据。安装版包含全部运行文件，无需另装运行环境。GitHub 的 **Code → Download ZIP** 和 Release 中的 **Source code** 是源码，不能直接运行。
+
+## 开发启动
 
 首次使用先安装依赖：
 
