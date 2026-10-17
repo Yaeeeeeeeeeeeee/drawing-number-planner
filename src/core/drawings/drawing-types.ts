@@ -1,4 +1,4 @@
-import type { DrawingBatchUsage } from '../files/material-batch-types.js';
+import type { MaterialBatchView, DrawingBatchUsage } from '../files/material-batch-types.js';
 
 export type PlannedDrawingStatus = 'reserved' | 'active' | 'voided';
 export type HistoricalDrawingStatus = 'active' | 'inactive';
@@ -75,10 +75,29 @@ export interface DrawingBomUsage {
   usesWhiteMaterial: boolean;
 }
 
+export interface DrawingBusinessUsage {
+  origin: DrawingOrigin;
+  recordId: number;
+  productId: number;
+  batchId: number | null;
+  batchName: string | null;
+  source: 'bom' | 'outbound';
+  sourceId: number;
+  current: boolean;
+  sku: string;
+  model: string;
+}
+
+export interface DrawingNavigationBatch extends MaterialBatchView {
+  confirmedDrawingCount: number;
+  usageProducts: Array<{ productId: number; state: 'current' | 'historical'; drawingCount: number }>;
+}
+
 export interface DrawingDetailRecord extends DrawingRecord {
   sourceFiles: DrawingFileRecord[];
   outlinedFiles: DrawingFileRecord[];
   currentBomUsage: DrawingBomUsage[];
+  businessUsage?: DrawingBusinessUsage[];
   readOnly: boolean;
   readOnlyMessage: string | null;
   batchUsage: DrawingBatchUsage;
@@ -96,6 +115,9 @@ export interface DrawingSearchFilters {
   projectItemId?: number;
   colorId?: number;
   materialBatchId?: number;
+  productId?: number;
+  usageBatchId?: number;
+  associationState?: 'pending';
   status?: DrawingStatus;
   sourcePresence?: FilePresenceFilter;
   outlinedPresence?: FilePresenceFilter;

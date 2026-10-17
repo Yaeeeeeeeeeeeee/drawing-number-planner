@@ -154,3 +154,10 @@ The user subsequently requested no copy buttons in BOM details. BOM query first/
 ### Product archive table and purpose navigation (2026-10-16)
 
 Latest explicit request: see docs/p4-products-list-20261016.md. The real product archive uses exactly eight combined identity/specification/status/purpose/action columns, with only Edit in row actions. No inline detail/edit expansion; lifecycle and protected cleanup remain in the separate product editor. Standard purpose status links use product identity and stable purpose keys; missing, single and multiple records have distinct navigation without automatic writes. Returning preserves filters/scroll and refreshes QR business states; file availability does not infer business state. This supersedes earlier product expansion/dynamic-purpose-column UI rules only. User explicitly paused Windows-package delivery pending further requests; do not package automatically. Preserve Schema, uniqueness, inactive-product creation restrictions and all data safeguards.
+
+
+### P4 图号库与外发配置整合（2026-10-17，最新明确授权）
+
+用户明确授权图号库按产品与实际使用批次导航、紧凑查看/同抽屉管理，以及外发工作台与邮件配置互斥三标签整合。见 docs/p4-integrated-ui-20261017.md。实际使用只依赖明确BOM/已完成外发关系，不以PDF扫描、同码文本或日期最新推断；保留所有历史/占号/引用保护。配置离开确认、单表单和返回工作台刷新可用选项应保留手工草稿。无Schema/业务规则变更。
+
+用户已再次明确要求本轮全部完成后直接给Windows验收包，此授权替代此前“暂停打包”要求。仅允许独立隔离验收包，不合并master，不打开用户正式数据库。UI自动化、原生CI和物理Windows4K/DPI人工验收仍分别记录。

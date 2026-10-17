@@ -238,3 +238,22 @@ describe('drawing library API', () => {
     await app.close();
   });
 });
+
+it('serves navigation before signed detail IDs and validates actual usage filters without writing', async () => {
+  const planned = seedPlannedDrawing(db);
+  const productId = (db.prepare('select product_id as id from drawing_numbers where id = ?').get(planned.id) as { id: number }).id;
+  const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+  const before = db.serialize(); db.pragma('query_only = ON');
+  try {
+    const navigation = await app.inject({ method: 'GET', url: '/api/drawings/navigation' });
+    expect(navigation.statusCode).toBe(200); expect(navigation.json()).toEqual({ batches: [] });
+    const filtered = await app.inject({ method: 'GET', url: `/api/drawings?productId=${productId}&associationState=pending` });
+    expect(filtered.statusCode).toBe(200); expect(filtered.json().items.map((item: { id: number }) => item.id)).toEqual([planned.id]);
+    expect((await app.inject({ method: 'GET', url: '/api/drawings?usageBatchId=1' })).json().total).toBe(0);
+    for (const query of ['productId=0', 'usageBatchId=-1', 'associationState=current']) {
+      expect((await app.inject({ method: 'GET', url: `/api/drawings?${query}` })).statusCode).toBe(400);
+    }
+    expect((await app.inject({ method: 'GET', url: `/api/drawings/${planned.id}` })).json().businessUsage).toEqual([]);
+    expect(db.serialize().equals(before)).toBe(true);
+  } finally { db.pragma('query_only = OFF'); await app.close(); }
+});

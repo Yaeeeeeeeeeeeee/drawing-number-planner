@@ -349,3 +349,119 @@ describe('DrawingQueryService', () => {
       .toEqual([expect.objectContaining({ fullCode: '02.0209.010.0401007', hasSourceFile: false, hasOutlinedFile: true })]);
   });
 });
+
+// These fixtures intentionally keep PDF storage, product ownership and actual usage independent.
+function usageFixture() {
+  const productId = (db.prepare('select product_id as id from drawing_numbers where id = ?').get(ids.first) as { id: number }).id;
+  const otherProductId = Number(db.prepare(`insert into products
+    (sku, brand_id, product_size_id, default_appearance_id, model, product_category, status, created_at)
+    select 'OTHER-SKU', brand_id, product_size_id, default_appearance_id, 'OTHER', product_category, status, created_at
+    from products where id = ?`).run(productId).lastInsertRowid);
+  const batch = (name: string, sequence: number) => Number(db.prepare(`insert into material_batches
+    (relative_path, product_directory, product_id, name, sequence_number, recognition_status, is_present, first_seen_at, last_seen_at)
+    values (?, 'storage-directory', ?, ?, ?, 'recognized', 1, 'now', 'now')`)
+    .run(`storage-directory/${name}`, productId, name, sequence).lastInsertRowid);
+  const older = batch('older-current', 1); const newest = batch('newer-history', 99); const storage = batch('pdf-only', 100);
+  const version = (number: number) => Number(db.prepare(`insert into bom_versions
+    (product_id, version_number, business_change_date, created_at) values (?, ?, '2026-10-17', 'now')`)
+    .run(otherProductId, number).lastInsertRowid);
+  const first = version(1); const second = version(2);
+  db.prepare('insert into bom_current (product_id, version_id, updated_at) values (?, ?, ?)').run(otherProductId, first, 'now');
+  const item = (versionId: number, batchId: number | null, drawingId = ids.first, historical = false) => Number(db.prepare(`insert into bom_items
+    (bom_version_id, project_item_id, ${historical ? 'historical_drawing_id' : 'drawing_id'}, quantity, effective_material_batch_id)
+    values (?, ?, ?, 1, ?)`).run(versionId, drawingId === ids.second && !historical ? ids.manual : ids.logo, drawingId, batchId).lastInsertRowid);
+  return { productId, otherProductId, older, newest, storage, first, second, item };
+}
+
+describe('exact drawing business usage', () => {
+  it('uses exact current BOM pointers rather than latest batches and preserves cross-product evidence', () => {
+    const f = usageFixture();
+    f.item(f.first, f.older); f.item(f.second, f.newest);
+    expect(drawings.search({ productId: f.otherProductId, usageBatchId: f.older }).items.map((row) => row.id)).toEqual([ids.first]);
+    expect(drawings.search({ productId: f.productId, usageBatchId: f.older }).total).toBe(0);
+    const navigation = drawings.navigation().batches;
+    expect(navigation.find((batch) => batch.id === f.older)).toMatchObject({
+      currentState: 'current', confirmedDrawingCount: 1,
+      usageProducts: [{ productId: f.otherProductId, state: 'current', drawingCount: 1 }],
+    });
+    expect(navigation.find((batch) => batch.id === f.newest)).toMatchObject({ currentState: 'historical' });
+    expect(navigation.find((batch) => batch.id === f.storage)).toMatchObject({ currentState: 'indeterminate', confirmedDrawingCount: 0 });
+    expect(drawings.get(ids.first).businessUsage).toEqual([
+      expect.objectContaining({ origin: 'planned', recordId: ids.first, productId: f.otherProductId, batchId: f.older, source: 'bom', sourceId: f.first, current: true }),
+      expect.objectContaining({ batchId: f.newest, sourceId: f.second, current: false }),
+    ]);
+  });
+
+  it('does not convert PDF occurrence into actual usage and leaves unbatched BOM associations pending', () => {
+    const f = usageFixture(); f.item(f.first, null);
+    db.prepare(`insert into pdf_files (relative_path, file_name, drawing_id, material_batch_id, match_status,
+      detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
+      values ('pdf-only/a.pdf', 'a.pdf', ?, ?, 'matched', '[]', 'outlined', 1, 'now', 'now', 1)`)
+      .run(ids.first, f.storage);
+    expect(drawings.search({ materialBatchId: f.storage }).total).toBe(1);
+    expect(drawings.search({ usageBatchId: f.storage }).total).toBe(0);
+    expect(drawings.search({ associationState: 'pending' }).items.map((row) => row.id)).toContain(ids.first);
+    expect(drawings.navigation().batches.find((batch) => batch.id === f.storage)?.confirmedDrawingCount).toBe(0);
+  });
+
+  it('retains exact historical identities in scoped queries and current BOM detail when codes coincide', () => {
+    const f = usageFixture();
+    const history = Number(db.prepare(`insert into historical_drawing_numbers
+      (full_code, product_id, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+      project_item_code, sequence, first_seen_at, last_seen_at)
+      values ('02.0209.010.0401001', ?, '02', '0209', '01', '0', '04', '01', 1, 'now', 'now')`)
+      .run(f.productId).lastInsertRowid);
+    f.item(f.first, f.older, history, true);
+    expect(drawings.search().items.filter((row) => row.fullCode === '02.0209.010.0401001').map((row) => row.id)).toEqual([ids.first]);
+    expect(drawings.search({ usageBatchId: f.older }).items.map((row) => row.id)).toEqual([-history]);
+    expect(drawings.get(-history).currentBomUsage).toEqual([expect.objectContaining({ bomVersionId: f.first, productId: f.otherProductId })]);
+    expect(drawings.get(ids.first).businessUsage).toEqual([]);
+    expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.confirmedDrawingCount).toBe(1);
+  });
+
+  it('counts distinct undeleted identities and ignores deleted BOM versions and items without mutating records', () => {
+    const f = usageFixture(); f.item(f.first, f.older); f.item(f.second, f.older);
+    const deletedItem = f.item(f.second, f.newest, ids.second);
+    db.prepare("update bom_items set deleted_at = 'deleted' where id = ?").run(deletedItem);
+    const before = db.serialize();
+    db.pragma('query_only = ON');
+    expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.confirmedDrawingCount).toBe(1);
+    expect(drawings.search({ usageBatchId: f.newest }).total).toBe(0);
+    drawings.get(ids.first);
+    expect(db.serialize().equals(before)).toBe(true);
+    db.pragma('query_only = OFF');
+    db.prepare("update bom_versions set deleted_at = 'deleted' where id = ?").run(f.first);
+    expect(drawings.get(ids.first).currentBomUsage).toEqual([]);
+    expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.currentState).toBe('historical');
+    db.prepare("update drawing_numbers set deleted_at = 'deleted', deletion_mode = 'retain_occupied' where id = ?").run(ids.first);
+    expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.confirmedDrawingCount).toBe(0);
+  });
+
+  it('uses completed outbound selected batches rather than file-source batches or drawing-code snapshots', () => {
+    const f = usageFixture();
+    const addPackage = (status: string, batchId: number) => {
+      const packageId = Number(db.prepare(`insert into outbound_packages
+        (product_id, material_type, package_mode, selected_material_batch_id, package_name, zip_relative_path, status, created_at)
+        values (?, 'update', 'current_complete', ?, 'package', 'package.zip', ?, 'now')`)
+        .run(f.otherProductId, batchId, status).lastInsertRowid);
+      db.prepare(`insert into outbound_package_items (package_id, project_item_id, drawing_id, source_material_batch_id,
+        project_item_name_snapshot, drawing_code_snapshot, file_name_snapshot, relative_path_snapshot, source_batch_name_snapshot)
+        values (?, ?, ?, ?, 'logo', 'reused-code', 'a.pdf', 'a.pdf', 'storage')`)
+        .run(packageId, ids.logo, ids.first, f.storage);
+      return packageId;
+    };
+    const completed = addPackage('completed', f.older); addPackage('failed', f.newest); addPackage('cancelled', f.newest);
+    expect(drawings.search({ productId: f.otherProductId, usageBatchId: f.older }).items.map((row) => row.id)).toEqual([ids.first]);
+    expect(drawings.search({ usageBatchId: f.storage }).total).toBe(0);
+    expect(drawings.search({ usageBatchId: f.newest }).total).toBe(0);
+    expect(drawings.get(ids.first).businessUsage).toEqual([expect.objectContaining({ source: 'outbound', sourceId: completed, batchId: f.older, current: false })]);
+    expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.currentState).toBe('historical');
+    // Releasing an old identity and reusing its number must never attach its outbound evidence to the replacement.
+    db.prepare(`update drawing_numbers set deleted_at = 'deleted', deletion_mode = 'release',
+      deleted_full_code = full_code, full_code = '__released_old__' where id = ?`).run(ids.first);
+    db.prepare(`update drawing_numbers set full_code = '02.0209.010.0401001' where id = ?`).run(ids.second);
+    expect(drawings.get(ids.second).businessUsage).toEqual([]);
+    expect(drawings.search({ usageBatchId: f.older }).total).toBe(0);
+    expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.confirmedDrawingCount).toBe(0);
+  });
+});

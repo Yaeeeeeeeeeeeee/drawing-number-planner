@@ -3,7 +3,7 @@ import { MaterialBatchService } from '../files/material-batch-service.js';
 import { DrawingDeletionService } from './drawing-deletion-service.js';
 import type { DeleteDrawingInput } from './drawing-deletion-types.js';
 import { DrawingRepository } from './drawing-repository.js';
-import type { DrawingDetailRecord, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
+import type { DrawingDetailRecord, DrawingNavigationBatch, DrawingSearchFilters, HistoricalDrawingStatus, PagedDrawingResult } from './drawing-types.js';
 
 export class DrawingQueryError extends Error {
   constructor(public readonly code: 'NOT_FOUND' | 'INVALID_TRANSITION' | 'HISTORICAL_READ_ONLY' | 'PDF_NOT_AVAILABLE', message: string) { super(message); }
@@ -32,6 +32,23 @@ export class DrawingQueryService {
       page,
       pageSize,
     };
+  }
+
+  navigation(): { batches: DrawingNavigationBatch[] } {
+    const usage = this.repository.businessUsage();
+    return { batches: this.batches.list().map((batch) => {
+      const evidence = usage.filter((item) => item.batchId === batch.id);
+      const identities = (items: typeof evidence) => new Set(items.map((item) => `${item.origin}:${item.recordId}`)).size;
+      const productIds = [...new Set(evidence.map((item) => item.productId))];
+      return { ...batch,
+        currentState: evidence.some((item) => item.current) ? 'current' : evidence.length ? 'historical' : 'indeterminate',
+        confirmedDrawingCount: identities(evidence),
+        usageProducts: productIds.map((productId) => {
+          const items = evidence.filter((item) => item.productId === productId);
+          return { productId, state: items.some((item) => item.current) ? 'current' : 'historical', drawingCount: identities(items) };
+        }),
+      };
+    }) };
   }
 
   get(id: number): DrawingDetailRecord {

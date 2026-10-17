@@ -15,6 +15,9 @@ const querySchema = z.object({
   mainCategoryId: z.coerce.number().int().positive().optional(),
   projectItemId: z.coerce.number().int().positive().optional(),
   colorId: z.coerce.number().int().positive().optional(),
+  productId: z.coerce.number().int().positive().optional(),
+  usageBatchId: z.coerce.number().int().positive().optional(),
+  associationState: z.literal('pending').optional(),
   materialBatchId: z.coerce.number().int().positive().optional(),
   status: z.enum(['reserved', 'active', 'voided', 'inactive', 'historical']).optional(),
   sourcePresence: z.enum(['present', 'missing', 'all']).optional(),
@@ -63,6 +66,8 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
     }
     return service.search(query.data);
   });
+
+  app.get('/api/drawings/navigation', async () => service.navigation());
 
   app.get('/api/drawings/:id', async (request, reply) => {
     const params = paramsSchema.safeParse(request.params);
