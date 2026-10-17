@@ -1,4 +1,4 @@
-# Layout feedback: copied row alignment, badges, navigation, QR count and compact recovery.
+# Final layout feedback candidate, including independent PDF query selection.
 name: P4 integrated UI Windows acceptance
 on:
   push:

@@ -197,12 +197,12 @@ function FilesWorkspace({ api, mock, initialTarget }: { api: PlannerApi; mock: b
     const next = { ...filters, productId, materialBatchId }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1);
   };
   const navigation = <ProductBatchNavigation mode="files" products={products} batches={batches}
-    scope={{kind: filters.materialBatchId ? 'batch' : filters.productId ? 'product' : 'all', productId: filters.productId ? Number(filters.productId) : undefined, batchId: filters.materialBatchId ? Number(filters.materialBatchId) : undefined, title:''}}
+    scope={{kind: filters.materialBatchId ? 'batch' : filters.productId ? 'product' : filters.matchStatus === 'pending' ? 'pending' : 'all', productId: filters.productId ? Number(filters.productId) : undefined, batchId: filters.materialBatchId ? Number(filters.materialBatchId) : undefined, title:''}}
     onSelect={scope => {
       if (scope.kind !== 'all') { navigate(scope.productId ? String(scope.productId) : '', scope.batchId ? String(scope.batchId) : ''); return; }
       const next = {...initialFilters, presence:'all'}; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); setMessage(''); void search(next,1);
     }} footer={<section className="drawing-query-navigation" aria-label="文件查询"><h3>文件查询</h3>
-      <button className="secondary-button" type="button" onClick={() => { const next = { ...initialFilters, presence: 'all', matchStatus: 'pending' }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1); }}>待确认文件</button>
+      <button className="secondary-button" type="button" aria-current={filters.matchStatus === 'pending' && !filters.productId && !filters.materialBatchId ? 'page' : undefined} onClick={() => { const next = { ...initialFilters, presence: 'all', matchStatus: 'pending' }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1); }}>待确认文件</button>
     </section>} />;
   const detail = detailFile ? <aside className="file-detail" aria-label="文件详情">
     <button className="secondary-button panel-close" type="button" onClick={() => { setDetailFile(null); document.getElementById(`file-detail-toggle-${detailFile.id}`)?.focus(); }}>关闭文件详情</button>

@@ -49,9 +49,12 @@ describe('FilesPage', () => {
     const api=apiFixture(true);render(<FilesPage api={api as never}/>);
     await screen.findByRole('button',{name:'全部文件'});
     expect(screen.queryByRole('button',{name:'未关联／未归批次核对'})).toBeNull();
+    expect(screen.queryByText('产品全部图号')).toBeNull();
     const queries=screen.getByRole('region',{name:'文件查询'});
     fireEvent.click(within(queries).getByRole('button',{name:'待确认文件'}));
     await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({matchStatus:'pending',presence:'all'})));
+    expect(within(queries).getByRole('button',{name:'待确认文件'})).toHaveAttribute('aria-current','page');
+    expect(screen.getByRole('button',{name:'全部文件'})).not.toHaveAttribute('aria-current');
     fireEvent.click(screen.getByRole('button',{name:'全部文件'}));
     await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith({keyword:'',matchStatus:'',conversionType:'',presence:'all',page:1,pageSize:50}));
   });
