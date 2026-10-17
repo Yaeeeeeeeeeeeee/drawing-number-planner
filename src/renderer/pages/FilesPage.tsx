@@ -12,6 +12,7 @@ import { createFilesMockApi, filesScenarios, initialFilesScenario, isFilesMockEn
 
 const initialFilters = { keyword: '', productId: '', materialBatchId: '', matchStatus: '', conversionType: '', presence: 'present' };
 const pageSize = 50;
+export interface DrawingPdfNavigationTarget { productId?: number; materialBatchId?: number; fullCode: string; }
 
 function FilePath({ path, name, onClose }: { path: string; name: string; onClose?: () => void }) {
   const [feedback, setFeedback] = useState('');
@@ -44,25 +45,25 @@ function searchInput(values: typeof initialFilters, page: number) {
     ...(values.materialBatchId ? { materialBatchId: Number(values.materialBatchId) } : {}), page, pageSize };
 }
 
-export function FilesPage({ api }: { api: PlannerApi }) {
+export function FilesPage({ api, initialTarget }: { api: PlannerApi; initialTarget?: DrawingPdfNavigationTarget | null }) {
   const mock = isFilesMockEnabled();
   const [scenario, setScenario] = useState<FilesScenario>(initialFilesScenario);
   const mockApi = useMemo(() => createFilesMockApi(scenario), [scenario]);
   return <>
     {mock && <section className="info-banner files-preview" aria-label="PDF 开发预览"><span><strong>开发预览 Mock</strong> · 仅内存数据，扫描、清理、任务与定位均已隔离。移除 ?mock=files 退出。</span>
       <label>压力场景<select aria-label="PDF 压力场景" value={scenario} onChange={event => setScenario(event.target.value as FilesScenario)}>{Object.entries(filesScenarios).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></section>}
-    <FilesWorkspace key={mock ? scenario : 'live'} api={mock ? mockApi : api} mock={mock} />
+    <FilesWorkspace key={mock ? scenario : 'live'} api={mock ? mockApi : api} mock={mock} initialTarget={initialTarget} />
   </>;
 }
 
-function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
+function FilesWorkspace({ api, mock, initialTarget }: { api: PlannerApi; mock: boolean; initialTarget?: DrawingPdfNavigationTarget | null }) {
   const [detailFile, setDetailFile] = useState<PdfFileView | null>(null);
   const [expandedPathId, setExpandedPathId] = useState<number | null>(null);
   const [settings, setSettings] = useState<WorkspaceSettingsView>({ workspaceRoot: null, configured: false, available: false });
   const [rootInput, setRootInput] = useState(''); const [files, setFiles] = useState<PdfFileView[]>([]);
   const [products, setProducts] = useState<ProductView[]>([]);
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
-  const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filters, setFilters] = useState(initialFilters);
+  const [total, setTotal] = useState(0); const [page, setPage] = useState(1); const [filters, setFilters] = useState(() => initialTarget ? { ...initialFilters, keyword: initialTarget.fullCode, productId: initialTarget.productId ? String(initialTarget.productId) : '', materialBatchId: initialTarget.materialBatchId ? String(initialTarget.materialBatchId) : '', presence: 'all' } : initialFilters);
   const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
   const [scanChanges, setScanChanges] = useState<FileScanChangesView | null>(null);
   const [showChanges, setShowChanges] = useState(false);
@@ -89,7 +90,7 @@ function FilesWorkspace({ api, mock }: { api: PlannerApi; mock: boolean }) {
 
   useEffect(() => {
     const request = ++searchRequest.current; setLoading(true); setError('');
-    void Promise.all([api.getWorkspaceSettings(), api.searchPdfFiles(searchInput(initialFilters, 1)),
+    void Promise.all([api.getWorkspaceSettings(), api.searchPdfFiles(searchInput(filters, 1)),
       api.listProducts({ status: 'all' }).catch(() => []), api.listMaterialBatches({}).catch(() => [])])
       .then(([nextSettings, result, productItems, batchItems]) => {
         if (request !== searchRequest.current) return;

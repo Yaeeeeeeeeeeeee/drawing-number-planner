@@ -41,9 +41,17 @@ export interface DrawingBomUsageView {
 }
 export interface DrawingDetailView extends DrawingView {
   sourceFiles: DrawingFileView[]; outlinedFiles: DrawingFileView[]; currentBomUsage: DrawingBomUsageView[];
+  businessUsage?: DrawingBusinessUsageView[];
   readOnly: boolean; readOnlyMessage: string | null;
 }
 
+export interface DrawingBusinessUsageView {
+  origin: 'planned' | 'historical'; recordId: number; productId: number; batchId: number | null; batchName: string | null;
+  source: 'bom' | 'outbound'; sourceId: number; current: boolean; sku: string; model: string;
+}
+export interface DrawingNavigationBatchView extends MaterialBatchView {
+  confirmedDrawingCount: number; usageProducts: Array<{productId: number; state: 'current' | 'historical'; drawingCount: number}>;
+}
 export type BatchUsageStateView = 'current' | 'historical' | 'unbatched' | 'indeterminate';
 export interface DrawingBatchUsageView {
   effectiveCurrentFileIds?: number[];
@@ -247,6 +255,7 @@ export interface LocalTaskView {
 }
 
 export interface PlannerApi {
+  getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[] }>;
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingDetailView>;
   activateDrawing(id: number): Promise<DrawingDetailView>;
@@ -491,6 +500,7 @@ async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_i
 
 export const apiClient: PlannerApi = {
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),
+  getDrawingNavigation: () => request('/api/drawings/navigation'),
   getDrawing: (id) => request(`/api/drawings/${id}`),
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),

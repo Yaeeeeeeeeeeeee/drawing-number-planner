@@ -45,6 +45,15 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('opens the exact product and batch supplied by drawing navigation without scanning or mutation', async () => {
+    const api = apiFixture(true);
+    render(<FilesPage api={api as never} initialTarget={{productId:9,materialBatchId:2,fullCode:file.fullCode}} />);
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.objectContaining({keyword:file.fullCode,productId:9,materialBatchId:2,presence:'all'})));
+    expect(api.scanPdfFiles).not.toHaveBeenCalled();
+    expect(api.cleanupPdfFiles).not.toHaveBeenCalled();
+    expect(api.updateWorkspaceSettings).not.toHaveBeenCalled();
+  });
+
   it('keeps a file-location failure visible inside the file detail drawer', async () => {
     delete window.plannerDesktop;
     render(<FilesPage api={apiFixture(true) as never} />);

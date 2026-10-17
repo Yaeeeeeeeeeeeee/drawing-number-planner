@@ -4,9 +4,9 @@ import { useWorkspaceExtent } from './useWorkspaceExtent';
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
 
 /** Layout only; panel movement never changes record selection or business state. */
-export function ModuleWorkspace({ children, navigation, detail, detailLabel, detailIdentity, onCloseDetail, fileWorkspace = false, resizable = false }: {
+export function ModuleWorkspace({ children, navigation, detail, detailLabel, detailIdentity, onCloseDetail, fileWorkspace = false, resizable = false, drawingWorkspace = false }: {
   children: ReactNode; navigation?: ReactNode; detail?: ReactNode; detailLabel: string;
-  detailIdentity?: number | string; onCloseDetail(): void; fileWorkspace?: boolean; resizable?: boolean;
+  detailIdentity?: number | string; onCloseDetail(): void; fileWorkspace?: boolean; resizable?: boolean; drawingWorkspace?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null), panel = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -14,14 +14,14 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const detailOrigin = useRef<HTMLElement | null>(null), hadDetail = useRef(false);
   const { width, height } = useWorkspaceExtent(root);
   const [navigationOpen, setNavigationOpen] = useState(false), [navigationCollapsed, setNavigationCollapsed] = useState(false);
-  const [preferredNavigation, setPreferredNavigation] = useState(220), [preferredDetail, setPreferredDetail] = useState(380);
+  const [preferredNavigation, setPreferredNavigation] = useState(drawingWorkspace ? 260 : 220), [preferredDetail, setPreferredDetail] = useState(drawingWorkspace ? 560 : 380);
   const closeRef = useRef(onCloseDetail); closeRef.current = onCloseDetail;
   const maxNavigation = Math.max(180, Math.min(280, width - 820));
   const navigationWidth = clamp(preferredNavigation, 180, maxNavigation);
   const navigationDocked = width >= navigationWidth + 820 && !navigationCollapsed;
   const centerWidth = width - (navigation && navigationDocked ? navigationWidth + 10 : 0);
-  const maxDetail = Math.max(300, Math.min(480, centerWidth - 810));
-  const detailWidth = clamp(preferredDetail, 300, maxDetail);
+  const maxDetail = Math.max(300, Math.min(drawingWorkspace ? 600 : 480, centerWidth - 810));
+  const detailWidth = clamp(drawingWorkspace && width < 1800 ? Math.min(520, preferredDetail) : preferredDetail, 300, maxDetail);
   const detailDocked = centerWidth >= 800 + detailWidth + 10;
   const detailModal = Boolean(detail) && !detailDocked;
   const navigationModal = Boolean(navigation) && navigationOpen && !navigationDocked && !detailModal;
@@ -78,10 +78,10 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   }, [modal, detailIdentity]);
 
   const navVisible = navigationDocked || navigationModal;
-  return <div ref={root} className={`module-workspace-viewport p4-workspace adaptive-data-workspace ${fileWorkspace ? 'file-workspace' : ''}`} style={{ '--workspace-available-height': `${height}px` } as CSSProperties}>
-    {(navigation && !navigationDocked || resizable && (preferredNavigation !== 220 || preferredDetail !== 380)) && <div className="module-workspace-tools">
+  return <div ref={root} className={`module-workspace-viewport p4-workspace adaptive-data-workspace ${fileWorkspace ? 'file-workspace' : ''} ${drawingWorkspace ? 'drawing-workspace' : ''}`} style={{ '--workspace-available-height': `${height}px` } as CSSProperties}>
+    {(navigation && !navigationDocked || resizable && (preferredNavigation !== (drawingWorkspace ? 260 : 220) || preferredDetail !== (drawingWorkspace ? 560 : 380))) && <div className="module-workspace-tools">
       {navigation && !navigationDocked && <button ref={toggle} className="secondary-button module-navigation-toggle" type="button" aria-expanded={navigationModal} onClick={() => { const canDock = width >= navigationWidth + 820; if (canDock) navigationFocus.current = 'panel'; setNavigationCollapsed(false); setNavigationOpen(!canDock); }}>产品／批次导航</button>}
-      {resizable && (preferredNavigation !== 220 || preferredDetail !== 380) && <button className="text-button" type="button" onClick={() => { setPreferredNavigation(220); setPreferredDetail(380); }}>恢复默认宽度</button>}
+      {resizable && (preferredNavigation !== (drawingWorkspace ? 260 : 220) || preferredDetail !== (drawingWorkspace ? 560 : 380)) && <button className="text-button" type="button" onClick={() => { setPreferredNavigation(drawingWorkspace ? 260 : 220); setPreferredDetail(drawingWorkspace ? 560 : 380); }}>恢复默认宽度</button>}
     </div>}
     <div className={`p4-workspace-grid ${navigation && navigationDocked ? 'has-navigation' : ''}`} style={{ gridTemplateColumns: navigation && navigationDocked ? `${navigationWidth}px 10px minmax(0,1fr)` : 'minmax(0,1fr)' }}>
       {navigation && <div ref={navigationModal ? panel : undefined} className={`module-navigation ${navigationModal ? 'module-drawer' : ''}`} hidden={!navVisible}

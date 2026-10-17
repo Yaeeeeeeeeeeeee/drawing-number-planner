@@ -1,0 +1,25 @@
+.drawing-library-page .drawing-code-inline {display:flex;gap:8px;align-items:center;flex-wrap:nowrap;min-width:0;}
+.drawing-library-page .drawing-code-inline h2 {overflow-wrap:anywhere;margin:0;}
+.drawing-library-page .drawing-code-inline>.link-button,.drawing-library-page .drawing-code-inline>h2 {min-width:0;overflow-wrap:anywhere;}
+.drawing-library-page .drawing-code-inline>div,.drawing-library-page .drawing-code-inline>span {display:inline-flex;}
+.drawing-library-page .drawing-code-inline>span:last-child,.drawing-library-page .drawing-code-inline>div {flex:none;}
+.drawing-library-page .drawing-detail-toolbar {display:flex;gap:8px;align-items:center;margin:10px 0;}
+.drawing-library-page .drawing-detail-attributes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.drawing-library-page .drawing-detail-columns {display:block;}
+.drawing-library-page .workspace-drawing-detail {width:auto;max-width:none;padding:16px;}
+.drawing-library-page .drawing-detail-section {margin:12px 0;padding:10px 0;}
+.drawing-library-page .drawing-detail-section summary {cursor:pointer;}
+.drawing-library-page .drawing-detail-section ul {padding-left:18px;}
+.drawing-library-page .drawing-detail-section small,.drawing-library-page td small {display:block;}
+.drawing-library-page .drawing-scope-title {font-size:18px;margin:0 0 12px;}
+.drawing-library-page .filter-grid {display:flex;flex-wrap:wrap;gap:10px;align-items:end;}
+.drawing-library-page .drawing-advanced-filters {flex-basis:100%;}
+.product-batch-navigation {display:grid;gap:8px;}
+.product-batch-navigation input {width:100%;min-width:0;}
+.product-batch-navigation button {display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px;border-radius:5px;overflow-wrap:anywhere;cursor:pointer;}
+.product-batch-navigation button[aria-current=page] {background:#e8e9eb;color:#25292e;font-weight:600;}
+.product-batch-navigation details>details {padding-left:10px;}
+.product-batch-navigation .product-batch-leaf {padding-left:18px;}
+.product-batch-navigation small {display:block;color:var(--text-muted,#677487);}
+.drawing-workspace .module-detail.module-drawer {width:min(520px,calc(100vw - 24px));max-width:600px;}
+@media(min-width:2200px) {.drawing-workspace .module-detail.module-drawer {width:560px;}}
