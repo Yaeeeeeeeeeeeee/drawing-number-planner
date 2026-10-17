@@ -247,7 +247,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf 
   const visiblePages = [...new Set([1, page - 1, page, page + 1, totalPages].filter((value) => value >= 1 && value <= totalPages))].sort((left, right) => left - right);
   const goToPage = (nextPage: number) => void search(filters, nextPage, pageSize);
 
-  const detailPanel = selected ? <DrawingDetailPanel key={`${selected.id}-${detailRequest.current}`} selected={selected} contextBatchId={scope.batchId} editing={editing} onManage={() => {setEditing(true); setError('');}} onCancelManage={() => {setEditing(false); setStaged([]); setDeletionPreview(null); setError('');}} onSave={() => void saveAssociations()} staged={staged} onNavigatePdf={onNavigatePdf ? () => onNavigatePdf({fullCode:selected.fullCode,...((scope.productId ?? selected.productId) != null ? {productId:scope.productId ?? selected.productId!} : {}),...(scope.batchId ? {materialBatchId:scope.batchId} : {})}) : undefined} errorMessage={error} previewOnly={mockMode} maintaining={maintaining || mockMode}
+  const detailPanel = selected ? <DrawingDetailPanel key={`${selected.id}-${detailRequest.current}`} selected={selected} contextBatchId={scope.batchId} contextProductId={scope.productId} editing={editing} onManage={() => {setEditing(true); setError('');}} onCancelManage={() => {setEditing(false); setStaged([]); setDeletionPreview(null); setError('');}} onSave={() => void saveAssociations()} staged={staged} onNavigatePdf={onNavigatePdf ? () => onNavigatePdf({fullCode:selected.fullCode,...((scope.productId ?? selected.productId) != null ? {productId:scope.productId ?? selected.productId!} : {}),...(scope.batchId ? {materialBatchId:scope.batchId} : {})}) : undefined} errorMessage={error} previewOnly={mockMode} maintaining={maintaining || mockMode}
         pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
         setSelectedPdfId={setSelectedPdfId} onClose={() => { if (maintaining) return; detailRequest.current++; setSelected(null); disclosureButtons.current.get(selected.id)?.focus(); }} onStatus={changeStatus} onOpen={openLocation}
         onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus}
@@ -312,11 +312,11 @@ const statusLabel = (origin: DrawingView['origin'], status: DrawingView['status'
   return status === 'active' ? '正式使用' : status === 'reserved' ? '已占号' : '作废';
 };
 
-function DrawingDetailPanel({ selected, contextBatchId, editing, onManage, onCancelManage, onSave, staged, onNavigatePdf, errorMessage, previewOnly = false, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
+function DrawingDetailPanel({ selected, contextBatchId, contextProductId, editing, onManage, onCancelManage, onSave, staged, onNavigatePdf, errorMessage, previewOnly = false, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
   setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus,
   onBeginDelete, deletionPreview, deletionMode, setDeletionMode, deletionReason, setDeletionReason,
   deletionConfirmation, setDeletionConfirmation, onConfirmDelete, onCancelDelete, onRestore, onError }: {
-  contextBatchId?: number; editing: boolean; onManage(): void; onCancelManage(): void; onSave(): void; staged: Array<{pdfId:number;type:'source'|'outlined'}>; onNavigatePdf?(): void;
+  contextBatchId?: number; contextProductId?: number; editing: boolean; onManage(): void; onCancelManage(): void; onSave(): void; staged: Array<{pdfId:number;type:'source'|'outlined'}>; onNavigatePdf?(): void;
   selected: DrawingDetailView; errorMessage: string; previewOnly?: boolean; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
   pdfCandidates: PdfFileView[]; selectedPdfId: string; setSelectedPdfId(value: string): void; onClose(): void;
   onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
@@ -350,7 +350,7 @@ function DrawingDetailPanel({ selected, contextBatchId, editing, onManage, onCan
       {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}
       </div>}{previewOnly && <p className="muted-text mock-maintenance-note">Mock 只读预览，维护和文件定位已禁用。</p>}</section>}
     <div className="drawing-detail-columns"><div className="drawing-detail-files">
-    <CurrentOutlinedFiles contextBatchId={contextBatchId} key={`${selected.origin}-${selected.id}`} selected={selected} onOpen={onOpen} previewOnly={previewOnly} />
+    <CurrentOutlinedFiles contextProductId={contextProductId} contextBatchId={contextBatchId} key={`${selected.origin}-${selected.id}`} selected={selected} onOpen={onOpen} previewOnly={previewOnly} />
     </div><div className="drawing-detail-relations">
     <details className="drawing-detail-section"><summary>关联批次（{new Set((selected.businessUsage ?? []).filter(usage => usage.batchId != null).map(usage => usage.batchId)).size}）</summary>
       {(selected.businessUsage ?? []).length ? <ul>{(selected.businessUsage ?? []).map((usage,index) => <li key={`${usage.source}-${usage.sourceId}-${index}`}>{usage.model} · {usage.batchName ? materialBatchLabel(usage.batchName) : '未归批次'} · {usage.current ? '当前使用' : '历史使用'}<small>{usage.source === 'bom' ? 'BOM' : '已完成外发'}</small></li>)}</ul> : <p className="muted-text">暂无实际业务关联</p>}
@@ -405,10 +405,10 @@ function DeletionReferenceSummary({ preview }: { preview: DrawingDeletionPreview
   return <ul className="deletion-reference-list">{labels.map(([key, label]) => <li key={key}>{label}：{preview.references[key] ?? 0}</li>)}</ul>;
 }
 
-function CurrentOutlinedFiles({ selected, contextBatchId, onOpen, previewOnly = false }: { selected: DrawingDetailView; contextBatchId?: number; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
+function CurrentOutlinedFiles({ selected, contextBatchId, contextProductId, onOpen, previewOnly = false }: { selected: DrawingDetailView; contextBatchId?: number; contextProductId?: number; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
   const [directory, setDirectory] = useState('');
   const occurrences = (selected.batchUsage?.occurrences ?? []).filter((occurrence) =>
-    selected.productId == null || occurrence.productId === selected.productId);
+    contextBatchId != null ? occurrence.batchId === contextBatchId : (contextProductId ?? selected.productId) == null || occurrence.productId === (contextProductId ?? selected.productId));
   const directories = [...new Set(occurrences.map((occurrence) => occurrence.productDirectory))];
   const effectiveDirectory = directories.length === 1 ? directories[0] : directory;
   const scopedOccurrences = occurrences.filter(occurrence => contextBatchId != null ? occurrence.batchId === contextBatchId :

@@ -15,12 +15,12 @@ describe('outbound shell leave guard',()=>{
  it('keeps the configuration mounted if main navigation discard confirmation is rejected',()=>{
  const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
  render(<AppShell api={{} as never}/>);
- fireEvent.click(screen.getByRole('button',{name:'外发资料',exact:true}));
+ fireEvent.click(screen.getByRole('button',{name:'外发资料'}));
  fireEvent.change(screen.getByLabelText('配置测试字段'),{target:{value:'未保存'}});
- fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材',exact:true}));
+ fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材'}));
  expect(confirm).toHaveBeenCalled();expect(screen.getByLabelText('配置测试字段')).toHaveValue('未保存');
  confirm.mockReturnValue(true);
- fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材',exact:true}));
+ fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材'}));
  expect(screen.queryByLabelText('配置测试字段')).toBeNull();expect(screen.getByText('规划主页')).toBeVisible();
  });
 });

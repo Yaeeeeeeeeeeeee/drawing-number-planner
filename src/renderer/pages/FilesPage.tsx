@@ -1,3 +1,5 @@
+import { ProductBatchNavigation } from '../components/ProductBatchNavigation';
+import './drawing-library.css';
 import { CopyButton } from '../components/CopyButton';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -194,21 +196,13 @@ function FilesWorkspace({ api, mock, initialTarget }: { api: PlannerApi; mock: b
   const navigate = (productId: string, materialBatchId = '') => {
     const next = { ...filters, productId, materialBatchId }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1);
   };
-  const navigation = <nav className="file-product-tree" aria-label="资料导航"><h2>产品与批次</h2>
-    <button className="secondary-button" type="button" aria-pressed={!filters.productId && !filters.materialBatchId} onClick={() => navigate('')}>全部产品／批次</button>
-    {products.map(product => <details className="file-tree-group" key={product.id} open={filters.productId === String(product.id)}>
-      <summary>{product.productCategory || '未分类'} · {product.model}</summary>
-      <button className="secondary-button file-tree-product" type="button" aria-label={`产品 ${product.sku ?? '待补录'} · ${product.model}`} aria-pressed={filters.productId === String(product.id) && !filters.materialBatchId}
-        onClick={() => navigate(String(product.id))}>{product.sku ?? '待补录'} · {product.model}</button>
-      {batches.filter(batch => batch.productId === product.id).map(batch => <button className="secondary-button file-tree-batch" type="button" key={batch.id}
-        aria-pressed={filters.materialBatchId === String(batch.id)} onClick={() => navigate(String(product.id), String(batch.id))}>{materialBatchLabel(batch.name)} · {batch.recognitionStatus === 'pending' ? '待确认' : batch.currentState === 'current' ? '当前使用' : batch.currentState === 'historical' ? '历史使用' : '未确定'}</button>)}
-    </details>)}
-    <details><summary>其他／待关联批次</summary>{batches.filter(batch => !products.some(product => product.id === batch.productId)).map(batch => <button className="secondary-button" type="button" key={batch.id}
-      aria-pressed={filters.materialBatchId === String(batch.id)} onClick={() => navigate('', String(batch.id))}>{materialBatchLabel(batch.name)} · {batch.recognitionStatus === 'pending' ? '待确认' : '未关联产品'}</button>)}</details>
+  const navigation = <ProductBatchNavigation mode="files" products={products} batches={batches}
+    scope={{kind: filters.materialBatchId ? 'batch' : filters.productId ? 'product' : 'all', productId: filters.productId ? Number(filters.productId) : undefined, batchId: filters.materialBatchId ? Number(filters.materialBatchId) : undefined, title:''}}
+    onSelect={scope => navigate(scope.productId ? String(scope.productId) : '', scope.batchId ? String(scope.batchId) : '')} footer={<>
     <button className="secondary-button" type="button" onClick={() => { const next = { ...initialFilters, presence: 'all', matchStatus: 'pending' }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); void search(next, 1); }}>待确认文件</button>
     <button className="secondary-button" type="button" onClick={() => { const next = { ...initialFilters, presence: 'all' }; setFilters(next); setSelectedIds([]); setDetailFile(null); setError(''); setMessage('现有接口不支持精确筛选未关联产品／未归入批次；已打开全部文件，请核对产品与批次列。'); void search(next, 1); }}>未关联／未归批次核对</button>
     <p className="muted-text">未关联产品、未归入批次的文件保留在全部列表；按“匹配状态”核对。导航不显示推测的文件总数。</p>
-  </nav>;
+  </>} />;
   const detail = detailFile ? <aside className="file-detail" aria-label="文件详情">
     <button className="secondary-button panel-close" type="button" onClick={() => { setDetailFile(null); document.getElementById(`file-detail-toggle-${detailFile.id}`)?.focus(); }}>关闭文件详情</button>
     <h2>文件详情</h2><p className="file-primary">{detailFile.fileName}</p>
