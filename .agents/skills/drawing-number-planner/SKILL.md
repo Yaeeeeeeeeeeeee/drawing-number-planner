@@ -84,3 +84,7 @@ The user subsequently requested no copy buttons in BOM details. BOM query first/
 ### Product archive table and purpose navigation (2026-10-16)
 
 Latest explicit request: see docs/p4-products-list-20261016.md. The real product archive uses exactly eight combined identity/specification/status/purpose/action columns, with only Edit in row actions. No inline detail/edit expansion; lifecycle and protected cleanup remain in the separate product editor. Standard purpose status links use product identity and stable purpose keys; missing, single and multiple records have distinct navigation without automatic writes. Returning preserves filters/scroll and refreshes QR business states; file availability does not infer business state. This supersedes earlier product expansion/dynamic-purpose-column UI rules only. User explicitly paused Windows-package delivery pending further requests; do not package automatically. Preserve Schema, uniqueness, inactive-product creation restrictions and all data safeguards.
+
+### P4 用户确认及 master 合并授权（2026-10-17）
+
+用户确认本轮版本，并随后明确要求“合并到master”。本次将已交付的 fc236a6 应用及后续文档合入 master 已获授权，替代此前 P4 未授权合并的限制。保持既有测试失败、物理Windows/DPI证据边界的诚实记录，不因此修改已确认应用、真实业务数据、Schema或历史文件。合并记录见 docs/p4-master-merge-20261017.md。
