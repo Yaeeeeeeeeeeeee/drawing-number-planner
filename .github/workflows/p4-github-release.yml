@@ -14,6 +14,7 @@ env:
   GH_TOKEN: ${{ github.token }}
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -72,7 +73,7 @@ jobs:
       - name: Publish downloadable EXE and portable ZIP
         shell: pwsh
         run: |
-          Copy-Item docs/p4-release-notes-20261017.md release-assets/使用说明.md
+          Copy-Item docs/p4-release-notes-20261017.md release-assets/README-Windows.md
           Get-ChildItem release-assets -File | Sort-Object Name | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content release-assets/SHA256SUMS.txt -Encoding utf8
           gh release view $env:P4_TAG --repo $env:GITHUB_REPOSITORY 2>$null
           if ($LASTEXITCODE -eq 0) { throw 'Release tag already exists; refusing to replace published assets' }
@@ -88,3 +89,38 @@ jobs:
           path: release-assets/
           retention-days: 14
           if-no-files-found: error
+  normalize-release-documents:
+    # GitHub normalizes non-ASCII asset names. Keep checksums in sync with
+    # the names actually served, without replacing either application package.
+    needs: release
+    if: always() && (needs.release.result == 'success' || needs.release.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Normalize the documentation name and checksum filenames
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          repo, tag = os.environ['GITHUB_REPOSITORY'], os.environ['P4_TAG']
+          endpoint = f'repos/{repo}/releases/tags/{tag}'
+          def fetch():
+              return json.loads(subprocess.check_output(['gh', 'api', endpoint]))
+          release = fetch()
+          if release['draft']:
+              raise RuntimeError('Refusing to normalize an incomplete draft release')
+          for asset in release['assets']:
+              if asset['name'] == 'default.md':
+                  subprocess.run(['gh', 'api', '--method', 'PATCH', f'repos/{repo}/releases/assets/{asset["id"]}', '-f', 'name=README-Windows.md'], check=True, stdout=subprocess.DEVNULL)
+          assets = fetch()['assets']
+          lines = []
+          for asset in sorted(assets, key=lambda asset: asset['name']):
+              if asset['name'] == 'SHA256SUMS.txt':
+                  continue
+              digest = asset.get('digest', '')
+              if asset['state'] != 'uploaded' or not digest.startswith('sha256:'):
+                  raise RuntimeError('Missing uploaded asset digest')
+              lines.append(f'{digest[7:]}  {asset["name"]}\n')
+          Path('SHA256SUMS.txt').write_text(''.join(lines), encoding='utf-8')
+          subprocess.run(['gh', 'release', 'upload', tag, 'SHA256SUMS.txt', '--repo', repo, '--clobber'], check=True)
+          PY
