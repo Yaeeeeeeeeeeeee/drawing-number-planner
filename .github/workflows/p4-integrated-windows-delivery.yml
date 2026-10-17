@@ -1,4 +1,4 @@
-# Final explicit-batch navigation and compact empty-state candidate.
+# Final candidate preserves recycle-bin business associations in readonly detail.
 name: P4 integrated UI Windows acceptance
 on:
   push:

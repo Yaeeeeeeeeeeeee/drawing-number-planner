@@ -456,6 +456,19 @@ describe('exact drawing business usage', () => {
     expect(drawings.search({ usageBatchId: f.newest }).total).toBe(0);
     expect(drawings.get(ids.first).businessUsage).toEqual([expect.objectContaining({ source: 'outbound', sourceId: completed, batchId: f.older, current: false })]);
     expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.currentState).toBe('historical');
+    // Recycle-bin detail retains evidence while navigation only counts visible identities.
+    db.prepare("update drawing_numbers set deleted_at = 'deleted', deletion_mode = 'retain_occupied' where id = ?")
+      .run(ids.first);
+    const beforeDeletedRead = db.serialize();
+    db.pragma('query_only = ON');
+    try {
+      expect(drawings.get(ids.first).businessUsage).toEqual([expect.objectContaining({
+        origin: 'planned', recordId: ids.first, productId: f.otherProductId,
+        source: 'outbound', sourceId: completed, batchId: f.older, current: false,
+      })]);
+      expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.confirmedDrawingCount).toBe(0);
+      expect(db.serialize().equals(beforeDeletedRead)).toBe(true);
+    } finally { db.pragma('query_only = OFF'); }
     // Releasing an old identity and reusing its number must never attach its outbound evidence to the replacement.
     db.prepare(`update drawing_numbers set deleted_at = 'deleted', deletion_mode = 'release',
       deleted_full_code = full_code, full_code = '__released_old__' where id = ?`).run(ids.first);

@@ -253,10 +253,11 @@ export class DrawingRepository {
 
   businessUsage(id?: number): DrawingBusinessUsage[] {
     const rows = this.db.prepare(`${businessUsageCte}
-      select usage.origin, usage.record_id as recordId, usage.product_id as productId,
+      select distinct usage.origin, usage.record_id as recordId, usage.product_id as productId,
         usage.batch_id as batchId, batch.name as batchName, usage.source, usage.source_id as sourceId,
-        usage.is_current as current, product.sku, product.model
-      from business_usage usage join products product on product.id = usage.product_id
+        usage.is_current as current, coalesce(product.sku, '') as sku, coalesce(product.model, '') as model
+      from ${id === undefined ? 'business_usage' : 'raw_business_usage'} usage
+      left join products product on product.id = usage.product_id
       left join material_batches batch on batch.id = usage.batch_id
       ${id === undefined ? '' : 'where usage.origin = ? and usage.record_id = ?'}
       order by usage.product_id, usage.batch_id, usage.source, usage.source_id`)
