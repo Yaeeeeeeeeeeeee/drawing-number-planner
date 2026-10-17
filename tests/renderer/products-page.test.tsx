@@ -26,6 +26,9 @@ describe('ProductsPage', () => {
     expect(headers.slice(4, 7)).toEqual(['说明书', '售后卡', '菜谱']);
     const normalCells = within(screen.getByText('SKU-N · N100').closest('tr')!).getAllByRole('cell');
     expect(within(normalCells[4]).getByRole('button', { name: '说明书 · 已启用' })).toBeVisible();
+    expect(within(normalCells[4]).getByRole('button', {name:'说明书 · 已启用'})).toHaveClass('product-purpose-active');
+    expect(within(normalCells[5]).getByRole('button', {name:'售后卡 · 已停用'})).toHaveClass('product-purpose-inactive');
+    expect(within(normalCells[6]).getByRole('button', {name:'菜谱 · 未配置'})).toHaveClass('product-purpose-unconfigured');
     expect(within(normalCells[5]).getByRole('button', { name: '售后卡 · 已停用' })).toBeVisible();
     expect(normalCells[6]).toHaveTextContent('未配置');
     expect(headers).toEqual(['SKU / 型号','品牌 / 类别','产品规格','状态','说明书','售后卡','菜谱','操作']);

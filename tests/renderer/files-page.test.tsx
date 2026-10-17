@@ -45,6 +45,17 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('separates file queries from batch navigation and opens the actual complete list',async()=>{
+    const api=apiFixture(true);render(<FilesPage api={api as never}/>);
+    await screen.findByRole('button',{name:'全部文件'});
+    expect(screen.queryByRole('button',{name:'未关联／未归批次核对'})).toBeNull();
+    const queries=screen.getByRole('region',{name:'文件查询'});
+    fireEvent.click(within(queries).getByRole('button',{name:'待确认文件'}));
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({matchStatus:'pending',presence:'all'})));
+    fireEvent.click(screen.getByRole('button',{name:'全部文件'}));
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith({keyword:'',matchStatus:'',conversionType:'',presence:'all',page:1,pageSize:50}));
+  });
+
   it('opens the exact product and batch supplied by drawing navigation without scanning or mutation', async () => {
     const api = apiFixture(true);
     render(<FilesPage api={api as never} initialTarget={{productId:9,materialBatchId:2,fullCode:file.fullCode}} />);

@@ -43,3 +43,25 @@
 .drawing-library-page .module-list th:last-child,.drawing-library-page .module-list td:last-child {position:sticky;right:0;background:#fff;white-space:nowrap;}
 .drawing-library-page .module-list th:last-child {background:#f6f6f6;}
 .product-batch-navigation > h2 {font-size:16px;margin:0 0 4px;}
+/* Screenshot feedback: copied state never participates in row geometry. */
+.drawing-library-page .drawing-copy-control {position:relative;display:inline-flex;flex:0 0 auto;align-items:center;line-height:1;}
+.drawing-library-page .drawing-copy-control > .copy-icon-button {display:inline-grid;place-items:center;flex:none;margin:0;vertical-align:middle;}
+.drawing-library-page .drawing-copy-error {position:absolute;top:100%;right:0;z-index:5;width:220px;padding:6px 8px;border:1px solid #d6d6d6;background:#fff;white-space:normal;color:#9b2c25;font-size:12px;line-height:1.4;}
+.drawing-library-page .module-list > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td) {text-align:center;vertical-align:middle;padding:10px 12px;}
+.drawing-library-page .module-list .drawing-code-inline {justify-content:center;gap:6px;}
+.drawing-library-page .module-list .drawing-code-inline > .link-button {white-space:nowrap;flex:none;}
+.drawing-library-page .module-list .drawing-code-inline > small {white-space:nowrap;}
+.drawing-query-navigation {border-top:1px solid #e2e2e2;margin-top:8px;padding-top:12px;}
+.drawing-query-navigation > h3 {font-size:12px;color:#737373;margin:0 8px 4px;}
+.product-batch-orphans > button {padding-left:18px;}
+.drawing-library-page .drawing-list-heading {margin:0 0 14px;padding:0;min-width:0;}
+.drawing-library-page .drawing-list-heading > h2 {font-size:18px;font-weight:600;line-height:1.4;margin:0;}
+.drawing-library-page .drawing-list-heading > p {margin:4px 0 0;font-size:12px;line-height:1.5;color:#737373;}
+.drawing-library-page .drawing-search-bar {display:grid;grid-template-columns:minmax(180px,360px) minmax(120px,180px) minmax(120px,160px) auto auto;justify-content:start;align-items:end;gap:10px 12px;margin:0 0 12px;padding:0 0 14px;}
+.drawing-library-page .drawing-search-bar > label {min-width:0;}
+.drawing-library-page .drawing-search-bar > label :is(input,select) {width:100%;height:36px;}
+.drawing-library-page .drawing-search-bar > button {height:36px;min-height:36px;white-space:nowrap;}
+.drawing-library-page .drawing-search-bar > .drawing-advanced-filters {grid-column:1 / -1;}
+.drawing-workspace > .p4-workspace-grid > .panel-resize-handle::after {width:1px;left:4px;top:0;height:100%;background:#e4e4e4;}
+.drawing-workspace > .p4-workspace-grid > .panel-resize-handle:hover::after,.drawing-workspace > .p4-workspace-grid > .panel-resize-handle:focus-visible::after {background:#888;}
+@media(max-width:760px) {.drawing-library-page .drawing-search-bar {display:flex;flex-wrap:wrap;}.drawing-library-page .drawing-search-bar > label:first-child {flex:1 1 100%;}.drawing-library-page .drawing-search-bar > label {flex:1 1 130px;}}

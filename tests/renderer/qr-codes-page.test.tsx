@@ -56,6 +56,7 @@ describe('QrCodesPage', () => {
     render(<QrCodesPage api={api as never} />);
 
     expect(await screen.findByRole('heading', { name: '二维码管理' })).toBeVisible();
+    expect(screen.queryByRole('columnheader',{name:'二维码用途'})).not.toBeInTheDocument();
     expect(screen.getByLabelText('SKU / 型号')).toBeVisible();
     expect(screen.getByLabelText('产品类别')).toBeVisible();
     expect(screen.getByLabelText('用途')).toBeVisible();

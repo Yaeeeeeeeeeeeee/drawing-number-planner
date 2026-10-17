@@ -237,8 +237,9 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
         { key: 'status', label: '状态', render: item => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span> },
         ...productQrPurposes.map(purpose => ({ key: purpose.key, label: purpose.label, render: (item: ProductView) => {
           const records = qrCodes.filter(code => code.productId === item.id && code.key === purpose.key);
-          const label = !records.length ? '未配置' : records.some(code => code.status === 'active') ? '已启用' : '已停用';
-          return <button className="text-button product-purpose-link" type="button" aria-label={`${purpose.label} · ${label}`} title={records.length > 1 ? `${records.length} 条记录，点击查看全部；${records.filter(code => code.status === 'active').length} 条已启用` : `管理 ${item.model} 的${purpose.label}`} onClick={() => openQr(item, purpose)} disabled={!onOpenQr}>{label}{records.length > 1 && <small> · {records.length} 条</small>}</button>;
+          const state = !records.length ? 'unconfigured' : records.some(code => code.status === 'active') ? 'active' : 'inactive';
+          const label = state === 'unconfigured' ? '未配置' : state === 'active' ? '已启用' : '已停用';
+          return <button className={`text-button product-purpose-link product-purpose-${state}`} type="button" aria-label={`${purpose.label} · ${label}`} title={records.length > 1 ? `${records.length} 条记录，点击查看全部；${records.filter(code => code.status === 'active').length} 条已启用` : `管理 ${item.model} 的${purpose.label}`} onClick={() => openQr(item, purpose)} disabled={!onOpenQr}>{label}{records.length > 1 && <small> · {records.length} 条</small>}</button>;
         }})),
         { key: 'actions', label: '操作', render: item => <button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button> },
       ]} />}

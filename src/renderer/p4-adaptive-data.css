@@ -141,3 +141,15 @@
   .products-compact.product-editor-page > .editor-strip { max-width:none; }
   @container (max-width:760px) { .products-compact > .filter-bar { display:flex; flex-wrap:wrap; } .products-compact > .filter-bar > label { flex:1 1 160px; min-width:0; } }
 }
+/* Latest product-table feedback: all columns centered; independent purpose badges. */
+.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td) {text-align:center;vertical-align:middle;}
+.products-compact .product-purpose-link {display:inline-flex;align-items:center;justify-content:center;gap:3px;min-height:26px;padding:3px 9px;border:1px solid transparent;border-radius:5px;font-size:12px;line-height:1.4;text-decoration:none;}
+.products-compact .product-purpose-link.product-purpose-active {color:#087552;background:#e7f5ed;border-color:#b7deca;}
+.products-compact .product-purpose-link.product-purpose-inactive {color:#9b2c25;background:#fff0ee;border-color:#edc4bf;}
+.products-compact .product-purpose-link.product-purpose-unconfigured {color:#656565;background:#f2f3f4;border-color:#d9dcdf;}
+.products-compact .product-purpose-link small {color:inherit;}
+.products-compact .product-purpose-link:hover:not(:disabled) {filter:brightness(.97);}
+/* Recovery actions remain unchanged; bound the popover rather than the viewport. */
+.safe-recovery.integrated-recovery .safe-recovery-panel {position:fixed;left:16px;bottom:16px;width:min(360px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto;padding:16px;}
+.safe-recovery.integrated-recovery .integrated-recovery-heading > strong {font-size:18px;line-height:1.4;}
+.safe-recovery.integrated-recovery .safe-recovery-panel > button {min-height:34px;padding:6px 10px;}

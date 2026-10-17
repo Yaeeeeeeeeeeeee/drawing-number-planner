@@ -60,12 +60,21 @@ const seedFile=path.join(directory,'resources/app/acceptance-seed/planner.db');c
  await navigate('产品档案');await page.locator('.products-compact tbody tr').first().waitFor();
  const productHeaders=await page.locator('.products-compact thead th').allTextContents();
  if(productHeaders.join('|')!=='SKU / 型号|品牌 / 类别|产品规格|状态|说明书|售后卡|菜谱|操作')throw Error('Product columns invalid');
+ const productPresentation=await page.locator('.products-compact table').evaluate(t=>({centered:[...t.querySelectorAll('th,td')].every(n=>getComputedStyle(n).textAlign==='center'),badges:[...t.querySelectorAll('.product-purpose-link')].map(n=>({className:n.className,border:getComputedStyle(n).borderTopWidth,background:getComputedStyle(n).backgroundColor}))}));
+ if(!productPresentation.centered||productPresentation.badges.length<3||productPresentation.badges.some(n=>n.border==='0px'||!n.className.includes('product-purpose-')))throw Error('Product centering/badges failed');
  await page.screenshot({path:path.join(directory,'Windows-产品档案-1920.png')});
  await navigate('图号库');await page.getByRole('heading',{name:'图号库',exact:true}).waitFor();
  if(await page.getByRole('button',{name:'按图号',exact:true}).count()||await page.getByRole('columnheader',{name:'资料使用',exact:true}).count())throw Error('Obsolete drawing modes/column');
  const drawingNavigation=await page.evaluate(async()=>{const r=await fetch('/api/drawings/navigation');if(!r.ok)throw Error('Navigation API failed');return r.json();});
  if(!Array.isArray(drawingNavigation.batches))throw Error('Navigation missing');
  const drawingList=await page.evaluate(async()=>(await fetch('/api/drawings?page=1&pageSize=50')).json());
+ const firstDrawingRow=page.getByRole('button',{name:drawingList.items[0].fullCode,exact:true}).first().locator('xpath=ancestor::tr');
+ const beforeCopyHeight=await firstDrawingRow.evaluate(n=>n.getBoundingClientRect().height);
+ await firstDrawingRow.getByRole('button',{name:'复制完整图号',exact:true}).click();await page.waitForTimeout(150);
+ const afterCopyHeight=await firstDrawingRow.evaluate(n=>n.getBoundingClientRect().height);
+ if(Math.abs(afterCopyHeight-beforeCopyHeight)>1||await page.getByText('已复制完整图号',{exact:true}).count()||await page.getByRole('complementary',{name:'图号详情',exact:true}).count())throw Error('Copy success text/row height/detail regression');
+ if(await app.evaluate(({clipboard})=>clipboard.readText())!==drawingList.items[0].fullCode)throw Error('Full drawing code not copied');
+ await page.screenshot({path:path.join(directory,'Windows-图号复制后-1920.png')});
  await page.getByRole('button',{name:drawingList.items[0].fullCode,exact:true}).first().click();await page.getByRole('button',{name:'管理图号',exact:true}).waitFor();
  const drawingMeasurements=[];
  for(const [width,height] of [[3840,2160],[1920,1080],[1100,760],[720,600]]){
@@ -78,7 +87,16 @@ const seedFile=path.join(directory,'resources/app/acceptance-seed/planner.db');c
  for(const tab of ['邮件模板','邮件签名','联系人']){await page.getByRole('tab',{name:tab,exact:true}).click();await page.getByRole('button',{name:tab==='联系人'?'新增联系人':`新增${tab}`,exact:true}).waitFor();if(await page.locator('.ob-mail-configuration form:visible').count())throw Error('Default configuration editor visible');await page.screenshot({path:path.join(directory,`Windows-邮件配置-${tab}-1920.png`)});}
  await page.getByRole('button',{name:'新增联系人',exact:true}).click();await page.getByLabel('公司',{exact:true}).fill('未保存保护验收');let refused=false;page.once('dialog',async d=>{refused=true;await d.dismiss();});await page.getByRole('tab',{name:'邮件模板',exact:true}).click();if(!refused||await page.getByLabel('公司',{exact:true}).inputValue()!=='未保存保护验收')throw Error('Dirty config lost');
  page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'返回外发工作台',exact:true}).click();await page.getByRole('button',{name:'预览文件',exact:true}).waitFor();
- fs.writeFileSync(path.join(directory,'windows-integrated-verification.json'),JSON.stringify({revision,productHeaders,drawingMeasurements,navigationBatchCount:drawingNavigation.batches.length,manageCancel:true,dirtyConfigProtection:true,scope:'Actual Windows Electron, original existing isolated sample; no new records. Physical user 4K/DPI/cross-monitor and real data remain manual.'},null,2));
+ await navigate('PDF 文件中心');await page.getByRole('button',{name:'全部文件',exact:true}).click();
+ if(await page.getByRole('button',{name:'未关联／未归批次核对',exact:true}).count())throw Error('Misleading PDF fallback remains');
+ await page.screenshot({path:path.join(directory,'Windows-PDF导航-1920.png')});
+ await navigate('二维码管理');await page.locator('.qr-page > .table-wrap > table').waitFor();
+ const qrHeaders=await page.locator('.qr-page > .table-wrap > table > thead th').allTextContents();if(qrHeaders.join('|')!=='产品 · SKU / 型号|需关注|操作')throw Error('QR count column remains');
+ const purposeToggle=page.getByRole('button',{name:/展开 .* 的二维码用途/}).first();await purposeToggle.click();await page.getByRole('columnheader',{name:'用途',exact:true}).waitFor();
+ await page.screenshot({path:path.join(directory,'Windows-二维码去数量列-1920.png')});
+ await page.getByRole('button',{name:'安全恢复',exact:true}).click();const recovery=await page.getByRole('region',{name:'安全恢复面板'}).evaluate(n=>({width:n.getBoundingClientRect().width,left:n.getBoundingClientRect().left,right:n.getBoundingClientRect().right}));if(recovery.width>361||recovery.left<0||recovery.right>1920)throw Error('Recovery popover too wide');
+ await page.screenshot({path:path.join(directory,'Windows-恢复浮层-1920.png')});await page.getByRole('region',{name:'安全恢复面板'}).getByRole('button',{name:'关闭',exact:true}).click();
+ fs.writeFileSync(path.join(directory,'windows-integrated-verification.json'),JSON.stringify({revision,productHeaders,productPresentation,beforeCopyHeight,afterCopyHeight,qrHeaders,recovery,drawingMeasurements,navigationBatchCount:drawingNavigation.batches.length,manageCancel:true,dirtyConfigProtection:true,scope:'Actual Windows Electron, original existing isolated sample; no new records. Physical user 4K/DPI/cross-monitor and real data remain manual.'},null,2));
  const after=snapshot(path.join(root,'planner.db'));for(const name of Object.keys(before))if(!['bom_versions','bom_items'].includes(name)&&JSON.stringify(before[name])!==JSON.stringify(after[name]))throw Error('Unrelated table changed: '+name);
  for(const name of Object.keys(before))if(before[name].count!==after[name].count)throw Error('Record count changed: '+name);
  if(JSON.stringify(before)!==JSON.stringify(snapshot(seedFile)))throw Error('Packaged original sample changed');if(writes.length!==1||!writes[0].includes('PUT ')||!writes[0].endsWith('/api/boms/versions/1'))throw Error('Unexpected writes or creation request: '+JSON.stringify(writes));

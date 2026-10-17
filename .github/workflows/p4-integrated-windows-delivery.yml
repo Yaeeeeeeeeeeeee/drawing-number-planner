@@ -1,4 +1,4 @@
-# Final candidate preserves recycle-bin business associations in readonly detail.
+# Layout feedback: copied row alignment, badges, navigation, QR count and compact recovery.
 name: P4 integrated UI Windows acceptance
 on:
   push:

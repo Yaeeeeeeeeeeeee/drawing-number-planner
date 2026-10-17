@@ -571,7 +571,7 @@ it('scopes navigation by actual product/batch usage and keeps scope when searchi
   fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'LOGO'}});
   fireEvent.click(screen.getByRole('button',{name:'检索'}));
   await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({productId:5,usageBatchId:7,keyword:'LOGO'})));
-  fireEvent.click(screen.getByRole('button',{name:'待关联 / 未归批次'}));
+  fireEvent.click(screen.getByRole('button',{name:'未关联图号'}));
   await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({associationState:'pending',productId:'',usageBatchId:''})));
   expect(screen.queryByRole('button',{name:'按图号'})).not.toBeInTheDocument();
 });
@@ -650,7 +650,7 @@ it('ignores scope and record changes during a save, then allows navigation after
   fireEvent.change(screen.getByLabelText('现有 PDF 索引'),{target:{value:'9'}});
   fireEvent.click(screen.getByRole('button',{name:'关联为转曲后文件'}));
   fireEvent.click(screen.getByRole('button',{name:'保存并返回详情'}));
-  fireEvent.click(screen.getByText('待关联 / 未归批次',{selector:'button'}));
+  fireEvent.click(screen.getByText('未关联图号',{selector:'button'}));
   fireEvent.click(screen.getByRole('button',{name:'OTHER'}));
   expect(api.searchDrawings).toHaveBeenCalledTimes(1);
   expect(api.getDrawing).toHaveBeenCalledTimes(1);
@@ -658,7 +658,7 @@ it('ignores scope and record changes during a save, then allows navigation after
   await act(async()=>resolve());
   await waitFor(()=>expect(screen.getByRole('button',{name:'管理图号'})).toBeEnabled());
   expect(api.associateDrawingPdf.mock.calls).toEqual([[1,8,'source'],[1,9,'outlined']]);
-  fireEvent.click(screen.getByText('待关联 / 未归批次',{selector:'button'}));
+  fireEvent.click(screen.getByText('未关联图号',{selector:'button'}));
   await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({associationState:'pending'})));
   fireEvent.click(await screen.findByRole('button',{name:'OTHER'}));
   await waitFor(()=>expect(api.getDrawing).toHaveBeenLastCalledWith(2));

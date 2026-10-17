@@ -269,12 +269,17 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
     <ModuleWorkspace drawingWorkspace resizable navigation={<ProductBatchNavigation products={products} batches={navigationBatches} scope={scope} onSelect={navigateScope} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
-    <h2 className="drawing-scope-title">{scope.title}</h2>{scope.kind === 'batch' && <p className="muted-text">{(() => {const batch=navigationBatches.find(item=>item.id===scope.batchId);const state=scope.productId ? batch?.usageProducts.find(item=>item.productId===scope.productId)?.state : batch?.currentState;return state==='current'?'当前批次实际使用图号':state==='historical'?'历史批次实际使用图号':'该批次实际使用图号；当前使用关系未确定';})()}</p>}
-    <form className="filter-bar filter-grid" onSubmit={submit}>
+    <header className="drawing-list-heading">
+      <h2 className="drawing-scope-title">{scope.kind === 'product' ? products.find(product => product.id === scope.productId)?.model ?? scope.title : scope.title}</h2>
+      {scope.kind === 'product' && <p>{products.find(product => product.id === scope.productId)?.sku ?? 'SKU待补录'} · 全部资料批次</p>}
+      {scope.kind === 'batch' && <p>{(() => {const batch=navigationBatches.find(item=>item.id===scope.batchId);const state=scope.productId ? batch?.usageProducts.find(item=>item.productId===scope.productId)?.state : batch?.currentState;return state==='current'?'当前批次实际使用图号':state==='historical'?'历史批次实际使用图号':'当前使用关系未确定';})()}</p>}
+      {scope.kind === 'pending' && <p>仅表示产品或使用批次关系未登记，不代表图号异常或文件缺失。</p>}
+    </header>
+    <form className="filter-bar filter-grid drawing-search-bar" onSubmit={submit}>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
-      <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
       {dictionarySelect('主类别', 'mainCategoryId', 'main_category')}
       <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={event => set('status',event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
+      <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
       {moreFilters && <div className="drawing-advanced-filters">      <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
@@ -298,7 +303,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
           onClick={(event) => event.stopPropagation()} onChange={(event) => setCheckedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /> },
         { key: 'code', label: '完整图号', render: (item) => <span className="drawing-code-inline"><button className="link-button" type="button"
           ref={(node) => { if (node) disclosureButtons.current.set(item.id, node); else disclosureButtons.current.delete(item.id); }}
-          aria-expanded={selected?.id === item.id} aria-controls={`drawing-detail-${item.id}`}>{item.fullCode}</button><small>{item.origin === 'planned' ? '正式规划' : '历史扫描'}{item.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</small><span onClick={event => event.stopPropagation()}><CopyDrawingCode code={item.fullCode} /></span></span> },
+          aria-expanded={selected?.id === item.id} aria-controls={`drawing-detail-${item.id}`}>{item.fullCode}</button><CopyDrawingCode code={item.fullCode} /><small>{item.origin === 'planned' ? '正式规划' : '历史扫描'}{item.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</small></span> },
         { key: 'category', label: '主类别 / 项目', render: (item) => <span>{item.mainCategoryName}<small>{item.projectItemName}</small></span> }, {key:'version',label:'版本',render:() => '未记录'},
         { key: 'status', label: '图号状态', render: (item) => <span className="drawing-status-summary"><span className={`status-text ${item.status}`}>{statusLabel(item.origin, item.status)}</span>{item.deletedAt && <span className="mapping-warning">{item.deletionMode === 'retain_occupied' ? '删除·保留占号' : '删除·已释放'}</span>}</span> },
         { key: 'files', label: '文件完整性', render: (item) => <span className="file-integrity-summary"><span>源文件<strong className={item.hasSourceFile ? 'integrity-present' : 'integrity-missing'}>{item.hasSourceFile ? '已有' : '缺失'}</strong></span><span>转曲后<strong className={item.hasOutlinedFile ? 'integrity-present' : 'integrity-missing'}>{item.hasOutlinedFile ? '已有' : '缺失'}</strong></span></span> },
@@ -458,9 +463,12 @@ function FileSection({ title, present, files, onOpen, previewOnly = false }: { t
 }
 
 function CopyDrawingCode({ code }: { code: string }) {
-  const [feedback, setFeedback] = useState('');
-  return <div><CopyButton label="复制完整图号" type="button" className="secondary-button" onClick={() => {
-    void (async () => { try { await navigator.clipboard.writeText(code); setFeedback('已复制完整图号'); }
-      catch { setFeedback('复制不可用，请选中完整图号复制'); } })();
-  }} />{feedback && <p role="status">{feedback}</p>}</div>;
+  const [error, setError] = useState('');
+  return <span className="drawing-copy-control" onClick={event => event.stopPropagation()}>
+    <CopyButton label="复制完整图号" type="button" className="secondary-button" onClick={() => {
+      void (async () => { try { await navigator.clipboard.writeText(code); setError(''); }
+        catch { setError('复制不可用，请选中完整图号复制'); } })();
+    }} />
+    {error && <span role="alert" className="drawing-copy-error">{error}</span>}
+  </span>;
 }
