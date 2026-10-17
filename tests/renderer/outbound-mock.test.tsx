@@ -43,7 +43,7 @@ describe('outbound isolated UI mock',()=>{
       fireEvent.change(screen.getByLabelText('正文'),{target:{value:'人工编辑保留'}});
       fireEvent.click(screen.getByRole('button',{name:'生成压缩包'}));await screen.findByRole('button',{name:'使用新压缩包资料'});expect(screen.getByLabelText('正文')).toHaveValue('人工编辑保留');
       const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'使用新压缩包资料'}));expect(confirm).toHaveBeenCalled();expect(screen.getByLabelText('正文')).toHaveValue('人工编辑保留');confirm.mockRestore();
-      fireEvent.click(screen.getByRole('button',{name:'联系人维护'}));await screen.findByText('样例供应商 · 张工');fireEvent.click(screen.getByRole('button',{name:'停用 张工'}));await screen.findByRole('button',{name:'启用 张工'});
+      fireEvent.click(screen.getByRole('button',{name:'联系人维护'}));await screen.findAllByRole('cell',{name:'样例供应商'});expect(screen.getByRole('cell',{name:'张工'})).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'停用 张工'}));await screen.findByRole('button',{name:'启用 张工'});
       fireEvent.click(screen.getByRole('button',{name:'返回外发工作'}));fireEvent.click(screen.getByRole('button',{name:'模板与签名'}));await screen.findByRole('button',{name:'编辑模板 包材更新通知'});
       expect(real).not.toHaveBeenCalled();expect(fetchSpy).not.toHaveBeenCalled();expect(desktop).not.toHaveBeenCalled();
     }finally{fetchSpy.mockRestore();delete window.plannerDesktop;window.history.replaceState({},'','/');}
