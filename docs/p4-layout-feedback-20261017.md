@@ -20,3 +20,27 @@
 
 
 补充核对：PDF产品节点显示“产品全部文件”；点击“待确认文件”仅高亮该查询，不再同时把“全部文件”标记为当前入口。图号库仍显示“产品全部图号”，两页职责和数据范围保持区分。97项相关测试（含进度）通过，六窗口复制前后首行均56px，无成功文字；新旧浏览器测量分别存档。
+
+
+## 本轮界面核对
+
+- 97项相关测试（含3项进度）通过；3项新回归先在旧实现失败。类型检查、Renderer/Main构建通过，保留既有资源体积提示。
+- 3840×2160、2560×1440、1920×1080、1366×768、1100×760、720×600六种浏览器视口通过。复制前后首行均56px、图标与图号同高、无成功文字、剪贴板内容完整、表头正文均居中。
+- 产品已启用/已停用/未配置分别有绿色/红色/灰色底框，实际点击入口和状态定义未改；三色来自原独立业务状态。
+- 全部文件重置与待确认匹配查询分开；批次导航仍带真实batchId，不伪造精确未关联文件筛选。恢复浮层六窗口实测360px；只打开/关闭浮层，未调用恢复命令。
+- QR主表只有产品/需关注/操作三列；展开子表仍保留六列用途资料。
+- [本轮截图](screenshots/p4-drawing-alignment-20261017) 中的 product-scope、after-copy、products-centered、files-navigation、qr-no-count、recovery-compact 对应本次各项反馈，均有“接口夹具”标记。
+- [机器可读报告](p4-layout-feedback-verification-20261017.json) 包含旧版复现和新版测量、相关测试及原生Windows流程。
+
+
+## 修正版Windows交付
+
+应用版本 `fc236a67bdf94a08494c29784b8eb92caad7c4a1`。本轮修正版替代旧d00e5c1包进行UI验收，不覆盖旧样例操作记录或正式数据库；完整解压到新目录，双击图号规划器验收版.exe即可。
+
+[最终Windows验收流程](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39033308716) 已成功，包含真实系统剪贴板完整图号、复制后行高稳定、无成功文字、产品居中/状态边框、PDF入口、QR主表去数量列及恢复浮层360px等检查，并保留原BOM原记录编辑/原隔离样例未变断言。包内为原有40条图号等隔离样例，未新增业务记录制造密度，未调用恢复命令。
+
+[备用验收包下载](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39033308716/artifacts/12100842591)（需登录仓库账号，保留14天）。ZIP大小167014096字节，SHA256为 `98a45ebc4b755a2bd3cba9560252ef40d3d791ec9f23b409ea44a2c47d0d0cba`。包内Windows截图对应实际EXE，不以浏览器夹具冒充。
+
+物理4K最大化、系统DPI和跨显示器，以及真实业务数据仍需本机人工验收。此UI修正不宣称关闭前次16项全量基线失败。源码留在独立P4分支，未合并master。
+
+本轮修改文件包括 DrawingLibraryPage.tsx、drawing-library.css、ProductBatchNavigation.tsx、FilesPage.tsx、ProductsPage.tsx、QrCodesPage.tsx、p4-adaptive-data.css，以及相关renderer测试、浏览器/Windows验收脚本和文档。Core/Server/Schema/Main/依赖文件无变更。

@@ -1,0 +1,826 @@
+{
+  "applicationRevision": "fc236a67bdf94a08494c29784b8eb92caad7c4a1",
+  "date": "2026-10-17T12:39:31.938766+00:00",
+  "tests": {
+    "passed": 97,
+    "failed": 0,
+    "redBeforeFix": 3,
+    "files": [
+      {
+        "name": "progress.test.ts",
+        "count": 3,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/drawing-alignment-feedback.test.tsx",
+        "count": 3,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/drawing-library-page.test.tsx",
+        "count": 33,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/files-page.test.tsx",
+        "count": 23,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/module-workspace.test.tsx",
+        "count": 4,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/products-page.test.tsx",
+        "count": 8,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/qr-codes-page.test.tsx",
+        "count": 11,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/recovery-feedback.test.tsx",
+        "count": 5,
+        "status": "passed"
+      },
+      {
+        "name": "renderer/safe-recovery.test.tsx",
+        "count": 7,
+        "status": "passed"
+      }
+    ]
+  },
+  "baselineBrowser": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "before": [
+        {
+          "height": 52,
+          "codeY": 425,
+          "copyY": 425,
+          "copyRight": true
+        },
+        {
+          "height": 52,
+          "codeY": 477,
+          "copyY": 477,
+          "copyRight": true
+        },
+        {
+          "height": 51.5,
+          "codeY": 529,
+          "copyY": 529,
+          "copyRight": true
+        }
+      ],
+      "after": [
+        {
+          "height": 94,
+          "codeY": 446,
+          "copyY": 423.5,
+          "copyRight": true
+        },
+        {
+          "height": 52,
+          "codeY": 519,
+          "copyY": 519,
+          "copyRight": true
+        },
+        {
+          "height": 51.5,
+          "codeY": 571,
+          "copyY": 571,
+          "copyRight": true
+        }
+      ],
+      "successText": 1,
+      "copiedCorrectly": true,
+      "overflow": false,
+      "align": [
+        {
+          "heading": "left",
+          "body": "start"
+        },
+        {
+          "heading": "left",
+          "body": "start"
+        },
+        {
+          "heading": "left",
+          "body": "start"
+        },
+        {
+          "heading": "left",
+          "body": "start"
+        },
+        {
+          "heading": "left",
+          "body": "start"
+        },
+        {
+          "heading": "left",
+          "body": "start"
+        },
+        {
+          "heading": "left",
+          "body": "start"
+        }
+      ]
+    }
+  ],
+  "finalBrowser": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "before": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "after": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "successText": 0,
+      "copiedCorrectly": true,
+      "overflow": false,
+      "align": [
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        }
+      ],
+      "products": {
+        "aligned": true,
+        "badges": [
+          {
+            "classes": "text-button product-purpose-link product-purpose-active",
+            "border": "1px",
+            "background": "rgb(231, 245, 237)",
+            "color": "rgb(8, 117, 82)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-inactive",
+            "border": "1px",
+            "background": "rgb(255, 240, 238)",
+            "color": "rgb(155, 44, 37)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-unconfigured",
+            "border": "1px",
+            "background": "rgb(242, 243, 244)",
+            "color": "rgb(101, 101, 101)"
+          }
+        ]
+      },
+      "qrHeaders": [
+        "产品 · SKU / 型号",
+        "需关注",
+        "操作"
+      ],
+      "recovery": {
+        "width": 360,
+        "left": 16,
+        "right": 376
+      }
+    },
+    {
+      "width": 2560,
+      "height": 1440,
+      "before": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "after": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "successText": 0,
+      "copiedCorrectly": true,
+      "overflow": false,
+      "align": [
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        }
+      ],
+      "products": {
+        "aligned": true,
+        "badges": [
+          {
+            "classes": "text-button product-purpose-link product-purpose-active",
+            "border": "1px",
+            "background": "rgb(231, 245, 237)",
+            "color": "rgb(8, 117, 82)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-inactive",
+            "border": "1px",
+            "background": "rgb(255, 240, 238)",
+            "color": "rgb(155, 44, 37)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-unconfigured",
+            "border": "1px",
+            "background": "rgb(242, 243, 244)",
+            "color": "rgb(101, 101, 101)"
+          }
+        ]
+      },
+      "qrHeaders": [
+        "产品 · SKU / 型号",
+        "需关注",
+        "操作"
+      ],
+      "recovery": {
+        "width": 360,
+        "left": 16,
+        "right": 376
+      }
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "before": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "after": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "successText": 0,
+      "copiedCorrectly": true,
+      "overflow": false,
+      "align": [
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        }
+      ],
+      "products": {
+        "aligned": true,
+        "badges": [
+          {
+            "classes": "text-button product-purpose-link product-purpose-active",
+            "border": "1px",
+            "background": "rgb(231, 245, 237)",
+            "color": "rgb(8, 117, 82)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-inactive",
+            "border": "1px",
+            "background": "rgb(255, 240, 238)",
+            "color": "rgb(155, 44, 37)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-unconfigured",
+            "border": "1px",
+            "background": "rgb(242, 243, 244)",
+            "color": "rgb(101, 101, 101)"
+          }
+        ]
+      },
+      "qrHeaders": [
+        "产品 · SKU / 型号",
+        "需关注",
+        "操作"
+      ],
+      "recovery": {
+        "width": 360,
+        "left": 16,
+        "right": 376
+      }
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "before": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "after": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "successText": 0,
+      "copiedCorrectly": true,
+      "overflow": false,
+      "align": [
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        }
+      ],
+      "products": {
+        "aligned": true,
+        "badges": [
+          {
+            "classes": "text-button product-purpose-link product-purpose-active",
+            "border": "1px",
+            "background": "rgb(231, 245, 237)",
+            "color": "rgb(8, 117, 82)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-inactive",
+            "border": "1px",
+            "background": "rgb(255, 240, 238)",
+            "color": "rgb(155, 44, 37)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-unconfigured",
+            "border": "1px",
+            "background": "rgb(242, 243, 244)",
+            "color": "rgb(101, 101, 101)"
+          }
+        ]
+      },
+      "qrHeaders": [
+        "产品 · SKU / 型号",
+        "需关注",
+        "操作"
+      ],
+      "recovery": {
+        "width": 360,
+        "left": 16,
+        "right": 376
+      }
+    },
+    {
+      "width": 1100,
+      "height": 760,
+      "before": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "after": [
+        {
+          "height": 56,
+          "codeY": 420.1875,
+          "copyY": 420.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 476.1875,
+          "copyY": 476.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 532.1875,
+          "copyY": 532.1875,
+          "copyRight": true
+        }
+      ],
+      "successText": 0,
+      "copiedCorrectly": true,
+      "overflow": false,
+      "align": [
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        }
+      ],
+      "products": {
+        "aligned": true,
+        "badges": [
+          {
+            "classes": "text-button product-purpose-link product-purpose-active",
+            "border": "1px",
+            "background": "rgb(231, 245, 237)",
+            "color": "rgb(8, 117, 82)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-inactive",
+            "border": "1px",
+            "background": "rgb(255, 240, 238)",
+            "color": "rgb(155, 44, 37)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-unconfigured",
+            "border": "1px",
+            "background": "rgb(242, 243, 244)",
+            "color": "rgb(101, 101, 101)"
+          }
+        ]
+      },
+      "qrHeaders": [
+        "产品 · SKU / 型号",
+        "需关注",
+        "操作"
+      ],
+      "recovery": {
+        "width": 360,
+        "left": 16,
+        "right": 376
+      }
+    },
+    {
+      "width": 720,
+      "height": 600,
+      "before": [
+        {
+          "height": 56,
+          "codeY": 533.1875,
+          "copyY": 533.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 589.1875,
+          "copyY": 589.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 645.1875,
+          "copyY": 645.1875,
+          "copyRight": true
+        }
+      ],
+      "after": [
+        {
+          "height": 56,
+          "codeY": 533.1875,
+          "copyY": 533.1875,
+          "copyRight": true
+        },
+        {
+          "height": 56,
+          "codeY": 589.1875,
+          "copyY": 589.1875,
+          "copyRight": true
+        },
+        {
+          "height": 55.5,
+          "codeY": 645.1875,
+          "copyY": 645.1875,
+          "copyRight": true
+        }
+      ],
+      "successText": 0,
+      "copiedCorrectly": true,
+      "overflow": false,
+      "align": [
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        },
+        {
+          "heading": "center",
+          "body": "center"
+        }
+      ],
+      "products": {
+        "aligned": true,
+        "badges": [
+          {
+            "classes": "text-button product-purpose-link product-purpose-active",
+            "border": "1px",
+            "background": "rgb(231, 245, 237)",
+            "color": "rgb(8, 117, 82)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-inactive",
+            "border": "1px",
+            "background": "rgb(255, 240, 238)",
+            "color": "rgb(155, 44, 37)"
+          },
+          {
+            "classes": "text-button product-purpose-link product-purpose-unconfigured",
+            "border": "1px",
+            "background": "rgb(242, 243, 244)",
+            "color": "rgb(101, 101, 101)"
+          }
+        ]
+      },
+      "qrHeaders": [
+        "产品 · SKU / 型号",
+        "需关注",
+        "操作"
+      ],
+      "recovery": {
+        "width": 360,
+        "left": 16,
+        "right": 376
+      }
+    }
+  ],
+  "typecheck": "passed",
+  "rendererAndMainBuild": "passed; existing >500kB warning remains",
+  "review": "No important behavioral regressions found in independent readonly review",
+  "unchanged": [
+    "Schema",
+    "Core/server queries and business rules",
+    "Main/IPC/recovery operations",
+    "Original business data/PDF files"
+  ],
+  "scope": "UI feedback only; intercepted browser fixtures clearly labelled; native package reuses original isolated sample and does not add records. Prior 16 full-suite failures remain documented; full suite not rerun for this UI-only change.",
+  "windows": {
+    "firstRun": 39033149441,
+    "firstStatus": "success",
+    "finalRun": 39033308716,
+    "finalStatus": "success",
+    "finalRevision": "fc236a67bdf94a08494c29784b8eb92caad7c4a1",
+    "artifactId": 12100842591,
+    "artifactBytes": 167014096,
+    "artifactSha256": "98a45ebc4b755a2bd3cba9560252ef40d3d791ec9f23b409ea44a2c47d0d0cba",
+    "checks": [
+      "Native EXE startup/BOM original edit/sample unchanged",
+      "Product all-column centering and independent bordered status badges",
+      "Real system clipboard full code, no success text, unchanged row height/no row detail opening",
+      "Drawing drawer save/cancel and content sizes",
+      "PDF full-list entry and QR three-column main table with expanded purposes retained",
+      "Recovery popover <=360px; no recovery actions invoked"
+    ]
+  },
+  "updatedAt": "2026-10-17T12:41:38.163636+00:00"
+}
