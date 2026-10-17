@@ -47,9 +47,12 @@ export function AppShell({ api }: { api: PlannerApi }) {
   const recoveryPreview = isRecoveryMock();
   const previewPage = publicUiPreview ? 'recovery' : recoveryPreview ? 'recovery' : isMigrationMock() ? 'import' : isPlanningMock() ? 'planning' : isDictionariesMock() ? 'dictionaries' : isProductsMockEnabled() ? 'products' : isOutboundMockEnabled() ? 'exports' : isQrMockEnabled() ? 'qr' : filesPreview ? 'files' : bomPreview ? 'bom' : null;
   const [page, setPage] = useState<Page | 'recovery'>(publicUiPreview ? 'recovery' : previewPage ?? 'planning');
+  const drawingLeaveGuard = useRef<(() => boolean) | null>(null);
+  const registerDrawingLeaveGuard = useCallback((guard: (() => boolean) | null) => { drawingLeaveGuard.current = guard; }, []);
   const outboundLeaveGuard = useRef<(() => boolean) | null>(null);
   const registerOutboundLeaveGuard = useCallback((guard: (() => boolean) | null) => { outboundLeaveGuard.current = guard; }, []);
   const navigatePage = (next: Page) => {
+    if (page === 'drawings' && next !== page && drawingLeaveGuard.current && !drawingLeaveGuard.current()) return;
     if (page === 'exports' && next !== page && outboundLeaveGuard.current && !outboundLeaveGuard.current()) return;
     setPage(next);
     if (next === 'qr') setProductQrTarget(null);
@@ -124,7 +127,7 @@ export function AppShell({ api }: { api: PlannerApi }) {
       <p className="nav-group-label">{group.label}</p>{group.items.map((item) => <button className={`nav-item ${page === item.key ? 'active' : ''}`} disabled={!item.enabled || (previewPage !== null && item.key !== previewPage)} onClick={() => item.enabled && (!previewPage || item.key === previewPage) && navigatePage(item.key as Page)} key={item.key} type="button">
         <span className="nav-label"><i aria-hidden="true">{item.icon}</i>{item.label}</span></button>)}</section>)}</nav>
     <div className="sidebar-footer">{recoveryPreview ? <RecoveryMockPage docked/> : previewPage ? <small>开发 Mock · 未连接业务服务</small> : <SafeRecovery api={api} />}</div></aside>
-    <main className="workspace" inert={narrow && navigationOpen}>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage api={api} active={page === 'drawings'} onNavigatePdf={target => { setDrawingPdfTarget(target); setPage('files'); }} /></div>}{page === 'dictionaries' && <DictionariesPage api={api} />}
+    <main className="workspace" inert={narrow && navigationOpen}>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage api={api} registerLeaveGuard={registerDrawingLeaveGuard} active={page === 'drawings'} onNavigatePdf={target => { if (drawingLeaveGuard.current && !drawingLeaveGuard.current()) return; setDrawingPdfTarget(target); setPage('files'); }} /></div>}{page === 'dictionaries' && <DictionariesPage api={api} />}
       {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{page === 'import' && <ImportPage api={api} />}{page === 'planning' && <PlanningPage api={api} />}
       {page === 'bom' && <BomPage api={api} />}{page === 'exports' && <OutboundPage api={api} registerLeaveGuard={registerOutboundLeaveGuard} />}{page === 'files' && <FilesPage key={drawingPdfTarget ? `${drawingPdfTarget.productId}:${drawingPdfTarget.materialBatchId}:${drawingPdfTarget.fullCode}` : 'all'} api={api} initialTarget={drawingPdfTarget} />}{page === 'qr' && <QrCodesPage key={productQrTarget ? `${productQrTarget.productId}:${productQrTarget.purposeKey}` : 'all'} api={api} productTarget={productQrTarget} onReturnProducts={() => { setPage('products'); setProductQrTarget(null); }} />}</main></div>;
 }

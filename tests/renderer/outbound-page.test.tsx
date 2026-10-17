@@ -603,4 +603,39 @@ describe('OutboundPage', () => {
     expect(screen.getByRole('button', { name: '生成邮件内容' })).toBeDisabled();
   });
 
+  it('closes a persisted new template when refresh fails and retries only the list read', async () => {
+    const api = apiFixture();
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '邮件配置' }));
+    await screen.findByRole('button', { name: '编辑模板 更新资料' });
+    fireEvent.click(screen.getByRole('button', { name: '新增邮件模板' }));
+    fireEvent.change(screen.getByLabelText('模板编码'), { target: { value: 'persisted_extra' } });
+    fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '已保存的新模板' } });
+    fireEvent.change(screen.getByLabelText('主题模板'), { target: { value: '{{package_name}}' } });
+    fireEvent.change(screen.getByLabelText('正文模板'), { target: { value: '{{file_list}}' } });
+    api.listOutboundTemplates.mockRejectedValueOnce(new Error('读取暂时不可用'));
+    fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
+    expect(await screen.findByText('已保存，但列表刷新失败：读取暂时不可用')).toBeVisible();
+    await waitFor(() => expect(screen.queryByRole('form', { name: '邮件模板编辑' })).not.toBeInTheDocument());
+    expect(api.createOutboundTemplate).toHaveBeenCalledOnce();
+    api.listOutboundTemplates.mockResolvedValue([template, { ...template, id: 22, key: 'persisted_extra', name: '已保存的新模板', blocks: [] }]);
+    fireEvent.click(screen.getByRole('button', { name: '重新加载列表' }));
+    expect(await screen.findByRole('button', { name: '编辑模板 已保存的新模板' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: '重新加载列表' })).not.toBeInTheDocument();
+    expect(api.createOutboundTemplate).toHaveBeenCalledOnce();
+  });
+
+  it('clears a deleted record editor even if its following list refresh fails', async () => {
+    const api = apiFixture(); vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<OutboundPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '邮件配置' }));
+    const edit = await screen.findByRole('button', { name: '编辑模板 更新资料' });
+    fireEvent.click(edit);
+    api.listOutboundTemplates.mockRejectedValueOnce(new Error('列表读取失败'));
+    fireEvent.click(within(edit.closest('article')!).getAllByRole('button', { name: '删除' })[0]);
+    expect(await screen.findByText('已保存，但列表刷新失败：列表读取失败')).toBeVisible();
+    await waitFor(() => expect(screen.queryByRole('form')).not.toBeInTheDocument());
+    expect(api.deleteOutboundTemplate).toHaveBeenCalledOnce();
+  });
+
 });

@@ -32,7 +32,7 @@ describe('DrawingLibraryPage', () => {
     expect(screen.getByRole('combobox', { name: '现有 PDF 索引' })).toHaveValue('20');
     expect(screen.queryByRole('option', { name: /late-A/ })).not.toBeInTheDocument();
   });
-  it('does not apply an earlier deletion preflight to a newly selected drawing', async () => {
+  it('blocks record changes during deletion preflight and clears it when changing records afterward', async () => {
     const first = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active', model: 'T40', displayName: '第一记录', readOnly: true, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
     const second = { ...first, id: 2, fullCode: '02.0209.010.0501002', displayName: '第二记录' };
     let resolvePreview!: (value: unknown) => void;
@@ -44,9 +44,10 @@ describe('DrawingLibraryPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '管理图号' }));
     fireEvent.click(await screen.findByRole('button', { name: '删除图号' }));
     fireEvent.click(screen.getByRole('button', { name: second.fullCode }));
-    fireEvent.click(await screen.findByRole('button', { name: '管理图号' }));
-    await screen.findByText('第二记录');
+    expect(api.getDrawing).toHaveBeenCalledTimes(1);
     await act(async () => resolvePreview({ fullCode: first.fullCode, origin: 'planned', deletable: true, references: {}, blockers: [] }));
+    fireEvent.click(screen.getByRole('button', { name: second.fullCode }));
+    await screen.findByText('第二记录');
     expect(within(screen.getByRole('complementary', { name: '图号详情' })).queryByText(first.fullCode)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '确认删除' })).not.toBeInTheDocument();
   });
@@ -84,7 +85,7 @@ describe('DrawingLibraryPage', () => {
     render(<DrawingLibraryPage api={new Proxy({}, { get: () => realCall }) as never} />);
     fireEvent.click(await screen.findByRole('button', { name: '02.0209.010.0501001' }));
     const detail = await screen.findByRole('complementary', { name: '图号详情' });
-    expect(within(detail).getAllByRole('term').map((term) => term.textContent)).toEqual(['SKU', '品牌', '型号', '产品类别', '主类别', '项目']);
+    expect(within(detail).getAllByRole('term').map((term) => term.textContent)).toEqual(['SKU', '型号', '品牌', '产品类别', '主类别', '项目明细']);
     expect(within(detail).getByText('正式使用')).toBeVisible();
     expect(within(detail).getByRole('button', { name: '管理图号' })).toBeDisabled();
     expect(within(detail).queryByRole('region', { name: '文件维护 / 索引维护' })).not.toBeInTheDocument();
@@ -548,10 +549,10 @@ describe('DrawingLibraryPage', () => {
     expect(screen.queryByRole('option', { name: '说明书' })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('项目明细'), { target: { value: '21' } });
     fireEvent.change(screen.getByLabelText('外观'), { target: { value: '31' } });
-    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '44' } });
+    expect(screen.queryByLabelText('资料批次')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '检索' }));
     await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({
-      productCategory: '冰柜', mainCategoryId: 12, projectItemId: 21, appearanceId: 31, materialBatchId: 44,
+      productCategory: '冰柜', mainCategoryId: 12, projectItemId: 21, appearanceId: 31, materialBatchId: '',
       page: 1, pageSize: 20,
     })));
     fireEvent.click(screen.getByRole('button', { name: '全部产品 / 批次' }));
@@ -634,4 +635,49 @@ it('reports partial association saves and retries failed associations while guar
   fireEvent.click(screen.getByRole('button',{name:'保存并返回详情'}));
   await waitFor(()=>expect(api.associateDrawingPdf).toHaveBeenCalledTimes(3));
   expect(api.associateDrawingPdf.mock.calls).toEqual([[1,8,'source'],[1,9,'outlined'],[1,9,'outlined']]);
+});
+
+it('ignores scope and record changes during a save, then allows navigation after the save completes', async () => {
+  const row={id:1,fullCode:'CODE',origin:'planned',status:'active',sourceFiles:[],outlinedFiles:[],currentBomUsage:[],readOnly:false};
+  const other={...row,id:2,fullCode:'OTHER'};
+  let resolve!:()=>void;
+  const api={searchDrawings:vi.fn().mockResolvedValue({items:[row,other],total:2}),listDictionaries:vi.fn().mockResolvedValue([]),getDrawing:vi.fn().mockImplementation((id:number)=>Promise.resolve(id===1?row:other)),searchPdfFiles:vi.fn().mockResolvedValue({items:[{id:8,fileName:'source.pdf'},{id:9,fileName:'outlined.pdf'}]}),associateDrawingPdf:vi.fn().mockImplementationOnce(()=>new Promise<void>(r=>{resolve=r;})).mockResolvedValue(row)};
+  render(<DrawingLibraryPage api={api as never}/>);
+  fireEvent.click(await screen.findByRole('button',{name:'CODE'}));
+  fireEvent.click(await screen.findByRole('button',{name:'管理图号'}));
+  await waitFor(()=>expect(screen.getByLabelText('现有 PDF 索引')).toHaveValue('8'));
+  fireEvent.click(screen.getByRole('button',{name:'关联为源文件'}));
+  fireEvent.change(screen.getByLabelText('现有 PDF 索引'),{target:{value:'9'}});
+  fireEvent.click(screen.getByRole('button',{name:'关联为转曲后文件'}));
+  fireEvent.click(screen.getByRole('button',{name:'保存并返回详情'}));
+  fireEvent.click(screen.getByText('待关联 / 未归批次',{selector:'button'}));
+  fireEvent.click(screen.getByRole('button',{name:'OTHER'}));
+  expect(api.searchDrawings).toHaveBeenCalledTimes(1);
+  expect(api.getDrawing).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button',{name:'保存并返回详情'})).toBeDisabled();
+  await act(async()=>resolve());
+  await waitFor(()=>expect(screen.getByRole('button',{name:'管理图号'})).toBeEnabled());
+  expect(api.associateDrawingPdf.mock.calls).toEqual([[1,8,'source'],[1,9,'outlined']]);
+  fireEvent.click(screen.getByText('待关联 / 未归批次',{selector:'button'}));
+  await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({associationState:'pending'})));
+  fireEvent.click(await screen.findByRole('button',{name:'OTHER'}));
+  await waitFor(()=>expect(api.getDrawing).toHaveBeenLastCalledWith(2));
+});
+
+it('keeps another product source and unbatched source out of the selected product current files', async () => {
+  const sourceA={pdfIndexId:1,fileName:'source-A.pdf',relativePath:'A/source.pdf',isPresent:true,conversionType:'source'};
+  const unbatchedA={...sourceA,pdfIndexId:3,fileName:'unbatched-A.pdf'};
+  const outlinedB={...sourceA,pdfIndexId:2,fileName:'outlined-B.pdf',relativePath:'B/outlined.pdf',conversionType:'outlined'};
+  const row={id:1,productId:1,fullCode:'CODE',origin:'planned',status:'active',sourceFiles:[sourceA,unbatchedA],outlinedFiles:[outlinedB],currentBomUsage:[],batchUsage:{effectiveCurrentFileIds:[1,2],occurrences:[{batchId:7,productId:1,productDirectory:'A',batchName:'A批次',usageState:'current',files:[sourceA]},{batchId:8,productId:2,productDirectory:'B',batchName:'B批次',usageState:'current',files:[outlinedB]}]}};
+  const api={searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1}),listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValue([{id:2,sku:'B',model:'ModelB',productCategory:'产品'}]),listMaterialBatches:vi.fn().mockResolvedValue([]),getDrawingNavigation:vi.fn().mockResolvedValue({batches:[]}),getDrawing:vi.fn().mockResolvedValue(row)};
+  render(<DrawingLibraryPage api={api as never}/>);
+  fireEvent.click(await screen.findByText('B · ModelB',{selector:'summary'}));
+  fireEvent.click(screen.getByRole('button',{name:'产品全部图号 B · ModelB'}));
+  fireEvent.click(await screen.findByRole('button',{name:'CODE'}));
+  expect(await screen.findByText('outlined-B.pdf')).toBeVisible();
+  expect(screen.getByText('source-A.pdf')).not.toBeVisible();
+  expect(screen.getByText('unbatched-A.pdf')).not.toBeVisible();
+  fireEvent.click(screen.getByText('查看历史文件'));
+  expect(screen.getByText('source-A.pdf')).toBeVisible();
+  expect(screen.getByText('unbatched-A.pdf')).toBeVisible();
 });

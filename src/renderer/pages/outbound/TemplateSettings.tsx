@@ -31,6 +31,7 @@ export function TemplateSettings({ api, fieldHelper = false, mode, registerLeave
   const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
   const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
   const [message, setMessage] = useState('');
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const [editTemplate, setEditTemplate] = useState<OutboundEmailTemplateInputView & { id?: number } | null>(null);
   const [blockEditor, setBlockEditor] = useState<{ templateId: number; id?: number; form: OutboundTemplateBlockInputView } | null>(null);
   const [editSignature, setEditSignature] = useState<OutboundSignatureInputView & { id?: number } | null>(null);
@@ -57,10 +58,26 @@ export function TemplateSettings({ api, fieldHelper = false, mode, registerLeave
   const run = async (operation: () => Promise<unknown>): Promise<boolean> => {
     setMessage('');
     try {
-      return await guard.run(async () => { await operation(); await load(); });
+      return await guard.run(async () => {
+        await operation();
+        // Persistence succeeded: a failed read must never invite replaying the write.
+        try { await load(); setRefreshFailed(false); }
+        catch (error) {
+          setRefreshFailed(true);
+          setMessage(`已保存，但列表刷新失败：${error instanceof Error ? error.message : '请重新加载列表'}`);
+        }
+      });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '操作失败');
       return false;
+    }
+  };
+
+  const reload = async () => {
+    try {
+      await guard.run(async () => { await load(); setRefreshFailed(false); setMessage(''); });
+    } catch (error) {
+      setMessage(`列表刷新失败：${error instanceof Error ? error.message : '请稍后重试'}`);
     }
   };
 
@@ -158,7 +175,8 @@ export function TemplateSettings({ api, fieldHelper = false, mode, registerLeave
     <section className="template-settings">
       <h3>{mode === 'signatures' ? '邮件签名' : '邮件模板'}</h3>
       <p className="muted-text">模板中的可变字段由系统校验，特殊说明使用附加段落管理。</p>
-      {message && <p className="error-banner">{message}</p>}
+      {message && <p role="alert" className="error-banner">{message}</p>}
+      {refreshFailed && <button type="button" className="text-button" disabled={guard.busy} onClick={() => void reload()}>重新加载列表</button>}
       <div className="ob-config-editor">{editTemplate && templateForm(editTemplate)}{blockEditor && blockForm(blockEditor)}{editSignature && signatureForm(editSignature)}</div>
       <fieldset disabled={guard.busy} className="ob-config-list-fieldset">
       <div className="settings-columns">

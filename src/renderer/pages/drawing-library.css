@@ -23,3 +23,22 @@
 .product-batch-navigation small {display:block;color:var(--text-muted,#677487);}
 .drawing-workspace .module-detail.module-drawer {width:min(520px,calc(100vw - 24px));max-width:600px;}
 @media(min-width:2200px) {.drawing-workspace .module-detail.module-drawer {width:560px;}}
+/* Compact V1 wins over the earlier stacked file-row baseline. */
+.drawing-library-page .workspace-drawing-detail .drawing-code-inline h2 {font-size:22px;line-height:1.3;min-width:0;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes {gap:8px 16px;margin:12px 0;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes div {padding:0;min-width:0;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes dt {margin:0 0 3px;font-size:12px;color:#737373;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes dd {margin:0;font-size:13px;overflow-wrap:anywhere;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-section {margin:0;padding:10px 0;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-section h3 {margin:0 0 6px;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-section ul {padding:0;gap:4px;}
+.drawing-library-page .workspace-drawing-detail .drawing-file-row {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px;background:#f7f7f7;}
+.drawing-library-page .workspace-drawing-detail .drawing-file-identity {display:grid;gap:2px;width:auto;}
+.drawing-library-page .workspace-drawing-detail .drawing-file-name {font-size:13px;line-height:1.4;}
+.drawing-library-page .workspace-drawing-detail .drawing-file-row small {line-height:1.4;}
+.drawing-library-page .workspace-drawing-detail .drawing-file-row button {align-self:center;}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-toolbar {margin:8px 0;flex-wrap:wrap;}
+.drawing-library-page .module-list .table-wrap {overflow-x:auto;}
+.drawing-library-page .module-list table {min-width:940px;}
+.drawing-library-page .module-list th:last-child,.drawing-library-page .module-list td:last-child {position:sticky;right:0;background:#fff;white-space:nowrap;}
+.drawing-library-page .module-list th:last-child {background:#f6f6f6;}
