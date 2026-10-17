@@ -1,0 +1,90 @@
+name: Publish confirmed P4 Windows EXE
+on:
+  push:
+    branches: [master]
+    paths: [.github/workflows/p4-github-release.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+env:
+  P4_TAG: p4-2026.10.17
+  P4_APP_REVISION: fc236a67bdf94a08494c29784b8eb92caad7c4a1
+  PLANNER_ACCEPTANCE_REVISION: fc236a67bdf94a08494c29784b8eb92caad7c4a1
+  GH_TOKEN: ${{ github.token }}
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Download the exact confirmed Windows package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-assets, confirmed-package | Out-Null
+          $zip = 'release-assets/DrawingNumberPlanner-P4-Windows-x64.zip'
+          $response = Invoke-WebRequest -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/12100842591/zip" -Headers @{Authorization="Bearer $env:GH_TOKEN"; Accept='application/vnd.github+json'} -OutFile $zip
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne '98a45ebc4b755a2bd3cba9560252ef40d3d791ec9f23b409ea44a2c47d0d0cba') { throw 'Confirmed ZIP checksum mismatch' }
+          Expand-Archive $zip confirmed-package
+          $version = Get-Content 'confirmed-package/resources/app/acceptance-version.json' -Raw | ConvertFrom-Json
+          if ($version.revision -ne $env:P4_APP_REVISION) { throw 'Incorrect application revision' }
+          if (!(Test-Path 'confirmed-package/图号规划器验收版.exe')) { throw 'Executable missing' }
+      - name: Create an installer containing the complete unchanged runtime
+        shell: pwsh
+        run: |
+          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $compiler)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Installer compiler unavailable' }
+          }
+          & $compiler "/DPackageRoot=$((Resolve-Path confirmed-package).Path)" "/DInstallerOutput=$((Resolve-Path release-assets).Path)" scripts/p4-windows-installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+      - name: Verify installation preserves every packaged file
+        shell: pwsh
+        run: |
+          $installed = Join-Path $env:RUNNER_TEMP 'P4-installed-verification'
+          $setup = (Resolve-Path 'release-assets/DrawingNumberPlanner-P4-Windows-x64-Setup.exe').Path
+          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installation failed: $($process.ExitCode)" }
+          $root = (Resolve-Path confirmed-package).Path
+          $count = 0
+          Get-ChildItem $root -File -Recurse -Force | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath($root, $_.FullName)
+            $target = Join-Path $installed $relative
+            if (!(Test-Path $target) -or (Get-FileHash $_.FullName -Algorithm SHA256).Hash -ne (Get-FileHash $target -Algorithm SHA256).Hash) { throw "Installed file differs: $relative" }
+            $count++
+          }
+          @{applicationRevision=$env:P4_APP_REVISION; sourceArtifact=12100842591; sourceZipSha256='98a45ebc4b755a2bd3cba9560252ef40d3d791ec9f23b409ea44a2c47d0d0cba'; verifiedFiles=$count; everyInstalledFileMatches=$true} | ConvertTo-Json | Set-Content release-assets/installer-verification.json -Encoding utf8
+          "P4_INSTALLED_DIRECTORY=$installed" >> $env:GITHUB_ENV
+      - name: Verify the installed EXE on native Windows
+        shell: pwsh
+        run: |
+          npx --yes pnpm@11.25.0 install --frozen-lockfile --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { throw 'Verification dependencies unavailable' }
+          node scripts/verify-p4-bom-windows.cjs . "$env:P4_INSTALLED_DIRECTORY/图号规划器验收版.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed EXE verification failed' }
+          Copy-Item "$env:P4_INSTALLED_DIRECTORY/windows-verification.json" release-assets/installed-windows-verification.json
+          Copy-Item "$env:P4_INSTALLED_DIRECTORY/windows-integrated-verification.json" release-assets/installed-windows-ui-verification.json
+      - name: Publish downloadable EXE and portable ZIP
+        shell: pwsh
+        run: |
+          Copy-Item docs/p4-release-notes-20261017.md release-assets/使用说明.md
+          Get-ChildItem release-assets -File | Sort-Object Name | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content release-assets/SHA256SUMS.txt -Encoding utf8
+          gh release view $env:P4_TAG --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'Release tag already exists; refusing to replace published assets' }
+          gh release create $env:P4_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title '图号规划器 P4 · Windows 安装版' --notes-file docs/p4-release-notes-20261017.md --draft
+          if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed' }
+          gh release upload $env:P4_TAG release-assets/* --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed; leaving release in draft' }
+          gh release edit $env:P4_TAG --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: P4-release-installer-verification
+          path: release-assets/
+          retention-days: 14
+          if-no-files-found: error
