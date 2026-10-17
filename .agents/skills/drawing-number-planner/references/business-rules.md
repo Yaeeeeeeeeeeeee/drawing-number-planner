@@ -37,3 +37,7 @@ The classifications in `SKILL.md` are authoritative for this reference. Current 
 - Any new cross-product sharing or historical-identity behavior not already covered by current code and tests.
 
 The original Excel workbook is an authority when coding structure, dictionary mapping, historical-number recognition, or a rule conflict is involved. It need not be loaded for unrelated work.
+
+## Current P4 BOM historical editing correction (2026-10-16)
+
+The latest explicit user request makes an existing BOM record's ID, business date (including legacy NULL), original createdAt, predecessor and version identity immutable during ordinary editing. Only an explicit create action may create a new record. Preserve editRevision concurrency and updatedAt; refresh the exact selected snapshot and do not fall back from a missing edit target to POST. The earlier date-correction-and-rearchive behavior is Historical for ordinary edits and must not be restored silently. Preserve unchanged legacy NULL-date attachments without inventing a dated archive; explicit new/replaced managed attachments must still pass existing path/type/size/existence/hash checks. Do not clean up duplicate user rows as part of this fix. See `docs/p4-bom-edit-corrections-20261016.md`.

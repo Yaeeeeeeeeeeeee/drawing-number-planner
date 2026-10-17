@@ -372,3 +372,14 @@ describe('product-level BOM service', () => {
     expect(service.getCurrent(r.product.id)?.id).toBe(current.version.id);
   });
 });
+it('preserves all three record identities, dates, submission times and neighbors when editing the middle record',()=>{
+ const r=setup(),drawing=r.draw(r.product.id,r.white.id,r.logo.id);const item={projectItemId:r.logo.id,drawingId:drawing.id,usesWhiteMaterial:false,material:'原材质'};
+ const one=service.saveVersion({productId:r.product.id,businessChangeDate:'2026-09-01',expectedCurrentVersionId:null,items:[item]}).version;
+ const two=service.saveVersion({productId:r.product.id,businessChangeDate:'2026-09-02',expectedCurrentVersionId:one.id,items:[item]}).version;
+ const three=service.saveVersion({productId:r.product.id,businessChangeDate:'2026-09-03',expectedCurrentVersionId:two.id,items:[item]}).version;
+ const changed=service.updateVersion(two.id,{productId:r.product.id,expectedCurrentVersionId:three.id,items:[{...item,material:'修订材质'}]},two.editRevision).version;
+ expect(service.listVersions(r.product.id)).toHaveLength(3);expect(changed).toMatchObject({id:two.id,createdAt:two.createdAt,businessChangeDate:two.businessChangeDate,previousVersionId:one.id,versionNumber:two.versionNumber,editRevision:two.editRevision+1});
+ expect(changed.items[0].material).toBe('修订材质');expect(service.getVersion(one.id)).toEqual(one);expect(service.getVersion(three.id)).toEqual(three);expect(service.getCurrent(r.product.id)?.id).toBe(three.id);
+ expect(()=>service.updateVersion(two.id,{productId:r.product.id,businessChangeDate:'2030-01-01',expectedCurrentVersionId:three.id,items:[item]},changed.editRevision)).toThrow(/不能更改.*业务变更日期/);
+ expect(service.getVersion(two.id)).toEqual(changed);expect(service.listVersions(r.product.id)).toHaveLength(3);
+});

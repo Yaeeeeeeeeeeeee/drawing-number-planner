@@ -1,0 +1,1404 @@
+{
+  "date": "2026-10-16",
+  "recordedAt": "2026-10-16T14:12:52.282340+08:00",
+  "branch": "codex/p4-bom-history-comparison-20261016",
+  "baseline": "5d55e48",
+  "scope": "BOM query history detail only; no merge or production writes",
+  "targeted": {
+    "files": 7,
+    "passed": 86,
+    "newHistorySuites": 3,
+    "newHistoryTests": 25
+  },
+  "unit": {
+    "total": 953,
+    "passed": 936,
+    "failed": 17,
+    "newFailures": 0,
+    "failures": [
+      {
+        "file": "core/indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace",
+        "existingBaseline": true
+      },
+      {
+        "file": "core/workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances",
+        "existingBaseline": true
+      },
+      {
+        "file": "renderer/outbound-mock.test.tsx",
+        "test": "outbound isolated UI mock routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls",
+        "existingBaseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check",
+        "existingBaseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return",
+        "existingBaseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded",
+        "existingBaseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers",
+        "existingBaseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears",
+        "existingBaseline": true
+      },
+      {
+        "file": "renderer/recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API",
+        "existingBaseline": true
+      },
+      {
+        "file": "server/application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart",
+        "existingBaseline": true
+      }
+    ],
+    "note": "Final frozen-code run; initial exploratory RED/race runs excluded from final result but retained in work logs."
+  },
+  "typecheck": "passed",
+  "rendererBuild": "passed",
+  "mainBuild": "passed",
+  "review": {
+    "rounds": 3,
+    "criticalOrImportantRemaining": 0,
+    "fixed": [
+      "attachment preview recovery",
+      "inspectable same-label batch snapshots",
+      "aborted verification continuation race"
+    ],
+    "freshHistoryTestsPassed": 25
+  },
+  "browser": {
+    "kind": "Chromium CSS viewport and DPR emulation, not Windows desktop acceptance",
+    "cases": [
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          3840,
+          2160
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 3570,
+        "tables": [
+          [
+            124,
+            3429
+          ],
+          [
+            124,
+            3429
+          ],
+          [
+            124,
+            3429
+          ],
+          [
+            124,
+            3429
+          ],
+          [
+            124,
+            3429
+          ],
+          [
+            124,
+            3429
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          2560,
+          1440
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 2290,
+        "tables": [
+          [
+            124,
+            2149
+          ],
+          [
+            124,
+            2149
+          ],
+          [
+            124,
+            2149
+          ],
+          [
+            124,
+            2149
+          ],
+          [
+            124,
+            2149
+          ],
+          [
+            124,
+            2149
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          1920,
+          1080
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1650,
+        "tables": [
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          1366,
+          768
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1096,
+        "tables": [
+          [
+            124,
+            955
+          ],
+          [
+            124,
+            955
+          ],
+          [
+            124,
+            955
+          ],
+          [
+            124,
+            955
+          ],
+          [
+            124,
+            955
+          ],
+          [
+            124,
+            955
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          1100,
+          760
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1046,
+        "tables": [
+          [
+            124,
+            905
+          ],
+          [
+            124,
+            905
+          ],
+          [
+            124,
+            905
+          ],
+          [
+            124,
+            905
+          ],
+          [
+            124,
+            905
+          ],
+          [
+            124,
+            905
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          720,
+          600
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 666,
+        "tables": [
+          [
+            92,
+            557
+          ],
+          [
+            92,
+            557
+          ],
+          [
+            92,
+            557
+          ],
+          [
+            92,
+            557
+          ],
+          [
+            92,
+            557
+          ],
+          [
+            92,
+            557
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          1536,
+          864
+        ],
+        "deviceScaleFactor": 1.25,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1266,
+        "tables": [
+          [
+            124,
+            1125
+          ],
+          [
+            124,
+            1125
+          ],
+          [
+            124,
+            1125
+          ],
+          [
+            124,
+            1125
+          ],
+          [
+            124,
+            1125
+          ],
+          [
+            124,
+            1125
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          1280,
+          720
+        ],
+        "deviceScaleFactor": 1.5,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1010,
+        "tables": [
+          [
+            124,
+            869
+          ],
+          [
+            124,
+            869
+          ],
+          [
+            124,
+            869
+          ],
+          [
+            124,
+            869
+          ],
+          [
+            124,
+            869
+          ],
+          [
+            124,
+            869
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "existing-sample",
+        "cssSize": [
+          1920,
+          1080
+        ],
+        "deviceScaleFactor": 2,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1650,
+        "tables": [
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ],
+          [
+            124,
+            1509
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          3840,
+          2160
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 3570,
+        "tables": [
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ],
+          [
+            124,
+            1715,
+            1715
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          2560,
+          1440
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 2290,
+        "tables": [
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ],
+          [
+            124,
+            1075,
+            1075
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          1920,
+          1080
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1650,
+        "tables": [
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          1366,
+          768
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1096,
+        "tables": [
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ],
+          [
+            124,
+            478,
+            478
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          1100,
+          760
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1046,
+        "tables": [
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ],
+          [
+            124,
+            453,
+            453
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          720,
+          600
+        ],
+        "deviceScaleFactor": 1,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 666,
+        "tables": [
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ],
+          [
+            92,
+            279,
+            279
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          1536,
+          864
+        ],
+        "deviceScaleFactor": 1.25,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1266,
+        "tables": [
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ],
+          [
+            124,
+            563,
+            563
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          1280,
+          720
+        ],
+        "deviceScaleFactor": 1.5,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1010,
+        "tables": [
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ],
+          [
+            124,
+            435,
+            435
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      },
+      {
+        "mode": "developer-mock",
+        "cssSize": [
+          1920,
+          1080
+        ],
+        "deviceScaleFactor": 2,
+        "pass": true,
+        "balanced": true,
+        "labelCompact": true,
+        "bodyOverflow": false,
+        "detailWidth": 1650,
+        "tables": [
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ],
+          [
+            124,
+            755,
+            755
+          ]
+        ],
+        "outOfBounds": 0,
+        "errors": [],
+        "mutations": []
+      }
+    ],
+    "passed": 18,
+    "failed": 0
+  },
+  "readonlyExistingSample": {
+    "scope": "Read-only existing data; no migrations, seed or business writes",
+    "before": {
+      "databasePath": "/workspace/drawing-number-planner/work/p1-delivery/desktop-acceptance-7d9e7b7/resources/app/acceptance-seed/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 2,
+          "sha256": "72c8c1bcb9d63232da8050382e36b9f8495de8bad5cc1cab194331c37183a475"
+        },
+        "bom_assets": {
+          "count": 3,
+          "sha256": "fa7a1dc671da0c98e2f0df2851d7dbd7fe4af8a6961c227b14efd6be29ec4c43"
+        },
+        "bom_current": {
+          "count": 1,
+          "sha256": "20ba2505cb277e4a14d423f19bf65feed044ddc3b5e53afe7651de8c1f8348df"
+        },
+        "bom_item_assets": {
+          "count": 2,
+          "sha256": "c5673957342b2ec07c403ab53aadda656faaa77cec3951aecf929e7300afa2b0"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 3,
+          "sha256": "57957833e7431f1958b41424e2b199bf92921e3c1ec17a764432833c64c94e9c"
+        },
+        "bom_versions": {
+          "count": 1,
+          "sha256": "9d8c179fbb863b8e0c0d9bdf51522f7bcde1e4b46b60d8fb8d774f55ae40cd8a"
+        },
+        "dictionary_items": {
+          "count": 8,
+          "sha256": "f277814274c1f4ca4c9fc2f9d467404f87e16ddf39774447d0ba9a997fe70bdb"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 4,
+          "sha256": "bbe9920f4e7cdc379de9f0863f9cbe2aff5aa29510d18fa0e118c678dc1ddcb9"
+        },
+        "file_scan_changes": {
+          "count": 11,
+          "sha256": "ae46d9072622d0e3b8ca7c5132a928221b215e531d3aec253f34ed72ff13dd8a"
+        },
+        "file_scan_runs": {
+          "count": 1,
+          "sha256": "5f202c5699255da0418d8ca07cc234208b1ff5395ea3690c139ec24f66b11108"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 2,
+          "sha256": "0e3efb0d22ec5ad73f28ac348afc3e2c5e9925b6f9a7c9ab984d147de0f75d58"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "d963c65f3462ff10f27a1de0518a91aaec68f49b3c0f9e5987a71197d12d9717"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "1d75b272b754169d4d46f25edcec0f6a153a1f53a275576a0973d535aecfdc38"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 9,
+          "sha256": "f2d2addb05a692a8b2e9ccc9765c683da296cb4e3f0e58c26a1e933ae241c586"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 3,
+          "sha256": "8c907e60321fb47d4dde730af15f34f0e443228d4228c9c11d02fe6a861ffa70"
+        },
+        "products": {
+          "count": 1,
+          "sha256": "d48ff46099daadbe22fc35e7bd6ac0f6447fb3dd728901d91e8b56027214020b"
+        },
+        "qr_code_files": {
+          "count": 2,
+          "sha256": "07f106d0e029c351c6d24640ac5122106d918b20c99e4ee226adc8660ddd53c6"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "4b092a917684ab552da8356926a4c51cafd0ebb2b1eca824425ae5d7756b74b7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "a4cf81302c6d7e3dff442571eaca70a31bce601dc0fafe4be9a905303dbfe33a"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "5656cb92aa078e4ae5797c409dcdac4e236ddc3b19332655349db871ffa52e37"
+        }
+      }
+    },
+    "after": {
+      "databasePath": "/workspace/drawing-number-planner/work/p1-delivery/desktop-acceptance-7d9e7b7/resources/app/acceptance-seed/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 2,
+          "sha256": "72c8c1bcb9d63232da8050382e36b9f8495de8bad5cc1cab194331c37183a475"
+        },
+        "bom_assets": {
+          "count": 3,
+          "sha256": "fa7a1dc671da0c98e2f0df2851d7dbd7fe4af8a6961c227b14efd6be29ec4c43"
+        },
+        "bom_current": {
+          "count": 1,
+          "sha256": "20ba2505cb277e4a14d423f19bf65feed044ddc3b5e53afe7651de8c1f8348df"
+        },
+        "bom_item_assets": {
+          "count": 2,
+          "sha256": "c5673957342b2ec07c403ab53aadda656faaa77cec3951aecf929e7300afa2b0"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 3,
+          "sha256": "57957833e7431f1958b41424e2b199bf92921e3c1ec17a764432833c64c94e9c"
+        },
+        "bom_versions": {
+          "count": 1,
+          "sha256": "9d8c179fbb863b8e0c0d9bdf51522f7bcde1e4b46b60d8fb8d774f55ae40cd8a"
+        },
+        "dictionary_items": {
+          "count": 8,
+          "sha256": "f277814274c1f4ca4c9fc2f9d467404f87e16ddf39774447d0ba9a997fe70bdb"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 4,
+          "sha256": "bbe9920f4e7cdc379de9f0863f9cbe2aff5aa29510d18fa0e118c678dc1ddcb9"
+        },
+        "file_scan_changes": {
+          "count": 11,
+          "sha256": "ae46d9072622d0e3b8ca7c5132a928221b215e531d3aec253f34ed72ff13dd8a"
+        },
+        "file_scan_runs": {
+          "count": 1,
+          "sha256": "5f202c5699255da0418d8ca07cc234208b1ff5395ea3690c139ec24f66b11108"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 2,
+          "sha256": "0e3efb0d22ec5ad73f28ac348afc3e2c5e9925b6f9a7c9ab984d147de0f75d58"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "d963c65f3462ff10f27a1de0518a91aaec68f49b3c0f9e5987a71197d12d9717"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "1d75b272b754169d4d46f25edcec0f6a153a1f53a275576a0973d535aecfdc38"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 9,
+          "sha256": "f2d2addb05a692a8b2e9ccc9765c683da296cb4e3f0e58c26a1e933ae241c586"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 3,
+          "sha256": "8c907e60321fb47d4dde730af15f34f0e443228d4228c9c11d02fe6a861ffa70"
+        },
+        "products": {
+          "count": 1,
+          "sha256": "d48ff46099daadbe22fc35e7bd6ac0f6447fb3dd728901d91e8b56027214020b"
+        },
+        "qr_code_files": {
+          "count": 2,
+          "sha256": "07f106d0e029c351c6d24640ac5122106d918b20c99e4ee226adc8660ddd53c6"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "4b092a917684ab552da8356926a4c51cafd0ebb2b1eca824425ae5d7756b74b7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "a4cf81302c6d7e3dff442571eaca70a31bce601dc0fafe4be9a905303dbfe33a"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "5656cb92aa078e4ae5797c409dcdac4e236ddc3b19332655349db871ffa52e37"
+        }
+      }
+    },
+    "databaseHashBefore": "23fad9b50159143f736e32873bfd8641b3612be8f40bab2018f376ba75514730",
+    "databaseHashAfter": "23fad9b50159143f736e32873bfd8641b3612be8f40bab2018f376ba75514730",
+    "unchanged": true
+  },
+  "emptyRuntimeDb": {
+    "sha256": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "products": 0,
+    "bom_versions": 0,
+    "bom_items": 0,
+    "bom_assets": 0
+  },
+  "screenshots": [
+    {
+      "file": "docs/screenshots/p4-bom-history-20261016/developer-mock-1100.png",
+      "sha256": "aff651ece395ea4cbded822896b581098723db240ba8b854af822bba6d4ad688",
+      "provenance": "existing developer mock, not real business-data acceptance"
+    },
+    {
+      "file": "docs/screenshots/p4-bom-history-20261016/developer-mock-1920.png",
+      "sha256": "8443a32ac91110a58040f43a021614ebc5d19b34008eecdb7720c80576e9bd31",
+      "provenance": "existing developer mock, not real business-data acceptance"
+    },
+    {
+      "file": "docs/screenshots/p4-bom-history-20261016/developer-mock-3840.png",
+      "sha256": "ce188303d082310728255218a68fcecd2fcb857ca262dfc27636c174b7af6377",
+      "provenance": "existing developer mock, not real business-data acceptance"
+    },
+    {
+      "file": "docs/screenshots/p4-bom-history-20261016/developer-mock-field-comparison.png",
+      "sha256": "6339ecb05326d4c08d5fd9086ea23cf5c1db42b088b2824392e92743931a24ae",
+      "provenance": "existing developer mock, not real business-data acceptance"
+    },
+    {
+      "file": "docs/screenshots/p4-bom-history-20261016/existing-sample-1100.png",
+      "sha256": "037e499235ac33f3ac3370af6f8a8a0a83efa1772b01310185540dc29ca82783",
+      "provenance": "pre-existing isolated P1 sample, first record only"
+    },
+    {
+      "file": "docs/screenshots/p4-bom-history-20261016/existing-sample-1920.png",
+      "sha256": "88bcc6870c1fba09e07579b6e8b906e9d728e7d50db6bfd8631b877bce2e7e41",
+      "provenance": "pre-existing isolated P1 sample, first record only"
+    },
+    {
+      "file": "docs/screenshots/p4-bom-history-20261016/existing-sample-3840.png",
+      "sha256": "fba4428618917d9901b6050ff9f656f5088c161c86712efe17ed75b347f2aba4",
+      "provenance": "pre-existing isolated P1 sample, first record only"
+    }
+  ],
+  "legacy30ProgressItems": "unchanged",
+  "notVerified": [
+    "populated real business BOM histories and original attachment operations",
+    "physical Windows 4K desktop",
+    "Windows OS display scaling 125/150/200 percent",
+    "native window resize and cross-monitor behavior"
+  ],
+  "e2e": "existing broad E2E suite not rerun; focused Chromium matrix recorded separately",
+  "applicationRevision": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5",
+  "delivery": {
+    "status": "pushed to existing GitHub repository on independent P4 branch",
+    "authorization": "User explicitly replied 允许 to uploading this code, isolated-sample/developer-mock screenshots and verification documents.",
+    "branch": "codex/p4-bom-history-comparison-20261016",
+    "applicationRevision": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5",
+    "pushedEvidenceRevision": "2c96447",
+    "recordedAt": "2026-10-16T14:31:48.905629+08:00",
+    "merged": false,
+    "next": "Windows read-only manual acceptance remains pending."
+  },
+  "windowsDelivery": {
+    "applicationRevision": "d4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5",
+    "deliveryToolsRevision": "7520429d39465775ed9138cc426ae856a8851e66",
+    "runId": 38864217262,
+    "conclusion": "success",
+    "artifactId": 12030701034,
+    "sizeBytes": 166093819,
+    "sha256": "1cb3d717b995f441b4d54d3af3a7896e7de827af57599537da4e20f5bdc401ab",
+    "expiresAt": "2026-10-30T06:59:17Z",
+    "scope": "Actual Windows Electron first-record BOM query/folding/attachment-state/native-window checks; unchanged pre-existing isolated sample files and table snapshots. Not real multi-version user history or physical DPI acceptance.",
+    "dataCreation": "No new sample records; reuse previous delivered isolated sample. Original package/seed unchanged.",
+    "chatDownloadFileId": "file_000000009b1c820eaeb4ea9ccabb336b"
+  }
+}

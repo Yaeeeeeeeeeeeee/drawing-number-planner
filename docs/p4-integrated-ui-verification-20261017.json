@@ -1,0 +1,268 @@
+{
+  "applicationRevision": "d00e5c100eb40264246ab47957cdbaea2d51958c",
+  "branch": "codex/p4-integrated-ui-20261017",
+  "updatedAt": "2026-10-17T05:29:07.881917+00:00",
+  "relatedRenderer": {
+    "passed": 102,
+    "failed": 0
+  },
+  "finalCoreAndApi": {
+    "passed": 34,
+    "failed": 0
+  },
+  "fullRegression": {
+    "revision": "b2b06ec52702c1e213a171b44e7065fcbfb380a3",
+    "total": 990,
+    "passed": 974,
+    "failed": 16,
+    "newFailures": 0,
+    "failures": [
+      {
+        "file": "tests/core/indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace",
+        "baseline": true
+      },
+      {
+        "file": "tests/core/workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances",
+        "baseline": true
+      },
+      {
+        "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check",
+        "baseline": true
+      },
+      {
+        "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return",
+        "baseline": true
+      },
+      {
+        "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded",
+        "baseline": true
+      },
+      {
+        "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers",
+        "baseline": true
+      },
+      {
+        "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears",
+        "baseline": true
+      },
+      {
+        "file": "tests/renderer/recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API",
+        "baseline": true
+      },
+      {
+        "file": "tests/server/application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart",
+        "baseline": true
+      }
+    ],
+    "note": "Final additional readonly recycled-detail change verified by 34 core/API tests and final native Windows run; full suite not repeated after this narrow change."
+  },
+  "typecheck": "passed",
+  "build": "passed; existing >500kB warning retained",
+  "browser": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "compact": {
+        "width": 543,
+        "overflow": false,
+        "openPaths": 0
+      },
+      "pass": true,
+      "writes": [],
+      "scope": "Intercepted isolated interface fixtures, not real business data or native Windows"
+    },
+    {
+      "width": 2560,
+      "height": 1440,
+      "compact": {
+        "width": 543,
+        "overflow": false,
+        "openPaths": 0
+      },
+      "pass": true,
+      "writes": [],
+      "scope": "Intercepted isolated interface fixtures, not real business data or native Windows"
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "compact": {
+        "width": 503,
+        "overflow": false,
+        "openPaths": 0
+      },
+      "pass": true,
+      "writes": [],
+      "scope": "Intercepted isolated interface fixtures, not real business data or native Windows"
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "compact": {
+        "width": 518,
+        "overflow": false,
+        "openPaths": 0
+      },
+      "pass": true,
+      "writes": [],
+      "scope": "Intercepted isolated interface fixtures, not real business data or native Windows"
+    },
+    {
+      "width": 1100,
+      "height": 760,
+      "compact": {
+        "width": 518,
+        "overflow": false,
+        "openPaths": 0
+      },
+      "pass": true,
+      "writes": [],
+      "scope": "Intercepted isolated interface fixtures, not real business data or native Windows"
+    },
+    {
+      "width": 720,
+      "height": 600,
+      "compact": {
+        "width": 518,
+        "overflow": false,
+        "openPaths": 0
+      },
+      "pass": true,
+      "writes": [],
+      "scope": "Intercepted isolated interface fixtures, not real business data or native Windows"
+    }
+  ],
+  "sourceConstraints": {
+    "schemaUnchanged": true,
+    "mainUnchanged": true,
+    "dependencyFilesUnchanged": true,
+    "noMasterMerge": true,
+    "noRealBusinessDataOperations": true
+  },
+  "changedFiles": [
+    ".agents/skills/drawing-number-planner/references/ui-and-acceptance.md",
+    ".github/workflows/p4-integrated-windows-delivery.yml",
+    "docs/p4-integrated-ui-20261017.md",
+    "docs/screenshots/p4-integrated-20261017/contact-editor-1100.png",
+    "docs/screenshots/p4-integrated-20261017/contact-editor-1920.png",
+    "docs/screenshots/p4-integrated-20261017/contact-editor-3840.png",
+    "docs/screenshots/p4-integrated-20261017/drawing-detail-1100.png",
+    "docs/screenshots/p4-integrated-20261017/drawing-detail-1920.png",
+    "docs/screenshots/p4-integrated-20261017/drawing-detail-3840.png",
+    "docs/screenshots/p4-integrated-20261017/mail-联系人-1100.png",
+    "docs/screenshots/p4-integrated-20261017/mail-联系人-1920.png",
+    "docs/screenshots/p4-integrated-20261017/mail-联系人-3840.png",
+    "docs/screenshots/p4-integrated-20261017/mail-邮件模板-1100.png",
+    "docs/screenshots/p4-integrated-20261017/mail-邮件模板-1920.png",
+    "docs/screenshots/p4-integrated-20261017/mail-邮件模板-3840.png",
+    "docs/screenshots/p4-integrated-20261017/mail-邮件签名-1100.png",
+    "docs/screenshots/p4-integrated-20261017/mail-邮件签名-1920.png",
+    "docs/screenshots/p4-integrated-20261017/mail-邮件签名-3840.png",
+    "docs/screenshots/p4-integrated-20261017/workbench-1100.png",
+    "docs/screenshots/p4-integrated-20261017/workbench-1920.png",
+    "docs/screenshots/p4-integrated-20261017/workbench-3840.png",
+    "scripts/repack-p4-bom-windows.mjs",
+    "scripts/verify-p4-bom-windows.cjs",
+    "scripts/verify-p4-integrated-layout.mjs",
+    "src/core/drawings/drawing-query-service.ts",
+    "src/core/drawings/drawing-repository.ts",
+    "src/core/drawings/drawing-types.ts",
+    "src/renderer/components/ModuleWorkspace.tsx",
+    "src/renderer/components/ProductBatchNavigation.tsx",
+    "src/renderer/data/client.ts",
+    "src/renderer/layout/AppShell.tsx",
+    "src/renderer/pages/DrawingLibraryPage.tsx",
+    "src/renderer/pages/FilesPage.tsx",
+    "src/renderer/pages/OutboundPage.tsx",
+    "src/renderer/pages/drawing-library.css",
+    "src/renderer/pages/outbound/ContactsManager.tsx",
+    "src/renderer/pages/outbound/EmailComposer.tsx",
+    "src/renderer/pages/outbound/MailConfiguration.tsx",
+    "src/renderer/pages/outbound/TemplateSettings.tsx",
+    "src/renderer/pages/outbound/outbound-configuration.css",
+    "src/renderer/pages/outbound/useConfigurationEditor.ts",
+    "src/server/routes/drawings.ts",
+    "tests/core/drawing-query.test.ts",
+    "tests/renderer/drawing-library-page.test.tsx",
+    "tests/renderer/files-page.test.tsx",
+    "tests/renderer/outbound-mock.test.tsx",
+    "tests/renderer/outbound-page.test.tsx",
+    "tests/renderer/outbound-shell-guard.test.tsx",
+    "tests/server/drawings-api.test.ts"
+  ],
+  "windows": {
+    "firstSuccessfulRun": 39005846839,
+    "secondSuccessfulRun": 39006027444,
+    "finalRun": 39006283189,
+    "finalRevision": "d00e5c100eb40264246ab47957cdbaea2d51958c",
+    "finalStatus": "success",
+    "artifactId": 12091356645,
+    "artifactBytes": 166754972,
+    "artifactSha256": "319118fad1f0ec844e39ba12a82410ce020402f397bbf40053f3aa6393244726",
+    "nativeChecks": [
+      "actual EXE startup and isolated userData/version",
+      "BOM original edit preserves total/id/date/createdAt",
+      "original sample and unrelated tables unchanged",
+      "BOM no QR/copy and compact effective batch",
+      "eight product columns",
+      "drawing navigation API, view/manage/cancel, actual Windows content sizes",
+      "exclusive configuration tabs and dirty refusal/confirm return"
+    ],
+    "physical4kDpiAndCrossMonitor": "manual; native CI content sizes are not physical user display acceptance"
+  },
+  "manualRemaining": [
+    "Physical Windows 4K maximized/system DPI/cross-monitor",
+    "Real multiversion business BOM dataset",
+    "Existing 16 baseline failures; no final release acceptance",
+    "Full application recovery/production file permission and long-term stability"
+  ],
+  "e2e": "Whole E2E not rerun; previously documented failures not closed",
+  "progressTests": {
+    "passed": 3,
+    "failed": 0
+  }
+}

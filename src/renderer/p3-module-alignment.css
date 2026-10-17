@@ -1,0 +1,39 @@
+@layer workspace {
+  .standard-page-header { align-items: center; min-height: 84px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--ws-line); }
+  .page-heading-copy { min-width: 0; flex: 1 1 300px; }
+  .standard-page-header h1 { margin: 0 0 6px; font-size: 24px; line-height: 1.3; }
+  .standard-page-header .page-description { display: block; margin: 0; font-size: 12px; line-height: 1.5; color: var(--ws-muted); overflow-wrap: anywhere; }
+  .standard-page-header > :is(.header-actions,.ob-actions) { align-items: center; gap: 8px; }
+  .standard-page-header > .record-count { align-self: center; }
+  .module-workspace-viewport { width: 100%; min-width: 0; max-width: 100%; }
+  .module-workspace-viewport.preserve-file-list { max-height: max(280px,calc(100dvh - 160px)); overflow: auto; overscroll-behavior-x: contain; padding-bottom: 8px; }
+  .preserve-file-list > .module-workspace { max-width: none; }
+  .preserve-file-list :is(.module-detail,.module-navigation):not(.module-drawer) { max-height: max(240px,calc(100dvh - 192px)); }
+  .files-page .module-list > .table-wrap > table { min-width: 1430px; }
+  .files-page .module-list tr:not(.expanded-table-row) > :is(th,td) { text-align: center; }
+  .files-page .module-list tr:not(.expanded-table-row) > :is(th,td):nth-child(2) { text-align: left; }
+  .files-page .module-list tr:not(.expanded-table-row) > :is(th,td):nth-child(3) { width: 140px; white-space: nowrap; overflow-wrap: normal; }
+  .files-page .module-list tr:not(.expanded-table-row) > :is(th,td):nth-child(4) { width: 110px; white-space: nowrap; overflow-wrap: normal; }
+  .files-page .module-list :is(.files-batch-code,.files-batch-state,.usage-badge) { white-space: nowrap; }
+  .files-page .module-list .file-row-actions { justify-content: center; }
+  .files-page .module-list .expanded-table-row > td { text-align: left; }
+  .approved-planning .pp-fields { grid-template-columns: 64px minmax(0,1fr) minmax(0,1.1fr) minmax(0,.75fr) minmax(0,1.1fr) auto; }
+  .approved-planning .pp-row-no { white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+  .dictionaries-real-page { --dictionary-nav-width: min(300px, 30%); }
+  .dictionaries-real-page .dm-toolbar { display: grid; grid-template-columns: var(--dictionary-nav-width) minmax(115px,170px) max-content max-content minmax(0,1fr); gap: 16px; align-items: center; }
+  .dictionaries-real-page .dm-toolbar > :is(input,select) { width: 100%; min-width: 0; height: 36px; }
+  .dictionaries-real-page .dm-toolbar > button { justify-self: end; margin-left: 0; }
+  .dictionaries-real-page .dictionary-hierarchy { grid-template-columns: var(--dictionary-nav-width) minmax(0,1fr); gap: 16px; }
+  .dictionaries-real-page .dictionary-parent-list { margin: 0; padding: 0; }
+  .dictionaries-real-page .dm-child-head { min-height: 42px; align-items: center; margin-top: 0; }
+  .bom-page .bom-basics, .products-integrated .filter-bar, .qr-page .qr-filter { gap: 12px; align-items: end; }
+  .bom-page .bom-basics label, .products-integrated .filter-bar label, .qr-page .qr-filter label { min-width: 0; }
+  .bom-page .bom-basics :is(input,select), .products-integrated .filter-bar :is(input,select), .qr-page .qr-filter :is(input,select) { min-height: 36px; }
+  .bom-page .bom-work-list, .qr-page .qr-detail-meta, .products-integrated .product-detail { border-color: var(--ws-line); }
+  @container (max-width: 1000px) {
+    .approved-planning .pp-fields { grid-template-columns: 64px repeat(2,minmax(0,1fr)); }
+    .dictionaries-real-page .dictionary-hierarchy { grid-template-columns: minmax(0,1fr); }
+    .dictionaries-real-page .dm-toolbar { grid-template-columns: minmax(0,1fr) max-content max-content auto; }
+    .dictionaries-real-page .dm-toolbar > input { grid-column: 1 / -1; }
+  }
+}

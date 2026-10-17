@@ -1,0 +1,47 @@
+name: P1 Windows isolated acceptance package
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/p1-windows-delivery-20261014]
+    paths:
+      - .github/workflows/p1-windows-acceptance.yml
+      - scripts/build-p1-windows.ps1
+      - scripts/prepare-p1-delivery.mjs
+      - scripts/verify-p1-windows.cjs
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 7d9e7b74ee1222c9b789946dd69d94f89704bfe7
+          path: p1-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build pinned P1 package with isolated sample
+        shell: pwsh
+        run: ./scripts/build-p1-windows.ps1 -Source "$pwd/p1-source" -Output "$pwd/P1-Windows-7d9e7b7"
+      - name: Verify actual Windows startup
+        id: smoke
+        continue-on-error: true
+        shell: pwsh
+        run: node scripts/verify-p1-windows.cjs "$pwd/p1-source" "$pwd/P1-Windows-7d9e7b7/图号规划器验收版.exe"
+      - name: Record Windows smoke outcome
+        shell: pwsh
+        run: |
+          '${{ steps.smoke.outcome }}' | Set-Content P1-Windows-7d9e7b7/Windows-smoke-outcome.txt
+          Get-ChildItem P1-Windows-7d9e7b7/resources/app/acceptance-version.json | Get-Content
+      - uses: actions/upload-artifact@v4
+        with:
+          name: P1-Windows-x64-7d9e7b7
+          path: P1-Windows-7d9e7b7/
+          retention-days: 14
+      - name: Report smoke failure without discarding package
+        if: steps.smoke.outcome != 'success'
+        shell: pwsh
+        run: throw 'Package uploaded, but Windows startup smoke did not pass; inspect artifact before local acceptance.'

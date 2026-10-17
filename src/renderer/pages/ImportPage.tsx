@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/PageHeader';
 import { Fragment, useMemo, useState } from 'react';
 
 import type { ImportReportView, PlannerApi } from '../data/client';
@@ -31,7 +32,7 @@ function ImportWorkspace({ api }: { api: PlannerApi }) {
   };
   const matches = (type:string,text:string) => (dictionaryFilter==='all'||dictionaryFilter===type)&&text.toLowerCase().includes(issueSearch.toLowerCase());
   const visibleCandidates = report?.candidates.filter(item => matches(item.type,`${item.code} ${item.name} ${item.sourceCell} ${item.parentName ?? ''}`) && (resultFilter==='all'||resultFilter==='eligible'&&!conflicted.has(item.id)||resultFilter==='blocked'&&conflicted.has(item.id))) ?? [];
-  return <section className="page-surface page-enter migration-integrated mm-page"><header className="page-header"><h1>迁移检查</h1></header>
+  return <section className="page-surface page-enter migration-integrated mm-page"><PageHeader title="迁移检查" description="核对导入候选与问题记录，确认范围后执行迁移。"></PageHeader>
     <div className="mm-source"><label className="file-picker"><span>选择 Excel 文件</span><input aria-label="选择 Excel 文件" type="file" accept=".xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
       <strong>{file?.name ?? '尚未选择文件'}</strong><button className="primary-button" disabled={!file || busy} onClick={() => void audit()} type="button">{busy ? '检查中…' : '开始检查'}</button></div>
     <p className="mm-scope">检查范围：“新版图号”工作表的固定字典列与编码/父级关系。未检查历史图号、BOM、PDF 或跨批次复用；原文件不修改。</p>
@@ -42,7 +43,7 @@ function ImportWorkspace({ api }: { api: PlannerApi }) {
       {reportView==='issues' && <>{!report.issues.length && <p>本次 Excel 检查未发现异常；未执行其他业务模块检查。</p>}<table aria-label="迁移问题工作表"><colgroup>{[22,14,22,22,20].map((width,index)=><col key={index} style={{width:`${width}%`}}/>)}</colgroup><thead><tr>{['问题类型','字典范围','数据摘要','来源单元格','操作'].map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>{report.issues.map((issue,index)=>matches(issue.dictionaryType,`${issue.code} ${issue.value ?? ''} ${issue.message} ${issue.sourceCell}`)&&(resultFilter==='all'||resultFilter===issue.code)?<Fragment key={`${issue.code}-${index}`}><tr><td><span className={issue.code.includes('PARENT')||issue.code==='INCOMPLETE_ROW'?'mm-warning':'mm-conflict'}>{issueLabels[issue.code]??issue.code}</span></td><td>{dictionaryLabels[issue.dictionaryType]??issue.dictionaryType}</td><td>{issue.value??'—'}</td><td>{issue.sourceCell}</td><td><button type="button" aria-expanded={openIssue===index} onClick={()=>setOpenIssue(openIssue===index?null:index)}>{openIssue===index?'收起原因':'查看原因'}</button></td></tr>{openIssue===index&&<tr><td colSpan={5} className="mm-detail"><p>{issue.message}</p><small>{issue.candidateIds?.length?`关联候选 ${issue.candidateIds.length} 条，禁止选择。`:'没有关联候选，仍需核对源表。'}</small></td></tr>}</Fragment>:null)}</tbody></table></>}
       <div hidden={reportView !== 'candidates'}>
       <div className="selection-actions"><button className="secondary-button" disabled={busy || consumed || !eligibleIds.length} onClick={() => setSelected(eligibleIds)} type="button">全选可导入项（含筛选外）</button><button className="secondary-button" disabled={busy || !selected.length} onClick={() => setSelected([])} type="button">取消全选</button></div>
-      <DataTable items={visibleCandidates} columns={[{ key: 'select', label: '导入', render: (item) => <input aria-label={`选择 ${item.name}`} type="checkbox" disabled={busy || consumed || conflicted.has(item.id)} checked={selected.includes(item.id)} onChange={() => toggle(item.id)} /> },
+      <DataTable fillViewport items={visibleCandidates} columns={[{ key: 'select', label: '导入', render: (item) => <input aria-label={`选择 ${item.name}`} type="checkbox" disabled={busy || consumed || conflicted.has(item.id)} checked={selected.includes(item.id)} onChange={() => toggle(item.id)} /> },
         { key: 'type', label: '字典', render: (item) => dictionaryLabels[item.type]??item.type }, { key: 'code', label: '编码', render: (item) => <strong>{item.code}</strong> },
         { key: 'name', label: '名称', render: (item) => item.name }, {key:'parent',label:'父级',render:item=>item.parentName??'—'}, { key: 'source', label: '来源单元格', render: (item) => item.sourceCell },{key:'result',label:'核查结果',render:item=>conflicted.has(item.id)?<span className="mm-conflict">禁止导入</span>:'无已知冲突'}]} />
       <div className="bottom-actions"><span>已选择 {selected.length} 条</span><button className="primary-button" disabled={!selected.length || busy || consumed} onClick={() => void confirm()} type="button">确认导入</button></div>

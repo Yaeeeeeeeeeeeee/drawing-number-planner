@@ -15,7 +15,7 @@ export function BomAttachmentControl({ index, role, asset, canReuse, reuse, disa
       <button type="button" className="text-button" disabled={disabled || previewOnly} aria-label={`第 ${index} 行选择${name}文件`} onClick={() => input.current?.click()}>{asset ? '替换' : '选择文件'}</button>
       <input ref={input} className="bom-file-input" tabIndex={-1} aria-label={`第 ${index} 行${name}`} type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled || previewOnly} onChange={(event) => { const file = event.target.files?.[0]; if (file && !previewOnly) onUpload(file); }} />
     </div>
-    {asset ? <div className="bom-attachment-summary"><BomAssetPreview assetId={asset.assetId} name={asset.originalFileName} onPreviewChange={onPreviewChange} /><span title={asset.relativePath}>{asset.originalFileName}</span></div> : <small>未关联{name}</small>}
+    {asset ? <div className="bom-attachment-summary"><BomAssetPreview assetId={asset.assetId} name={asset.originalFileName} onPreviewChange={onPreviewChange} /><span>{asset.originalFileName}</span></div> : <small>未关联{name}</small>}
     {canReuse && <label className="bom-inline-check bom-reuse-control"><input type="checkbox" aria-label={`第 ${index} 行沿用${name}`} checked={reuse} disabled={disabled} onChange={(event) => onReuse(event.target.checked)} />沿用上一 BOM</label>}
   </div>;
 }

@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
+import type { DrawingBusinessUsage, DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
 
 interface DrawingRow {
   id: number; origin: DrawingRecord['origin']; sku: string | null; full_code: string; display_name: string;
@@ -20,7 +20,33 @@ interface DrawingBomUsageRow extends Omit<DrawingBomUsage, 'usesWhiteMaterial'> 
   usesWhiteMaterial: number;
 }
 
-const unifiedCte = `with drawing_records as (
+// Business evidence uses immutable identity, never codes, PDF occurrence, or path guesses.
+const businessUsageCte = `with raw_business_usage as (
+  select case when item.drawing_id is not null then 'planned' else 'historical' end as origin,
+    coalesce(item.drawing_id, item.historical_drawing_id) as record_id,
+    version.product_id, item.effective_material_batch_id as batch_id, 'bom' as source,
+    version.id as source_id,
+    exists(select 1 from bom_current current_bom where current_bom.product_id = version.product_id
+      and current_bom.version_id = version.id) as is_current
+  from bom_items item join bom_versions version on version.id = item.bom_version_id
+  where item.deleted_at is null and version.deleted_at is null
+  union all
+  select case when item.drawing_id is not null then 'planned' else 'historical' end,
+    coalesce(item.drawing_id, item.historical_drawing_id), package.product_id,
+    package.selected_material_batch_id, 'outbound', package.id, 0
+  from outbound_package_items item join outbound_packages package on package.id = item.package_id
+  where package.status = 'completed'
+), business_usage as (
+  select distinct usage.* from raw_business_usage usage
+  where (usage.origin = 'planned' and exists(select 1 from drawing_numbers drawing
+      where drawing.id = usage.record_id and drawing.deleted_at is null))
+    or (usage.origin = 'historical' and exists(select 1 from historical_drawing_numbers drawing
+      where drawing.id = usage.record_id and drawing.deleted_at is null))
+)`;
+
+const exactUsageIdentity = `(usage.origin = record.origin and usage.record_id = abs(record.id))`;
+
+const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as (
   select drawing.id, 'planned' as origin, product.sku, coalesce(drawing.deleted_full_code, drawing.full_code) as full_code, drawing.display_name,
     drawing.product_id, product.model, product.product_category, product.brand_id, brand.name as brand_name,
     drawing.appearance_id, appearance.name as appearance_name, drawing.color_id, color.name as color_name,
@@ -87,8 +113,8 @@ const unifiedCte = `with drawing_records as (
   left join dictionary_items main_category on main_category.type = 'main_category' and main_category.code = historical.main_category_code
   left join dictionary_items project_item on project_item.type = 'project_item'
     and project_item.code = historical.project_item_code and project_item.parent_id = main_category.id
-  where historical.deleted_at is not null or not exists(select 1 from drawing_numbers drawing
-    where drawing.deleted_at is null and drawing.full_code = historical.full_code)
+  ${scoped ? '' : `where historical.deleted_at is not null or not exists(select 1 from drawing_numbers drawing
+    where drawing.deleted_at is null and drawing.full_code = historical.full_code)`}
 )`;
 
 const mapRow = (row: DrawingRow): DrawingRecord => ({
@@ -137,6 +163,21 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
     ))`);
     values.push(filters.materialBatchId);
   }
+  if (filters.productId !== undefined) {
+    conditions.push(`(record.product_id = ? or exists(select 1 from business_usage usage
+      where ${exactUsageIdentity} and usage.product_id = ?))`);
+    values.push(filters.productId, filters.productId);
+  }
+  if (filters.usageBatchId !== undefined) {
+    conditions.push(`exists(select 1 from business_usage usage where ${exactUsageIdentity}
+      and usage.batch_id = ?${filters.productId !== undefined ? ' and usage.product_id = ?' : ''})`);
+    values.push(filters.usageBatchId);
+    if (filters.productId !== undefined) values.push(filters.productId);
+  }
+  if (filters.associationState === 'pending') {
+    conditions.push(`(record.product_id is null or not exists(select 1 from business_usage usage
+      where ${exactUsageIdentity} and usage.batch_id is not null))`);
+  }
   if (filters.status !== undefined) { conditions.push('record.status = ?'); values.push(filters.status); }
   if (filters.sourcePresence && filters.sourcePresence !== 'all') {
     conditions.push('record.has_source_file = ?'); values.push(filters.sourcePresence === 'present' ? 1 : 0);
@@ -158,16 +199,18 @@ export class DrawingRepository {
 
   search(filters: DrawingSearchFilters, page: number, pageSize: number): { items: DrawingRecord[]; total: number } {
     const condition = buildConditions(filters);
-    const total = (this.db.prepare(`${unifiedCte} select count(*) as total from drawing_records record${condition.sql}`)
+    const cte = unifiedCte(filters.productId !== undefined || filters.usageBatchId !== undefined
+      || filters.associationState !== undefined);
+    const total = (this.db.prepare(`${cte} select count(*) as total from drawing_records record${condition.sql}`)
       .get(...condition.values) as { total: number }).total;
-    const rows = this.db.prepare(`${unifiedCte} select * from drawing_records record${condition.sql}
+    const rows = this.db.prepare(`${cte} select * from drawing_records record${condition.sql}
       order by record.created_at desc, record.id desc limit ? offset ?`)
       .all(...condition.values, pageSize, (page - 1) * pageSize) as DrawingRow[];
     return { items: rows.map(mapRow), total };
   }
 
   get(id: number): DrawingRecord | undefined {
-    const row = this.db.prepare(`${unifiedCte} select * from drawing_records where id = ?`).get(id) as DrawingRow | undefined;
+    const row = this.db.prepare(`${unifiedCte(true)} select * from drawing_records where id = ?`).get(id) as DrawingRow | undefined;
     return row ? mapRow(row) : undefined;
   }
 
@@ -186,27 +229,41 @@ export class DrawingRepository {
         conversionType: DrawingFileRecord['conversionType'];
       }>;
     const files = fileRows.map((file): DrawingFileRecord => ({ ...file, isPresent: file.isPresent === 1 }));
-    const currentBomUsage = drawing.origin === 'planned' ? (this.db.prepare(`select version.id as bomVersionId,
-      version.product_id as productId, product.model, usage_drawing.color_id as colorId, color.name as colorName,
+    const currentBomUsage = (this.db.prepare(`select version.id as bomVersionId,
+      version.product_id as productId, product.model, ? as colorId, ? as colorName,
       version.version_number as versionNumber, item.project_item_id as projectItemId,
       project.name as projectItemName, item.quantity, item.uses_white_material as usesWhiteMaterial
       from bom_current current_bom
-      join bom_versions version on version.id = current_bom.version_id
+      join bom_versions version on version.id = current_bom.version_id and version.product_id = current_bom.product_id
       join products product on product.id = version.product_id
       join bom_items item on item.bom_version_id = version.id
-      join drawing_numbers usage_drawing on usage_drawing.id = item.drawing_id
-      join dictionary_items color on color.id = usage_drawing.color_id
       join dictionary_items project on project.id = item.project_item_id
-      where item.drawing_id = ? and item.deleted_at is null and version.deleted_at is null
-      order by product.model, color.name, project.name`)
-      .all(drawing.id) as DrawingBomUsageRow[]).map((row): DrawingBomUsage => ({
+      where ${drawing.origin === 'planned' ? 'item.drawing_id' : 'item.historical_drawing_id'} = ?
+        and item.deleted_at is null and version.deleted_at is null
+      order by product.model, project.name`)
+      .all(drawing.colorId, drawing.colorName, Math.abs(drawing.id)) as DrawingBomUsageRow[]).map((row): DrawingBomUsage => ({
         ...row, usesWhiteMaterial: row.usesWhiteMaterial === 1,
-      })) : [];
+      }));
     return { ...drawing,
       sourceFiles: files.filter((file) => file.conversionType === 'source'),
       outlinedFiles: files.filter((file) => file.conversionType === 'outlined'),
-      currentBomUsage, readOnly: drawing.origin === 'historical',
+      currentBomUsage, businessUsage: this.businessUsage(id), readOnly: drawing.origin === 'historical',
       readOnlyMessage: drawing.origin === 'historical' ? '历史图号的编码和文件关联不可修改；停用不释放号码。' : null };
+  }
+
+  businessUsage(id?: number): DrawingBusinessUsage[] {
+    const rows = this.db.prepare(`${businessUsageCte}
+      select distinct usage.origin, usage.record_id as recordId, usage.product_id as productId,
+        usage.batch_id as batchId, batch.name as batchName, usage.source, usage.source_id as sourceId,
+        usage.is_current as current, coalesce(product.sku, '') as sku, coalesce(product.model, '') as model
+      from ${id === undefined ? 'business_usage' : 'raw_business_usage'} usage
+      left join products product on product.id = usage.product_id
+      left join material_batches batch on batch.id = usage.batch_id
+      ${id === undefined ? '' : 'where usage.origin = ? and usage.record_id = ?'}
+      order by usage.product_id, usage.batch_id, usage.source, usage.source_id`)
+      .all(...(id === undefined ? [] : [id < 0 ? 'historical' : 'planned', Math.abs(id)])) as
+      Array<Omit<DrawingBusinessUsage, 'current'> & { current: number }>;
+    return rows.map((row) => ({ ...row, current: row.current === 1 }));
   }
 
   updateStatus(id: number, status: 'active' | 'voided'): void {

@@ -1,0 +1,66 @@
+# P4 Windows隔离验收交付（2026-10-15）
+
+本轮仅P4。独立分支`codex/p4-workspace-refinement-20261015`，固定应用提交`8dc2112b596cebc045a121f6e5126c8059a6c4e0`；交付工作流提交`20cae427ad7a8391537536351d48daf1683eaeb7`。WindowsCI实际构建与启动烟测通过。未合并master、未创建PR或正式发布，P1/P2/P3旧目录和历史记录保留。
+
+## 最少操作
+
+1. 关闭当前旧验收版，避免4317端口冲突；不要结束不明进程。
+2. 从下方GitHub Actions制品链接下载完整ZIP。建议解压到新目录`D:\Codex验收\P4-8dc2112\`，不要放入旧版目录，也不要只复制exe。
+3. 双击`图号规划器验收版.exe`。标题应为“图号规划器 P4 验收版 · 8dc2112”。本包无须Node、开发服务器或另建数据库。
+4. 图号库选择每页50，应有40条；PDF有实际隔离样例，产品关联二维码按真实状态直接显示。具体验收见`p4-workspace-refinement-20261015.md`。
+
+仅使用包内隔离资料；不要选择正式数据库、正式资料根或导入真实资料。首次启动由原隔离bootstrap复制样例到系统appData下`DrawingNumberPlannerAcceptance\8dc2112\`；与正式版及旧验收版各目录隔离。样例仅用于索引/布局，不是PDF预览实现或二维码扫描通过证明。
+
+## 版本核对与恢复
+
+窗口标题的P4+短SHA、`resources\app\acceptance-version.json`完整SHA、运行隔离目录`.acceptance-version`必须一致。Git分支文档交付提交可能晚于应用固定SHA，包固定的应用SHA才是运行版本。`windows-verification.json`记录实际WindowsCI启动、健康检查、实测CSS视口及隔离路径；`Windows-smoke-outcome.txt`应为success。
+
+验收失败：关闭P4，重新启动保留的P3/P2/P1或正式旧版目录。不要把P4验收数据库复制给旧版本，不需要git reset或覆盖安装。重验需要全新样例时，先关闭应用，将**本P4 SHA专属**隔离目录改名备份再启动；不处理正式或其他SHA目录。
+
+## 本地重建备用
+
+需要Git for Windows、Node.js24和PowerShell。使用新源码目录，以下不覆盖旧工作树或未提交修改：
+
+```powershell
+git clone --single-branch --branch codex/p4-workspace-refinement-20261015 https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner.git D:\Codex验收\P4-build-tools
+cd D:\Codex验收\P4-build-tools
+# 工具自动另建干净固定源码与全新输出目录，不覆盖旧目录。
+./scripts/build-p1-windows.ps1 -Phase P4 -Revision 8dc2112b596cebc045a121f6e5126c8059a6c4e0
+```
+
+不将工具默认P1 SHA作为P4版本。不要在有未提交修改的旧仓库强行切分支；工具会拒绝脏源码和已存在输出目录。
+
+## 尚待Windows人工确认
+
+本包WindowsCI仅启动及部分布局/键盘/数据密度烟测；不代表人工视觉验收。1920×1080/2560×1440/3840×2160，适用100/125/150/200%系统缩放、最大化/窗口化/半屏/窄窗、跨不同DPI显示器移动，均需你在实际Windows设备核对宽高。720×600 CSS px核心操作/弹窗/完整图号复制可达，不强求三栏；图号/文件详情拖宽不能破坏主表核对。所有危险操作和真实文件动作仅在隔离样例中验收。
+
+## 实际制品与Windows结果
+
+- 下载：[P4-Windows-x64-8dc2112](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38697339387/artifacts/11955251774)，约159MiB，GitHub登录后下载，保留期至2026-10-29。
+- 工作流：[38697339387](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38697339387)。Windows构建与实际Electron启动、健康检查/隔离路径/标题版本、三组实测CSS尺寸及PDF布局、键盘调宽、图号40条检查通过。
+- 包内`Windows-P4文件详情.png`、`Windows-P4图号详情.png`、`Windows启动烟测.png`与`windows-verification.json`提供实际Windows证据。完整系统DPI/跨屏人工验收尚未执行。
+- 制品ZIP摘要：`sha256:0da09a979761e561ceafe50e1f06642fd1e964c9a9e4ad231458d198c50f94bd`。
+
+## Windows PowerShell 5.1构建兼容修正（本地反馈）
+
+用户本地执行策略处理后出现中文乱码与连续ParserError，构建尚未开始。根因：含中文的`build-p1-windows.ps1`以UTF-8无BOM保存，Windows PowerShell 5.1按系统旧代码页读取，中文字节被误解读为引号等语法字符。原WindowsCI使用pwsh（PowerShell7），不能证明系统自带5.1可解析。
+
+- 回归提交`897512b`：在真实Windows PowerShell5.1调用Parser.ParseFile，CI38705100274失败，复现Unexpected token与乱码；保留RED证据。
+- 修复提交`9a9b5da`：仅给构建脚本增加UTF-8 BOM，脚本文本与行为不变；不改应用8dc2112，不改执行策略、安全机制或正式数据。
+- 原源码目录中更新工具：`git pull --ff-only origin codex/p4-workspace-refinement-20261015`，成功后再执行原固定SHA构建命令。不强制重置或覆盖本地修改。
+- Windows PowerShell运行脚本被策略拦截与编码错误是两个独立问题；不永久修改系统策略，不使用Bypass/全局Unrestricted。
+
+复测：CI[38705216259](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38705216259)的真实Windows PowerShell5.1解析检查已通过（GREEN）；脚本正文与原文件逐字节相同，仅增加EF BB BF。进度文档专项3/3通过。本地最终构建/启动仍以用户实际执行结果为准。
+
+## Windows PowerShell5.1版本检测运行错误（后续本地反馈）
+
+Node.js已安装v24.22.0，但`node -p`中嵌套双引号被Windows PowerShell5.1传原生程序参数时移除，实际Node输入变成`process.versions.node.split(.)[0]`。表达式SyntaxError导致空输出被转为0，从而误报需Node24。与前面的文件编码问题不同；用户不用重装Node。
+
+原5.1只做ParseFile，完整构建仍由pwsh执行，未覆盖该运行时差异。本次将完整构建步骤切为Windows PowerShell5.1复现，再将版本检测改为`node --version`并在PowerShell内解析主版本，检查原生命令退出码；不改变Node24最低要求、P4应用SHA8dc2112、数据隔离或业务。
+
+本次运行证据：
+
+- RED：[38706094312](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38706094312)，完整Windows PowerShell5.1构建在版本检测处复现`process.versions.node.split(.)[0]`和错误版本提示。
+- 修复：`a2f3472`，保留UTF-8 BOM，改用`node --version`，校验退出码并在PowerShell内解析主版本；仍拒绝小于24或无法读取的版本。
+- GREEN：[38706227976](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/38706227976)，Windows PowerShell5.1完整构建成功，实际Electron启动/隔离数据/文件详情及40图号烟测通过；不再只有语法解析。进度文档专项3/3通过。
+- P4应用仍固定`8dc2112b596cebc045a121f6e5126c8059a6c4e0`；未修改应用、API、数据库、IPC或系统策略。Skill影响检查：无业务或验收规则变更，不需改Skill。

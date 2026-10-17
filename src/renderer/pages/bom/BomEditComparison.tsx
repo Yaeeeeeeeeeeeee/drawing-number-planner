@@ -1,5 +1,6 @@
 import { Children, type ReactNode } from 'react';
 import type { BomItemView, DictionaryItemView } from '../../data/client';
+import { BomValue } from './BomValue';
 import { materialBatchLabel } from '../../../core/files/material-batch-label';
 
 const fields = ['主类别', '项目', '图号', '生效批次', '材质', '尺寸', '图片', '位置', '位置示意图', '修改明细', '备注'];
@@ -10,12 +11,12 @@ export function BomEditComparison({ index, original, mainCategories, projects, c
   query?: boolean; previousDate?: string; selectedDate?: string; changeDetails?: string | null;
 }) {
   const attachments = (role: 'image' | 'diagram') => original?.assets.filter((asset) => asset.role === role).map((asset) =>
-    <div key={asset.id}><span>{asset.originalFileName}{asset.inherited || asset.inheritedFromBomItemAssetId ? '（沿用）' : ''}</span><small className="bom-asset-path">{asset.relativePath}</small></div>);
+    <div key={asset.id}><span>{asset.originalFileName}{asset.inherited || asset.inheritedFromBomItemAssetId ? '（沿用）' : ''}</span></div>);
   const values: ReactNode[] = original ? [
     mainCategories.find((category) => category.id === projects.find((project) => project.id === original.projectItemId)?.parentId)?.name,
     original.projectItemName,
-    <><span className="code-cell">{original.fullCode}</span><small>{original.origin === 'historical' ? '历史图号' : '正式图号'} · {original.status === 'voided' ? '作废' : original.status === 'inactive' ? '已停用' : original.status === 'reserved' ? '已占号' : '使用中'}{original.usesWhiteMaterial ? ' · 引用白色图号' : ''}</small></>,
-    <><span>{original.effectiveBatchName ? materialBatchLabel(original.effectiveBatchName) : '未选择'}</span><small className="bom-asset-path">{original.effectiveBatchRelativePath}</small></>,
+    <BomValue value={original.fullCode} code/>,
+    original.effectiveBatchName ? <BomValue value={materialBatchLabel(original.effectiveBatchName)}/> : '未选择',
     original.material, original.dimensions,
     original.assets.some((asset) => asset.role === 'image') ? attachments('image') : '未关联图片',
     original.position,

@@ -56,6 +56,7 @@ describe('QrCodesPage', () => {
     render(<QrCodesPage api={api as never} />);
 
     expect(await screen.findByRole('heading', { name: '二维码管理' })).toBeVisible();
+    expect(screen.queryByRole('columnheader',{name:'二维码用途'})).not.toBeInTheDocument();
     expect(screen.getByLabelText('SKU / 型号')).toBeVisible();
     expect(screen.getByLabelText('产品类别')).toBeVisible();
     expect(screen.getByLabelText('用途')).toBeVisible();
@@ -143,4 +144,29 @@ describe('QrCodesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '查看文件' }));
     expect(await screen.findByText('请在 Windows 桌面版查看二维码文件')).toBeVisible();
   });
+});
+
+it('opens an unconfigured product purpose with exact preselection and never creates automatically',async()=>{
+ const purpose={id:8,key:'recipe',englishName:'Recipe',displayName:'菜谱',status:'active',defaultForAll:false,productCategories:[]};
+ const product={id:3,sku:'SKU-Q1',model:'Q100',productCategory:'冰柜',status:'inactive'};
+ const api={listQrCodes:vi.fn().mockResolvedValue({items:[]}),listQrPurposes:vi.fn().mockResolvedValue({items:[purpose]}),listProducts:vi.fn().mockResolvedValue([product]),listPendingQrFiles:vi.fn().mockResolvedValue({items:[]}),createQrCode:vi.fn()};
+ render(<QrCodesPage api={api as never} {...{productTarget:{productId:3,sku:'SKU-Q1',model:'Q100',productCategory:'冰柜',purposeKey:'recipe' as const,purposeLabel:'菜谱',purposeEnglishName:'Recipe'}}}/>);
+ expect(await screen.findByLabelText('新增二维码产品')).toHaveValue('3');expect(screen.getByLabelText('新增二维码用途')).toHaveValue('8');
+ expect(api.createQrCode).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'返回产品档案'})).toBeVisible();expect(screen.getByRole('button',{name:'保存新增二维码'})).toBeDisabled();expect(screen.getByText(/须在产品编辑中重新启用/)).toBeVisible();
+});
+it('shows all matching records instead of arbitrarily opening one',async()=>{
+ const api={listQrCodes:vi.fn().mockResolvedValue({items:[manual,{...manual,id:12,name:'同用途第二条',status:'inactive'}]}),listQrPurposes:vi.fn().mockResolvedValue({items:[{id:1,key:'user_manual',status:'active',displayName:'说明书'}]}),listProducts:vi.fn().mockResolvedValue([{id:3,sku:'SKU-Q1',model:'Q100',status:'active'}]),getQrCode:vi.fn()};
+ render(<QrCodesPage api={api as never} {...{productTarget:{productId:3,sku:'SKU-Q1',model:'Q100',productCategory:'冰柜',purposeKey:'user_manual' as const,purposeLabel:'说明书',purposeEnglishName:'User Manual'}}}/>);
+ expect(await screen.findByRole('button',{name:'查看 同用途第二条'})).toBeVisible();expect(screen.getByRole('button',{name:'查看 Q100 使用说明'})).toBeVisible();expect(api.getQrCode).not.toHaveBeenCalled();
+});
+it('opens the inactive target record and retains its explicit enable action',async()=>{
+ const inactive={...manual,status:'inactive'};
+ const api={listQrCodes:vi.fn().mockResolvedValue({items:[inactive]}),listQrPurposes:vi.fn().mockResolvedValue({items:[{id:1,key:'user_manual',status:'active'}]}),listProducts:vi.fn().mockResolvedValue([{id:3,sku:'SKU-Q1',model:'Q100',status:'active'}]),getQrCode:vi.fn().mockResolvedValue(inactive),activateQrCode:vi.fn()};
+ render(<QrCodesPage api={api as never} productTarget={{productId:3,sku:'SKU-Q1',model:'Q100',productCategory:'冰柜',purposeKey:'user_manual',purposeLabel:'说明书',purposeEnglishName:'User Manual'}}/>);
+ expect(await screen.findByRole('heading',{name:manual.name})).toBeVisible();expect(screen.getByRole('button',{name:'启用二维码'})).toBeVisible();expect(api.activateQrCode).not.toHaveBeenCalled();
+});
+it('never falls back to an unrelated purpose when the target purpose is unavailable',async()=>{
+ const api={listQrCodes:vi.fn().mockResolvedValue({items:[]}),listQrPurposes:vi.fn().mockResolvedValue({items:[{id:1,key:'user_manual',status:'active'}]}),listProducts:vi.fn().mockResolvedValue([{id:3,sku:'SKU-Q1',model:'Q100',status:'active'}]),createQrCode:vi.fn()};
+ render(<QrCodesPage api={api as never} productTarget={{productId:3,sku:'SKU-Q1',model:'Q100',productCategory:'冰柜',purposeKey:'recipe',purposeLabel:'菜谱',purposeEnglishName:'Recipe'}}/>);
+ expect(await screen.findByText(/对应资料用途尚未建立/)).toBeVisible();expect(screen.queryByLabelText('新增二维码用途')).toBeNull();expect(screen.getByRole('button',{name:'新增二维码'})).toBeDisabled();expect(api.createQrCode).not.toHaveBeenCalled();
 });

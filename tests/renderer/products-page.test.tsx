@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProductsPage } from '../../src/renderer/pages/ProductsPage';
@@ -19,14 +19,30 @@ describe('ProductsPage', () => {
     const onOpenQr = vi.fn();
     render(<ProductsPage api={api as never} onOpenQr={onOpenQr} />);
 
-    fireEvent.click(await screen.findByText('二维码 2 项'));
-    fireEvent.click(screen.getByText('二维码 1 项'));
-    expect(screen.getByRole('button', { name: '说明书 · 启用中' })).toBeVisible();
-    expect(screen.getByRole('button', { name: '售后 · 已停用' })).toBeVisible();
+    await screen.findByRole('button', { name: '说明书 · 已启用' });
+    expect(screen.queryByText(/二维码 \d+ 项/)).not.toBeInTheDocument();
+    const headers = screen.getAllByRole('columnheader').map(header => header.textContent);
+    expect(headers).not.toContain('关联资料');
+    expect(headers.slice(4, 7)).toEqual(['说明书', '售后卡', '菜谱']);
+    const normalCells = within(screen.getByText('SKU-N · N100').closest('tr')!).getAllByRole('cell');
+    expect(within(normalCells[4]).getByRole('button', { name: '说明书 · 已启用' })).toBeVisible();
+    expect(within(normalCells[4]).getByRole('button', {name:'说明书 · 已启用'})).toHaveClass('product-purpose-active');
+    expect(within(normalCells[5]).getByRole('button', {name:'售后卡 · 已停用'})).toHaveClass('product-purpose-inactive');
+    expect(within(normalCells[6]).getByRole('button', {name:'菜谱 · 未配置'})).toHaveClass('product-purpose-unconfigured');
+    expect(within(normalCells[5]).getByRole('button', { name: '售后卡 · 已停用' })).toBeVisible();
+    expect(normalCells[6]).toHaveTextContent('未配置');
+    expect(headers).toEqual(['SKU / 型号','品牌 / 类别','产品规格','状态','说明书','售后卡','菜谱','操作']);
+    expect(screen.queryByRole('button',{name:/详情 /})).toBeNull();
+    expect(screen.queryByRole('button',{name:/停用 /})).toBeNull();
+
+    expect(screen.getByRole('button', { name: '说明书 · 已启用' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '售后卡 · 已停用' })).toBeVisible();
     expect(screen.getByRole('button', { name: '菜谱 · 已停用' })).toBeVisible();
     expect(screen.queryByText('Quick Start')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '菜谱 · 已停用' }));
-    expect(onOpenQr).toHaveBeenCalledWith(21);
+    expect(onOpenQr).toHaveBeenCalledWith(expect.objectContaining({productId:2,sku:'SKU-A',model:'A100',purposeKey:'recipe'}));
+    fireEvent.click(within(normalCells[6]).getByRole('button',{name:'菜谱 · 未配置'}));
+    expect(onOpenQr).toHaveBeenLastCalledWith(expect.objectContaining({productId:1,purposeKey:'recipe'}));
   });
 
   it('creates a product archive record with active dictionary selections', async () => {
@@ -60,9 +76,9 @@ describe('ProductsPage', () => {
     fireEvent.change(screen.getByLabelText('默认外观'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: '保存产品' }));
 
-    expect(await screen.findByText('ZC220')).toBeVisible();
+    expect(await screen.findByText(/ · ZC220$/)).toBeVisible();
     expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ sku: 'SKDZC220JP', model: 'ZC220', brandId: 1 }));
-    fireEvent.click(await screen.findByText('二维码 1 项'));
+    await screen.findByRole('button', { name: '说明书 · 已停用' });
     expect(screen.getByRole('button', { name: '说明书 · 已停用' })).toBeVisible();
     expect(api.listQrCodes).toHaveBeenLastCalledWith({ productId: created.id });
   });
@@ -86,7 +102,7 @@ describe('ProductsPage', () => {
       deactivateProduct: vi.fn().mockResolvedValue({ ...target, status: 'inactive' }),
     };
     render(<ProductsPage api={api as never} />);
-    await screen.findByText('ZC220');
+    await screen.findByText(/ · ZC220$/);
 
     fireEvent.change(screen.getByLabelText('搜索产品'), { target: { value: 'ZC22' } });
     fireEvent.change(screen.getByLabelText('筛选品牌'), { target: { value: '1' } });
@@ -100,7 +116,8 @@ describe('ProductsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
     expect(api.updateProduct).toHaveBeenCalledWith(2, expect.objectContaining({ model: 'ZC220A', referenceProductId: 1 }));
 
-    fireEvent.click(await screen.findByRole('button', { name: '停用 ZC220A' }));
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 ZC220A' }));
+    fireEvent.click(screen.getByRole('button', { name: '停用 ZC220A' }));
     expect(api.deactivateProduct).toHaveBeenCalledWith(2);
   });
 
@@ -119,11 +136,12 @@ describe('ProductsPage', () => {
     };
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<ProductsPage api={api as never} />);
-    await screen.findByText('ZC220');
+    await screen.findByText(/ · ZC220$/);
 
+    fireEvent.click(screen.getByRole('button', { name: '编辑 ZC220' }));
     fireEvent.click(screen.getByRole('button', { name: '启用 ZC220' }));
     await waitFor(() => expect(api.activateProduct).toHaveBeenCalledWith(2));
-    fireEvent.click(await screen.findByRole('button', { name: '详情 ZC220' }));
+
     fireEvent.click(screen.getByRole('button', { name: '删除档案 ZC220' }));
 
     const submit = await screen.findByRole('button', { name: '确认删除档案' });
@@ -132,7 +150,7 @@ describe('ProductsPage', () => {
     fireEvent.click(submit);
     await waitFor(() => expect(api.cleanupProduct).toHaveBeenCalledWith(2, 'ZC220'));
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('ZC220')).not.toBeInTheDocument();
+    expect(screen.queryByText(/ · ZC220$/)).not.toBeInTheDocument();
     confirm.mockRestore();
   });
 
@@ -151,8 +169,8 @@ describe('ProductsPage', () => {
     };
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<ProductsPage api={api as never} />);
-    await screen.findByText('ZC220');
-    fireEvent.click(screen.getByRole('button', { name: '详情 ZC220' }));
+    await screen.findByText(/ · ZC220$/);
+    fireEvent.click(screen.getByRole('button', { name: '编辑 ZC220' }));
     fireEvent.click(screen.getByRole('button', { name: '删除档案 ZC220' }));
 
     expect(await screen.findByText('其他产品 T40 的 BOM #7 仍引用本产品资料')).toBeVisible();
@@ -184,7 +202,7 @@ describe('ProductsPage', () => {
     await screen.findByText('还没有产品档案');
     expect(screen.queryByText('SKDZU070JP')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '从资料库识别历史产品' }));
+    fireEvent.click(screen.getByRole('button', { name: '识别历史产品' }));
     expect(await screen.findByText('SKDZU070JP')).toBeVisible();
     expect(screen.getByText('4 个历史图号')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '确认建立 ZU70SD' }));
@@ -199,8 +217,8 @@ describe('ProductsPage', () => {
       brandId: 1, productSizeId: 2, defaultAppearanceId: 3,
     }));
     expect(await screen.findByText('已建立 ZU70SD，并关联 4 个历史图号。')).toBeVisible();
-    expect(screen.getByText('ZU70SD')).toBeVisible();
-    fireEvent.click(await screen.findByText('二维码 1 项'));
+    expect(screen.getByText(/ · ZU70SD$/)).toBeVisible();
+    await screen.findByRole('button', { name: '说明书 · 已停用' });
     expect(screen.getByRole('button', { name: '说明书 · 已停用' })).toBeVisible();
     expect(api.listQrCodes).toHaveBeenLastCalledWith({ productId: created.id });
   });
@@ -216,8 +234,23 @@ describe('ProductsPage', () => {
     };
     render(<ProductsPage api={api as never} />);
     await screen.findByText('还没有产品档案');
-    fireEvent.click(screen.getByRole('button', { name: '从资料库识别历史产品' }));
+    fireEvent.click(screen.getByRole('button', { name: '识别历史产品' }));
     expect(await screen.findByText('目录信息有歧义，请先人工整理或补充确认')).toBeVisible();
     expect(screen.queryByRole('button', { name: '确认建立 A' })).not.toBeInTheDocument();
   });
+});
+
+it('restores filters and scroll after returning and reloads independent business states',async()=>{
+ const p={id:2,sku:'F-SKU',model:'F60',brandId:1,brandName:'品牌',productCategory:'空气炸锅',productSizeId:1,productSizeName:'6L',status:'active',defaultAppearanceId:null,defaultAppearanceName:null,referenceProductId:null,referenceProductModel:null};
+ const code={id:4,productId:2,key:'user_manual',status:'active',files:[]};
+ const api={listProducts:vi.fn().mockResolvedValue([p]),listDictionaries:vi.fn().mockResolvedValue([{id:1,name:'品牌'}]),listQrCodes:vi.fn().mockResolvedValue({items:[code]})};
+ const onOpenQr=vi.fn();const {rerender}=render(<ProductsPage api={api as never} onOpenQr={onOpenQr}/>);
+ await screen.findByRole('button',{name:'说明书 · 已启用'});
+ fireEvent.change(screen.getByLabelText('搜索产品'),{target:{value:'F60'}});fireEvent.change(screen.getByLabelText('筛选品牌'),{target:{value:'1'}});fireEvent.change(screen.getByLabelText('筛选产品类别'),{target:{value:'空气炸锅'}});fireEvent.change(screen.getByLabelText('产品状态'),{target:{value:'active'}});
+ fireEvent.click(screen.getByRole('button',{name:'筛选'}));await waitFor(()=>expect(api.listProducts).toHaveBeenLastCalledWith({search:'F60',brandId:1,productCategory:'空气炸锅',status:'active'}));
+ await screen.findByText('F-SKU · F60');const table=document.querySelector('.table-wrap')!;table.scrollTop=180;table.scrollLeft=60;
+ fireEvent.click(screen.getByRole('button',{name:'说明书 · 已启用'}));rerender(<ProductsPage api={api as never} onOpenQr={onOpenQr} active={false}/>);
+ api.listQrCodes.mockResolvedValue({items:[{...code,status:'inactive'}]});rerender(<ProductsPage api={api as never} onOpenQr={onOpenQr} active/>);
+ expect(await screen.findByRole('button',{name:'说明书 · 已停用'})).toBeVisible();expect(screen.getByLabelText('搜索产品')).toHaveValue('F60');expect(screen.getByLabelText('筛选品牌')).toHaveValue('1');expect(screen.getByLabelText('筛选产品类别')).toHaveValue('空气炸锅');expect(screen.getByLabelText('产品状态')).toHaveValue('active');
+ await waitFor(()=>expect(document.querySelector('.table-wrap')!.scrollTop).toBe(180));expect(document.querySelector('.table-wrap')!.scrollLeft).toBe(60);
 });

@@ -46,3 +46,45 @@ When a task changes a rule, update the classification and supporting reference o
 For UI, desktop delivery, acceptance claims, or changes affecting confirmed rules, read [the UI baseline and acceptance supplement](references/ui-and-acceptance.md#ui-baseline-and-acceptance-supplement-2026-10-13) and the project documents `docs/approved-ui-alignment-20261013.md` and `docs/desktop-acceptance-20261013.md`. These are dated evidence, not blanket authorization or proof of final acceptance.
 
 Preserve confirmed module layouts and real business safeguards. Keep candidate UI, automated verification, conditional acceptance, manual desktop acceptance, and final release acceptance separate. Before concluding future work, check whether it changes a Current rule, a module UI principle, a deprecated design, or an acceptance boundary; update only affected Skill guidance when a confirmed rule actually changes. Report missing evidence and unresolved discrepancies rather than promoting a candidate or test result to human approval.
+
+
+<!-- drawing-number-planner-workspace-20261014 -->
+## Current UI direction (2026-10-14)
+
+For future UI work, also read [the current workspace supplement](references/ui-and-acceptance.md#minimal-engineering-workspace-supplement-2026-10-14), `docs/minimal-engineering-workspace-design-20261014.md` and `docs/minimal-engineering-workspace-acceptance-20261014.md`. These confirmed decisions supersede conflicting earlier visual constraints only; preserve the 2026-10-13 historical evidence and all business protections. P0 design approval alone does not authorize implementation. Check the latest explicit phase authorization; the 2026-10-14 P1 authorization and evidence are routed by `docs/p1-minimal-workspace-20261014.md`. P1 does not authorize P2 or later phases.
+
+### Later P2 authorization and P1 feedback
+
+The user subsequently gave preliminary approval to P1 and explicitly authorized fixing narrow product/dictionary action wrapping and left-aligning PDF filenames, then continuing directly into P2 for combined acceptance. Read `docs/p2-workspaces-20261014.md` and `docs/superpowers/plans/2026-10-14-p2-workspaces.md` for that scope and fresh evidence. This does not authorize P3–P5, merge, production data, embedded PDF preview or draggable widths. Preliminary P1 approval is not full Windows/DPI or release acceptance.
+
+### P3 authorization (2026-10-15)
+
+The user explicitly authorized P3 and included PDF/dictionary/planning feedback. Read `docs/p3-module-alignment-20261015.md`: module headings use one Chinese title and one Chinese description, without English eyebrows; PDF table columns center except the filename, with single-line batch and batch state; opening file detail preserves list width with local scrolling; dictionary columns align with their toolbar; planning item numbers remain single-line. P3 preserves all confirmed information structures, business actions, semantic colors and historical evidence. No P4 resizing, merge or production-data authorization follows.
+
+### P4 authorization and current refinements (2026-10-15)
+
+User explicitly authorized P4 including latest feedback. Read `docs/p4-workspace-refinement-20261015.md` and the P4 plan. PDF now scrolls only its central file table; product/batch navigation stays fixed and file detail overlays that central workspace, with the narrow modal preserved. Product QR entry is a direct list of real purposes/states rather than a count disclosure. P4 permits constrained, keyboard-accessible panel resizing and reset without persistence; planning/outbound gain visual stage grouping while keeping existing business actions, validation and manual-draft protection. Historical P3 scroll and QR disclosure requirements are superseded only by these confirmed UI changes. No P5/merge/production-data authorization follows.
+
+### Latest P4 existing-data adaptive layout (2026-10-15)
+
+Read `docs/p4-adaptive-data-workspaces-20261015.md` for the user's later all-page width/height refinement. It supersedes the earlier P4 wide PDF overlay: dock detail beside the primary list when the measured width budget permits, use a drawer when narrow, and preserve independent scrolling, resizing, focus and selection. Data regions may use full available width/height while controls remain bounded; preserve complete pagination and all record/history semantics. For this refinement, use existing data read-only and do not create/clone records or run the old 40-record seed to simulate density. Earlier sample evidence remains historical, not real-data acceptance. Explicitly report missing populated data, physical 4K/Windows DPI and native-window evidence. No P5/merge/production write authorization follows.
+
+### Latest P4 BOM query history refinement (2026-10-16)
+
+For the later explicit query-only history comparison request, read `docs/p4-bom-history-comparison-20261016.md` and the matching supplement in `references/ui-and-acceptance.md`. This authorizes summaries, reliable matching, changed-field filtering, project folding and verified historical attachments only in query details. Earlier path hiding is superseded here only by on-demand disclosure; all data safety and manual Windows acceptance boundaries remain.
+
+### P4 historical edit and detail corrections (latest 2026-10-16)
+
+Read `docs/p4-bom-edit-corrections-20261016.md` and the matching business/UI reference supplements. The latest user request explicitly protects original record identity/date/submission time and count on edits, separates batch metadata from field cells, puts copy icons beside values, and removes QR from BOM query fields/diff counting without deleting relationships. This supersedes preceding date-correction/inline-batch-details presentation only; no duplicate-data cleanup, Schema/merge or production write authorization follows.
+
+### Latest BOM copy-control removal (2026-10-16)
+
+The user subsequently requested no copy buttons in BOM details. BOM query first/history fields, batch disclosures, historical attachment path disclosures and edit comparison display complete selectable text without copy controls. This supersedes the preceding inline-copy requirement only within BOM; retain copy actions in other modules and all business/data protections.
+
+### Product archive table and purpose navigation (2026-10-16)
+
+Latest explicit request: see docs/p4-products-list-20261016.md. The real product archive uses exactly eight combined identity/specification/status/purpose/action columns, with only Edit in row actions. No inline detail/edit expansion; lifecycle and protected cleanup remain in the separate product editor. Standard purpose status links use product identity and stable purpose keys; missing, single and multiple records have distinct navigation without automatic writes. Returning preserves filters/scroll and refreshes QR business states; file availability does not infer business state. This supersedes earlier product expansion/dynamic-purpose-column UI rules only. User explicitly paused Windows-package delivery pending further requests; do not package automatically. Preserve Schema, uniqueness, inactive-product creation restrictions and all data safeguards.
+
+### P4 用户确认及 master 合并授权（2026-10-17）
+
+用户确认本轮版本，并随后明确要求“合并到master”。本次将已交付的 fc236a6 应用及后续文档合入 master 已获授权，替代此前 P4 未授权合并的限制。保持既有测试失败、物理Windows/DPI证据边界的诚实记录，不因此修改已确认应用、真实业务数据、Schema或历史文件。合并记录见 docs/p4-master-merge-20261017.md。

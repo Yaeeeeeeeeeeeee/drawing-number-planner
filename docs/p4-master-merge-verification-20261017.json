@@ -1,0 +1,100 @@
+{
+  "total": 994,
+  "passed": 978,
+  "failed": 16,
+  "failures": [
+    {
+      "file": "tests/core/indexed-pdf-resolver.test.ts",
+      "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace",
+      "error": "AssertionError: expected function to throw an error, but it didn't"
+    },
+    {
+      "file": "tests/core/outbound-artifact-ownership.test.ts",
+      "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs",
+      "error": "AssertionError: expected { claimsRemoved: 2, …(1) } to deeply equal { claimsRemoved: 2, …(1) }"
+    },
+    {
+      "file": "tests/core/outbound-package-service.test.ts",
+      "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit",
+      "error": "AssertionError: expected { claimsRemoved: 2, …(1) } to deeply equal { claimsRemoved: 2, …(1) }"
+    },
+    {
+      "file": "tests/core/outbound-package-service.test.ts",
+      "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link",
+      "error": "AssertionError: expected function to throw an error, but it didn't"
+    },
+    {
+      "file": "tests/core/outbound-package-service.test.ts",
+      "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path",
+      "error": "AssertionError: expected function to throw an error, but it didn't"
+    },
+    {
+      "file": "tests/core/qr-file-scanner.test.ts",
+      "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file",
+      "error": "AssertionError: expected [ …(3) ] to deeply equal [ …(3) ]"
+    },
+    {
+      "file": "tests/core/workspace-paths.test.ts",
+      "test": "workspace paths normalizes a real root and resolves a nested relative path inside it",
+      "error": "Error: 资料根目录必须是已存在的本机绝对目录"
+    },
+    {
+      "file": "tests/core/workspace-paths.test.ts",
+      "test": "workspace paths rejects a directory junction that resolves outside the workspace",
+      "error": "AssertionError: expected function to throw an error, but it didn't"
+    },
+    {
+      "file": "tests/core/workspace-settings.test.ts",
+      "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances",
+      "error": "Error: 资料根目录必须是已存在的本机绝对目录"
+    },
+    {
+      "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+      "test": "isolated BOM roundtrip restores source filter and forces fresh check",
+      "error": "TestingLibraryElementError: Unable to find an element with the text: 前往处理. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible."
+    },
+    {
+      "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+      "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return",
+      "error": "TestingLibraryElementError: Unable to find an element with the text: 前往处理. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible."
+    },
+    {
+      "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+      "test": "isolated BOM roundtrip does not assume cancelled processing succeeded",
+      "error": "TestingLibraryElementError: Unable to find an element with the text: 前往处理. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible."
+    },
+    {
+      "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+      "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers",
+      "error": "TestingLibraryElementError: Found multiple elements with the text: 重新检查"
+    },
+    {
+      "file": "tests/renderer/product-bom-roundtrip.test.tsx",
+      "test": "isolated BOM roundtrip fails closed after product disappears",
+      "error": "TestingLibraryElementError: Unable to find an element with the text: 前往处理. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible."
+    },
+    {
+      "file": "tests/renderer/recovery-mock.test.tsx",
+      "test": "isolated recovery panel never mounts real recovery or queries API",
+      "error": "TestingLibraryElementError: Unable to find an accessible element with the role \"region\" and name \"安全恢复面板\""
+    },
+    {
+      "file": "tests/server/application-api.test.ts",
+      "test": "real application API removes only stale task-owned outbound claim and temporary files after restart",
+      "error": "AssertionError: expected [ true, true, true, true, true ] to deeply equal [ false, false, true, false, false ]"
+    }
+  ],
+  "newFailures": [],
+  "testedRevision": "4d8b43de6523121b9ae5db5d577be6447ac841f2",
+  "applicationRevision": "fc236a67bdf94a08494c29784b8eb92caad7c4a1",
+  "baseRevision": "b0c31a4c6d0688dfff9f42abe8ae04a700d25315",
+  "recordedAt": "2026-10-17T13:16:49.599159+00:00",
+  "typecheck": "passed",
+  "progressTests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "applicationChanged": false,
+  "mergeAuthorization": "用户已确认本版，并明确要求合并master后更新GitHub；已披露16项失败保留，不宣称全绿。",
+  "pr": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/pull/1"
+}

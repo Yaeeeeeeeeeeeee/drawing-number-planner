@@ -1,0 +1,60 @@
+name: P4 BOM historical edit corrections Windows package
+on:
+  push:
+    branches: [codex/p4-bom-edit-corrections-20261016]
+    paths:
+      - .github/workflows/p4-bom-windows-delivery.yml
+      - scripts/repack-p4-bom-windows.mjs
+      - scripts/verify-p4-bom-windows.cjs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  PLANNER_ACCEPTANCE_REVISION: eb5da2273cc4c8049ff78ca9cb330ca8e6a17ca5
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: eb5da2273cc4c8049ff78ca9cb330ca8e6a17ca5
+          path: bom-source
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Retrieve previously delivered P4 package without creating sample records
+        uses: actions/download-artifact@v4
+        with:
+          name: P4-Windows-x64-8dc2112
+          run-id: 38697339387
+          github-token: ${{ github.token }}
+          path: existing-p4
+      - name: Install pinned build tools and build unchanged application revision
+        shell: pwsh
+        working-directory: bom-source
+        run: |
+          npx --yes pnpm@11.25.0 install --frozen-lockfile --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency install failed' }
+          node node_modules/typescript/bin/tsc --noEmit
+          if ($LASTEXITCODE -ne 0) { throw 'Typecheck failed' }
+          node node_modules/vite/bin/vite.js build
+          if ($LASTEXITCODE -ne 0) { throw 'Renderer build failed' }
+          node node_modules/typescript/bin/tsc -p tsconfig.main.json
+          if ($LASTEXITCODE -ne 0) { throw 'Main build failed' }
+      - name: Package fixed BOM application with unchanged original sample and runtime
+        shell: pwsh
+        run: node scripts/repack-p4-bom-windows.mjs bom-source existing-p4 P4-BOM-Windows-eb5da22
+      - name: Verify actual Windows startup, BOM details and unchanged sample
+        shell: pwsh
+        run: node scripts/verify-p4-bom-windows.cjs bom-source "P4-BOM-Windows-eb5da22/图号规划器验收版.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: P4-BOM-Fix-Windows-x64-eb5da22
+          path: P4-BOM-Windows-eb5da22/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

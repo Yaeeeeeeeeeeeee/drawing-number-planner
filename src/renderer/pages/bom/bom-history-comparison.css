@@ -1,0 +1,39 @@
+.bom-page .bom-history-comparison { width:100%; min-width:0; color:var(--text-primary,#272727); }
+.bom-history-comparison .bom-history-basic { display:flex; align-items:baseline; gap:12px 24px; flex-wrap:wrap; padding:12px 0; }
+.bom-history-comparison h3,.bom-history-comparison h4,.bom-history-comparison p { margin:0; }
+.bom-history-comparison p { padding:6px 0; }
+.bom-history-comparison .bom-history-summary { padding:12px 0; border-block:1px solid #e5e5e5; }
+.bom-history-comparison .bom-history-counts { display:flex; gap:12px 24px; flex-wrap:wrap; padding:8px 0; font-weight:600; }
+.bom-history-comparison small { display:block; color:#737373; font-weight:400; overflow-wrap:anywhere; }
+.bom-history-comparison .bom-history-field-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 0; }
+.bom-history-comparison .bom-history-field-toolbar>div { display:flex; gap:12px; }
+.bom-history-comparison button[aria-pressed=true] { font-weight:700; text-decoration:underline; text-underline-offset:5px; }
+.bom-page .bom-history-comparison .bom-history-project { margin:0; padding:0; border:0; border-bottom:1px solid #ddd; min-width:0; }
+.bom-history-comparison .bom-history-project-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px; background:#f6f6f6; padding:8px; }
+.bom-history-comparison .bom-history-toggle { display:flex; align-items:center; text-align:left; gap:12px; white-space:normal; overflow-wrap:anywhere; }
+.bom-history-comparison .bom-history-project-body { padding:0 8px 12px; min-width:0; }
+.bom-history-comparison .bom-history-table-scroll { width:100%; overflow:auto; }
+.bom-page .bom-history-comparison table.bom-history-fields { width:100%; table-layout:fixed; min-width:460px; border-collapse:collapse; }
+.bom-history-comparison .bom-history-label-col { width:124px; }
+.bom-page .bom-history-comparison .bom-history-fields :is(th,td) { padding:9px 12px; vertical-align:top; text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; word-break:normal; border-bottom:1px solid #eee; }
+.bom-history-comparison .bom-history-fields thead th { background:#fafafa; }
+.bom-history-comparison .bom-history-fields tr[data-changed=true] { background:#f3f3f3; }
+.bom-history-comparison .bom-history-fields tr[data-changed=true] td:last-child { font-weight:600; }
+.bom-history-comparison .bom-history-fields .code-cell { white-space:normal; overflow-wrap:anywhere; }
+.bom-history-comparison .bom-history-asset { display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; margin-bottom:12px; }
+.bom-history-comparison .bom-history-asset>strong,.bom-history-comparison details { max-width:100%; overflow-wrap:anywhere; }
+.bom-history-comparison .bom-history-asset img { max-width:100%; width:180px; height:110px; object-fit:contain; }
+.bom-history-comparison .bom-history-asset details { font-size:12px; font-weight:400; }
+@media(max-width:900px) { .bom-history-comparison .bom-history-label-col { width:92px; } .bom-page .bom-history-comparison .bom-history-fields :is(th,td) { padding:8px; } }
+.bom-history-comparison .bom-history-path { display:block; }
+.bom-page .bom-history-comparison .bom-history-fields th:last-child { width:auto; }
+.bom-page .bom-history-comparison .bom-history-fields col.bom-history-label-col { width:124px; }
+@media(max-width:900px) { .bom-page .bom-history-comparison .bom-history-fields col.bom-history-label-col { width:92px; } }
+.bom-page .bom-history-comparison .bom-history-fields :is(th,td) { height:auto; }
+/* Shared read-only BOM values: full text and icon stay side by side. */
+.bom-history-comparison .bom-history-batch-details { margin:10px 0; font-size:12px; }
+.bom-history-comparison .bom-history-batch-snapshots { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:16px; padding:8px; border:1px solid #e5e5e5; }
+.bom-history-comparison .bom-history-batch-snapshots section { min-width:0; }
+.bom-history-comparison .bom-history-batch-snapshots dl { display:grid; grid-template-columns:80px minmax(0,1fr); gap:6px; }
+.bom-history-comparison .bom-history-batch-snapshots :is(dt,dd) { margin:0; min-width:0; overflow-wrap:anywhere; }
+.bom-page .bom-value-text { overflow-wrap:anywhere; white-space:pre-wrap; }

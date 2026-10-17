@@ -1,0 +1,189 @@
+{
+  "scope": "P4 cloud automated evidence; not manual Windows/DPI acceptance",
+  "unit": {
+    "passed": 903,
+    "total": 920,
+    "baselineFailuresUnchanged": true,
+    "failed": [
+      {
+        "file": "core/indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace"
+      },
+      {
+        "file": "core/outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path"
+      },
+      {
+        "file": "core/qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace"
+      },
+      {
+        "file": "core/workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances"
+      },
+      {
+        "file": "renderer/outbound-mock.test.tsx",
+        "test": "outbound isolated UI mock routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears"
+      },
+      {
+        "file": "renderer/recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API"
+      },
+      {
+        "file": "server/application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart"
+      }
+    ]
+  },
+  "rendererTargeted": {
+    "passed": 98,
+    "total": 98
+  },
+  "e2e": {
+    "passed": 6,
+    "total": 8,
+    "remaining": [
+      "tar.exe ENOENT",
+      "Windows backslash assertion on Linux"
+    ]
+  },
+  "typecheck": "passed",
+  "productionBuild": "Renderer and Main passed",
+  "browser": {
+    "assertions": 437,
+    "failures": 0,
+    "forbiddenWrites": [],
+    "viewportDprCases": [
+      [
+        720,
+        600,
+        1
+      ],
+      [
+        960,
+        540,
+        2
+      ],
+      [
+        1080,
+        800,
+        1
+      ],
+      [
+        1280,
+        720,
+        1.5
+      ],
+      [
+        1600,
+        900,
+        1
+      ],
+      [
+        1920,
+        1080,
+        1
+      ],
+      [
+        2560,
+        1440,
+        1
+      ],
+      [
+        3840,
+        2160,
+        1
+      ],
+      [
+        1536,
+        864,
+        1.25
+      ],
+      [
+        1706,
+        960,
+        1.5
+      ],
+      [
+        1280,
+        720,
+        2
+      ],
+      [
+        3072,
+        1728,
+        1.25
+      ],
+      [
+        2560,
+        1440,
+        1.5
+      ],
+      [
+        1920,
+        1080,
+        2
+      ]
+    ]
+  },
+  "isolatedSamples": {
+    "drawings": 40,
+    "PDFs": 81
+  },
+  "applicationRevision": "8dc2112b596cebc045a121f6e5126c8059a6c4e0",
+  "windowsCI": {
+    "runId": 38697339387,
+    "startupAndP4Smoke": "passed",
+    "artifactId": 11955251774,
+    "manualDpiCrossMonitor": "pending"
+  },
+  "extraReadOnlyBrowserChecks": {
+    "treeIndentationX": [
+      239,
+      251,
+      267
+    ],
+    "detailCheckboxIndependent": true,
+    "fileNameActionsSeparate": true
+  }
+}

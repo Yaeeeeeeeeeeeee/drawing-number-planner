@@ -1,0 +1,285 @@
+{
+  "date": "2026-10-16",
+  "branch": "codex/p4-products-list-20261016",
+  "scope": "Product archive UI and product-purpose QR navigation only; no package requested",
+  "related": {
+    "files": 6,
+    "passed": 58
+  },
+  "progressTests": 3,
+  "typecheck": "passed",
+  "rendererBuild": "passed (existing >500kB chunk warning)",
+  "mainBuild": "passed",
+  "full": {
+    "total": 969,
+    "passed": 952,
+    "failed": 17,
+    "newFailures": 0,
+    "failures": [
+      {
+        "file": "core/indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link",
+        "baseline": true
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path",
+        "baseline": true
+      },
+      {
+        "file": "core/qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file",
+        "baseline": true
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it",
+        "baseline": true
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace",
+        "baseline": true
+      },
+      {
+        "file": "core/workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances",
+        "baseline": true
+      },
+      {
+        "file": "server/application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart",
+        "baseline": true
+      },
+      {
+        "file": "renderer/outbound-mock.test.tsx",
+        "test": "outbound isolated UI mock routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers",
+        "baseline": true
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears",
+        "baseline": true
+      },
+      {
+        "file": "renderer/recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API",
+        "baseline": true
+      }
+    ]
+  },
+  "browser": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "source": "existing test fixtures via intercepted API; no real database",
+      "pass": true,
+      "headers": [
+        "SKU / 型号",
+        "品牌 / 类别",
+        "产品规格",
+        "状态",
+        "说明书",
+        "售后卡",
+        "菜谱",
+        "操作"
+      ],
+      "overflow": false,
+      "tableWidth": 3592,
+      "workspaceWidth": 3592,
+      "actionVisible": true,
+      "expanded": 0,
+      "filtersTop": [
+        187,
+        187,
+        187,
+        187
+      ]
+    },
+    {
+      "width": 2560,
+      "height": 1440,
+      "source": "existing test fixtures via intercepted API; no real database",
+      "pass": true,
+      "headers": [
+        "SKU / 型号",
+        "品牌 / 类别",
+        "产品规格",
+        "状态",
+        "说明书",
+        "售后卡",
+        "菜谱",
+        "操作"
+      ],
+      "overflow": false,
+      "tableWidth": 2312,
+      "workspaceWidth": 2312,
+      "actionVisible": true,
+      "expanded": 0,
+      "filtersTop": [
+        187,
+        187,
+        187,
+        187
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "source": "existing test fixtures via intercepted API; no real database",
+      "pass": true,
+      "headers": [
+        "SKU / 型号",
+        "品牌 / 类别",
+        "产品规格",
+        "状态",
+        "说明书",
+        "售后卡",
+        "菜谱",
+        "操作"
+      ],
+      "overflow": false,
+      "tableWidth": 1672,
+      "workspaceWidth": 1672,
+      "actionVisible": true,
+      "expanded": 0,
+      "filtersTop": [
+        187,
+        187,
+        187,
+        187
+      ]
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "source": "existing test fixtures via intercepted API; no real database",
+      "pass": true,
+      "headers": [
+        "SKU / 型号",
+        "品牌 / 类别",
+        "产品规格",
+        "状态",
+        "说明书",
+        "售后卡",
+        "菜谱",
+        "操作"
+      ],
+      "overflow": false,
+      "tableWidth": 1118,
+      "workspaceWidth": 1118,
+      "actionVisible": true,
+      "expanded": 0,
+      "filtersTop": [
+        188,
+        188,
+        188,
+        188
+      ]
+    },
+    {
+      "width": 1100,
+      "height": 760,
+      "source": "existing test fixtures via intercepted API; no real database",
+      "pass": true,
+      "headers": [
+        "SKU / 型号",
+        "品牌 / 类别",
+        "产品规格",
+        "状态",
+        "说明书",
+        "售后卡",
+        "菜谱",
+        "操作"
+      ],
+      "overflow": false,
+      "tableWidth": 1068,
+      "workspaceWidth": 1068,
+      "actionVisible": true,
+      "expanded": 0,
+      "filtersTop": [
+        187,
+        187,
+        187,
+        187
+      ]
+    },
+    {
+      "width": 720,
+      "height": 600,
+      "source": "existing test fixtures via intercepted API; no real database",
+      "pass": true,
+      "headers": [
+        "SKU / 型号",
+        "品牌 / 类别",
+        "产品规格",
+        "状态",
+        "说明书",
+        "售后卡",
+        "菜谱",
+        "操作"
+      ],
+      "overflow": false,
+      "tableWidth": 688,
+      "workspaceWidth": 688,
+      "actionVisible": true,
+      "expanded": 0,
+      "filtersTop": [
+        187,
+        187,
+        187,
+        250
+      ]
+    }
+  ],
+  "review": "Inline review of target identity, unknown/inactive purpose and product guards, state restoration, cleanup entry and unchanged service boundaries; independent agent review not performed this turn",
+  "data": {
+    "source": "existing unit-test fixtures; browser intercepts API, not real user business data",
+    "runtimeDbSha256": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "productionWritten": false,
+    "schemaChanged": false,
+    "originalFilesChanged": false
+  },
+  "unverified": [
+    "Windows physical 4K maximized/DPI/cross-monitor",
+    "User populated business database acceptance"
+  ],
+  "packaged": false,
+  "merged": false,
+  "applicationRevision": "7aafd901616bc91c370ad190b144e403a53f65e3"
+}

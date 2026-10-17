@@ -1,0 +1,1898 @@
+{
+  "date": "2026-10-16",
+  "baseline": "083c20e",
+  "unit": {
+    "total": 928,
+    "passed": 910,
+    "failed": 18,
+    "baselineFailuresRetained": 17,
+    "extraFailure": [
+      {
+        "file": "files-mock.test.tsx",
+        "test": "PDF renderer-only preview isolation opens files directly without recovery, business API, or desktop calls",
+        "duration": 5231.359624000001
+      }
+    ],
+    "extraFailureRecheck": "files-mock.test.tsx 10/10 passed without code/test changes; first duration 5231ms, 5s timeout",
+    "failures": [
+      {
+        "file": "indexed-pdf-resolver.test.ts",
+        "test": "IndexedPdfResolver rejects unsafe stored paths and a junction whose real target escapes the workspace",
+        "duration": 61.37525400000004
+      },
+      {
+        "file": "outbound-artifact-ownership.test.ts",
+        "test": "outbound temporary artifact ownership recovers all abandoned part temporaries while preserving unrelated files and published ZIPs",
+        "duration": 15.958767999999964
+      },
+      {
+        "file": "outbound-package-service.test.ts",
+        "test": "OutboundPackageService never records half a multipart publication as completed after abrupt process exit",
+        "duration": 792.5457959999999
+      },
+      {
+        "file": "outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects a canonical path that escapes through a filesystem link",
+        "duration": 55.9056700000001
+      },
+      {
+        "file": "outbound-package-service.test.ts",
+        "test": "OutboundPackageService rejects two indexes resolving to the same canonical actual path",
+        "duration": 45.90416699999969
+      },
+      {
+        "file": "qr-file-scanner.test.ts",
+        "test": "scanQrWorkspace returns QR naming candidates across supported file types without rewriting any workspace file",
+        "duration": 27.601031000000148
+      },
+      {
+        "file": "workspace-paths.test.ts",
+        "test": "workspace paths normalizes a real root and resolves a nested relative path inside it",
+        "duration": 4.30107299999986
+      },
+      {
+        "file": "workspace-paths.test.ts",
+        "test": "workspace paths rejects a directory junction that resolves outside the workspace",
+        "duration": 1.686768999999913
+      },
+      {
+        "file": "workspace-settings.test.ts",
+        "test": "WorkspaceSettingsStore starts unconfigured and persists a normalized existing directory across instances",
+        "duration": 7.377091999999948
+      },
+      {
+        "file": "files-mock.test.tsx",
+        "test": "PDF renderer-only preview isolation opens files directly without recovery, business API, or desktop calls",
+        "duration": 5231.359624000001
+      },
+      {
+        "file": "outbound-mock.test.tsx",
+        "test": "outbound isolated UI mock routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls",
+        "duration": 2321.280581
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip restores source filter and forces fresh check",
+        "duration": 533.0650950000002
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip protects unsaved changes on tab switch and return",
+        "duration": 478.29316200000017
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip does not assume cancelled processing succeeded",
+        "duration": 477.273193
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip uses completed memory result but still checks other blockers",
+        "duration": 485.29312700000037
+      },
+      {
+        "file": "product-bom-roundtrip.test.tsx",
+        "test": "isolated BOM roundtrip fails closed after product disappears",
+        "duration": 491.8312729999998
+      },
+      {
+        "file": "recovery-mock.test.tsx",
+        "test": "isolated recovery panel never mounts real recovery or queries API",
+        "duration": 220.08353100000022
+      },
+      {
+        "file": "application-api.test.ts",
+        "test": "real application API removes only stale task-owned outbound claim and temporary files after restart",
+        "duration": 70.93880600000011
+      }
+    ]
+  },
+  "related": {
+    "files": 11,
+    "passed": 164,
+    "pdfMockRecheckPassed": 10
+  },
+  "geometry": {
+    "scope": "Read-only existing cloud DB empty business entities; no Windows or populated-data acceptance",
+    "results": [
+      {
+        "ok": true,
+        "name": "number-visually-outside-frame",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "planning-no-page-overflow",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "horizontal-fields-readable-color-compact-remove",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "labels": [
+            {
+              "top": 512.1875,
+              "width": 190
+            },
+            {
+              "top": 512.1875,
+              "width": 210
+            },
+            {
+              "top": 512.1875,
+              "width": 150
+            },
+            {
+              "top": 512.1875,
+              "width": 210
+            }
+          ],
+          "remove": 64,
+          "scrollHost": 686,
+          "scrollWidth": 892
+        }
+      },
+      {
+        "ok": true,
+        "name": "add-keeps-two-separate-labels",
+        "size": [
+          720,
+          600
+        ]
+      },
+      {
+        "ok": true,
+        "name": "remove-keeps-remaining-label",
+        "size": [
+          720,
+          600
+        ]
+      },
+      {
+        "ok": true,
+        "name": "icon-复制收件人",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制收件人",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制抄送",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制抄送",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制主题",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制主题",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制正文",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制正文",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-全部复制",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "text": "",
+          "title": "全部复制",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "number-visually-outside-frame",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "planning-no-page-overflow",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "horizontal-fields-readable-color-compact-remove",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "labels": [
+            {
+              "top": 512.1875,
+              "width": 244
+            },
+            {
+              "top": 512.1875,
+              "width": 264
+            },
+            {
+              "top": 512.1875,
+              "width": 200
+            },
+            {
+              "top": 512.1875,
+              "width": 264
+            }
+          ],
+          "remove": 64,
+          "scrollHost": 1116,
+          "scrollWidth": 1116
+        }
+      },
+      {
+        "ok": true,
+        "name": "add-keeps-two-separate-labels",
+        "size": [
+          1366,
+          768
+        ]
+      },
+      {
+        "ok": true,
+        "name": "remove-keeps-remaining-label",
+        "size": [
+          1366,
+          768
+        ]
+      },
+      {
+        "ok": true,
+        "name": "icon-复制收件人",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制收件人",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制抄送",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制抄送",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制主题",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制主题",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制正文",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制正文",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-全部复制",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "text": "",
+          "title": "全部复制",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "number-visually-outside-frame",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "planning-no-page-overflow",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "horizontal-fields-readable-color-compact-remove",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "labels": [
+            {
+              "top": 512.1875,
+              "width": 380
+            },
+            {
+              "top": 512.1875,
+              "width": 420
+            },
+            {
+              "top": 512.1875,
+              "width": 200
+            },
+            {
+              "top": 512.1875,
+              "width": 480
+            }
+          ],
+          "remove": 64,
+          "scrollHost": 1670,
+          "scrollWidth": 1670
+        }
+      },
+      {
+        "ok": true,
+        "name": "add-keeps-two-separate-labels",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "remove-keeps-remaining-label",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "icon-复制收件人",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制收件人",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制抄送",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制抄送",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制主题",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制主题",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制正文",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制正文",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-全部复制",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "text": "",
+          "title": "全部复制",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "number-visually-outside-frame",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "planning-no-page-overflow",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "rootBorder": "0px",
+          "numberBottom": 491.1875,
+          "rowTop": 499.1875,
+          "insideFrame": false,
+          "overflow": false
+        }
+      },
+      {
+        "ok": true,
+        "name": "horizontal-fields-readable-color-compact-remove",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "labels": [
+            {
+              "top": 512.1875,
+              "width": 380
+            },
+            {
+              "top": 512.1875,
+              "width": 420
+            },
+            {
+              "top": 512.1875,
+              "width": 200
+            },
+            {
+              "top": 512.1875,
+              "width": 480
+            }
+          ],
+          "remove": 64,
+          "scrollHost": 3590,
+          "scrollWidth": 3590
+        }
+      },
+      {
+        "ok": true,
+        "name": "add-keeps-two-separate-labels",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "remove-keeps-remaining-label",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "icon-复制收件人",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制收件人",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制抄送",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制抄送",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制主题",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制主题",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-复制正文",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "text": "",
+          "title": "复制正文",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      },
+      {
+        "ok": true,
+        "name": "icon-全部复制",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "text": "",
+          "title": "全部复制",
+          "svg": true,
+          "width": 32,
+          "height": 32
+        }
+      }
+    ],
+    "failures": []
+  },
+  "sharedWorkspaceGeometry": {
+    "scope": "Structural component probe, blank dimensions only; NOT populated business-data or Windows desktop acceptance",
+    "results": [
+      {
+        "ok": true,
+        "name": "filename-header-center-body-left",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "headerAlign": "center",
+          "bodyAlign": "left"
+        }
+      },
+      {
+        "ok": true,
+        "name": "docked-detail-does-not-cover-list",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "detail": {
+            "x": 244,
+            "y": 16,
+            "width": 460,
+            "height": 568
+          },
+          "list": {
+            "x": 16,
+            "y": 216.8125,
+            "width": 688,
+            "height": 351
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "list-width-budget",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "detail": {
+            "x": 244,
+            "y": 16,
+            "width": 460,
+            "height": 568
+          },
+          "list": {
+            "x": 16,
+            "y": 216.8125,
+            "width": 688,
+            "height": 351
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-within-viewport",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "x": 244,
+          "y": 16,
+          "width": 460,
+          "height": 568
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-bottom-action-reachable",
+        "size": [
+          720,
+          600
+        ],
+        "evidence": {
+          "x": 245,
+          "y": 558,
+          "width": 94.015625,
+          "height": 25
+        }
+      },
+      {
+        "ok": true,
+        "name": "dock-to-drawer-keeps-focus",
+        "size": [
+          720,
+          600
+        ]
+      },
+      {
+        "ok": true,
+        "name": "drawer-to-dock-keeps-focus",
+        "size": [
+          720,
+          600
+        ]
+      },
+      {
+        "ok": true,
+        "name": "breakpoint-keeps-value",
+        "size": [
+          720,
+          600
+        ]
+      },
+      {
+        "ok": true,
+        "name": "close-restores-origin",
+        "size": [
+          720,
+          600
+        ]
+      },
+      {
+        "ok": true,
+        "name": "no-page-overflow",
+        "size": [
+          720,
+          600
+        ]
+      },
+      {
+        "ok": true,
+        "name": "filename-header-center-body-left",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "headerAlign": "center",
+          "bodyAlign": "left"
+        }
+      },
+      {
+        "ok": true,
+        "name": "docked-detail-does-not-cover-list",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "detail": {
+            "x": 548,
+            "y": 16,
+            "width": 460,
+            "height": 688
+          },
+          "list": {
+            "x": 16,
+            "y": 216.8125,
+            "width": 992,
+            "height": 471
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "list-width-budget",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "detail": {
+            "x": 548,
+            "y": 16,
+            "width": 460,
+            "height": 688
+          },
+          "list": {
+            "x": 16,
+            "y": 216.8125,
+            "width": 992,
+            "height": 471
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-within-viewport",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "x": 548,
+          "y": 16,
+          "width": 460,
+          "height": 688
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-bottom-action-reachable",
+        "size": [
+          1024,
+          720
+        ],
+        "evidence": {
+          "x": 549,
+          "y": 678,
+          "width": 94.015625,
+          "height": 25
+        }
+      },
+      {
+        "ok": true,
+        "name": "dock-to-drawer-keeps-focus",
+        "size": [
+          1024,
+          720
+        ]
+      },
+      {
+        "ok": true,
+        "name": "drawer-to-dock-keeps-focus",
+        "size": [
+          1024,
+          720
+        ]
+      },
+      {
+        "ok": true,
+        "name": "breakpoint-keeps-value",
+        "size": [
+          1024,
+          720
+        ]
+      },
+      {
+        "ok": true,
+        "name": "close-restores-origin",
+        "size": [
+          1024,
+          720
+        ]
+      },
+      {
+        "ok": true,
+        "name": "no-page-overflow",
+        "size": [
+          1024,
+          720
+        ]
+      },
+      {
+        "ok": true,
+        "name": "filename-header-center-body-left",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "headerAlign": "center",
+          "bodyAlign": "left"
+        }
+      },
+      {
+        "ok": true,
+        "name": "docked-detail-does-not-cover-list",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "detail": {
+            "x": 890,
+            "y": 16,
+            "width": 460,
+            "height": 736
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 888,
+            "height": 565
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "list-width-budget",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "detail": {
+            "x": 890,
+            "y": 16,
+            "width": 460,
+            "height": 736
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 888,
+            "height": 565
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-within-viewport",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "x": 890,
+          "y": 16,
+          "width": 460,
+          "height": 736
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-bottom-action-reachable",
+        "size": [
+          1366,
+          768
+        ],
+        "evidence": {
+          "x": 891,
+          "y": 726,
+          "width": 94.015625,
+          "height": 25
+        }
+      },
+      {
+        "ok": true,
+        "name": "dock-to-drawer-keeps-focus",
+        "size": [
+          1366,
+          768
+        ]
+      },
+      {
+        "ok": true,
+        "name": "drawer-to-dock-keeps-focus",
+        "size": [
+          1366,
+          768
+        ]
+      },
+      {
+        "ok": true,
+        "name": "breakpoint-keeps-value",
+        "size": [
+          1366,
+          768
+        ]
+      },
+      {
+        "ok": true,
+        "name": "close-restores-origin",
+        "size": [
+          1366,
+          768
+        ]
+      },
+      {
+        "ok": true,
+        "name": "no-page-overflow",
+        "size": [
+          1366,
+          768
+        ]
+      },
+      {
+        "ok": true,
+        "name": "filename-header-center-body-left",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "headerAlign": "center",
+          "bodyAlign": "left"
+        }
+      },
+      {
+        "ok": true,
+        "name": "docked-detail-does-not-cover-list",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "detail": {
+            "x": 1516,
+            "y": 170.8125,
+            "width": 380,
+            "height": 877
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 1052,
+            "height": 877
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "list-width-budget",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "detail": {
+            "x": 1516,
+            "y": 170.8125,
+            "width": 380,
+            "height": 877
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 1052,
+            "height": 877
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-within-viewport",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "x": 1516,
+          "y": 170.8125,
+          "width": 380,
+          "height": 877
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-bottom-action-reachable",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "x": 1517,
+          "y": 1021.8125,
+          "width": 94.015625,
+          "height": 25
+        }
+      },
+      {
+        "ok": true,
+        "name": "table-scroll-keeps-navigation-fixed",
+        "size": [
+          1920,
+          1080
+        ],
+        "evidence": {
+          "before": {
+            "x": 224,
+            "y": 170.8125,
+            "width": 220,
+            "height": 877
+          },
+          "after": {
+            "x": 224,
+            "y": 170.8125,
+            "width": 220,
+            "height": 877
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "resizer-preserves-budget",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "pointer-resize",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "fold-focus-transfer",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "unfold-focus-transfer",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "dock-to-drawer-keeps-focus",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "drawer-to-dock-keeps-focus",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "breakpoint-keeps-value",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "close-restores-origin",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "no-page-overflow",
+        "size": [
+          1920,
+          1080
+        ]
+      },
+      {
+        "ok": true,
+        "name": "filename-header-center-body-left",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "headerAlign": "center",
+          "bodyAlign": "left"
+        }
+      },
+      {
+        "ok": true,
+        "name": "docked-detail-does-not-cover-list",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "detail": {
+            "x": 2156,
+            "y": 170.8125,
+            "width": 380,
+            "height": 1237
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 1692,
+            "height": 1237
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "list-width-budget",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "detail": {
+            "x": 2156,
+            "y": 170.8125,
+            "width": 380,
+            "height": 1237
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 1692,
+            "height": 1237
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-within-viewport",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "x": 2156,
+          "y": 170.8125,
+          "width": 380,
+          "height": 1237
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-bottom-action-reachable",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "x": 2157,
+          "y": 1381.8125,
+          "width": 94.015625,
+          "height": 25
+        }
+      },
+      {
+        "ok": true,
+        "name": "table-scroll-keeps-navigation-fixed",
+        "size": [
+          2560,
+          1440
+        ],
+        "evidence": {
+          "before": {
+            "x": 224,
+            "y": 170.8125,
+            "width": 220,
+            "height": 1237
+          },
+          "after": {
+            "x": 224,
+            "y": 170.8125,
+            "width": 220,
+            "height": 1237
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "resizer-preserves-budget",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "fold-focus-transfer",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "unfold-focus-transfer",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "dock-to-drawer-keeps-focus",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "drawer-to-dock-keeps-focus",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "breakpoint-keeps-value",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "close-restores-origin",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "no-page-overflow",
+        "size": [
+          2560,
+          1440
+        ]
+      },
+      {
+        "ok": true,
+        "name": "filename-header-center-body-left",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "headerAlign": "center",
+          "bodyAlign": "left"
+        }
+      },
+      {
+        "ok": true,
+        "name": "docked-detail-does-not-cover-list",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "detail": {
+            "x": 3436,
+            "y": 170.8125,
+            "width": 380,
+            "height": 1957
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 2972,
+            "height": 1957
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "list-width-budget",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "detail": {
+            "x": 3436,
+            "y": 170.8125,
+            "width": 380,
+            "height": 1957
+          },
+          "list": {
+            "x": 454,
+            "y": 170.8125,
+            "width": 2972,
+            "height": 1957
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-within-viewport",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "x": 3436,
+          "y": 170.8125,
+          "width": 380,
+          "height": 1957
+        }
+      },
+      {
+        "ok": true,
+        "name": "detail-bottom-action-reachable",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "x": 3437,
+          "y": 1609.8125,
+          "width": 94.015625,
+          "height": 25
+        }
+      },
+      {
+        "ok": true,
+        "name": "table-scroll-keeps-navigation-fixed",
+        "size": [
+          3840,
+          2160
+        ],
+        "evidence": {
+          "before": {
+            "x": 224,
+            "y": 170.8125,
+            "width": 220,
+            "height": 1957
+          },
+          "after": {
+            "x": 224,
+            "y": 170.8125,
+            "width": 220,
+            "height": 1957
+          }
+        }
+      },
+      {
+        "ok": true,
+        "name": "resizer-preserves-budget",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "fold-focus-transfer",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "unfold-focus-transfer",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "dock-to-drawer-keeps-focus",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "drawer-to-dock-keeps-focus",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "breakpoint-keeps-value",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "close-restores-origin",
+        "size": [
+          3840,
+          2160
+        ]
+      },
+      {
+        "ok": true,
+        "name": "no-page-overflow",
+        "size": [
+          3840,
+          2160
+        ]
+      }
+    ],
+    "failures": []
+  },
+  "priorFullPageMatrix": {
+    "cases": 16,
+    "checks": 518,
+    "failed": 0,
+    "scope": "Before final icon/filename-header/field-scroll refinements; final changed areas covered by 40+73 targeted geometry checks"
+  },
+  "readonlyAudit": {
+    "scope": "Read-only existing data; no migrations, seed or business writes",
+    "before": {
+      "databasePath": "/workspace/drawing-number-planner/work/runtime-data/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_current": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_versions": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dictionary_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_changes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_runs": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "dcba8d8fa85c6fd9d913ed8c49dd3941f70224bc2f0b26c015b3546379f9590b"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "03356787e156cc69a02c97d53beae655b72aaf981c6a8f7c313e344ee9e16573"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "products": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_code_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "3e516b8cc3a77e2f47969dbf08a19897b1a6df64adf65a0a8c0b43e04170b8d7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "83c1b44ae89b6c93ca668b9504d78525cbe17750bef8be49681e374b6a301511"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "ed0ce3ddaa4b1e1b51394cba720b16b721f57c5ad26e0f236589757d5eb2c528"
+        }
+      }
+    },
+    "after": {
+      "databasePath": "/workspace/drawing-number-planner/work/runtime-data/planner.db",
+      "tables": {
+        "bom_asset_archive_mappings": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_current": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_assets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_item_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "bom_versions": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dictionary_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_deletion_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_changes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "file_scan_runs": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "historical_drawing_numbers": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "material_batches": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_contacts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_drafts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_email_templates": {
+          "count": 2,
+          "sha256": "dcba8d8fa85c6fd9d913ed8c49dd3941f70224bc2f0b26c015b3546379f9590b"
+        },
+        "outbound_package_items": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_package_parts": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_packages": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "outbound_signatures": {
+          "count": 1,
+          "sha256": "03356787e156cc69a02c97d53beae655b72aaf981c6a8f7c313e344ee9e16573"
+        },
+        "outbound_template_blocks": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pdf_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_cleanup_events": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "product_qr_codes": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "products": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_code_files": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "qr_purpose_product_categories": {
+          "count": 1,
+          "sha256": "3e516b8cc3a77e2f47969dbf08a19897b1a6df64adf65a0a8c0b43e04170b8d7"
+        },
+        "qr_purposes": {
+          "count": 3,
+          "sha256": "83c1b44ae89b6c93ca668b9504d78525cbe17750bef8be49681e374b6a301511"
+        },
+        "schema_migrations": {
+          "count": 15,
+          "sha256": "ed0ce3ddaa4b1e1b51394cba720b16b721f57c5ad26e0f236589757d5eb2c528"
+        }
+      }
+    },
+    "databaseHashBefore": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "databaseHashAfter": "806201e22c9ea99579c332750fe171b392790d6b9b5b7cb11d8a89ac1cd9cfe9",
+    "unchanged": true
+  },
+  "build": {
+    "typecheck": true,
+    "renderer": true,
+    "main": true,
+    "warning": "existing >500kB chunk"
+  },
+  "notExecuted": [
+    "E2E rerun this patch",
+    "physical Windows DPI/cross-monitor/native desktop",
+    "populated user business DB and original PDFs"
+  ]
+}

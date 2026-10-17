@@ -37,12 +37,16 @@ const itemSchema = z.object({
     reusePrevious: z.boolean().optional() }).strict()).max(2).optional(),
   qrCodeIds: z.array(z.number().int().positive()).max(100).optional(),
 }).strict().refine((value) => Boolean(value.drawingReference) !== Boolean(value.drawingId));
-const saveSchema = z.object({
+const saveFields = z.object({
   productId: z.number().int().positive(), businessChangeDate: z.string().trim(),
   entryMode: z.enum(['current', 'historical']).default('current'),
   expectedCurrentVersionId: z.number().int().positive().nullable(), notes: z.string().max(1000).optional(),
   items: z.array(itemSchema).max(500),
-}).strict().refine((value) => new Set(value.items.map((item) => item.projectItemId)).size === value.items.length);
+}).strict();
+const uniqueProjects = (value: { items: Array<{ projectItemId: number }> }) => new Set(value.items.map(item => item.projectItemId)).size === value.items.length;
+const saveSchema = saveFields.refine(uniqueProjects);
+// Update may omit the immutable original date, including legacy NULL dates.
+const updateSchema = saveFields.extend({ businessChangeDate: z.string().trim().optional() }).refine(uniqueProjects);
 const versionParams = z.object({ id: z.coerce.number().int().positive() }).strict();
 const deleteVersionSchema = z.object({ confirmed: z.boolean() }).strict();
 const deleteProductSchema = z.object({ modelConfirmation: z.string() }).strict();
@@ -77,7 +81,7 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
   });
   app.put('/api/boms/versions/:id', async (request, reply) => {
     const params = versionParams.safeParse(request.params);
-    const body = z.object({ input: saveSchema, expectedRevision: z.number().int().nonnegative() }).strict().safeParse(request.body);
+    const body = z.object({ input: updateSchema, expectedRevision: z.number().int().nonnegative() }).strict().safeParse(request.body);
     if (!params.success || !body.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 编辑内容无效' } });
     const input: SaveBomInput = { ...body.data.input, items: body.data.input.items.map((item): BomItemInput => {
       const { drawingReference, drawingId, ...fields } = item;

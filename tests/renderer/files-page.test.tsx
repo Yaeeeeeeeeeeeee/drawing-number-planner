@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../src/renderer/data/client';
@@ -45,6 +45,51 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('separates file queries from batch navigation and opens the actual complete list',async()=>{
+    const api=apiFixture(true);render(<FilesPage api={api as never}/>);
+    await screen.findByRole('button',{name:'全部文件'});
+    expect(screen.queryByRole('button',{name:'未关联／未归批次核对'})).toBeNull();
+    expect(screen.queryByText('产品全部图号')).toBeNull();
+    const queries=screen.getByRole('region',{name:'文件查询'});
+    fireEvent.click(within(queries).getByRole('button',{name:'待确认文件'}));
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({matchStatus:'pending',presence:'all'})));
+    expect(within(queries).getByRole('button',{name:'待确认文件'})).toHaveAttribute('aria-current','page');
+    expect(screen.getByRole('button',{name:'全部文件'})).not.toHaveAttribute('aria-current');
+    fireEvent.click(screen.getByRole('button',{name:'全部文件'}));
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith({keyword:'',matchStatus:'',conversionType:'',presence:'all',page:1,pageSize:50}));
+  });
+
+  it('opens the exact product and batch supplied by drawing navigation without scanning or mutation', async () => {
+    const api = apiFixture(true);
+    render(<FilesPage api={api as never} initialTarget={{productId:9,materialBatchId:2,fullCode:file.fullCode}} />);
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.objectContaining({keyword:file.fullCode,productId:9,materialBatchId:2,presence:'all'})));
+    expect(api.scanPdfFiles).not.toHaveBeenCalled();
+    expect(api.cleanupPdfFiles).not.toHaveBeenCalled();
+    expect(api.updateWorkspaceSettings).not.toHaveBeenCalled();
+  });
+
+  it('keeps a file-location failure visible inside the file detail drawer', async () => {
+    delete window.plannerDesktop;
+    render(<FilesPage api={apiFixture(true) as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: `文件详情 ${file.fileName}` }));
+    const detail = await screen.findByRole('complementary', { name: '文件详情' });
+    fireEvent.click(within(detail).getByRole('button', { name: '打开文件位置' }));
+    expect(await within(detail).findByRole('alert')).toHaveTextContent('请在 Windows 桌面版打开文件位置');
+  });
+  it('navigates with real product IDs and shows indexed file details separately from cleanup selection', async () => {
+    const api = apiFixture(true);
+    render(<FilesPage api={api as never} />);
+    fireEvent.click(await screen.findByRole('button', { name: '产品 SKDZC100JP · ZC100' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9, page: 1 })));
+    fireEvent.click(screen.getByRole('button', { name: `文件详情 ${file.fileName}` }));
+    const detail = await screen.findByRole('complementary', { name: '文件详情' });
+    expect(detail.closest('table')).toBeNull();
+    expect(detail.textContent).toContain(file.relativePath);
+    expect(detail.textContent).toContain('1024 B');
+    expect(screen.getByRole('checkbox', { name: `选择 ${file.fileName}` })).not.toBeChecked();
+    expect(api.scanPdfFiles).not.toHaveBeenCalled();
+    expect(api.cleanupPdfFiles).not.toHaveBeenCalled();
+  });
   it('keeps legal cross-batch instances visible and explains that they are not scan duplicates', async () => {
     const first = { ...file, id: 71, relativePath: 'T40\\00.首批大货\\same.pdf',
       materialBatchId: 1, materialBatchName: '00.首批大货', materialBatchStatus: 'recognized' };
