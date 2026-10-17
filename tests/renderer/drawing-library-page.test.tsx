@@ -554,7 +554,7 @@ describe('DrawingLibraryPage', () => {
       productCategory: '冰柜', mainCategoryId: 12, projectItemId: 21, appearanceId: 31, materialBatchId: 44,
       page: 1, pageSize: 20,
     })));
-    fireEvent.click(screen.getByRole('button', { name: '全部图号' }));
+    fireEvent.click(screen.getByRole('button', { name: '全部产品 / 批次' }));
     await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 20 })));
   });
 });
