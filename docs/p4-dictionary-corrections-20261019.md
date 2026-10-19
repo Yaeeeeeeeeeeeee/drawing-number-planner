@@ -25,3 +25,13 @@
 主要文件：dictionary-repository/service/types、dictionaries路由、client、DictionariesPage/DictionaryPermanentDelete、workspace-theme、相关Core/API/Renderer测试及浏览器/原生Windows验证脚本。没有删除用户数据，没有变更Schema，没有自动合并本轮或替换已确认Release。
 
 本轮进一步按用户“所有修改删除”要求，逐页检查品牌、品类尺寸、外观、颜色、主类别父级及项目明细，所有行操作76×32px，保存/取消同尺寸；六窗口均通过。Windows首轮在重打包前被旧Main全不变保护挡住，未启动/交付失败程序；现只允许两处明确授权的菜单可见性语句，另有2项工具保护测试，安全/恢复/依赖/Schema校验不放宽。
+
+## Windows 候选交付
+
+[原生Windows流程39215880675](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39215880675) 全部成功，应用修订 `3a6f23f`。安装逐文件哈希一致，原生菜单默认隐藏且原恢复菜单保留，六窗口目录默认展开/宽屏不遮挡/窄屏覆盖通过。
+
+在原有隔离样例中对一条既有品牌执行普通删除→页面内确认恢复→真实键盘事件输入/光标/Backspace/Delete→保存，再恢复原始名称；最终全表逐行快照与开始一致，原样例文件未变。全部行操作及保存/取消为76×32px。原生永久删除仅核对只读预检会阻止原样例引用，不为制造场景新增记录或删除历史；真正物理删除成功与并发阻断由内存SQLite/Core/API测试覆盖。
+
+[安装EXE验收包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39215880675/artifacts/12170010304)（ZIP内含Setup.exe、实际Windows截图与JSON报告，144926565字节）及[完整免安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39215880675/artifacts/12168943797)，保留到2026-11-02。完整解压前者后运行DrawingNumberPlanner-P4-Windows-x64-Setup.exe；仍使用本修订独立AppData验收样例，不导入或覆盖正式数据。
+
+最终90项相关测试+2项打包保护测试、类型检查、Renderer/Main构建和六窗口接口夹具通过，独立复查无剩余Important问题。[完整变更记录PR #2](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/pull/2) 保持草稿，未合并master，未替换此前确认Release。用户本机中文输入法、物理4K/DPI/跨屏仍须人工验收；CI键盘事件不等于这些证据。
