@@ -41,3 +41,7 @@ The original Excel workbook is an authority when coding structure, dictionary ma
 ## Current P4 BOM historical editing correction (2026-10-16)
 
 The latest explicit user request makes an existing BOM record's ID, business date (including legacy NULL), original createdAt, predecessor and version identity immutable during ordinary editing. Only an explicit create action may create a new record. Preserve editRevision concurrency and updatedAt; refresh the exact selected snapshot and do not fall back from a missing edit target to POST. The earlier date-correction-and-rearchive behavior is Historical for ordinary edits and must not be restored silently. Preserve unchanged legacy NULL-date attachments without inventing a dated archive; explicit new/replaced managed attachments must still pass existing path/type/size/existence/hash checks. Do not clean up duplicate user rows as part of this fix. See `docs/p4-bom-edit-corrections-20261016.md`.
+
+## 字典永久删除与恢复（2026-10-19）
+
+用户要求编码字典对已删除记录提供永久删除入口。仅已删除且无直接/历史编码引用的记录可物理删除，需完整编码及核对身份，事务内再检查；禁止级联、解除引用或通过旧DELETE绕过。普通删除遇到引用保留字典历史身份。恢复后仍可改名称，编码保持锁定，历史快照及图号字符串不随改名重写。见docs/p4-dictionary-corrections-20261019.md。本次功能授权不等于授权执行用户真实数据删除。

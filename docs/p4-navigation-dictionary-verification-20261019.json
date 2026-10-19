@@ -1,0 +1,540 @@
+{
+  "date": "2026-10-19T07:20:25.113224+00:00",
+  "branch": "codex/p4-floating-navigation-20261019",
+  "baseRevision": "6a3947e",
+  "relatedTests": {
+    "total": 90,
+    "passed": 90,
+    "failed": 0
+  },
+  "regressionsBeforeChanges": {
+    "navigationFailed": 4,
+    "permanentDeletionFailed": 11,
+    "nativeRestoreConfirmationFailed": 1
+  },
+  "typecheck": "passed",
+  "rendererMainBuild": "passed; existing >500kB warning",
+  "browser": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "initial": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 2148
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 3596,
+          "height": 2160
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "closed": {
+        "panel": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 3840,
+          "height": 2160
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "reopened": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 2148
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 3596,
+          "height": 2160
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "actionSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "editorSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "keyboardRestoreEdit": true,
+      "filterPreserved": true,
+      "fixtureWrites": [
+        "/api/dictionaries/items/7/activate",
+        "/api/dictionaries/items/7"
+      ],
+      "noRealDatabaseAccess": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "initial": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 1068
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 1676,
+          "height": 1080
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "closed": {
+        "panel": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "reopened": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 1068
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 1676,
+          "height": 1080
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "actionSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "editorSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "keyboardRestoreEdit": true,
+      "filterPreserved": true,
+      "fixtureWrites": [
+        "/api/dictionaries/items/7/activate",
+        "/api/dictionaries/items/7"
+      ],
+      "noRealDatabaseAccess": true
+    },
+    {
+      "width": 1100,
+      "height": 760,
+      "initial": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 748
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 856,
+          "height": 760
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "closed": {
+        "panel": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 1100,
+          "height": 760
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "reopened": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 748
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 856,
+          "height": 760
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "actionSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "editorSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "keyboardRestoreEdit": true,
+      "filterPreserved": true,
+      "fixtureWrites": [
+        "/api/dictionaries/items/7/activate",
+        "/api/dictionaries/items/7"
+      ],
+      "noRealDatabaseAccess": true
+    },
+    {
+      "width": 1024,
+      "height": 760,
+      "initial": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 748
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 780,
+          "height": 760
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "closed": {
+        "panel": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 760
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "reopened": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 748
+        },
+        "main": {
+          "x": 244,
+          "y": 0,
+          "width": 780,
+          "height": 760
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "actionSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "editorSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "keyboardRestoreEdit": true,
+      "filterPreserved": true,
+      "fixtureWrites": [
+        "/api/dictionaries/items/7/activate",
+        "/api/dictionaries/items/7"
+      ],
+      "noRealDatabaseAccess": true
+    },
+    {
+      "width": 1023,
+      "height": 760,
+      "initial": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 748
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 1023,
+          "height": 760
+        },
+        "inert": true,
+        "modal": "true",
+        "overflow": false
+      },
+      "closed": {
+        "panel": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 1023,
+          "height": 760
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "reopened": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 748
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 1023,
+          "height": 760
+        },
+        "inert": true,
+        "modal": "true",
+        "overflow": false
+      },
+      "actionSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "editorSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "keyboardRestoreEdit": true,
+      "filterPreserved": true,
+      "fixtureWrites": [
+        "/api/dictionaries/items/7/activate",
+        "/api/dictionaries/items/7"
+      ],
+      "noRealDatabaseAccess": true
+    },
+    {
+      "width": 720,
+      "height": 600,
+      "initial": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 588
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 720,
+          "height": 600
+        },
+        "inert": true,
+        "modal": "true",
+        "overflow": false
+      },
+      "closed": {
+        "panel": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 720,
+          "height": 600
+        },
+        "inert": false,
+        "modal": null,
+        "overflow": false
+      },
+      "reopened": {
+        "panel": {
+          "x": 12,
+          "y": 12,
+          "right": 232,
+          "bottom": 588
+        },
+        "main": {
+          "x": 0,
+          "y": 0,
+          "width": 720,
+          "height": 600
+        },
+        "inert": true,
+        "modal": "true",
+        "overflow": false
+      },
+      "actionSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "editorSizes": [
+        {
+          "width": 76,
+          "height": 32
+        },
+        {
+          "width": 76,
+          "height": 32
+        }
+      ],
+      "keyboardRestoreEdit": true,
+      "filterPreserved": true,
+      "fixtureWrites": [
+        "/api/dictionaries/items/7/activate",
+        "/api/dictionaries/items/7"
+      ],
+      "noRealDatabaseAccess": true
+    }
+  ],
+  "review": "Read-only independent review; legacy DELETE bypass fixed, second review no remaining Important findings.",
+  "schemaChanged": false,
+  "realUserDataTouched": false,
+  "windowsCandidate": "pending workflow build; do not treat browser fixtures as native evidence",
+  "fullSuite": "not rerun; previous 16 existing failures retained"
+}

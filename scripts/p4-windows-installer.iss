@@ -9,7 +9,7 @@
 [Setup]
 AppId={{BA4A93E5-A8AA-4EF9-B6AF-98361C59B170}
 AppName=图号规划器 P4
-AppVersion=2026.10.17
+AppVersion=2026.10.19
 AppPublisher=Drawing Number Planner
 DefaultDirName={localappdata}\Programs\DrawingNumberPlannerP4
 DefaultGroupName=图号规划器 P4

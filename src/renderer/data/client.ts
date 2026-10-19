@@ -1,4 +1,6 @@
 import type { ProductCleanupPreview } from '../../core/products/product-cleanup-service.js';
+import type { DictionaryDeletionPreview, PermanentDictionaryDeletionInput } from '../../core/dictionaries/dictionary-types.js';
+export type { DictionaryDeletionPreview } from '../../core/dictionaries/dictionary-types.js';
 import type { OutboundBomContext } from '../../core/outbound/outbound-bom-context.js';
 export type ProductCleanupPreviewView = ProductCleanupPreview;
 export interface DictionaryItemView {
@@ -279,6 +281,8 @@ export interface PlannerApi {
   deactivateDictionary(id: number): Promise<DictionaryItemView>;
   activateDictionary(id: number): Promise<DictionaryItemView>;
   deleteDictionary(id: number): Promise<void>;
+  previewPermanentDictionaryDeletion(id: number): Promise<DictionaryDeletionPreview>;
+  permanentlyDeleteDictionary(id: number, input: PermanentDictionaryDeletionInput): Promise<void>;
   listProducts(filters?: Record<string, string | number | undefined>): Promise<ProductView[]>;
   createProduct(input: Record<string, unknown>): Promise<ProductView>;
   updateProduct(id: number, input: Record<string, unknown>): Promise<ProductView>;
@@ -528,6 +532,8 @@ export const apiClient: PlannerApi = {
   deactivateDictionary: (id) => request(`/api/dictionaries/items/${id}/deactivate`, json('POST')),
   activateDictionary: (id) => request(`/api/dictionaries/items/${id}/activate`, json('POST')),
   deleteDictionary: (id) => request(`/api/dictionaries/items/${id}`, { method: 'DELETE' }),
+  previewPermanentDictionaryDeletion: (id) => request(`/api/dictionaries/items/${id}/permanent-deletion`),
+  permanentlyDeleteDictionary: (id,input) => request(`/api/dictionaries/items/${id}/permanent`, json('DELETE',input)),
   listProducts: async (filters = {}) => (await request<{ items: ProductView[] }>(`/api/products${queryString(filters)}`)).items,
   createProduct: (input) => request('/api/products', json('POST', input)),
   updateProduct: (id, input) => request(`/api/products/${id}`, json('PUT', input)),
