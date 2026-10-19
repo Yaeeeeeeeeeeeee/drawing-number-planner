@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { DrawingLibraryPage } from '../../src/renderer/pages/DrawingLibraryPage';
+
+beforeEach(() => vi.stubGlobal('innerWidth', 1920));
+afterEach(() => vi.unstubAllGlobals());
 
 describe('drawing library origin column', () => {
   it.each(['default', 'batch', 'recycle'] as const)('separates actual origin from full code in the %s list', async (scope) => {
@@ -18,16 +21,16 @@ describe('drawing library origin column', () => {
     render(<DrawingLibraryPage api={api as never} />);
     await screen.findByRole('button', { name: rows[0].fullCode });
     if (scope === 'batch') {
-      fireEvent.click(await screen.findByText('SKU · T40', { selector: 'summary' }));
+      fireEvent.click(await screen.findByRole('button', { name: '展开产品 SKU · T40' }));
       fireEvent.click(screen.getByRole('button', { name: /20261019/ }));
       await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 5, usageBatchId: 7 })));
     } else if (scope === 'recycle') {
       fireEvent.click(screen.getByRole('button', { name: '回收站' }));
-      await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ deletionState: 'deleted-retained' })));
+      await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ deletionState: 'deleted' })));
     }
     const table = await screen.findByRole('table');
     const headers = within(table).getAllByRole('columnheader').map(header => header.textContent);
-    expect(headers).toEqual(['选择', '完整图号', '来源', '主类别 / 项目', '版本', '图号状态', '文件完整性', '操作']);
+    expect(headers).toEqual(['选择', '完整图号', '来源', '主类别 / 项目', '版本', '图号状态', '操作']);
     for (const [index, record] of rows.entries()) {
       const cells = within(within(table).getAllByRole('row')[index + 1]).getAllByRole('cell');
       expect(cells).toHaveLength(headers.length);
@@ -37,4 +40,12 @@ describe('drawing library origin column', () => {
       expect(cells[2]).toHaveTextContent(record.origin === 'planned' ? '正式规划' : '历史扫描');
     }
   });
+});
+
+it('shows an available recorded version without making up a default version', async () => {
+  const rows = [{id:1,fullCode:'VERSIONED',origin:'planned',status:'active',version:'R2'}, {id:2,fullCode:'UNVERSIONED',origin:'historical',status:'active'}];
+  render(<DrawingLibraryPage api={{searchDrawings:vi.fn().mockResolvedValue({items:rows,total:2}),listDictionaries:vi.fn().mockResolvedValue([])} as never} />);
+  const table=await screen.findByRole('table');
+  expect(within(within(table).getAllByRole('row')[1]).getAllByRole('cell')[4]).toHaveTextContent('R2');
+  expect(within(within(table).getAllByRole('row')[2]).getAllByRole('cell')[4]).toHaveTextContent('未记录');
 });

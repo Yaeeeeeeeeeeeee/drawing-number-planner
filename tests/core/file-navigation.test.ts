@@ -79,6 +79,47 @@ describe('PDF navigation statistics', () => {
     }
   });
 
+  it('refreshes counts immediately after explicit historical product confirmation without rescanning or reassigning unknown PDFs', () => {
+    const fullCode = parseDrawingCode('02.0404.010.0401007')!;
+    const context = { productCategory: '冰柜', sku: 'NEW-SKU', model: 'Z40' };
+    const root = '03.冰柜\\NEW-SKU-Z40\\03.量产后的变更文件';
+    repository.replaceScan([
+      record(`${root}\\00.首批大货\\same.pdf`, fullCode.fullCode),
+      record(`${root}\\01.20241210\\same.pdf`, fullCode.fullCode),
+      record(`${root}\\01.20241210\\unknown.pdf`),
+    ], [{ ...fullCode, directoryContext: context }], timestamp);
+    const beforeFiles = db.prepare('select id, drawing_id, historical_drawing_id, material_batch_id from pdf_files order by id').all();
+    expect(repository.navigation({ presence: 'all' }).unassociatedProducts).toBe(3);
+    const products = new ProductService(db), template = products.get(productId);
+    const confirmed = products.confirmHistoricalCandidate({ ...context, brandId: template.brandId,
+      productSizeId: template.productSizeId, defaultAppearanceId: template.defaultAppearanceId! });
+    expect(confirmed.linkedHistoricalCount).toBe(1);
+    const stats = repository.navigation({ presence: 'all' });
+    expect(stats).toMatchObject({ total: 3, unassociatedProducts: 1,
+      products: [{ productId: confirmed.product.id, count: 2 }], categories: [{ name: '冰柜', count: 2 }] });
+    expect(repository.search({ presence: 'all', unassociatedProduct: true }).items.map(file => file.fileName)).toEqual(['unknown.pdf']);
+    expect(repository.search({ presence: 'all', productId: confirmed.product.id }).total).toBe(2);
+    expect(db.prepare('select id, drawing_id, historical_drawing_id, material_batch_id from pdf_files order by id').all()).toEqual(beforeFiles);
+    expect(db.prepare('select count(*) as count from file_scan_runs').get()).toEqual({ count: 1 });
+  });
+
+  it('does not infer a product association merely because a matching product was newly created', () => {
+    const code = parseDrawingCode('02.0404.010.0401008')!;
+    const context = { productCategory: '冰柜', sku: 'NEW-SKU', model: 'Z40' };
+    const rows = [record('candidate.pdf', code.fullCode)];
+    repository.replaceScan(rows, [{ ...code, directoryContext: context }], timestamp);
+    const products = new ProductService(db), template = products.get(productId);
+    const product = products.create({ ...context, brandId: template.brandId,
+      productSizeId: template.productSizeId, defaultAppearanceId: template.defaultAppearanceId });
+    expect(repository.navigation({ presence: 'all' })).toMatchObject({ total: 1, unassociatedProducts: 1, products: [] });
+    expect(repository.search({ unassociatedProduct: true }).total).toBe(1);
+    // The existing scanner may reliably resolve the stored historical directory context on a later scan.
+    repository.replaceScan(rows, [{ ...code, directoryContext: context }], timestamp);
+    expect(repository.navigation({ presence: 'all' })).toMatchObject({ total: 1, unassociatedProducts: 0,
+      products: [{ productId: product.id, count: 1 }] });
+    expect(repository.search({ unassociatedProduct: true }).total).toBe(0);
+  });
+
   it('keeps every aggregate on one read snapshot while another connection commits a change', () => {
     seed();
     const directory = mkdtempSync(join(tmpdir(), 'pdf-navigation-snapshot-'));

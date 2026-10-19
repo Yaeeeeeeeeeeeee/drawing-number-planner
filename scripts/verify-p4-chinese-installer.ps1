@@ -1,0 +1,55 @@
+param([Parameter(Mandatory=$true)][string]$SetupPath, [Parameter(Mandatory=$true)][string]$OutputDirectory)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+$setup = (Resolve-Path $SetupPath).Path
+Start-Process $setup -ArgumentList @('/SP-', '/NORESTART') | Out-Null
+$root = [System.Windows.Automation.AutomationElement]::RootElement
+$window = $null
+for ($attempt=0; $attempt -lt 60; $attempt++) {
+  $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+  foreach ($candidate in $windows) {
+    if ($candidate.Current.Name -like '*图号规划器*' -and $candidate.Current.Name -match '安装') { $window=$candidate; break }
+  }
+  if ($window) { break }
+  Start-Sleep -Milliseconds 500
+}
+if (!$window) { throw 'Chinese installer window not found' }
+try {
+  $edit = $null
+  for ($page=0; $page -lt 4; $page++) {
+    $elements = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+    foreach ($element in $elements) {
+      if ($element.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit) {
+        $pattern=$null
+        if ($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern) -and $pattern.Current.Value -match 'DrawingNumberPlanner|图号规划器') { $edit=$element; break }
+      }
+    }
+    if ($edit) { break }
+    $next = $elements | Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $_.Current.Name -match '下一步' } | Select-Object -First 1
+    if (!$next) { throw 'Chinese Next button not found' }
+    $next.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Start-Sleep -Milliseconds 300
+  }
+  if (!$edit) { throw 'Selectable installation directory edit not found' }
+  $custom = Join-Path $env:RUNNER_TEMP '中文安装路径-人工可选'
+  $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+  if ($value.Current.IsReadOnly) { throw 'Directory cannot be edited' }
+  $value.SetValue($custom)
+  if ($value.Current.Value -ne $custom) { throw 'Custom directory did not remain selected' }
+  $names = @($window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name })
+  if (!($names | Where-Object { $_ -match '浏览|目标位置|选择安装|安装位置' })) { throw 'Chinese directory labels not found' }
+  New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
+  $bounds=$window.Current.BoundingRectangle
+  $bitmap=New-Object System.Drawing.Bitmap ([int]$bounds.Width),([int]$bounds.Height)
+  $graphics=[System.Drawing.Graphics]::FromImage($bitmap)
+  try { $graphics.CopyFromScreen([int]$bounds.X,[int]$bounds.Y,0,0,$bitmap.Size); $bitmap.Save((Join-Path $OutputDirectory 'Windows-中文安装向导-自选路径.png'),[System.Drawing.Imaging.ImageFormat]::Png) }
+  finally { $graphics.Dispose(); $bitmap.Dispose() }
+  @{ language='简体中文'; directoryEditable=$true; chosenDirectory=$custom; title=$window.Current.Name; installedByThisProbe=$false } | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory 'windows-chinese-installer.json')
+} finally {
+  # Probe does not install; terminate only the isolated Inno wizard process.
+  $wizardPid = $window.Current.ProcessId
+  if ($wizardPid) { Stop-Process -Id $wizardPid -Force -ErrorAction SilentlyContinue }
+}

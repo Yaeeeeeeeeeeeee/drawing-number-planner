@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
+import { ProductCatalogNavigation } from '../../src/renderer/components/ProductCatalogNavigation';
 import { PdfProductBatchNavigation } from '../../src/renderer/components/PdfProductBatchNavigation';
 
 it('uses explicit business usage instead of inferred sequence state and expands search ancestors', () => {
@@ -39,4 +40,34 @@ it('keeps explicit current usage visible even when batch recognition remains pen
   fireEvent.click(screen.getByRole('button',{name:'展开产品 SKU · T40'}));
   expect(screen.getByRole('button',{name:'批次 首批'})).toHaveTextContent('当前使用');
   expect(screen.getByRole('button',{name:'批次 首批'})).not.toHaveTextContent('待确认');
+});
+
+it('places pending products directly after the tree inside its scroll region before filters', () => {
+  const {container}=render(<PdfProductBatchNavigation products={[]} batches={[]} counts={null} scope={{kind:'all'}} onSelect={vi.fn()} filters={<input aria-label="保留的文件筛选" />} />);
+  const pending=screen.getByRole('button',{name:'待关联产品'});
+  const scroll=container.querySelector('.pdf-nav-scroll')!;
+  expect(scroll).toContainElement(pending);
+  expect(pending.compareDocumentPosition(screen.getByText('文件筛选')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(pending.querySelector('svg')).toHaveAttribute('width','18');
+  expect(pending.querySelector('svg')).toHaveAttribute('stroke-width','1.8');
+});
+
+it('preserves direct orphan batch navigation with truthful unavailable file counts',()=>{
+  const select=vi.fn();
+  render(<PdfProductBatchNavigation products={[]} batches={[{id:7,productId:null,name:'01.首批',recognitionStatus:'pending'}] as never} counts={null} scope={{kind:'all'}} onSelect={select} filters={<input aria-label="手工文件筛选"/>}/>);
+  fireEvent.click(screen.getByText('未关联产品批次（1）'));
+  const batch=screen.getByRole('button',{name:'批次 首批'});
+  expect(batch).toHaveTextContent('待确认');
+  expect(batch).toHaveTextContent('—');
+  fireEvent.click(batch);
+  expect(select).toHaveBeenCalledWith({kind:'batch',batchId:7});
+  expect(screen.getByText('文件筛选').closest('details')).not.toHaveAttribute('open');
+});
+
+
+it('uses drawing-number terminology for the shared drawing catalog',()=>{
+  render(<ProductCatalogNavigation products={[]} batches={[]} counts={{total:2,unassociated:1,categories:[],products:[],batches:[]}} scope={{kind:'all'}} onSelect={vi.fn()} mode="drawings"/>);
+  expect(screen.getByRole('button',{name:'全部图号'})).toBeVisible();
+  expect(screen.getByRole('button',{name:'未关联图号'})).toBeVisible();
+  expect(screen.getByLabelText('2 个图号')).toBeVisible();
 });

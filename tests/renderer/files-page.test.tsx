@@ -49,6 +49,7 @@ describe('FilesPage', () => {
   it('keeps manual file filters when all files clears only navigation scope', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
     await screen.findByRole('button', { name: '全部文件' });
+    fireEvent.click(screen.getByText('文件筛选'));
     fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'manual' } });
     fireEvent.change(screen.getByLabelText('匹配状态'), { target: { value: 'pending' } });
     fireEvent.click(screen.getByRole('button', { name: '待关联产品' }));
@@ -281,6 +282,7 @@ describe('FilesPage', () => {
   it('submits combined filters and shows unmatched or missing states without stale requests winning', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
     await screen.findByText(unmatched.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
+    fireEvent.click(screen.getByText('文件筛选'));
     fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'unknown' } });
     fireEvent.change(screen.getByLabelText('匹配状态'), { target: { value: 'unmatched' } });
     fireEvent.change(screen.getByLabelText('存在状态'), { target: { value: 'missing' } });

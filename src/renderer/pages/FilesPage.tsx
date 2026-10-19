@@ -2,7 +2,7 @@ import { PdfProductBatchNavigation, type PdfNavigationScope, type PdfNavigationC
 import './drawing-library.css';
 import { CopyButton } from '../components/CopyButton';
 import { PageHeader } from '../components/PageHeader';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
 
 import { ModuleWorkspace } from '../components/ModuleWorkspace';
@@ -217,7 +217,7 @@ function FilesWorkspace({ api, mock, initialTarget }: { api: PlannerApi; mock: b
     if (!result.ok) setError(result.error?.message ?? '打开文件位置失败');
   };
 
-  const navigation = <PdfProductBatchNavigation products={products} batches={batches} counts={navigationCounts} usageBatches={usageBatches} scope={navigationScope}
+  const navigation = ({collapseControl}: {collapseControl: ReactNode}) => <PdfProductBatchNavigation collapseControl={collapseControl} products={products} batches={batches} counts={navigationCounts} usageBatches={usageBatches} scope={navigationScope}
     onSelect={scope => { setNavigationScope(scope); setSelectedIds([]); setDetailFile(null); setError(''); setMessage(''); void search(filters, 1, scope); }}
     filters={<form className="filter-bar files-filter" onSubmit={submit}>
       <label><span>文件关键词</span><input aria-label="文件关键词" value={filters.keyword} onChange={(event) => setFilter('keyword', event.target.value)} /></label>

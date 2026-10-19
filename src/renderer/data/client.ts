@@ -1,3 +1,4 @@
+import type { DrawingNavigationCounts } from '../../core/drawings/drawing-types.js';
 import type { FileNavigationResult } from '../../core/files/file-types.js';
 export type PdfNavigationCounts = FileNavigationResult;
 import type { ProductCleanupPreview, ProductCleanupSelection } from '../../core/products/product-cleanup-service.js';
@@ -260,6 +261,7 @@ export interface LocalTaskView {
 }
 
 export interface PlannerApi {
+  getDrawingNavigationCounts?(filters?: Record<string, string | number | boolean | undefined>): Promise<DrawingNavigationCounts>;
   getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[] }>;
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingDetailView>;
@@ -509,6 +511,7 @@ async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_i
 export const apiClient: PlannerApi = {
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),
   getDrawingNavigation: () => request('/api/drawings/navigation'),
+  getDrawingNavigationCounts: (filters = {}) => request(`/api/drawings/navigation-counts${queryString(filters)}`),
   getDrawing: (id) => request(`/api/drawings/${id}`),
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),

@@ -179,3 +179,9 @@ Current：用户明确要求去掉截图顶部应用横栏，并先后纠正为�
 See docs/p4-product-corrections-20261019.md. Product dictionary options refresh on workspace reactivation and editor opening; loading failure is visible and retryable, not silently represented as an empty dictionary. Product exit presents independent unselected occupancy/history choices, explicit impact counts and inline final confirmation; retain exact identity/code confirmations and transactional safeguards.
 
 Drawing origin is an independent 来源 column. User selected a low-saturation grey-blue bordered category badge (11px) and smaller dark project text (12px), centered, with complete wrapping names. Category colors describe classification presentation only, never infer business status. Shared batch display formatting removes recognized directory ordinals from valid date/range/description labels while preserving dates, colors and parentheses; raw name/path/ID/order remain unchanged and identical displayed names must not merge identities. Native Windows installation and browser fixture screenshots are distinct evidence; do not execute product-history clearing on user or existing acceptance data to manufacture a screenshot.
+
+### 共享目录与中文空数据候选（2026-10-20）
+
+Current：图号/PDF共用目录树与Lucide18px/1.8图标；标题行图标收起，默认300px、可调260–420px。待关联入口位于树后同一滚动区，不固定底部。单套兼容文件筛选折叠，待关联只清导航冲突条件，保留手动条件。计数按唯一索引/实际图号身份、明确关联查询；修改后刷新列表与统计。图号七列不含默认文件完整性列，详情仍保留。
+
+Current：用户要求交付无示例、中文、自选路径。本候选不携带acceptance-seed；首次新库移除预设示例模板和个人签名，保留系统用途定义；已存在用户数据不重置。旧样例安装目标拒绝并要求新目录，禁止靠清理AppData或原始PDF实现空数据。仅隔离交付，不自动合并或覆盖已发布版本。见docs/p4-unified-navigation-empty-installer-20261020.md。

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { ChevronsLeft } from 'lucide-react';
 import { PanelResizeHandle } from './PanelResizeHandle';
 import { useWorkspaceExtent } from './useWorkspaceExtent';
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
 
 /** Layout only; panel movement never changes record selection or business state. */
 export function ModuleWorkspace({ children, navigation, detail, detailLabel, detailIdentity, onCloseDetail, fileWorkspace = false, resizable = false, drawingWorkspace = false }: {
-  children: ReactNode; navigation?: ReactNode; detail?: ReactNode; detailLabel: string;
+  children: ReactNode; navigation?: ReactNode | ((controls: {collapseControl: ReactNode}) => ReactNode); detail?: ReactNode; detailLabel: string;
   detailIdentity?: number | string; onCloseDetail(): void; fileWorkspace?: boolean; resizable?: boolean; drawingWorkspace?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null), panel = useRef<HTMLDivElement>(null);
@@ -14,11 +15,12 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const detailOrigin = useRef<HTMLElement | null>(null), hadDetail = useRef(false);
   const { width, height } = useWorkspaceExtent(root);
   const [navigationOpen, setNavigationOpen] = useState(false), [navigationCollapsed, setNavigationCollapsed] = useState(false);
-  const defaultNavigation = fileWorkspace ? 300 : drawingWorkspace ? 260 : 220;
-  const minimumNavigation = fileWorkspace ? 260 : 180;
+  const catalogWorkspace = fileWorkspace || drawingWorkspace;
+  const defaultNavigation = catalogWorkspace ? 300 : 220;
+  const minimumNavigation = catalogWorkspace ? 260 : 180;
   const [preferredNavigation, setPreferredNavigation] = useState(defaultNavigation), [preferredDetail, setPreferredDetail] = useState(drawingWorkspace ? 560 : 380);
   const closeRef = useRef(onCloseDetail); closeRef.current = onCloseDetail;
-  const maxNavigation = Math.max(minimumNavigation, Math.min(fileWorkspace ? 420 : 280, width - 820));
+  const maxNavigation = Math.max(minimumNavigation, Math.min(catalogWorkspace ? 420 : 280, width - 820));
   const navigationWidth = clamp(preferredNavigation, minimumNavigation, maxNavigation);
   const navigationDocked = width >= navigationWidth + 820 && !navigationCollapsed;
   const centerWidth = width - (navigation && navigationDocked ? navigationWidth + 10 : 0);
@@ -55,8 +57,9 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
         background.push([sibling, sibling.hasAttribute('inert')]); sibling.setAttribute('inert', '');
       }
     }
-    const controls = () => [...current.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]')]
-      .filter(el => !el.closest('[hidden],[inert]') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden');
+    const controls = () => [...current.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],summary,[tabindex="0"]')]
+      .filter(el => !el.closest('[hidden],[inert]') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')
+      .filter(el => ![...current.querySelectorAll('details:not([open])')].some(details => details.contains(el) && details.querySelector(':scope > summary') !== el));
     if (!current.contains(document.activeElement)) (controls()[0] ?? current).focus();
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
@@ -80,6 +83,9 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   }, [modal, detailIdentity]);
 
   const navVisible = navigationDocked || navigationModal;
+  const closeNavigation = () => { if(navigationDocked) { navigationFocus.current = 'toggle'; setNavigationCollapsed(true); } setNavigationOpen(false); };
+  const collapseControl = <button type="button" className="text-button navigation-fold" aria-label={navigationDocked ? '收起产品导航' : '关闭产品导航'} title={navigationDocked ? '收起产品导航' : '关闭产品导航'} onClick={closeNavigation}><ChevronsLeft size={18} strokeWidth={1.8} aria-hidden="true"/></button>;
+  const integratedNavigation = typeof navigation === 'function';
   return <div ref={root} className={`module-workspace-viewport p4-workspace adaptive-data-workspace ${fileWorkspace ? 'file-workspace' : ''} ${drawingWorkspace ? 'drawing-workspace' : ''}`} style={{ '--workspace-available-height': `${height}px` } as CSSProperties}>
     {(navigation && !navigationDocked || resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 560 : 380))) && <div className="module-workspace-tools">
       {navigation && !navigationDocked && <button ref={toggle} className="secondary-button module-navigation-toggle" type="button" aria-expanded={navigationModal} onClick={() => { const canDock = width >= navigationWidth + 820; if (canDock) navigationFocus.current = 'panel'; setNavigationCollapsed(false); setNavigationOpen(!canDock); }}>产品／批次导航</button>}
@@ -88,8 +94,8 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
     <div className={`p4-workspace-grid ${navigation && navigationDocked ? 'has-navigation' : ''}`} style={{ gridTemplateColumns: navigation && navigationDocked ? `${navigationWidth}px 10px minmax(0,1fr)` : 'minmax(0,1fr)' }}>
       {navigation && <div ref={navigationModal ? panel : undefined} className={`module-navigation ${navigationModal ? 'module-drawer' : ''}`} hidden={!navVisible}
         role={navigationModal ? 'dialog' : undefined} aria-modal={navigationModal || undefined} aria-label="产品／批次导航" tabIndex={-1}>
-        {navigationDocked ? <button type="button" className="text-button navigation-fold" onClick={() => { navigationFocus.current = 'toggle'; setNavigationCollapsed(true); setNavigationOpen(false); }}>收起产品导航</button> : <button type="button" className="secondary-button" onClick={() => setNavigationOpen(false)}>关闭产品导航</button>}
-        <div className="module-navigation-content" onClick={event => { if (!navigationDocked && (event.target as HTMLElement).closest(fileWorkspace ? '[data-navigation-select]' : 'button')) setNavigationOpen(false); }}>{navigation}</div>
+        {!integratedNavigation && (navigationDocked ? <button type="button" className="text-button navigation-fold" onClick={closeNavigation}>收起产品导航</button> : <button type="button" className="secondary-button" onClick={closeNavigation}>关闭产品导航</button>)}
+        <div className="module-navigation-content" onClick={event => { if (!navigationDocked && (event.target as HTMLElement).closest(fileWorkspace || integratedNavigation ? '[data-navigation-select]' : 'button')) setNavigationOpen(false); }}>{typeof navigation === 'function' ? navigation({collapseControl}) : navigation}</div>
       </div>}
       {navigation && navigationDocked && resizable && <PanelResizeHandle label="调整产品导航宽度" value={navigationWidth} min={minimumNavigation} max={maxNavigation} onChange={setPreferredNavigation} />}
       <div className={`module-center ${detail && detailDocked ? 'docked-detail' : ''}`} style={{ gridTemplateColumns: detail && detailDocked ? `minmax(0,1fr) 10px ${detailWidth}px` : 'minmax(0,1fr)' }}>

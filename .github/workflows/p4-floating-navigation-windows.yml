@@ -1,4 +1,4 @@
-# Product exit choices, dictionary refresh and origin/category presentation candidate.
+# Shared navigation, real counts and Chinese custom-path empty-data candidate.
 # Includes shared batch display prefix correction and PDF table consistency.
 # Whole-product release uses a single model confirmation and reviewed snapshot.
 # Native menu visibility remains the only allowed Main difference from the original runtime.
@@ -12,6 +12,11 @@ on:
       - scripts/p4-delivery-source-guard.ts
       - scripts/verify-p4-floating-navigation-windows.cjs
       - scripts/p4-windows-installer.iss
+      - scripts/acceptance-entry.cjs
+      - scripts/prepare-acceptance-data.cjs
+      - scripts/initialize-empty-acceptance.ts
+      - scripts/verify-p4-chinese-installer.ps1
+      - scripts/installer-languages/**
   workflow_dispatch:
 permissions:
   contents: read
@@ -50,7 +55,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Renderer build failed' }
           node node_modules/typescript/bin/tsc -p tsconfig.main.json
           if ($LASTEXITCODE -ne 0) { throw 'Main build failed' }
-      - name: Preserve original sample and runtime, repack integrated UI
+      - name: Verify original runtime, exclude sample and repack empty UI
         shell: pwsh
         run: node scripts/repack-p4-bom-windows.mjs app-source existing-p4 P4-Windows-Integrated
       - name: Build and install the complete Windows candidate
@@ -64,7 +69,16 @@ jobs:
           }
           & $compiler "/DPackageRoot=$((Resolve-Path P4-Windows-Integrated).Path)" "/DInstallerOutput=$((Resolve-Path installer).Path)" scripts/p4-windows-installer.iss
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
-          $installed = Join-Path $env:RUNNER_TEMP 'P4-floating-installed'
+          & ./scripts/verify-p4-chinese-installer.ps1 -SetupPath 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe' -OutputDirectory 'installer'
+          # Refuse an old sample-bearing target rather than deleting its files.
+          $oldTarget = Join-Path $env:RUNNER_TEMP 'P4-existing-sample-target'
+          $sentinel = Join-Path $oldTarget 'resources/app/acceptance-seed/planner.db'
+          New-Item -ItemType Directory -Force (Split-Path $sentinel) | Out-Null
+          Set-Content -Path $sentinel -Value 'existing sample must remain untouched'
+          $beforeSentinel = (Get-FileHash $sentinel -Algorithm SHA256).Hash
+          $refused = Start-Process (Resolve-Path 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$oldTarget`"") -Wait -PassThru
+          if ($refused.ExitCode -eq 0 -or (Get-FileHash $sentinel -Algorithm SHA256).Hash -ne $beforeSentinel) { throw 'Old sample target was not safely refused' }
+          $installed = Join-Path $env:RUNNER_TEMP '图号规划器-自定义安装路径'
           $process = Start-Process (Resolve-Path 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw 'Installer failed' }
           $root = (Resolve-Path P4-Windows-Integrated).Path
@@ -74,7 +88,7 @@ jobs:
             if (!(Test-Path $target) -or (Get-FileHash $_.FullName -Algorithm SHA256).Hash -ne (Get-FileHash $target -Algorithm SHA256).Hash) { throw "Installed file differs: $relative" }
           }
           "P4_INSTALLED_DIRECTORY=$installed" >> $env:GITHUB_ENV
-      - name: Native Windows floating navigation verification
+      - name: Native Windows empty-data navigation verification
         shell: pwsh
         run: |
           node scripts/verify-p4-floating-navigation-windows.cjs app-source "$env:P4_INSTALLED_DIRECTORY/图号规划器验收版.exe"
