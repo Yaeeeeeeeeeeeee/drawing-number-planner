@@ -101,8 +101,8 @@ describe('FilesPage', () => {
     render(<FilesPage api={api as never} />);
 
     expect(await screen.findAllByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' })).toHaveLength(2);
-    expect(screen.getByText('00.首批大货')).toBeVisible();
-    expect(screen.getByText('06.20260309')).toBeVisible();
+    expect(screen.getByText('首批大货', { selector: '.files-batch-code' })).toBeVisible();
+    expect(screen.getByText('20260309', { selector: '.files-batch-code' })).toBeVisible();
     expect(screen.getByText(/同一图号出现在不同资料批次属于正常历史快照/)).toBeVisible();
     expect(screen.queryByText('扫描重复')).not.toBeInTheDocument();
   });

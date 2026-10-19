@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-19T07:20:25.113224+00:00",
+  "date": "2026-10-19T07:53:23.840573+00:00",
   "branch": "codex/p4-floating-navigation-20261019",
   "baseRevision": "6a3947e",
   "relatedTests": {
@@ -1078,5 +1078,1254 @@
       "reason": "Previous guard forbade any Main change. Now permits only exact native-menu visibility additions; all other Main/dependency/Schema changes still rejected."
     }
   ],
-  "applicationRevision": "3a6f23f9dbc15805dd50404738620926d7b9a837"
+  "applicationRevision": "3a6f23f9dbc15805dd50404738620926d7b9a837",
+  "productCorrections": {
+    "applicationRevision": "81cf4a1dfbaf21cb7b2f587d8e1c625e304e7629",
+    "relatedTests": {
+      "passed": 146,
+      "failed": 0
+    },
+    "productCleanupCore": {
+      "passed": 23,
+      "failed": 0
+    },
+    "fullSuite": {
+      "total": 1038,
+      "passed": 1022,
+      "failed": 16,
+      "sameFailuresAsMasterEvidence": true,
+      "failures": [
+        {
+          "file": "core/indexed-pdf-resolver.test.ts",
+          "test": "rejects unsafe stored paths and a junction whose real target escapes the workspace"
+        },
+        {
+          "file": "core/outbound-artifact-ownership.test.ts",
+          "test": "recovers all abandoned part temporaries while preserving unrelated files and published ZIPs"
+        },
+        {
+          "file": "core/outbound-package-service.test.ts",
+          "test": "never records half a multipart publication as completed after abrupt process exit"
+        },
+        {
+          "file": "core/outbound-package-service.test.ts",
+          "test": "rejects a canonical path that escapes through a filesystem link"
+        },
+        {
+          "file": "core/outbound-package-service.test.ts",
+          "test": "rejects two indexes resolving to the same canonical actual path"
+        },
+        {
+          "file": "core/qr-file-scanner.test.ts",
+          "test": "returns QR naming candidates across supported file types without rewriting any workspace file"
+        },
+        {
+          "file": "core/workspace-paths.test.ts",
+          "test": "normalizes a real root and resolves a nested relative path inside it"
+        },
+        {
+          "file": "core/workspace-paths.test.ts",
+          "test": "rejects a directory junction that resolves outside the workspace"
+        },
+        {
+          "file": "core/workspace-settings.test.ts",
+          "test": "starts unconfigured and persists a normalized existing directory across instances"
+        },
+        {
+          "file": "renderer/product-bom-roundtrip.test.tsx",
+          "test": "does not assume cancelled processing succeeded"
+        },
+        {
+          "file": "renderer/product-bom-roundtrip.test.tsx",
+          "test": "fails closed after product disappears"
+        },
+        {
+          "file": "renderer/product-bom-roundtrip.test.tsx",
+          "test": "protects unsaved changes on tab switch and return"
+        },
+        {
+          "file": "renderer/product-bom-roundtrip.test.tsx",
+          "test": "restores source filter and forces fresh check"
+        },
+        {
+          "file": "renderer/product-bom-roundtrip.test.tsx",
+          "test": "uses completed memory result but still checks other blockers"
+        },
+        {
+          "file": "renderer/recovery-mock.test.tsx",
+          "test": "never mounts real recovery or queries API"
+        },
+        {
+          "file": "server/application-api.test.ts",
+          "test": "removes only stale task-owned outbound claim and temporary files after restart"
+        }
+      ]
+    },
+    "browser": [
+      {
+        "width": 3840,
+        "height": 2160,
+        "initial": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 2148
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 3596,
+            "height": 2160
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "closed": {
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "reopened": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 2148
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 3596,
+            "height": 2160
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "actionSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "editorSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "dictionaryTabs": [
+          {
+            "tab": "品类尺寸",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "外观",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "颜色",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "主类别",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          }
+        ],
+        "cleanupButtons": [
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 844.71875
+          },
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 844.71875
+          }
+        ],
+        "categoryStyle": {
+          "background": "rgb(238, 242, 246)",
+          "border": "1px",
+          "font": "11px"
+        },
+        "projectFont": "12px",
+        "sourceCells": [
+          "正式规划",
+          "历史扫描"
+        ],
+        "productDictionaryReload": true,
+        "keyboardRestoreEdit": true,
+        "filterPreserved": true,
+        "fixtureWrites": [
+          "/api/dictionaries/items/7/activate",
+          "/api/dictionaries/items/7"
+        ],
+        "noRealDatabaseAccess": true
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "initial": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 1068
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 1676,
+            "height": 1080
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "closed": {
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "reopened": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 1068
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 1676,
+            "height": 1080
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "actionSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "editorSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "dictionaryTabs": [
+          {
+            "tab": "品类尺寸",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "外观",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "颜色",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "主类别",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          }
+        ],
+        "cleanupButtons": [
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 844.71875
+          },
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 844.71875
+          }
+        ],
+        "categoryStyle": {
+          "background": "rgb(238, 242, 246)",
+          "border": "1px",
+          "font": "11px"
+        },
+        "projectFont": "12px",
+        "sourceCells": [
+          "正式规划",
+          "历史扫描"
+        ],
+        "productDictionaryReload": true,
+        "keyboardRestoreEdit": true,
+        "filterPreserved": true,
+        "fixtureWrites": [
+          "/api/dictionaries/items/7/activate",
+          "/api/dictionaries/items/7"
+        ],
+        "noRealDatabaseAccess": true
+      },
+      {
+        "width": 1100,
+        "height": 760,
+        "initial": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 748
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 856,
+            "height": 760
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "closed": {
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 1100,
+            "height": 760
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "reopened": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 748
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 856,
+            "height": 760
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "actionSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "editorSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "dictionaryTabs": [
+          {
+            "tab": "品类尺寸",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "外观",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "颜色",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "主类别",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          }
+        ],
+        "cleanupButtons": [
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 795.71875
+          },
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 795.71875
+          }
+        ],
+        "categoryStyle": {
+          "background": "rgb(238, 242, 246)",
+          "border": "1px",
+          "font": "11px"
+        },
+        "projectFont": "12px",
+        "sourceCells": [
+          "正式规划",
+          "历史扫描"
+        ],
+        "productDictionaryReload": true,
+        "keyboardRestoreEdit": true,
+        "filterPreserved": true,
+        "fixtureWrites": [
+          "/api/dictionaries/items/7/activate",
+          "/api/dictionaries/items/7"
+        ],
+        "noRealDatabaseAccess": true
+      },
+      {
+        "width": 1024,
+        "height": 760,
+        "initial": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 748
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 780,
+            "height": 760
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "closed": {
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 1024,
+            "height": 760
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "reopened": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 748
+          },
+          "main": {
+            "x": 244,
+            "y": 0,
+            "width": 780,
+            "height": 760
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "actionSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "editorSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "dictionaryTabs": [
+          {
+            "tab": "品类尺寸",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "外观",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "颜色",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "主类别",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          }
+        ],
+        "cleanupButtons": [
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 795.90625
+          },
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 795.90625
+          }
+        ],
+        "categoryStyle": {
+          "background": "rgb(238, 242, 246)",
+          "border": "1px",
+          "font": "11px"
+        },
+        "projectFont": "12px",
+        "sourceCells": [
+          "正式规划",
+          "历史扫描"
+        ],
+        "productDictionaryReload": true,
+        "keyboardRestoreEdit": true,
+        "filterPreserved": true,
+        "fixtureWrites": [
+          "/api/dictionaries/items/7/activate",
+          "/api/dictionaries/items/7"
+        ],
+        "noRealDatabaseAccess": true
+      },
+      {
+        "width": 1023,
+        "height": 760,
+        "initial": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 748
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 1023,
+            "height": 760
+          },
+          "inert": true,
+          "modal": "true",
+          "overflow": false
+        },
+        "closed": {
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 1023,
+            "height": 760
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "reopened": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 748
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 1023,
+            "height": 760
+          },
+          "inert": true,
+          "modal": "true",
+          "overflow": false
+        },
+        "actionSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "editorSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "dictionaryTabs": [
+          {
+            "tab": "品类尺寸",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "外观",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "颜色",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "主类别",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          }
+        ],
+        "cleanupButtons": [
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 795.71875
+          },
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 795.71875
+          }
+        ],
+        "categoryStyle": {
+          "background": "rgb(238, 242, 246)",
+          "border": "1px",
+          "font": "11px"
+        },
+        "projectFont": "12px",
+        "sourceCells": [
+          "正式规划",
+          "历史扫描"
+        ],
+        "productDictionaryReload": true,
+        "keyboardRestoreEdit": true,
+        "filterPreserved": true,
+        "fixtureWrites": [
+          "/api/dictionaries/items/7/activate",
+          "/api/dictionaries/items/7"
+        ],
+        "noRealDatabaseAccess": true
+      },
+      {
+        "width": 720,
+        "height": 600,
+        "initial": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 588
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 720,
+            "height": 600
+          },
+          "inert": true,
+          "modal": "true",
+          "overflow": false
+        },
+        "closed": {
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 720,
+            "height": 600
+          },
+          "inert": false,
+          "modal": null,
+          "overflow": false
+        },
+        "reopened": {
+          "panel": {
+            "x": 12,
+            "y": 12,
+            "right": 232,
+            "bottom": 588
+          },
+          "main": {
+            "x": 0,
+            "y": 0,
+            "width": 720,
+            "height": 600
+          },
+          "inert": true,
+          "modal": "true",
+          "overflow": false
+        },
+        "actionSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "editorSizes": [
+          {
+            "width": 76,
+            "height": 32
+          },
+          {
+            "width": 76,
+            "height": 32
+          }
+        ],
+        "dictionaryTabs": [
+          {
+            "tab": "品类尺寸",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "外观",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "颜色",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          },
+          {
+            "tab": "主类别",
+            "sizes": [
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              },
+              {
+                "width": 76,
+                "height": 32
+              }
+            ]
+          }
+        ],
+        "cleanupButtons": [
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 635.90625
+          },
+          {
+            "width": 120,
+            "height": 36,
+            "radius": "6px",
+            "y": 635.90625
+          }
+        ],
+        "categoryStyle": {
+          "background": "rgb(238, 242, 246)",
+          "border": "1px",
+          "font": "11px"
+        },
+        "projectFont": "12px",
+        "sourceCells": [
+          "正式规划",
+          "历史扫描"
+        ],
+        "productDictionaryReload": true,
+        "keyboardRestoreEdit": true,
+        "filterPreserved": true,
+        "fixtureWrites": [
+          "/api/dictionaries/items/7/activate",
+          "/api/dictionaries/items/7"
+        ],
+        "noRealDatabaseAccess": true
+      }
+    ],
+    "review": "Important fingerprint omission fixed after failing PDF regression; PDF and QR indexes now included; follow-up found no remaining Important issues.",
+    "schemaChanged": false,
+    "actualUserDataTouched": false,
+    "windowsRunId": 39218694089,
+    "windowsStatus": "in_progress",
+    "scope": "Native Windows reads product exit choices without executing history clearing. Necessary drawing records and product exit audit retained; selected owned BOM/QR/batch/outbound/draft history may be purged in isolated tests only."
+  }
 }

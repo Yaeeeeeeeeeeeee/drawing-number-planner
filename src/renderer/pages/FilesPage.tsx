@@ -319,7 +319,7 @@ function FilesWorkspace({ api, mock, initialTarget }: { api: PlannerApi; mock: b
           aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning || item.isPresent}
           onChange={() => toggleSelection(item.id)} /> },
         { key: 'name', label: '文件名', render: (item) => <div className="files-name-row"><button id={`file-detail-toggle-${item.id}`} className="files-name-button" type="button" aria-label={`文件详情 ${item.fileName}`} aria-expanded={detailFile?.id === item.id} onClick={() => setDetailFile(item)}><span className="file-primary">{item.fileName.replace(/\.pdf$/i, '')}</span></button></div> },
-        { key: 'batch', label: '资料批次', render: (item) => <span className="files-batch-code">{item.materialBatchName ?? '未归入批次'}</span> },
+        { key: 'batch', label: '资料批次', render: (item) => <span className="files-batch-code">{item.materialBatchName ? materialBatchLabel(item.materialBatchName) : '未归入批次'}</span> },
         { key: 'batchStatus', label: '批次状态', render: (item) => <FileBatch item={item} batches={batches} /> },
         { key: 'product', label: '产品', render: (item) => item.productId ? <span className="file-product"><strong>{item.productCategory} · {item.model}</strong><small>SKU：{item.sku ?? '待补录'}</small></span> : <span className="muted-text">待关联</span> },
         { key: 'drawing', label: '匹配图号', render: (item) => item.fullCode ? <span className="file-match matched">

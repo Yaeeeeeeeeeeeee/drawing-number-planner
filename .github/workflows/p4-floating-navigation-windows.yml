@@ -1,4 +1,5 @@
 # Product exit choices, dictionary refresh and origin/category presentation candidate.
+# Includes shared batch display prefix correction and PDF table consistency.
 # Native menu visibility remains the only allowed Main difference from the original runtime.
 name: P4 floating navigation Windows candidate
 on:
