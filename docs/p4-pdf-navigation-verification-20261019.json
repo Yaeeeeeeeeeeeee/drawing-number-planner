@@ -1,0 +1,371 @@
+{
+  "date": "2026-10-19T12:41:52.487115+00:00",
+  "applicationRevision": "f0870cd89c68a2aede1a69d38d1692bd3e4fe5f2",
+  "branch": "codex/p4-floating-navigation-20261019",
+  "relatedTests": {
+    "passed": 148,
+    "failed": 0
+  },
+  "fullSuite": {
+    "total": 1080,
+    "passed": 1064,
+    "failed": 16,
+    "sameFailuresAsMasterEvidence": true,
+    "failures": [
+      {
+        "file": "core/indexed-pdf-resolver.test.ts",
+        "test": "rejects unsafe stored paths and a junction whose real target escapes the workspace"
+      },
+      {
+        "file": "core/outbound-artifact-ownership.test.ts",
+        "test": "recovers all abandoned part temporaries while preserving unrelated files and published ZIPs"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "never records half a multipart publication as completed after abrupt process exit"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "rejects a canonical path that escapes through a filesystem link"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "rejects two indexes resolving to the same canonical actual path"
+      },
+      {
+        "file": "core/qr-file-scanner.test.ts",
+        "test": "returns QR naming candidates across supported file types without rewriting any workspace file"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "normalizes a real root and resolves a nested relative path inside it"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "rejects a directory junction that resolves outside the workspace"
+      },
+      {
+        "file": "core/workspace-settings.test.ts",
+        "test": "starts unconfigured and persists a normalized existing directory across instances"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "restores source filter and forces fresh check"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "protects unsaved changes on tab switch and return"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "does not assume cancelled processing succeeded"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "uses completed memory result but still checks other blockers"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "fails closed after product disappears"
+      },
+      {
+        "file": "renderer/recovery-mock.test.tsx",
+        "test": "never mounts real recovery or queries API"
+      },
+      {
+        "file": "server/application-api.test.ts",
+        "test": "removes only stale task-owned outbound claim and temporary files after restart"
+      }
+    ]
+  },
+  "typecheck": "passed",
+  "build": "passed; existing 500kB warning retained",
+  "browser": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "counts": {
+        "total": 4,
+        "unassociatedProducts": 1,
+        "categories": [
+          {
+            "name": "空气炸锅",
+            "count": 2
+          },
+          {
+            "name": "冰柜",
+            "count": 1
+          }
+        ],
+        "products": [
+          {
+            "productId": 1,
+            "count": 2
+          },
+          {
+            "productId": 2,
+            "count": 1
+          }
+        ],
+        "batches": [
+          {
+            "materialBatchId": 11,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 12,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 13,
+            "productId": 2,
+            "count": 1
+          }
+        ]
+      },
+      "explicitBusinessStates": true,
+      "headerSticky": true,
+      "allPreservesManualFilter": true,
+      "resize": "420",
+      "noBusinessWrites": true
+    },
+    {
+      "width": 2560,
+      "height": 1440,
+      "counts": {
+        "total": 4,
+        "unassociatedProducts": 1,
+        "categories": [
+          {
+            "name": "空气炸锅",
+            "count": 2
+          },
+          {
+            "name": "冰柜",
+            "count": 1
+          }
+        ],
+        "products": [
+          {
+            "productId": 1,
+            "count": 2
+          },
+          {
+            "productId": 2,
+            "count": 1
+          }
+        ],
+        "batches": [
+          {
+            "materialBatchId": 11,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 12,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 13,
+            "productId": 2,
+            "count": 1
+          }
+        ]
+      },
+      "explicitBusinessStates": true,
+      "headerSticky": true,
+      "allPreservesManualFilter": true,
+      "resize": "420",
+      "noBusinessWrites": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "counts": {
+        "total": 4,
+        "unassociatedProducts": 1,
+        "categories": [
+          {
+            "name": "空气炸锅",
+            "count": 2
+          },
+          {
+            "name": "冰柜",
+            "count": 1
+          }
+        ],
+        "products": [
+          {
+            "productId": 1,
+            "count": 2
+          },
+          {
+            "productId": 2,
+            "count": 1
+          }
+        ],
+        "batches": [
+          {
+            "materialBatchId": 11,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 12,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 13,
+            "productId": 2,
+            "count": 1
+          }
+        ]
+      },
+      "explicitBusinessStates": true,
+      "headerSticky": true,
+      "allPreservesManualFilter": true,
+      "resize": "420",
+      "noBusinessWrites": true
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "counts": {
+        "total": 4,
+        "unassociatedProducts": 1,
+        "categories": [
+          {
+            "name": "空气炸锅",
+            "count": 2
+          },
+          {
+            "name": "冰柜",
+            "count": 1
+          }
+        ],
+        "products": [
+          {
+            "productId": 1,
+            "count": 2
+          },
+          {
+            "productId": 2,
+            "count": 1
+          }
+        ],
+        "batches": [
+          {
+            "materialBatchId": 11,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 12,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 13,
+            "productId": 2,
+            "count": 1
+          }
+        ]
+      },
+      "explicitBusinessStates": true,
+      "headerSticky": true,
+      "allPreservesManualFilter": true,
+      "resize": null,
+      "noBusinessWrites": true
+    },
+    {
+      "width": 800,
+      "height": 650,
+      "counts": {
+        "total": 4,
+        "unassociatedProducts": 1,
+        "categories": [
+          {
+            "name": "空气炸锅",
+            "count": 2
+          },
+          {
+            "name": "冰柜",
+            "count": 1
+          }
+        ],
+        "products": [
+          {
+            "productId": 1,
+            "count": 2
+          },
+          {
+            "productId": 2,
+            "count": 1
+          }
+        ],
+        "batches": [
+          {
+            "materialBatchId": 11,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 12,
+            "productId": 1,
+            "count": 1
+          },
+          {
+            "materialBatchId": 13,
+            "productId": 2,
+            "count": 1
+          }
+        ]
+      },
+      "explicitBusinessStates": true,
+      "headerSticky": true,
+      "allPreservesManualFilter": true,
+      "resize": null,
+      "noBusinessWrites": true
+    }
+  ],
+  "review": {
+    "closed": [
+      "mutation refresh retaining latest applied scope/filter",
+      "explicit usage evidence precedes pending recognition"
+    ],
+    "remainingImportant": 0
+  },
+  "schemaChanged": false,
+  "userDataTouched": false,
+  "windows": {
+    "runId": 39253578375,
+    "jobId": 118063142105,
+    "conclusion": "success",
+    "installedFilesHashMatch": true,
+    "originalSeedUnchanged": true,
+    "isolatedDatabaseRowsRestored": true,
+    "pdfStatisticsReadOnly": true,
+    "fileNavigationWidth": {
+      "default": 300,
+      "min": 260,
+      "max": 420
+    },
+    "wholeProductConfirmationTextboxes": 1,
+    "installerArtifact": {
+      "id": 12186378916,
+      "size": 144933292,
+      "sha256": "c1e7ceebff0c5c63ff949e1a1a88d6f6224fb46818f30e19c1290710f7182ec8"
+    },
+    "portableArtifact": {
+      "id": 12187346542,
+      "size": 165898125,
+      "sha256": "d0da2443b81085ed02e20d71b1208af554166d3dff2242da1a6610b3a2ad253f"
+    },
+    "expiresAt": "2026-11-02",
+    "limitations": "Product clearing never executed on real user or existing seed history. Physical Windows/DPI, Chinese IME and actual data remain manual."
+  }
+}
