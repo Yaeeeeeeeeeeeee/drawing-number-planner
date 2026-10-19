@@ -11,6 +11,8 @@ describe('empty Windows installer data policy', () => {
     expect(installer).toMatch(/^DisableDirPage=no$/m);
     expect(installer).toContain("DirExists(AddBackslash(Directory) + 'resources\\app\\acceptance-seed')");
     expect(installer).toContain('HasOldAcceptanceSeed(WizardDirValue)');
+    expect(installer).toContain("RequestedDirectory := ExpandConstant('{param:DIR|}')");
+    expect(installer).toContain('HasOldAcceptanceSeed(RequestedDirectory)');
     expect(installer).toContain("HasOldAcceptanceSeed(ExpandConstant('{app}'))");
     expect(installer).not.toMatch(/\[InstallDelete\]|DelTree\s*\(|DeleteFile\s*\(|RemoveDir\s*\(/i);
   });

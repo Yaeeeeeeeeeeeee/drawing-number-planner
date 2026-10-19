@@ -58,7 +58,7 @@ jobs:
       - name: Verify original runtime, exclude sample and repack empty UI
         shell: pwsh
         run: node scripts/repack-p4-bom-windows.mjs app-source existing-p4 P4-Windows-Integrated
-      - name: Build and install the complete Windows candidate
+      - name: Build the Chinese Windows installer
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force installer | Out-Null
@@ -69,17 +69,28 @@ jobs:
           }
           & $compiler "/DPackageRoot=$((Resolve-Path P4-Windows-Integrated).Path)" "/DInstallerOutput=$((Resolve-Path installer).Path)" scripts/p4-windows-installer.iss
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+      - name: Verify Chinese directory-selection wizard
+        shell: pwsh
+        run: |
           & ./scripts/verify-p4-chinese-installer.ps1 -SetupPath 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe' -OutputDirectory 'installer'
+      - name: Refuse an old sample-bearing installation target
+        shell: pwsh
+        run: |
           # Refuse an old sample-bearing target rather than deleting its files.
           $oldTarget = Join-Path $env:RUNNER_TEMP 'P4-existing-sample-target'
           $sentinel = Join-Path $oldTarget 'resources/app/acceptance-seed/planner.db'
           New-Item -ItemType Directory -Force (Split-Path $sentinel) | Out-Null
           Set-Content -Path $sentinel -Value 'existing sample must remain untouched'
           $beforeSentinel = (Get-FileHash $sentinel -Algorithm SHA256).Hash
-          $refused = Start-Process (Resolve-Path 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$oldTarget`"") -Wait -PassThru
+          $refused = Start-Process (Resolve-Path 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$oldTarget`"") -PassThru
+          if (!$refused.WaitForExit(30000)) { throw 'Old-target refusal did not terminate in time' }
           if ($refused.ExitCode -eq 0 -or (Get-FileHash $sentinel -Algorithm SHA256).Hash -ne $beforeSentinel) { throw 'Old sample target was not safely refused' }
+      - name: Install to a custom Chinese path and verify every installed hash
+        shell: pwsh
+        run: |
           $installed = Join-Path $env:RUNNER_TEMP '图号规划器-自定义安装路径'
-          $process = Start-Process (Resolve-Path 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
+          $process = Start-Process (Resolve-Path 'installer/DrawingNumberPlanner-P4-Windows-x64-Setup.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -PassThru
+          if (!$process.WaitForExit(120000)) { throw 'Custom-path install did not terminate in time' }
           if ($process.ExitCode -ne 0) { throw 'Installer failed' }
           $root = (Resolve-Path P4-Windows-Integrated).Path
           Get-ChildItem $root -File -Recurse -Force | ForEach-Object {

@@ -50,6 +50,17 @@ begin
   Result := '所选目录中存在旧版示例资料。为确保本版以无业务数据状态安装，请选择新的安装目录。旧目录、示例资料和个人数据不会被删除。';
 end;
 
+function InitializeSetup(): Boolean;
+var
+  RequestedDirectory: String;
+begin
+  { Refuse an explicitly supplied old target before a silent wizard is created. }
+  RequestedDirectory := ExpandConstant('{param:DIR|}');
+  Result := not ((RequestedDirectory <> '') and HasOldAcceptanceSeed(RequestedDirectory));
+  if not Result then
+    Log(ExistingSampleMessage());
+end;
+
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
