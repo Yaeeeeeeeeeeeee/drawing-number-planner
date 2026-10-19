@@ -6,6 +6,7 @@ import type { DictionaryItemView, PlannerApi } from '../data/client';
 import { DataTable } from '../components/DataTable';
 import { QueryFeedback } from '../components/QueryFeedback';
 import { EmptyState } from '../components/EmptyState';
+import { DictionaryPermanentDelete } from './DictionaryPermanentDelete';
 import { DictionariesMockPage, isDictionariesMock } from './dictionaries-mock';
 
 const rootTypes = [['brand', '品牌'], ['product_size', '品类尺寸'], ['appearance', '外观'], ['color', '颜色'],
@@ -35,13 +36,15 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
   const [loadError, setLoadError] = useState('');
   const [editing, setEditing] = useState<DictionaryItemView | null>(null); const [editingName, setEditingName] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [confirmRestoreId, setConfirmRestoreId] = useState<number | null>(null);
+  const [permanentDeleteId, setPermanentDeleteId] = useState<number | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [rowFeedback, setRowFeedback] = useState<{ id: number; kind: 'success' | 'error'; message: string } | null>(null);
   const requestGeneration = useRef(0);
 
   const load = async () => {
     const generation = ++requestGeneration.current;
-    setItems([]); setProjects([]); setSelectedMainId(null); setEditing(null); setError(''); setLoadError(''); setLoading(true);
+    setItems([]); setProjects([]); setSelectedMainId(null); setConfirmRestoreId(null); setPermanentDeleteId(null); setEditing(null); setError(''); setLoadError(''); setLoading(true);
     try {
       if (type === 'main_category') {
         const [mainCategories, projectItems] = await Promise.all([
@@ -63,7 +66,7 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
   const selectType = (next: RootDictionaryType) => {
     if (next === type) return;
     ++requestGeneration.current;
-    setItems([]); setProjects([]); setSelectedMainId(null); setEditing(null); setError(''); setLoading(true);
+    setItems([]); setProjects([]); setSelectedMainId(null); setConfirmRestoreId(null); setPermanentDeleteId(null); setEditing(null); setError(''); setLoading(true);
     setCreatingRoot(false); setCreatingProject(false); setSearch(''); setStatusFilter('all'); setType(next);
   };
 
@@ -78,6 +81,7 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
     const remove = (current: DictionaryItemView[]) => current.filter((item) => item.id !== deleted.id);
     if (deleted.type === 'project_item') setProjects(remove);
     else setItems(remove);
+    if (selectedMainId === deleted.id) setSelectedMainId(null);
   };
   const createRoot = async (event: FormEvent) => {
     event.preventDefault(); setError(''); const generation = requestGeneration.current;
@@ -113,7 +117,7 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
     const generation = requestGeneration.current; setPendingId(id); setRowFeedback(null);
     try {
       const updated = await api.activateDictionary(id);
-      if (generation === requestGeneration.current) { updateStoredItem(updated); setRowFeedback({ id, kind: 'success', message: '已启用，可在新建业务中使用。' }); }
+      if (generation === requestGeneration.current) { updateStoredItem(updated); setConfirmRestoreId(null); setRowFeedback({ id, kind: 'success', message: '已启用，可在新建业务中使用。' }); }
     } catch (reason) {
       if (generation === requestGeneration.current) setRowFeedback({ id, kind: 'error', message: reason instanceof Error ? reason.message : '启用失败' });
     } finally { if (generation === requestGeneration.current) setPendingId(null); }
@@ -138,15 +142,18 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
     } finally { setPendingId(null); }
   };
   const itemActions = (item: DictionaryItemView) => <div className="row-actions dm-actions">
-    <button className="text-button" disabled={pendingId === item.id} aria-label={`修改 ${item.name}`} onClick={() => { setEditing(item); setEditingName(item.name); setConfirmDeleteId(null); setRowFeedback(null); }} type="button">修改</button>
-    {item.status === 'active' && <button className="text-button dictionary-stop amber" disabled={pendingId === item.id} aria-label={`停用 ${item.name}`} onClick={() => void deactivate(item.id)} type="button">停用</button>}
-    {item.status === 'inactive' && <button className="text-button green" disabled={pendingId === item.id} aria-label={`${item.deletedAt ? '恢复' : '启用'} ${item.name}`} onClick={() => { if (!item.deletedAt || window.confirm(`确认恢复字典 ${item.code} ${item.name}？`)) void activate(item.id); }} type="button">{item.deletedAt ? '恢复记录' : '启用'}</button>}
-    {!item.deletedAt && <button className="text-button danger" disabled={pendingId === item.id} aria-label={`删除 ${item.name}`} onClick={() => { setConfirmDeleteId(item.id); setEditing(null); setRowFeedback(null); }} type="button">删除</button>}
+    <button className="text-button" disabled={pendingId === item.id} aria-label={`修改 ${item.name}`} onClick={() => { setConfirmRestoreId(null); setPermanentDeleteId(null); setEditing(item); setEditingName(item.name); setConfirmDeleteId(null); setRowFeedback(null); }} type="button">修改</button>
+    {item.status === 'active' && <button className="text-button dictionary-stop amber" disabled={pendingId === item.id} aria-label={`停用 ${item.name}`} onClick={() => {setPermanentDeleteId(null);void deactivate(item.id);}} type="button">停用</button>}
+    {item.status === 'inactive' && <button className="text-button green" disabled={pendingId === item.id} aria-label={`${item.deletedAt ? '恢复' : '启用'} ${item.name}`} onClick={() => { setPermanentDeleteId(null); setEditing(null); setConfirmDeleteId(null); setRowFeedback(null); if (item.deletedAt) setConfirmRestoreId(item.id); else void activate(item.id); }} type="button">{item.deletedAt ? '恢复记录' : '启用'}</button>}
+    {!item.deletedAt && <button className="text-button danger" disabled={pendingId === item.id} aria-label={`删除 ${item.name}`} onClick={() => { setConfirmRestoreId(null); setConfirmDeleteId(item.id); setEditing(null); setRowFeedback(null); }} type="button">删除</button>}
+    {item.deletedAt && <button className="text-button danger" disabled={pendingId !== null} aria-label={`永久删除 ${item.name}`} onClick={() => {setConfirmRestoreId(null);setPermanentDeleteId(item.id);setEditing(null);setConfirmDeleteId(null);setRowFeedback(null);}} type="button">永久删除</button>}
   </div>;
-  const dictionaryEditor = (item: DictionaryItemView) => editing?.id === item.id || confirmDeleteId === item.id || rowFeedback?.id === item.id ? <div className="dm-edit-branch">
+  const dictionaryEditor = (item: DictionaryItemView) => editing?.id === item.id || confirmDeleteId === item.id || confirmRestoreId === item.id || permanentDeleteId === item.id || rowFeedback?.id === item.id ? <div className="dm-edit-branch">
+    {confirmRestoreId === item.id && <div className="inline-confirm dictionary-restore-confirm" role="alert"><p>确认恢复“{item.code} {item.name}”？将重新启用此字典记录，历史引用保持不变。</p><div className="form-actions"><button type="button" disabled={pendingId === item.id} onClick={()=>setConfirmRestoreId(null)}>取消恢复</button><button className="primary-button" type="button" disabled={pendingId === item.id} onClick={()=>void activate(item.id)}>{pendingId === item.id?'恢复中…':'确认恢复'}</button></div></div>}
+    {permanentDeleteId === item.id && <DictionaryPermanentDelete api={api} item={item} onCancel={()=>setPermanentDeleteId(null)} onBusy={busy=>setPendingId(busy?item.id:null)} onDeleted={()=>{removeStoredItem(item);setPermanentDeleteId(null);}}/>}
     {editing?.id === item.id && <form className="dm-editor dictionary-name-editor" onSubmit={saveName}>
       <label>编码<input aria-label="编码" value={item.code} disabled /></label>
-      <label><span>修改名称</span><input aria-label="修改名称" value={editingName} onChange={(event) => setEditingName(event.target.value)} required /></label>
+      <label><span>修改名称</span><input autoFocus aria-label="修改名称" value={editingName} onChange={(event) => setEditingName(event.target.value)} required /></label>
       <button className="primary-button" disabled={pendingId === item.id} type="submit">{pendingId === item.id ? '保存中…' : '保存'}</button><button disabled={pendingId === item.id} type="button" onClick={() => setEditing(null)}>取消</button><small>编码锁定，仅修改名称</small>
     </form>}
     {confirmDeleteId === item.id && <div className="inline-confirm" role="alert"><p>确认删除“{item.code} {item.name}”？未引用的编码会物理删除；已引用的编码退出正常列表并保留历史身份，不改变历史图号或占号。当前接口未提供独立引用预检，实际影响由服务在确认时核对；失败不表示删除成功。</p>

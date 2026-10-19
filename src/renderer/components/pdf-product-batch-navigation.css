@@ -1,0 +1,37 @@
+.file-workspace .module-navigation,.drawing-workspace .module-navigation {padding:10px;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.file-workspace .module-navigation[hidden],.drawing-workspace .module-navigation[hidden] {display:none;}
+.file-workspace .module-navigation > .module-navigation-content,.drawing-workspace .module-navigation > .module-navigation-content {flex:1;min-height:0;overflow:hidden;}
+.pdf-product-navigation {height:100%;min-height:0;display:flex;flex-direction:column;gap:8px;}
+.pdf-nav-header {flex:none;padding:8px;border-radius:5px;}
+.catalog-nav-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.catalog-nav-heading h2 {font-size:15px;margin:0;}
+.catalog-nav-heading .navigation-fold {display:flex;align-items:center;justify-content:center;width:28px;height:28px;min-height:28px;margin:0;padding:5px;flex:none;}
+.catalog-nav-search {display:flex;align-items:center;gap:6px;color:var(--text-muted,#677487);}
+.catalog-nav-search svg {flex:none;}
+.pdf-nav-header input {width:100%;min-width:0;}
+.pdf-nav-scroll {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;}
+.pdf-product-navigation button {border:0;background:transparent;cursor:pointer;min-width:0;}
+.pdf-product-navigation button[data-navigation-select] {display:flex;align-items:center;gap:6px;width:100%;height:36px;min-height:36px;padding:7px 8px;text-align:left;border-radius:5px;}
+.pdf-product-navigation button[aria-current=page] {background:#e8e9eb;color:#25292e;font-weight:600;}
+.pdf-nav-label {min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pdf-nav-count {font-size:11px;flex:none;min-width:22px;text-align:right;color:var(--text-muted,#677487);font-variant-numeric:tabular-nums;}
+.pdf-nav-branch {display:flex;align-items:center;min-width:0;}
+.pdf-nav-expand {display:flex;align-items:center;justify-content:center;flex:none;width:22px;height:36px;padding:0;color:var(--text-muted,#677487);}
+.pdf-nav-product {padding-left:12px;}
+.pdf-nav-batch {padding-left:23px;}
+.pdf-nav-state {flex:none;font-size:10px;white-space:nowrap;color:#737b85;}
+.pdf-nav-state.current {color:#36694d;background:#edf5ef;border:1px solid #d0e3d5;border-radius:3px;padding:1px 3px;}.pdf-nav-state.pending {color:#87671d;background:#faf4e5;border:1px solid #eadbb5;border-radius:3px;padding:1px 3px;}
+.pdf-nav-note {display:block;margin:4px 8px 10px;color:var(--text-muted,#677487);font-size:11px;}
+.catalog-nav-special {border-top:1px solid var(--border,#e1e5e9);padding-top:7px;}
+.pdf-nav-filters {margin-top:12px;border-top:1px solid var(--border,#e1e5e9);padding-top:10px;}
+.pdf-nav-filters summary {font-size:12px;cursor:pointer;}
+.files-page .pdf-nav-filters .files-filter {display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 0;margin:0;border:0;box-shadow:none;background:transparent;}
+.files-page .pdf-nav-filters .files-filter label {min-width:0;width:100%;}
+.files-page .pdf-nav-filters .files-filter input,.files-page .pdf-nav-filters .files-filter select {width:100%;min-width:0;}
+.pdf-nav-icon {width:18px;height:18px;flex:none;color:#666;}
+.pdf-nav-category > .pdf-nav-branch .pdf-nav-label,.pdf-nav-product > .pdf-nav-branch .pdf-nav-label {font-weight:600;}
+.pdf-nav-state:not(.current):not(.pending) {border:1px solid #e0e0e0;border-radius:3px;background:#f1f1f1;padding:1px 3px;}
+.file-workspace .module-navigation.module-drawer,.drawing-workspace .module-navigation.module-drawer {left:16px;right:auto;width:min(300px,calc(100vw - 32px));}
+
+.catalog-nav-orphans {font-size:12px;padding:4px 0;}
+.catalog-nav-orphans summary {cursor:pointer;padding:6px 8px;}

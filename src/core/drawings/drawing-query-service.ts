@@ -34,6 +34,8 @@ export class DrawingQueryService {
     };
   }
 
+  navigationCounts(filters: DrawingSearchFilters = {}) { return this.repository.navigationCounts(filters); }
+
   navigation(): { batches: DrawingNavigationBatch[] } {
     const usage = this.repository.businessUsage();
     return { batches: this.batches.list().map((batch) => {

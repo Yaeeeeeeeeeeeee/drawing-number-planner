@@ -1,0 +1,73 @@
+# 图号/PDF统一导航与中文空数据安装包（2026-10-20）
+
+本轮是用户新增的候选验收需求，未合并master。此前f0870cd仍是旧样例候选，不应用作本轮空数据验收。
+
+## 最终行为
+
+- 图号库与PDF文件中心共用 `ProductCatalogNavigation`，Lucide图标18px、描边1.8；标题与收起图标同一行，目录默认300px，可调260–420px。窄窗口保留模态焦点、Esc和背景不可操作保护。
+- 产品类别→SKU/型号→资料批次，来源为现有产品、批次、真实关联。当前/历史使用依据明确BOM或已完成外发关系，不按日期或PDF扫描推断。未关联产品的真实批次保留可展开查询入口。
+- PDF“待关联产品”紧跟目录树，位于同一滚动区；单套文件筛选默认折叠。选择待关联清除树的类别/产品/批次限制，保留兼容手动筛选，页码回1；全部文件只清树范围。
+- PDF统计与列表共用查询条件，按唯一索引ID计数。已匹配图号但未关联产品，以及已识别批次但未关联产品都计入待关联，不改原匹配状态。已有明确产品确认后无需重扫即反映数量；单纯新增产品不会引入新的自动关联规则。
+- 图号默认七列：选择、完整图号、来源、主类别/项目、版本、图号状态、操作。图号等宽字体、复制按钮相邻；主类别低饱和标签，项目12px深色；表头/操作列固定，列表滚动与底部分页分开。文件完整性保留在详情。
+- 查询及清除筛选与导航范围共同生效。图号状态/文件关联修改后，按当前已应用条件刷新列表与计数，保留页码、范围、详情和表格滚动；详情重新读取失败时也刷新统计并保留错误信息。
+- 回收站默认同时显示保留占号与已释放记录，可用现有低频筛选缩小；删除/释放/恢复及逐项引用预检保持原规则。
+
+## 点击问题的定位边界
+
+检查了点击回调、导航范围传递、真实HTTP参数、后端谓词及统计。在当前代码中未复现后台把“图号未匹配”当作“产品未关联”的错误，未凭猜测改写归属规则。旧入口位于独立底部区域，本轮将其迁至树后并验证滚动区、命中测试、选中样式、实际请求、结果总数及分页。兼容关键词/匹配状态等仍可能合法地筛选为0，不会擅自清除用户条件。
+
+## 中文安装和空数据
+
+- 安装向导固定简体中文，明确显示路径选择，支持浏览、手输及静默 `/DIR`；默认新目录 `DrawingNumberPlannerP4-Empty`。
+- 只复用已核验Windows运行时；包内不携带 `acceptance-seed`、示例数据库或PDF。
+- 首次启动独占创建本版本隔离数据库，调用原有迁移，移除仅新库的预设邮件模板和个人签名；除迁移账本、系统二维码用途与适用品类定义，业务表均为0。不修改Schema。
+- 已标记的本版本目录再次启动直接使用已有数据，不运行清空；旧版本AppData/正式数据库/原始PDF均不读取或删除。
+- 包含旧验收样例的安装目标在交互及静默安装前被拒绝，提示选择新目录；不通过删除旧文件实现空界面。
+- 安装位置与业务数据目录分离；候选数据位于AppData/DrawingNumberPlannerAcceptance/版本短SHA。更换安装目录不会重置同版本数据。
+
+## 修改文件
+
+应用：`src/renderer/components/ProductCatalogNavigation.tsx`、`PdfProductBatchNavigation.tsx`、`ModuleWorkspace.tsx`、共享导航CSS、`pages/DrawingLibraryPage.tsx`与CSS、`pages/FilesPage.tsx`、`data/client.ts`；图号类型/Repository/Service/路由。
+
+交付：`scripts/acceptance-entry.cjs`、`prepare-acceptance-data.cjs`、`initialize-empty-acceptance.ts`、`repack-p4-bom-windows.mjs`、`p4-delivery-source-guard.ts`、`p4-windows-installer.iss`、中文语言文件、两份Windows验证脚本及工作流。增加唯一指定图标依赖 `lucide-react@1.59.0`，守卫精确限制其package/lock增量，原Schema/Main安全与恢复守卫保留。
+
+回归：图号/PDF核心及API、目录树/工作区/列表、空初始化/安装目标保护/交付守卫测试；浏览器验证脚本及截图。完整清单以提交diff为准。
+
+## 验证证据
+
+- 专项：共享目录41项、图号页面48项、图号核心/API37项、PDF后端57项、空初始化/安装策略7项已有通过记录。
+- 浏览器：3840×2160、2560×1440、1920×1080、1280×800、800×650，通过真实点击与elementFromPoint检查，无业务写入。截图为标明的接口夹具，不冒充用户数据。
+- 最终完整回归1108项：1092通过、16项既有失败；与master基线失败名称逐项一致，新增失败0。报告 `work/p4-unified-final-full.json`，比较 `work/p4-unified-test-comparison.json`。早期并发编辑期间的中间回归21失败已由最终静止源码重跑取代。
+- 最终类型检查、生产构建、进度账本3项、交付守卫/安装策略4项通过；最终相关两组各59项通过（包含交叉用例，不相加）。
+- Windows源码固定为 `befdba31136e0bef48132d4660e1d777a48ac014`：[Actions 39299519242](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39299519242) 全部成功。实际中文向导输入路径、旧目标拒绝且哨兵不变、指定中文目录安装、所有文件哈希一致、空库首次启动/重启通过；原生6尺寸、实际0数量/列表/可点击入口与260–420px调整通过。
+- 包内 `windows-chinese-installer.json`、`windows-floating-navigation.json` 和 `Windows-中文安装向导-自选路径.png`、`Windows-浮动目录-*空数据-1920.png` 是实际Windows证据。没有为原生验证创建业务样例或执行删除。
+- 较早候选的安装自动化暴露VCL控件均为UIA Pane及跨进程读取限制；随后改为真实原生窗口控件、WM_SETTEXT/WM_GETTEXT。旧目标静默安装改在初始化前拒绝。最终成功运行取代早期未完成验证的候选；不以修正验证脚本冒充业务改动。
+- [结构化结果](p4-unified-navigation-empty-installer-20261020.json) 记录完整失败基线名称、产物ID及散列。
+
+## 下载
+
+解压安装ZIP后运行 `DrawingNumberPlanner-P4-Windows-x64-Setup.exe`。
+
+- [中文安装版 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39299519242/artifacts/12211326081)（约138.2 MiB，含安装器、真实Windows截图及验证JSON）。
+- [免安装目录 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39299519242/artifacts/12211636009)（约158.1 MiB）。
+- 安装ZIP SHA256：`87328ceb0191770f8baa4d4ce972704d21b9a580b0c4dc635bf0ae5e583d9d21`。
+- GitHub产物保留14天至2026-11-03北京时间凌晨附近；下载需相应仓库访问权限。未签名候选，未合并master。
+
+## 截图
+
+- [图号与PDF并排](screenshots/p4-pdf-navigation-20261019/drawing-pdf-side-by-side-1920.png)
+- [图号库](screenshots/p4-pdf-navigation-20261019/drawings-shared-1920.png)
+- [PDF文件中心](screenshots/p4-pdf-navigation-20261019/pdf-shared-1920.png)
+- [空图号列表](screenshots/p4-pdf-navigation-20261019/drawings-empty-1920.png)
+- [空PDF界面](screenshots/p4-pdf-navigation-20261019/pdf-empty-1920.png)
+
+## Windows人工验收
+
+1. 解压交付ZIP，运行Setup.exe，确认向导为中文；在目标位置页选择自行指定的新目录。若选旧样例目录，应提示更换且旧文件不变。
+2. 启动：产品、图号、BOM、PDF和外发配置无示例记录；系统二维码用途定义仍可用。
+3. 在本候选隔离数据中正常创建字典/产品并索引测试资料。切换待关联/全部/类别/产品/批次，核对索引数量、结果、分页及原图号匹配状态；验证已识别批次但未关联产品的文件可查。
+4. 明确确认产品关联后检查导航数量，勿将仅新增产品等同强制自动关联。核对同图号跨批次不合并PDF索引、批次实际使用图号来自业务关系。
+5. 修改状态/文件关联后核对列表与计数；核对回收站保留/释放过滤。所有危险操作只在明确选定的备份测试数据中做。
+6. 1080P/2K/4K最大化、窗口高度缩小、系统缩放及跨屏核对目录滚动、图标收起/展开、拖宽、表头/操作/分页可达。退出再启动，自己创建的记录仍在。
+
+物理Windows显示器/DPI、真实业务数据和长期稳定性仍需人工验收；浏览器夹具或CI窗口像素不替代这些证据。

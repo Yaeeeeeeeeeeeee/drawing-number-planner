@@ -45,7 +45,11 @@ export function registerProductRoutes(app: FastifyInstance, service: ProductServ
     });
     app.post('/api/products/:id/cleanup', async (request, reply) => {
       const params = idSchema.safeParse(request.params);
-      const input = z.object({ confirmed: z.literal(true), confirmedModel: z.string().min(1) }).strict().safeParse(request.body);
+      const input = z.object({ confirmed: z.literal(true), confirmedModel: z.string().min(1), selection:z.object({
+        occupancy:z.enum(['retain_occupied','release']),history:z.enum(['retain','purge']),expectedFingerprint:z.string().regex(/^[a-f0-9]{64}$/),
+        confirmedCodes:z.array(z.object({signedId:z.number().int().refine(value=>value!==0),confirmedCode:z.string().min(1)}).strict()).optional(),
+        confirmedHistory:z.string().optional(),
+      }).strict().optional() }).strict().safeParse(request.body);
       if (!params.success || !input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '请确认清理范围并输入产品型号' } });
       try { return cleanup.cleanup(params.data.id, input.data); } catch (error) { return sendProductError(error, reply); }
     });

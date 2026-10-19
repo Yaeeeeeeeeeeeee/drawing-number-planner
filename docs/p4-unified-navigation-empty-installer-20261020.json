@@ -1,0 +1,108 @@
+{
+  "revision": "befdba31136e0bef48132d4660e1d777a48ac014",
+  "workflowRun": 39299519242,
+  "workflowUrl": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39299519242",
+  "windowsConclusion": "success",
+  "verified": [
+    "中文目标位置界面及原生输入框自定义路径读写",
+    "旧样例目标目录拒绝，哨兵文件不变",
+    "实际中文路径安装及所有文件哈希一致",
+    "不包含acceptance-seed",
+    "首次启动业务表为0，仅系统定义和迁移元数据保留",
+    "无API业务写入",
+    "实际图号/PDF空数据统计和列表一致",
+    "待关联入口命中/选中/同滚动区域",
+    "目录300px及260–420px调整",
+    "3840/1920/1100/1024/1023/720六种原生窗口布局",
+    "重启不重置已初始化数据库"
+  ],
+  "fullTests": {
+    "total": 1108,
+    "pass": 1092,
+    "fail": 16,
+    "newFailures": [],
+    "resolved": [],
+    "failures": [
+      [
+        "core/indexed-pdf-resolver.test.ts",
+        "rejects unsafe stored paths and a junction whose real target escapes the workspace"
+      ],
+      [
+        "core/outbound-artifact-ownership.test.ts",
+        "recovers all abandoned part temporaries while preserving unrelated files and published ZIPs"
+      ],
+      [
+        "core/outbound-package-service.test.ts",
+        "never records half a multipart publication as completed after abrupt process exit"
+      ],
+      [
+        "core/outbound-package-service.test.ts",
+        "rejects a canonical path that escapes through a filesystem link"
+      ],
+      [
+        "core/outbound-package-service.test.ts",
+        "rejects two indexes resolving to the same canonical actual path"
+      ],
+      [
+        "core/qr-file-scanner.test.ts",
+        "returns QR naming candidates across supported file types without rewriting any workspace file"
+      ],
+      [
+        "core/workspace-paths.test.ts",
+        "normalizes a real root and resolves a nested relative path inside it"
+      ],
+      [
+        "core/workspace-paths.test.ts",
+        "rejects a directory junction that resolves outside the workspace"
+      ],
+      [
+        "core/workspace-settings.test.ts",
+        "starts unconfigured and persists a normalized existing directory across instances"
+      ],
+      [
+        "renderer/product-bom-roundtrip.test.tsx",
+        "does not assume cancelled processing succeeded"
+      ],
+      [
+        "renderer/product-bom-roundtrip.test.tsx",
+        "fails closed after product disappears"
+      ],
+      [
+        "renderer/product-bom-roundtrip.test.tsx",
+        "protects unsaved changes on tab switch and return"
+      ],
+      [
+        "renderer/product-bom-roundtrip.test.tsx",
+        "restores source filter and forces fresh check"
+      ],
+      [
+        "renderer/product-bom-roundtrip.test.tsx",
+        "uses completed memory result but still checks other blockers"
+      ],
+      [
+        "renderer/recovery-mock.test.tsx",
+        "never mounts real recovery or queries API"
+      ],
+      [
+        "server/application-api.test.ts",
+        "removes only stale task-owned outbound claim and temporary files after restart"
+      ]
+    ]
+  },
+  "setupArtifact": {
+    "id": 12211326081,
+    "size": 144893369,
+    "sha256": "87328ceb0191770f8baa4d4ce972704d21b9a580b0c4dc635bf0ae5e583d9d21"
+  },
+  "portableArtifact": {
+    "id": 12211636009,
+    "size": 165809351,
+    "sha256": "5a1eafedf42183c22d46df8cfd13bcf7c5c566d75a8bbecb31f8acf99bad43af"
+  },
+  "manualRemaining": [
+    "物理Windows屏幕系统DPI/4K最大化/跨显示器",
+    "真实业务数据和长期使用",
+    "在用户自己选择的隔离数据中验证有数据的完整业务流程"
+  ],
+  "notMergedToMaster": true
+}

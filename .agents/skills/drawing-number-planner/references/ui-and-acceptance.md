@@ -170,3 +170,18 @@ Latest explicit request: see docs/p4-products-list-20261016.md. The real product
 ### P4 版本确认与合并授权（2026-10-17）
 
 用户明确表示“这版已确定”，随后要求“合并到master”。已交付 fc236a6 应用为本次确认版本，本次主分支合并已授权；此前未合并限制保留为历史记录，不再阻止本次操作。不得把确认版本/合并授权改写为全量测试全绿、实体4K/DPI或真实业务数据自动验收通过。见 docs/p4-master-merge-20261017.md。
+
+### 默认展开的浮动目录（2026-10-19）
+
+Current：用户明确要求去掉截图顶部应用横栏，并先后纠正为“不要默认收起”“不覆盖内容上方，只要宽度到必须覆盖的时候再覆盖”。默认展开、宽屏并排且互不遮挡；保留手动关闭/重开状态，窄屏才覆盖并保留遮罩、Esc和焦点保护。去除Renderer顶部栏，Windows原生菜单默认隐藏但恢复功能及Alt入口不删除。当前1024 CSS px切换点源于220px目录、24px间隔及720px内容预算，属于可验证布局选择，不是业务规则；物理4K/DPI证据仍单列。见 docs/p4-floating-navigation-20261019.md。
+## Latest product and drawing presentation corrections (2026-10-19)
+
+See docs/p4-product-corrections-20261019.md. Product dictionary options refresh on workspace reactivation and editor opening; loading failure is visible and retryable, not silently represented as an empty dictionary. Product exit presents independent unselected occupancy/history choices, explicit impact counts and inline final confirmation; retain exact identity/code confirmations and transactional safeguards.
+
+Drawing origin is an independent 来源 column. User selected a low-saturation grey-blue bordered category badge (11px) and smaller dark project text (12px), centered, with complete wrapping names. Category colors describe classification presentation only, never infer business status. Shared batch display formatting removes recognized directory ordinals from valid date/range/description labels while preserving dates, colors and parentheses; raw name/path/ID/order remain unchanged and identical displayed names must not merge identities. Native Windows installation and browser fixture screenshots are distinct evidence; do not execute product-history clearing on user or existing acceptance data to manufacture a screenshot.
+
+### 共享目录与中文空数据候选（2026-10-20）
+
+Current：图号/PDF共用目录树与Lucide18px/1.8图标；标题行图标收起，默认300px、可调260–420px。待关联入口位于树后同一滚动区，不固定底部。单套兼容文件筛选折叠，待关联只清导航冲突条件，保留手动条件。计数按唯一索引/实际图号身份、明确关联查询；修改后刷新列表与统计。图号七列不含默认文件完整性列，详情仍保留。
+
+Current：用户要求交付无示例、中文、自选路径。本候选不携带acceptance-seed；首次新库移除预设示例模板和个人签名，保留系统用途定义；已存在用户数据不重置。旧样例安装目标拒绝并要求新目录，禁止靠清理AppData或原始PDF实现空数据。仅隔离交付，不自动合并或覆盖已发布版本。见docs/p4-unified-navigation-empty-installer-20261020.md。
