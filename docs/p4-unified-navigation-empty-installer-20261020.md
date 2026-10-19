@@ -39,7 +39,19 @@
 - 浏览器：3840×2160、2560×1440、1920×1080、1280×800、800×650，通过真实点击与elementFromPoint检查，无业务写入。截图为标明的接口夹具，不冒充用户数据。
 - 最终完整回归1108项：1092通过、16项既有失败；与master基线失败名称逐项一致，新增失败0。报告 `work/p4-unified-final-full.json`，比较 `work/p4-unified-test-comparison.json`。早期并发编辑期间的中间回归21失败已由最终静止源码重跑取代。
 - 最终类型检查、生产构建、进度账本3项、交付守卫/安装策略4项通过；最终相关两组各59项通过（包含交叉用例，不相加）。
-- Windows实际中文向导/自选目录/旧目录拒绝/安装哈希/原生空启动及重启验证等待CI，不先宣称通过。
+- Windows源码固定为 `befdba31136e0bef48132d4660e1d777a48ac014`：[Actions 39299519242](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39299519242) 全部成功。实际中文向导输入路径、旧目标拒绝且哨兵不变、指定中文目录安装、所有文件哈希一致、空库首次启动/重启通过；原生6尺寸、实际0数量/列表/可点击入口与260–420px调整通过。
+- 包内 `windows-chinese-installer.json`、`windows-floating-navigation.json` 和 `Windows-中文安装向导-自选路径.png`、`Windows-浮动目录-*空数据-1920.png` 是实际Windows证据。没有为原生验证创建业务样例或执行删除。
+- 较早候选的安装自动化暴露VCL控件均为UIA Pane及跨进程读取限制；随后改为真实原生窗口控件、WM_SETTEXT/WM_GETTEXT。旧目标静默安装改在初始化前拒绝。最终成功运行取代早期未完成验证的候选；不以修正验证脚本冒充业务改动。
+- [结构化结果](p4-unified-navigation-empty-installer-20261020.json) 记录完整失败基线名称、产物ID及散列。
+
+## 下载
+
+解压安装ZIP后运行 `DrawingNumberPlanner-P4-Windows-x64-Setup.exe`。
+
+- [中文安装版 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39299519242/artifacts/12211326081)（约138.2 MiB，含安装器、真实Windows截图及验证JSON）。
+- [免安装目录 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39299519242/artifacts/12211636009)（约158.1 MiB）。
+- 安装ZIP SHA256：`87328ceb0191770f8baa4d4ce972704d21b9a580b0c4dc635bf0ae5e583d9d21`。
+- GitHub产物保留14天至2026-11-03北京时间凌晨附近；下载需相应仓库访问权限。未签名候选，未合并master。
 
 ## 截图
 
