@@ -174,3 +174,8 @@ Latest explicit request: see docs/p4-products-list-20261016.md. The real product
 ### 默认展开的浮动目录（2026-10-19）
 
 Current：用户明确要求去掉截图顶部应用横栏，并先后纠正为“不要默认收起”“不覆盖内容上方，只要宽度到必须覆盖的时候再覆盖”。默认展开、宽屏并排且互不遮挡；保留手动关闭/重开状态，窄屏才覆盖并保留遮罩、Esc和焦点保护。去除Renderer顶部栏，Windows原生菜单默认隐藏但恢复功能及Alt入口不删除。当前1024 CSS px切换点源于220px目录、24px间隔及720px内容预算，属于可验证布局选择，不是业务规则；物理4K/DPI证据仍单列。见 docs/p4-floating-navigation-20261019.md。
+## Latest product and drawing presentation corrections (2026-10-19)
+
+See docs/p4-product-corrections-20261019.md. Product dictionary options refresh on workspace reactivation and editor opening; loading failure is visible and retryable, not silently represented as an empty dictionary. Product exit presents independent unselected occupancy/history choices, explicit impact counts and inline final confirmation; retain exact identity/code confirmations and transactional safeguards.
+
+Drawing origin is an independent 来源 column. User selected a low-saturation grey-blue bordered category badge (11px) and smaller dark project text (12px), centered, with complete wrapping names. Category colors describe classification presentation only, never infer business status. Shared batch display formatting removes recognized directory ordinals from valid date/range/description labels while preserving dates, colors and parentheses; raw name/path/ID/order remain unchanged and identical displayed names must not merge identities. Native Windows installation and browser fixture screenshots are distinct evidence; do not execute product-history clearing on user or existing acceptance data to manufacture a screenshot.

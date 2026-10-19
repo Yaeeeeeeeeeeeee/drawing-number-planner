@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-19T07:53:23.840573+00:00",
+  "date": "2026-10-19T08:00:32.240601+00:00",
   "branch": "codex/p4-floating-navigation-20261019",
   "baseRevision": "6a3947e",
   "relatedTests": {
@@ -1028,8 +1028,8 @@
   "schemaChanged": false,
   "realUserDataTouched": false,
   "windowsCandidate": {
-    "runId": 39215880675,
-    "jobId": 117939479432,
+    "runId": 39219258238,
+    "jobId": 117950428464,
     "conclusion": "success",
     "nativeMenuHidden": true,
     "nativeRecoveryMenuRetained": true,
@@ -1052,19 +1052,99 @@
     "originalSeedUnchanged": true,
     "permanentDeletionNativeScope": "Read-only reference preflight on existing sample; actual purge success covered by memory SQLite Core/API tests, not performed on sample history.",
     "installerArtifact": {
-      "id": 12170010304,
-      "bytes": 144926565,
-      "sha256": "3bcd13706833361bcd005a5ae77adcfc22f210b2340ce156950434f7ca5d470d"
+      "id": 12171515147,
+      "bytes": 144930655,
+      "sha256": "a007deda2f530b0849af1c2722a08b87c35207fd75a82c98178e0a880a389a70"
     },
     "portableArtifact": {
-      "id": 12168943797,
-      "bytes": 165891616,
-      "sha256": "a0612de04e1d91a7bf56351a4bc6dbd6ccff64e2806f87a6d300fbc86e44c8b6"
+      "id": 12171156756,
+      "bytes": 165895662,
+      "sha256": "98c4e4186bc6fa71a7542cdaf9f463d3cc5f9d135115796c0afcc12def309d1c"
     },
     "expiresAt": "2026-11-02",
-    "manualRemaining": "Physical user keyboard/Chinese IME, 4K/DPI/cross-monitor and actual business data are not inferred from CI."
+    "manualRemaining": "Physical user keyboard/Chinese IME, 4K/DPI/cross-monitor and actual business data are not inferred from CI.",
+    "productDictionaryOptions": true,
+    "productExitChoicesReadOnly": true,
+    "drawingSourceColumn": true,
+    "projectFont": "12px",
+    "productCleanupButtons": {
+      "width": 120,
+      "height": 36
+    }
   },
-  "fullSuite": "not rerun; previous 16 existing failures retained",
+  "fullSuite": {
+    "sourceRevision": "89fefd0d2eb63f65d4eaeb581e2cb29c7649fb9b",
+    "total": 1065,
+    "passed": 1049,
+    "failed": 16,
+    "sameFailuresAsMasterEvidence": true,
+    "failures": [
+      {
+        "file": "core/indexed-pdf-resolver.test.ts",
+        "test": "rejects unsafe stored paths and a junction whose real target escapes the workspace"
+      },
+      {
+        "file": "core/outbound-artifact-ownership.test.ts",
+        "test": "recovers all abandoned part temporaries while preserving unrelated files and published ZIPs"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "never records half a multipart publication as completed after abrupt process exit"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "rejects a canonical path that escapes through a filesystem link"
+      },
+      {
+        "file": "core/outbound-package-service.test.ts",
+        "test": "rejects two indexes resolving to the same canonical actual path"
+      },
+      {
+        "file": "core/qr-file-scanner.test.ts",
+        "test": "returns QR naming candidates across supported file types without rewriting any workspace file"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "normalizes a real root and resolves a nested relative path inside it"
+      },
+      {
+        "file": "core/workspace-paths.test.ts",
+        "test": "rejects a directory junction that resolves outside the workspace"
+      },
+      {
+        "file": "core/workspace-settings.test.ts",
+        "test": "starts unconfigured and persists a normalized existing directory across instances"
+      },
+      {
+        "file": "server/application-api.test.ts",
+        "test": "removes only stale task-owned outbound claim and temporary files after restart"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "restores source filter and forces fresh check"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "protects unsaved changes on tab switch and return"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "does not assume cancelled processing succeeded"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "uses completed memory result but still checks other blockers"
+      },
+      {
+        "file": "renderer/product-bom-roundtrip.test.tsx",
+        "test": "fails closed after product disappears"
+      },
+      {
+        "file": "renderer/recovery-mock.test.tsx",
+        "test": "never mounts real recovery or queries API"
+      }
+    ]
+  },
   "deliveryGuardTests": {
     "passed": 2,
     "failed": 0
@@ -1078,7 +1158,7 @@
       "reason": "Previous guard forbade any Main change. Now permits only exact native-menu visibility additions; all other Main/dependency/Schema changes still rejected."
     }
   ],
-  "applicationRevision": "3a6f23f9dbc15805dd50404738620926d7b9a837",
+  "applicationRevision": "89fefd0d2eb63f65d4eaeb581e2cb29c7649fb9b",
   "productCorrections": {
     "applicationRevision": "81cf4a1dfbaf21cb7b2f587d8e1c625e304e7629",
     "relatedTests": {
@@ -2325,7 +2405,67 @@
     "schemaChanged": false,
     "actualUserDataTouched": false,
     "windowsRunId": 39218694089,
-    "windowsStatus": "in_progress",
+    "windowsStatus": "success",
     "scope": "Native Windows reads product exit choices without executing history clearing. Necessary drawing records and product exit audit retained; selected owned BOM/QR/batch/outbound/draft history may be purged in isolated tests only."
+  },
+  "previousCandidates": [
+    {
+      "applicationRevision": "3a6f23f9dbc15805dd50404738620926d7b9a837",
+      "windows": {
+        "runId": 39219258238,
+        "jobId": 117950428464,
+        "conclusion": "success",
+        "nativeMenuHidden": true,
+        "nativeRecoveryMenuRetained": true,
+        "defaultNavigationOpen": true,
+        "viewportWidths": [
+          3840,
+          1920,
+          1100,
+          1024,
+          1023,
+          720
+        ],
+        "installedFilesUnchanged": true,
+        "restoreKeyboardEditPassed": true,
+        "uniformActionsAndEditorButtons": {
+          "width": 76,
+          "height": 32
+        },
+        "existingSampleRowsRestored": true,
+        "originalSeedUnchanged": true,
+        "permanentDeletionNativeScope": "Read-only reference preflight on existing sample; actual purge success covered by memory SQLite Core/API tests, not performed on sample history.",
+        "installerArtifact": {
+          "id": 12171515147,
+          "bytes": 144930655,
+          "sha256": "a007deda2f530b0849af1c2722a08b87c35207fd75a82c98178e0a880a389a70"
+        },
+        "portableArtifact": {
+          "id": 12171156756,
+          "bytes": 165895662,
+          "sha256": "98c4e4186bc6fa71a7542cdaf9f463d3cc5f9d135115796c0afcc12def309d1c"
+        },
+        "expiresAt": "2026-11-02",
+        "manualRemaining": "Physical user keyboard/Chinese IME, 4K/DPI/cross-monitor and actual business data are not inferred from CI.",
+        "productDictionaryOptions": true,
+        "productExitChoicesReadOnly": true,
+        "drawingSourceColumn": true,
+        "projectFont": "12px",
+        "productCleanupButtons": {
+          "width": 120,
+          "height": 36
+        }
+      }
+    }
+  ],
+  "batchLabelCorrection": {
+    "applicationRevision": "89fefd0d2eb63f65d4eaeb581e2cb29c7649fb9b",
+    "relatedPassed": 74,
+    "relatedFailed": 0,
+    "typecheck": "passed",
+    "browserSixScreenshotCases": "passed; screenshot batch-labels-1920.png, isolated interface fixture",
+    "persistedNamePathOrRelationsChanged": false,
+    "latestNativeRunId": 39219258238,
+    "latestNativeStatus": "success"
   }
 }

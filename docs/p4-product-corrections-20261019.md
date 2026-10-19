@@ -32,12 +32,24 @@
 
 相关146项通过，类型检查、Renderer/Main构建通过（保留已有500kB分块警告）；六窗口夹具验证来源列、11/12px文字、120×36px按钮及页面内确认通过。完整测试结果及最终 Windows 构建标识随候选完成后更新。历史处理测试仅内存数据库；浏览器接口全部拦截，截图标注夹具。原生 Windows 仅在既有隔离样例读取产品选项与下拉，不执行产品清除；字典恢复/键盘编辑测试结束逐行还原。真实中文输入法、物理 Windows 4K/DPI 及用户数据仍需人工验收。
 
-完整套件最终1038项、1022通过、16失败；与work/p4-master-merge/full-tests-local-network.json的16项逐文件/用例名一致，没有新增失败。范围为路径/链接解析、外发遗留临时文件清理、QR扫描顺序、旧产品-BOM往返夹具及恢复夹具，逐名列于机器报告productCorrections.fullSuite。初次普通沙箱执行另遇监听/子进程EPERM及4项新夹具准备错误；已修正准备并在允许本机监听/子进程环境重新完整执行，不把第一次输出当作最终结果。没有通过放宽断言掩盖既有失败。
+产品阶段完整套件1038项、1022通过、16失败；加入批次补充后最终完整1065项、1049通过、16失败。两次均与work/p4-master-merge/full-tests-local-network.json的16项逐文件/用例名一致，没有新增失败。范围为路径/链接解析、外发遗留临时文件清理、QR扫描顺序、旧产品-BOM往返夹具及恢复夹具，逐名列于机器报告fullSuite。初次普通沙箱执行另遇监听/子进程EPERM及4项新夹具准备错误；已修正准备并在允许本机监听/子进程环境重新完整执行，不把第一次输出当作最终结果。没有通过放宽断言掩盖既有失败。
 
 效果图：[主类别与项目局部](screenshots/p4-floating-navigation-20261019/drawing-category-closeup.png)、[1920px完整列表](screenshots/p4-floating-navigation-20261019/drawing-source-category-1920.png)、[删除处理选项](screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1920.png)。这些是接口夹具，非用户真实业务数据。
+
+批次补充截图：[截图中六种批次名称的实际浏览器显示](screenshots/p4-floating-navigation-20261019/batch-labels-1920.png)，保留相同名称的两条独立批次。
 
 新增关联图测试起初错误地再次插入产品服务已自动创建的默认二维码而触发唯一约束；已按真实服务结果修正测试准备，23项产品清理测试全部通过。审查发现指纹漏掉受影响文件索引，先补PDF变化失败回归，再加入PDF/二维码索引指纹，复核无剩余Important问题。
 
 主要变更：ProductCleanupPanel / ProductExitWorksheet / product-cleanup-service / 新product-cleanup-options / products路由和client；ProductsPage与字典刷新回归；DrawingLibraryPage / drawing-library.css与来源列回归；workspace-theme按钮样式；浏览器及Windows验证脚本。源Schema、迁移、Main安全设置均未因本补充改动。
 
 人工重点：字典新增/恢复后回产品新建检查下拉；四种删除组合逐项核对范围，先在备份副本上验收释放/永久清除；有外部引用、确认后关联发生变化时必须阻止且不部分执行；检查 来源 列和小窗口布局。
+
+## 最终 Windows 验收包
+
+应用89fefd0d2eb63f65d4eaeb581e2cb29c7649fb9b，包含本页全部补充及之前的浮动导航/字典修正。Windows Actions 39219258238（job117950428464）全部成功：确切源代码编译、原运行时/种子保护、完整安装程序生成和静默安装、所有安装文件哈希一致、原生Electron验证。
+
+Setup候选Artifact12171515147（ZIP144930655字节，SHA256 a007deda2f530b0849af1c2722a08b87c35207fd75a82c98178e0a880a389a70），免安装Artifact12171156756，保留至2026-11-02。安装ZIP内运行DrawingNumberPlanner-P4-Windows-x64-Setup.exe；使用独立验收数据目录，不替换用户原业务数据库，不自动运行历史清除。
+
+实际Windows检查导航六尺寸、原生菜单隐藏但恢复入口保留、恢复字典后键盘编辑/保存/统一尺寸，并还原既有隔离样例；产品品牌下拉有真实已有选项，占号/历史选项未预选，释放/清除缺少确认时禁用，120×36px按钮、来源列和12px项目文字通过。产品清除仅只读核查，未在已有样例或真实用户数据上执行。之前81cf4a1候选也通过Windows，但不含最后的批次前缀补充；安装本最终89fefd0包。
+
+工作分支codex/p4-floating-navigation-20261019，草稿PR #2。未合并master，未替换之前已确认的Release。
