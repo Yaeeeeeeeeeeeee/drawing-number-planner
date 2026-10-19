@@ -19,8 +19,13 @@ for ($attempt=0; $attempt -lt 60; $attempt++) {
 if (!$window) { throw 'Chinese installer window not found' }
 try {
   $edit = $null
-  for ($page=0; $page -lt 4; $page++) {
+  $lastElements = @()
+  $nextClicks = 0
+  # Inno's bootstrap exposes its top-level title before the actual wizard controls.
+  # Wait for usable controls rather than treating the first empty tree as failure.
+  for ($attempt=0; $attempt -lt 80; $attempt++) {
     $elements = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+    $lastElements = @($elements | ForEach-Object { @{ name=$_.Current.Name; type=$_.Current.ControlType.ProgrammaticName; enabled=$_.Current.IsEnabled } })
     foreach ($element in $elements) {
       if ($element.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit) {
         $pattern=$null
@@ -28,12 +33,14 @@ try {
       }
     }
     if ($edit) { break }
-    $next = $elements | Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $_.Current.Name -match '下一步' } | Select-Object -First 1
-    if (!$next) { throw 'Chinese Next button not found' }
-    $next.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-    Start-Sleep -Milliseconds 300
+    $next = $elements | Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $_.Current.Name -match '下一步' -and $_.Current.IsEnabled } | Select-Object -First 1
+    if ($next -and $nextClicks -lt 3) {
+      $next.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+      $nextClicks++
+    }
+    Start-Sleep -Milliseconds 500
   }
-  if (!$edit) { throw 'Selectable installation directory edit not found' }
+  if (!$edit) { $lastElements | ConvertTo-Json -Depth 3 | Write-Output; throw 'Selectable installation directory edit not found after waiting for controls' }
   $custom = Join-Path $env:RUNNER_TEMP '中文安装路径-人工可选'
   $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
   if ($value.Current.IsReadOnly) { throw 'Directory cannot be edited' }
