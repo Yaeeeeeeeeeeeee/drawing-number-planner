@@ -12,7 +12,7 @@ using System.Text;
 using System.Runtime.InteropServices;
 public static class InstallerNative {
  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
- [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
+ [DllImport("user32.dll", EntryPoint="SendMessageW", CharSet=CharSet.Unicode)] public static extern IntPtr ReadText(IntPtr hwnd, uint message, IntPtr count, StringBuilder text);
  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wparam, string lparam);
  [DllImport("user32.dll", EntryPoint="GetWindowLongW")] public static extern int GetWindowLong(IntPtr hwnd, int index);
 }
@@ -61,8 +61,10 @@ try {
   if (([InstallerNative]::GetWindowLong($editHandle,-16) -band 0x0800) -ne 0) { throw 'Directory cannot be edited' }
   [void][InstallerNative]::SendMessage($editHandle,0x000C,[IntPtr]::Zero,$custom)
   $selected=New-Object System.Text.StringBuilder 1024
-  [void][InstallerNative]::GetWindowText($editHandle,$selected,$selected.Capacity)
-  if ($selected.ToString() -ne $custom) { throw 'Custom directory did not remain selected' }
+  # GetWindowText cannot read another process's edit contents. WM_GETTEXT is
+  # marshalled by Windows for this genuine cross-process control readback.
+  [void][InstallerNative]::ReadText($editHandle,0x000D,[IntPtr]$selected.Capacity,$selected)
+  if ($selected.ToString() -ne $custom) { throw ('Custom directory did not remain selected: ' + $selected.ToString()) }
   $names = @($window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name })
   if (!($names | Where-Object { $_ -match '浏览|目标位置|选择安装|安装位置' })) { throw 'Chinese directory labels not found' }
   New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
