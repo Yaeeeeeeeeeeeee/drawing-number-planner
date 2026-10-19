@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
+import { assertDesktopLayoutOnly } from './p4-delivery-source-guard.ts';
 const revision = process.env.PLANNER_ACCEPTANCE_REVISION ?? 'd4a6359c26f6dd8534c99d1b4d0328ca1a2d9dd5';
 if (!/^[0-9a-f]{40}$/.test(revision)) throw Error('Explicit pinned application SHA required');
 const baseRevision = '8dc2112b596cebc045a121f6e5126c8059a6c4e0';
@@ -19,7 +20,10 @@ function files(root) {
   walk(root); return result.sort((a,b)=>a.path.localeCompare(b.path));
 }
 if (git('rev-parse','HEAD') !== revision || git('status','--porcelain')) throw Error('Source must be clean and exactly pinned; no reset or overwrite');
-git('diff','--quiet',baseRevision,revision,'--','package.json','pnpm-lock.yaml','src/db','src/main');
+git('diff','--quiet',baseRevision,revision,'--','package.json','pnpm-lock.yaml','src/db');
+const desktopChanges=git('diff','--name-only',baseRevision,revision,'--','src/main').split('\n').filter(Boolean);
+if(desktopChanges.some(file=>file!=='src/main/index.ts'))throw Error('Unexpected desktop module change');
+assertDesktopLayoutOnly(git('show',`${baseRevision}:src/main/index.ts`),git('show',`${revision}:src/main/index.ts`));
 if (fs.existsSync(output) || inside(base, output) || inside(output, base) || inside(source,output) || inside(output,source)) throw Error('Output must be a new separate delivery directory');
 const originalVersion=JSON.parse(fs.readFileSync(path.join(base,'resources/app/acceptance-version.json'),'utf8'));
 if(originalVersion.revision!==baseRevision)throw Error('Only the explicitly identified existing P4 package may be reused');

@@ -93,6 +93,88 @@
           "height": 32
         }
       ],
+      "dictionaryTabs": [
+        {
+          "tab": "品类尺寸",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "外观",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "颜色",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "主类别",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        }
+      ],
       "keyboardRestoreEdit": true,
       "filterPreserved": true,
       "fixtureWrites": [
@@ -177,6 +259,88 @@
         {
           "width": 76,
           "height": 32
+        }
+      ],
+      "dictionaryTabs": [
+        {
+          "tab": "品类尺寸",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "外观",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "颜色",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "主类别",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
         }
       ],
       "keyboardRestoreEdit": true,
@@ -265,6 +429,88 @@
           "height": 32
         }
       ],
+      "dictionaryTabs": [
+        {
+          "tab": "品类尺寸",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "外观",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "颜色",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "主类别",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        }
+      ],
       "keyboardRestoreEdit": true,
       "filterPreserved": true,
       "fixtureWrites": [
@@ -349,6 +595,88 @@
         {
           "width": 76,
           "height": 32
+        }
+      ],
+      "dictionaryTabs": [
+        {
+          "tab": "品类尺寸",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "外观",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "颜色",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "主类别",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
         }
       ],
       "keyboardRestoreEdit": true,
@@ -437,6 +765,88 @@
           "height": 32
         }
       ],
+      "dictionaryTabs": [
+        {
+          "tab": "品类尺寸",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "外观",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "颜色",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "主类别",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        }
+      ],
       "keyboardRestoreEdit": true,
       "filterPreserved": true,
       "fixtureWrites": [
@@ -523,6 +933,88 @@
           "height": 32
         }
       ],
+      "dictionaryTabs": [
+        {
+          "tab": "品类尺寸",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "外观",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "颜色",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        },
+        {
+          "tab": "主类别",
+          "sizes": [
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            },
+            {
+              "width": 76,
+              "height": 32
+            }
+          ]
+        }
+      ],
       "keyboardRestoreEdit": true,
       "filterPreserved": true,
       "fixtureWrites": [
@@ -536,5 +1028,18 @@
   "schemaChanged": false,
   "realUserDataTouched": false,
   "windowsCandidate": "pending workflow build; do not treat browser fixtures as native evidence",
-  "fullSuite": "not rerun; previous 16 existing failures retained"
+  "fullSuite": "not rerun; previous 16 existing failures retained",
+  "deliveryGuardTests": {
+    "passed": 2,
+    "failed": 0
+  },
+  "windowsAttempts": [
+    {
+      "runId": 39215374161,
+      "revision": "4178edbe888d56a5a2e4b803ff86f1887c81feb3",
+      "conclusion": "failure",
+      "stage": "repack before launching app",
+      "reason": "Previous guard forbade any Main change. Now permits only exact native-menu visibility additions; all other Main/dependency/Schema changes still rejected."
+    }
+  ]
 }

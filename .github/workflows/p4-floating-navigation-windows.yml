@@ -1,3 +1,4 @@
+# Native menu visibility is the only allowed Main difference from the original runtime.
 name: P4 floating navigation Windows candidate
 on:
   push:
@@ -5,6 +6,7 @@ on:
     paths:
       - .github/workflows/p4-floating-navigation-windows.yml
       - scripts/repack-p4-bom-windows.mjs
+      - scripts/p4-delivery-source-guard.ts
       - scripts/verify-p4-floating-navigation-windows.cjs
       - scripts/p4-windows-installer.iss
   workflow_dispatch:

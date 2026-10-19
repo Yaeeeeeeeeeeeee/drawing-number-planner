@@ -31,6 +31,8 @@ try {
       if (path === '/api/dictionaries/items/7' && request.method() === 'PATCH') brandName = request.postDataJSON().name;
       const archivedBrand = {id:7,type:'brand',code:'02',name:brandName,parentId:null,status:brandArchived?'inactive':'active',...(brandArchived?{deletedAt:'2026-10-19'}:{})};
       if (path === '/api/dictionaries/items/7/activate' || path === '/api/dictionaries/items/7' && request.method() === 'PATCH') body = archivedBrand;
+      const otherDictionaries={product_size:{id:8,type:'product_size',code:'0404',name:'品类尺寸样例',parentId:null,status:'active'},appearance:{id:9,type:'appearance',code:'01',name:'外观样例',parentId:null,status:'active'},color:{id:10,type:'color',code:'0',name:'颜色样例',parentId:null,status:'active'},main_category:{id:11,type:'main_category',code:'04',name:'主类样例',parentId:null,status:'active'},project_item:{id:12,type:'project_item',code:'01',name:'项目样例',parentId:11,status:'active'}};
+      if(path.startsWith('/api/dictionaries/')&&!path.includes('/items/')&&otherDictionaries[path.split('/').at(-1)])body={items:[otherDictionaries[path.split('/').at(-1)]]};
       if (path === '/api/dictionaries/brand') body = {items:!brandArchived || url.searchParams.get('includeDeleted')==='true'?[archivedBrand]:[]};
       if (path === '/api/dictionaries/items/7/permanent-deletion') body = {item:archivedBrand,allowed:false,blockers:['产品档案仍有引用（包括停用或历史保留档案）','历史图号编码仍有引用']};
       await route.fulfill({ json: body });
@@ -106,7 +108,18 @@ try {
     await page.getByRole('button', {name:'修改 Restored-Edited',exact:true}).waitFor();
     assert.deepEqual(dialogs,[]);
     assert.deepEqual(writes, ['/api/dictionaries/items/7/activate','/api/dictionaries/items/7']); assert.deepEqual(errors, []);
-    results.push({ width, height, initial, closed, reopened, actionSizes, editorSizes, keyboardRestoreEdit:true, filterPreserved:true, fixtureWrites:writes, noRealDatabaseAccess:true });
+    const dictionaryTabs=[];
+    for(const [tab,name] of [['品类尺寸','品类尺寸样例'],['外观','外观样例'],['颜色','颜色样例'],['主类别','主类样例']]) {
+      await page.getByRole('tab',{name:tab,exact:true}).click();
+      if(tab==='主类别')await page.getByRole('button',{name:`查看 ${name} 的项目明细`,exact:true}).click();
+      await page.getByRole('button',{name:`修改 ${name}`,exact:true}).waitFor();
+      if(tab==='主类别')await page.getByRole('button',{name:'修改 项目样例',exact:true}).waitFor();
+      const sizes=await page.locator('.dm-actions > button').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
+      assert.equal(sizes.length,tab==='主类别'?6:3);assert.ok(sizes.every(r=>r.width===76&&r.height===32));
+      dictionaryTabs.push({tab,sizes});
+      if(width===1920&&tab==='主类别')await page.screenshot({path:`${output}/dictionary-parent-project-actions-${width}.png`});
+    }
+    results.push({ width, height, initial, closed, reopened, actionSizes, editorSizes, dictionaryTabs, keyboardRestoreEdit:true, filterPreserved:true, fixtureWrites:writes, noRealDatabaseAccess:true });
     await page.close();
   }
   fs.writeFileSync('work/p4-floating-browser.json', JSON.stringify(results, null, 2));
