@@ -111,7 +111,40 @@ function snapshot(file) {
     assert.ok(writes[0].startsWith('DELETE ')&&writes[0].endsWith(suffix));
     assert.ok(writes[1].startsWith('POST ')&&writes[1].endsWith(suffix+'/activate'));
     assert.ok(writes.slice(2).every(w=>w.startsWith('PATCH ')&&w.endsWith(suffix)));
+    // Read-only acceptance of product dictionary options and explicit exit choices.
+    // Do not execute product exit or clear history in the pre-existing sample.
+    const product=await page.evaluate(async()=>{const response=await fetch('/api/products?status=all');return (await response.json()).items[0];});
+    assert.ok(product,'Existing sample product required');
+    if(await toggle.isVisible())await toggle.click();
+    await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'产品档案',exact:true}).click();
+    await page.getByRole('button',{name:`编辑 ${product.model}`,exact:true}).click();
+    await page.getByLabel('品牌',{exact:true}).locator(`option[value="${product.brandId}"]`).waitFor({state:'attached'});
+    await page.getByRole('button',{name:`删除档案 ${product.model}`,exact:true}).click();
+    const cleanup=page.getByRole('region',{name:'产品删除检查与清理'});
+    await cleanup.getByLabel('输入型号确认').fill(product.model);
+    assert.equal(await cleanup.getByRole('radio',{checked:true}).count(),0);
+    assert.equal(await cleanup.getByRole('button',{name:'核对处理结果',exact:true}).isDisabled(),true);
+    await cleanup.getByLabel('继续保留占号',{exact:true}).check();
+    await cleanup.getByLabel('保留业务历史',{exact:true}).check();
+    const cleanupButtons=await cleanup.locator(':scope > .product-cleanup-actions > button').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
+    assert.equal(cleanupButtons.length,2);assert.ok(cleanupButtons.every(r=>r.width===120&&r.height===36));
+    await cleanup.getByRole('button',{name:'核对处理结果',exact:true}).scrollIntoViewIfNeeded();
+    await page.screenshot({path:path.join(directory,'Windows-产品删除处理选项-1920.png')});
+    await cleanup.getByLabel('释放占号',{exact:true}).check();
+    await cleanup.getByLabel('永久清除业务历史',{exact:true}).check();
+    assert.equal(await cleanup.getByRole('button',{name:'核对处理结果',exact:true}).isDisabled(),true);
+    await cleanup.getByLabel('输入“永久清除历史”确认').scrollIntoViewIfNeeded();
+    await page.screenshot({path:path.join(directory,'Windows-产品释放与历史清除确认-1920.png')});
+    await cleanup.getByRole('button',{name:'取消',exact:true}).click();
+    if(await toggle.isVisible())await toggle.click();
+    await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'图号库',exact:true}).click();
+    await page.getByRole('columnheader',{name:'来源',exact:true}).waitFor();
+    await page.locator('.drawing-project-name').first().waitFor();
+    const projectFont=await page.locator('.drawing-project-name').first().evaluate(n=>getComputedStyle(n).fontSize);
+    assert.equal(projectFont,'12px');
+    await page.screenshot({path:path.join(directory,'Windows-图号来源与主类别标签-1920.png')});
+    assert.equal(writes.length,4);
     assert.deepEqual(snapshot(path.join(root,'planner.db')),originalDatabase);assert.equal(hash(),before);
-    fs.writeFileSync(path.join(directory,'windows-floating-navigation.json'),JSON.stringify({ revision:process.env.PLANNER_ACCEPTANCE_REVISION, native, rows, dictionaryPreflight, actionSizes, editorSizes, restoredKeyboardEdit:true, originalDatabaseRestored:true, filterPreserved:true, seedUnchanged:true, writes, scope:'Installed EXE on native Windows; controlled delete/restore/rename of one existing isolated sample, original database rows restored. Physical user IME/4K/DPI remain manual.' },null,2));
+    fs.writeFileSync(path.join(directory,'windows-floating-navigation.json'),JSON.stringify({ revision:process.env.PLANNER_ACCEPTANCE_REVISION, native, rows, dictionaryPreflight, actionSizes, editorSizes,cleanupButtons,projectFont,sourceColumn:true,productDictionaryOptions:true,productExitChoicesReadOnly:true, restoredKeyboardEdit:true, originalDatabaseRestored:true, filterPreserved:true, seedUnchanged:true, writes, scope:'Installed EXE on native Windows; controlled delete/restore/rename of one existing isolated sample, product exit choices inspected read-only, original database rows restored. Physical user IME/4K/DPI remain manual.' },null,2));
   } finally { await app.close(); }
 })().catch(error=>{ console.error(error);process.exitCode=1; });

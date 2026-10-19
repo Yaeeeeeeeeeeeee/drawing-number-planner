@@ -131,7 +131,8 @@ describe('ProductsPage', () => {
       createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn(),
       activateProduct: vi.fn().mockResolvedValue({ ...inactive, status: 'active' }),
       previewProductCleanup: vi.fn().mockResolvedValue({ productId: 2, model: 'ZC220', sku: 'SKU-INACTIVE', blockers: [],
-        owned: { drawings: 2, historicalDrawings: 3, bomRecords: 1, qrCodes: 2, batches: 4 }, preservedSnapshots: 1 }),
+        owned: { drawings: 2, historicalDrawings: 3, bomRecords: 1, qrCodes: 2, batches: 4 }, preservedSnapshots: 1,
+        choices:{fingerprint:'f'.repeat(64),occupiedDrawings:[],purgeCounts:{bomRecords:1,qrCodes:2,batches:4,outboundPackages:1,emailDrafts:0},purgeBlockers:[]} }),
       cleanupProduct: vi.fn().mockResolvedValue({}),
     };
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -144,12 +145,15 @@ describe('ProductsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '删除档案 ZC220' }));
 
-    const submit = await screen.findByRole('button', { name: '确认删除档案' });
+    const submit = await screen.findByRole('button', { name: '核对处理结果' });
     expect(submit).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('继续保留占号'));
+    fireEvent.click(screen.getByLabelText('保留业务历史'));
     fireEvent.change(screen.getByLabelText('输入型号确认'), { target: { value: 'ZC220' } });
     fireEvent.click(submit);
-    await waitFor(() => expect(api.cleanupProduct).toHaveBeenCalledWith(2, 'ZC220'));
-    expect(confirm).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button',{name:'确认执行'}));
+    await waitFor(() => expect(api.cleanupProduct).toHaveBeenCalledWith(2, 'ZC220',expect.objectContaining({occupancy:'retain_occupied',history:'retain'})));
+    expect(confirm).not.toHaveBeenCalled();
     expect(screen.queryByText(/ · ZC220$/)).not.toBeInTheDocument();
     confirm.mockRestore();
   });
@@ -174,7 +178,7 @@ describe('ProductsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '删除档案 ZC220' }));
 
     expect(await screen.findByText('其他产品 T40 的 BOM #7 仍引用本产品资料')).toBeVisible();
-    expect(screen.getByRole('button', { name: '确认删除档案' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '核对处理结果' })).toBeDisabled();
     expect(api.cleanupProduct).not.toHaveBeenCalled();
     confirm.mockRestore();
   });

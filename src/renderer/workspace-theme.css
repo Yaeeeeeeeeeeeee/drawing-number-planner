@@ -50,6 +50,22 @@
   .primary-button.danger:hover:not(:disabled) { background: #912018; border-color: #912018; }
   .navigation-close { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; padding: 0; background: white; border: 1px solid var(--ws-line); border-radius: 6px; color: var(--ws-text); font-size: 22px; line-height: 1; }
   .secondary-button { min-height: 34px; padding: 6px 12px; color: var(--ws-text); background: white; border: 1px solid var(--ws-line); border-radius: 6px; box-shadow: none; }
+  .product-cleanup-panel .product-cleanup-confirmation { display: grid; gap: 6px; max-width: 360px; }
+  .product-cleanup-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .product-cleanup-heading h3 { margin: 0; }
+  .product-cleanup-details { margin: 10px 0; }
+  .product-cleanup-details summary { cursor: pointer; color: var(--ws-muted); }
+  .product-cleanup-panel .product-cleanup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+  .product-cleanup-panel .product-cleanup-actions > button { box-sizing: border-box; min-width: 120px; height: 36px; min-height: 36px; padding: 0 16px; border-radius: 6px; line-height: 1.2; white-space: nowrap; }
+  .product-cleanup-options { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 14px 0 0; padding: 12px; border: 1px solid var(--ws-line); border-radius: 6px; }
+  .product-cleanup-options > div { min-width: 0; }
+  .product-cleanup-options > div > label { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .product-cleanup-options > div > .product-cleanup-confirmation { display: grid; overflow-wrap: anywhere; }
+  .product-cleanup-options p, .product-cleanup-review p { color: var(--ws-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+  .product-cleanup-options .danger-text { color: #b42318; }
+  .product-cleanup-review { padding: 12px; margin-top: 12px; border: 1px solid var(--ws-line); border-radius: 6px; background: var(--ws-panel); }
+  .product-cleanup-review h4 { margin: 0; }
+  @container (max-width: 640px) { .product-cleanup-options { grid-template-columns: minmax(0,1fr); } }
   .text-button, .link-button { color: var(--ws-text); }
   .text-button:hover:not(:disabled), .link-button:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
   .text-button:is(.green, .product-start) { color: #087f66; }

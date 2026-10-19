@@ -1,4 +1,5 @@
-import type { ProductCleanupPreview } from '../../core/products/product-cleanup-service.js';
+import type { ProductCleanupPreview, ProductCleanupSelection } from '../../core/products/product-cleanup-service.js';
+export type { ProductCleanupSelection } from '../../core/products/product-cleanup-service.js';
 import type { DictionaryDeletionPreview, PermanentDictionaryDeletionInput } from '../../core/dictionaries/dictionary-types.js';
 export type { DictionaryDeletionPreview } from '../../core/dictionaries/dictionary-types.js';
 import type { OutboundBomContext } from '../../core/outbound/outbound-bom-context.js';
@@ -290,7 +291,7 @@ export interface PlannerApi {
   activateProduct(id: number): Promise<ProductView>;
   deleteProduct(id: number): Promise<{ deleted: true }>;
   previewProductCleanup(id: number): Promise<ProductCleanupPreviewView>;
-  cleanupProduct(id: number, confirmedModel: string): Promise<ProductCleanupPreviewView>;
+  cleanupProduct(id: number, confirmedModel: string, selection?: ProductCleanupSelection): Promise<ProductCleanupPreviewView>;
   listQrCodes(filters?: ProductQrCodeFilters): Promise<{ items: ProductQrCodeView[] }>;
   listQrPurposes(): Promise<{ items: QrPurposeView[] }>;
   createQrPurpose(input: { key: string; englishName: string; displayName: string; defaultForAll: boolean;
@@ -541,7 +542,7 @@ export const apiClient: PlannerApi = {
   activateProduct: (id) => request(`/api/products/${id}/activate`, json('POST')),
   deleteProduct: (id) => request(`/api/products/${id}`, { method: 'DELETE' }),
   previewProductCleanup: (id) => request(`/api/products/${id}/cleanup-preview`),
-  cleanupProduct: (id, confirmedModel) => request(`/api/products/${id}/cleanup`, json('POST', { confirmed: true, confirmedModel })),
+  cleanupProduct: (id, confirmedModel, selection) => request(`/api/products/${id}/cleanup`, json('POST', { confirmed: true, confirmedModel, ...(selection ? {selection} : {}) })),
   listQrCodes: (filters = {}) => request(`/api/qr-codes${queryString(filters)}`),
   listQrPurposes: () => request('/api/qr-purposes'),
   createQrPurpose: (input) => request('/api/qr-purposes', json('POST', input)),
