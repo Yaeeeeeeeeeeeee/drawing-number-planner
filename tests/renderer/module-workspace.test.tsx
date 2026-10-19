@@ -4,6 +4,21 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ModuleWorkspace } from '../../src/renderer/components/ModuleWorkspace';
 
 afterEach(() => vi.unstubAllGlobals());
+it('gives PDF navigation a 300px default and keyboard bounds of 260–420px',()=>{
+  vi.stubGlobal('innerWidth',1920);
+  render(<ModuleWorkspace resizable fileWorkspace navigation={<p>PDF导航</p>} detailLabel="文件详情" onCloseDetail={()=>{}}><p>文件列表</p></ModuleWorkspace>);
+  const handle=screen.getByRole('separator',{name:'调整产品导航宽度'});
+  expect(handle).toHaveAttribute('aria-valuenow','300');expect(handle).toHaveAttribute('aria-valuemin','260');expect(handle).toHaveAttribute('aria-valuemax','420');
+});
+it('keeps narrow PDF navigation open for tree expansion and filters, closing only on explicit selection',()=>{
+  vi.stubGlobal('innerWidth',720);
+  render(<ModuleWorkspace fileWorkspace navigation={<><button>展开类别</button><button data-navigation-select>选择产品</button></>} detailLabel="文件详情" onCloseDetail={()=>{}}><p>文件列表</p></ModuleWorkspace>);
+  fireEvent.click(screen.getByRole('button',{name:'产品／批次导航'}));
+  fireEvent.click(screen.getByRole('button',{name:'展开类别'}));
+  expect(screen.getByRole('dialog',{name:'产品／批次导航'})).toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:'选择产品'}));
+  expect(screen.queryByRole('dialog',{name:'产品／批次导航'})).toBeNull();
+});
 it('supports keyboard panel sizing and reset without changing the detail input', () => {
   vi.stubGlobal('innerWidth', 1920);
   render(<ModuleWorkspace resizable fileWorkspace navigation={<button>产品A</button>} detail={<input aria-label="详情输入" defaultValue="保留输入" />} detailLabel="文件详情" detailIdentity={1} onCloseDetail={() => {}}><p>列表</p></ModuleWorkspace>);

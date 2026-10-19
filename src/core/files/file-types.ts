@@ -32,6 +32,8 @@ export interface FileSearchFilters {
   keyword?: string;
   productId?: number;
   materialBatchId?: number;
+  productCategory?: string;
+  unassociatedProduct?: boolean;
   matchStatus?: FileMatchStatus;
   conversionType?: ConversionType;
   presence?: FilePresence;
@@ -84,4 +86,15 @@ export interface FileScanChangeView {
 export interface FileScanChangesView {
   scan: FileScanRunView;
   changes: { added: FileScanChangeView[]; missing: FileScanChangeView[]; changed: FileScanChangeView[] };
+}
+
+/** Manual filters shared by the file list and navigation counts; navigation scope is excluded. */
+export type FileNavigationFilters = Pick<FileSearchFilters, 'keyword' | 'matchStatus' | 'conversionType' | 'presence'>;
+
+export interface FileNavigationResult {
+  total: number;
+  unassociatedProducts: number;
+  categories: Array<{ name: string; count: number }>;
+  products: Array<{ productId: number; count: number }>;
+  batches: Array<{ materialBatchId: number; productId: number | null; count: number }>;
 }

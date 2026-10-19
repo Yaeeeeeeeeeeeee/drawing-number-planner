@@ -1,3 +1,5 @@
+import type { FileNavigationResult } from '../../core/files/file-types.js';
+export type PdfNavigationCounts = FileNavigationResult;
 import type { ProductCleanupPreview, ProductCleanupSelection } from '../../core/products/product-cleanup-service.js';
 export type { ProductCleanupSelection } from '../../core/products/product-cleanup-service.js';
 import type { DictionaryDeletionPreview, PermanentDictionaryDeletionInput } from '../../core/dictionaries/dictionary-types.js';
@@ -367,6 +369,7 @@ export interface PlannerApi {
   cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
   getFileIndexClearPreview(): Promise<FileIndexClearPreviewView>;
   clearFileIndex(confirmation: string): Promise<FileIndexClearResultView>;
+  getPdfFileNavigation?(filters?: Record<string, string | number | undefined>): Promise<PdfNavigationCounts>;
   searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
     items: PdfFileView[]; total: number; page: number; pageSize: number;
   }>;
@@ -628,6 +631,7 @@ export const apiClient: PlannerApi = {
   cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),
   getFileIndexClearPreview: () => request('/api/files/index/clear-preview'),
   clearFileIndex: (confirmation) => runLocalTask('index_clear', { confirmation }),
+  getPdfFileNavigation: (filters = {}) => request(`/api/files/navigation${queryString(filters)}`),
   searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
   checkServiceHealth: () => request('/api/health'),
   listLocalTasks: async () => (await request<{ tasks: LocalTaskView[] }>('/api/tasks')).tasks,

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../src/renderer/data/client';
 import { FilesPage } from '../../src/renderer/pages/FilesPage';
@@ -40,23 +40,37 @@ function apiFixture(configured = false) {
     clearFileIndex: vi.fn().mockResolvedValue({ pdfFiles: 4, qrCodeFiles: 2, materialBatches: 1, scanChanges: 4, scanRuns: 2 }),
     searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
     listProducts: vi.fn().mockResolvedValue([{ id: 9, sku: 'SKDZC100JP', model: 'ZC100', productCategory: '冰柜', status: 'active' }]),
-    listMaterialBatches: vi.fn().mockResolvedValue([{ id: 2, sku: 'SKDZC100JP', model: 'ZC100', name: '06.20260309' }]),
+    listMaterialBatches: vi.fn().mockResolvedValue([{ id: 2, sku: 'SKDZC100JP', model: 'ZC100', productId: 9, name: '06.20260309' }]),
   };
 }
 
 describe('FilesPage', () => {
-  it('separates file queries from batch navigation and opens the actual complete list',async()=>{
-    const api=apiFixture(true);render(<FilesPage api={api as never}/>);
-    await screen.findByRole('button',{name:'全部文件'});
-    expect(screen.queryByRole('button',{name:'未关联／未归批次核对'})).toBeNull();
-    expect(screen.queryByText('产品全部图号')).toBeNull();
-    const queries=screen.getByRole('region',{name:'文件查询'});
-    fireEvent.click(within(queries).getByRole('button',{name:'待确认文件'}));
-    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({matchStatus:'pending',presence:'all'})));
-    expect(within(queries).getByRole('button',{name:'待确认文件'})).toHaveAttribute('aria-current','page');
-    expect(screen.getByRole('button',{name:'全部文件'})).not.toHaveAttribute('aria-current');
-    fireEvent.click(screen.getByRole('button',{name:'全部文件'}));
-    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith({keyword:'',matchStatus:'',conversionType:'',presence:'all',page:1,pageSize:50}));
+  beforeEach(() => { Object.defineProperty(window, 'innerWidth', {configurable:true,value:1600}); });
+  it('keeps manual file filters when all files clears only navigation scope', async () => {
+    const api = apiFixture(true); render(<FilesPage api={api as never} />);
+    await screen.findByRole('button', { name: '全部文件' });
+    fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'manual' } });
+    fireEvent.change(screen.getByLabelText('匹配状态'), { target: { value: 'pending' } });
+    fireEvent.click(screen.getByRole('button', { name: '待关联产品' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'manual', matchStatus: 'pending', unassociatedProduct: 'true' })));
+    fireEvent.click(screen.getByRole('button', { name: '全部文件' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith({ keyword: 'manual', matchStatus: 'pending', conversionType: '', presence: 'all', page: 1, pageSize: 50 }));
+    expect(screen.getAllByLabelText('文件关键词')).toHaveLength(1);
+    expect(screen.getByLabelText('文件关键词').closest('nav')).toHaveAttribute('aria-label', '资料导航');
+    expect(screen.queryByRole('button', { name: '待确认文件' })).not.toBeInTheDocument();
+    expect(screen.queryByText('回收站')).not.toBeInTheDocument();
+  });
+
+  it('finishes workspace metadata loading when navigation changes before the first query resolves', async () => {
+    const api = apiFixture(true);
+    let release!: (value: {workspaceRoot:string;configured:boolean;available:boolean}) => void;
+    api.getWorkspaceSettings.mockImplementationOnce(() => new Promise(resolve => {release=resolve;}));
+    render(<FilesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('button',{name:'待关联产品'}));
+    await screen.findAllByText('冰柜 · ZC100',{selector:'.file-product strong'});
+    release({workspaceRoot:'X:\\Library',configured:true,available:true});
+    expect(await screen.findByDisplayValue('X:\\Library')).toBeVisible();
+    expect(await screen.findByRole('button',{name:'产品 SKDZC100JP · ZC100'})).toBeVisible();
   });
 
   it('opens the exact product and batch supplied by drawing navigation without scanning or mutation', async () => {
@@ -114,10 +128,8 @@ describe('FilesPage', () => {
     expect(await screen.findAllByText('冰柜 · ZC100', { selector: '.file-product strong' })).toHaveLength(2);
     expect(screen.getAllByText('SKU：SKDZC100JP', { selector: '.file-product small' })).toHaveLength(2);
     expect(screen.getAllByText('待关联').length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('产品档案'), { target: { value: '9' } });
-    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '2' } });
-    fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
-    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9, materialBatchId: 2 })));
+    fireEvent.click(screen.getByRole('button', { name: '产品 SKDZC100JP · ZC100' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9 })));
   });
   it('opens a present file by PDF index ID and disables missing file locations', async () => {
     const showFileInFolder = vi.fn().mockResolvedValue({ ok: true }); window.plannerDesktop = { showFileInFolder };
@@ -184,6 +196,24 @@ describe('FilesPage', () => {
     expect(screen.getByText('转曲后', { selector: '.conversion-label' })).toBeVisible();
   });
 
+  it('refreshes the latest selected scope when a scan finishes after navigation changes', async () => {
+    const api = apiFixture(true);
+    const summary = await api.scanPdfFiles();
+    let finishScan!: (value: typeof summary) => void;
+    api.scanPdfFiles.mockImplementationOnce(() => new Promise(resolve => { finishScan = resolve; }));
+    api.searchPdfFiles.mockImplementation(async (filters: Record<string, unknown>) => ({items: filters.unassociatedProduct ? [unmatched] : [file], total:1,page:1,pageSize:50}));
+    render(<FilesPage api={api as never} initialTarget={{productId:9,fullCode:''}} />);
+    await screen.findByDisplayValue('X:\\Library');
+    fireEvent.click(screen.getByRole('button',{name:'扫描资料库'}));
+    fireEvent.click(screen.getByRole('button',{name:'待关联产品'}));
+    await screen.findByText('unknown',{selector:'.file-primary'});
+    finishScan(summary);
+    await waitFor(() => expect(screen.getByRole('button',{name:'扫描资料库'})).toBeEnabled());
+    expect(screen.getByRole('button',{name:'待关联产品'})).toHaveAttribute('aria-current','page');
+    expect(screen.getByText('unknown',{selector:'.file-primary'})).toBeVisible();
+    expect(screen.queryByText(file.fileName.replace(/\.pdf$/i,''),{selector:'.file-primary'})).not.toBeInTheDocument();
+  });
+
   it('separates current library state from this scan changes and expands grouped details in place', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
     await screen.findByDisplayValue('X:\\Library');
@@ -217,14 +247,15 @@ describe('FilesPage', () => {
   it('refreshes material-batch filter options after a successful scan', async () => {
     const api = apiFixture(true);
     api.listMaterialBatches.mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { id: 12, sku: 'SKDWT040JP', model: 'T40', name: '06.20260309' },
+      { id: 12, sku: 'SKDWT040JP', model: 'T40', productId: 9, name: '06.20260309' },
     ]);
     render(<FilesPage api={api as never} />);
     await screen.findByDisplayValue('X:\\Library');
 
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
 
-    expect(await screen.findByRole('option', { name: 'SKDWT040JP · T40 · 20260309' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'展开产品 SKDZC100JP · ZC100'}));
+    expect(await screen.findByRole('button', { name: '批次 20260309' })).toBeVisible();
     expect(api.listMaterialBatches).toHaveBeenCalledTimes(2);
   });
 
@@ -331,24 +362,26 @@ describe('FilesPage', () => {
     const rebuilt = { ...file, id: 12, fileName: 'rebuilt.pdf', relativePath: 'rebuilt.pdf' };
     const api = apiFixture(true);
     api.searchPdfFiles.mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 50 })
+      .mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 50 })
       .mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 50 })
       .mockResolvedValueOnce({ items: [rebuilt], total: 1, page: 1, pageSize: 50 });
-    api.listMaterialBatches.mockResolvedValueOnce([{ id: 2, sku: 'SKDZC100JP', model: 'ZC100', name: '旧批次' }])
+    api.listMaterialBatches.mockResolvedValueOnce([{ id: 2, productId:9, sku: 'SKDZC100JP', model: 'ZC100', name: '旧批次' }])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: 12, sku: 'SKDWT040JP', model: 'T40', name: '重扫批次' }]);
+      .mockResolvedValueOnce([{ id: 12, productId:9, sku: 'SKDWT040JP', model: 'T40', name: '重扫批次' }]);
     render(<FilesPage api={api as never} />);
     await screen.findByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
-    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button',{name:'展开产品 SKDZC100JP · ZC100'}));
+    fireEvent.click(screen.getByRole('button',{name:'批次 旧批次'}));
 
     fireEvent.click(screen.getByRole('button', { name: '清空资料库索引' }));
     fireEvent.click(await screen.findByRole('button', { name: '继续' }));
     fireEvent.change(screen.getByLabelText('确认短语'), { target: { value: '清空资料库索引' } });
     fireEvent.click(screen.getByRole('button', { name: '确认清空资料库索引' }));
 
-    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenNthCalledWith(2, expect.not.objectContaining({ materialBatchId: 2 })));
-    expect(screen.getByLabelText('资料批次')).toHaveValue('');
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenNthCalledWith(3, expect.not.objectContaining({ materialBatchId: 2 })));
+    expect(screen.getByRole('button',{name:'全部文件'})).toHaveAttribute('aria-current','page');
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
-    expect(await screen.findByRole('option', { name: 'SKDWT040JP · T40 · 重扫批次' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: '批次 重扫批次' })).toBeVisible();
     expect(screen.getByText('rebuilt', { selector: '.file-primary' })).toBeVisible();
   });
 

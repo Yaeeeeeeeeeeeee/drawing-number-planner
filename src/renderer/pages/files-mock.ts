@@ -32,20 +32,34 @@ export function createFilesMockApi(scenario: FilesScenario): PlannerApi {
   let scanCount = 1;
   let task: LocalTaskView | null = null;
   const counts = () => ({ pdfFiles: rows.length, qrCodeFiles: qrCount, materialBatches: batches.length, scanChanges: scanCount ? 3 : 0, scanRuns: scanCount });
+  const filterRows = (filters: Record<string, any>) => {
+      const keyword = String(filters.keyword ?? '').trim().toLowerCase();
+    return scenario === 'no-results' ? [] : rows.filter(row => (!keyword || [row.fileName, row.relativePath, row.fullCode ?? row.historicalFullCode].some(value => value?.toLowerCase().includes(keyword)))
+        && (!filters.productId || row.productId === filters.productId) && (!filters.materialBatchId || row.materialBatchId === filters.materialBatchId)
+        && (!filters.productCategory || row.productCategory === filters.productCategory)
+        && (filters.unassociatedProduct !== 'true' || row.productId === null)
+        && (!filters.matchStatus || row.matchStatus === filters.matchStatus) && (!filters.conversionType || row.conversionType === filters.conversionType)
+        && ((filters.presence ?? 'present') === 'all' || row.isPresent === ((filters.presence ?? 'present') === 'present')));
+  };
   const methods: Record<string, (...args: any[]) => Promise<unknown>> = {
     getWorkspaceSettings: async () => ({ workspaceRoot: root, configured: true, available: true }),
     updateWorkspaceSettings: async (value: string) => { root = value; return { workspaceRoot: root, configured: true, available: true }; },
     listProducts: async () => clone([product]),
     listMaterialBatches: async () => clone(batches.map(batch => ({ ...batch, fileCount: rows.filter(row => row.materialBatchId === batch.id).length }))),
+    getPdfFileNavigation: async (filters: Record<string, any> = {}) => {
+      if (scenario === 'error') throw new Error('Mock：导航统计加载失败');
+      const filtered = filterRows({ keyword: filters.keyword, matchStatus: filters.matchStatus, conversionType: filters.conversionType, presence: filters.presence });
+      const associated = filtered.filter(row => row.productId === product.id);
+      return {total:filtered.length,unassociatedProducts:filtered.filter(row => row.productId === null).length,
+        categories:associated.length ? [{name:product.productCategory,count:associated.length}] : [],
+        products:associated.length ? [{productId:product.id,count:associated.length}] : [],
+        batches:batches.flatMap(batch => [product.id,null].map(productId => ({materialBatchId:batch.id,productId,count:filtered.filter(row => row.materialBatchId === batch.id && row.productId === productId).length})).filter(item => item.count > 0))};
+    },
+    getDrawingNavigation: async () => ({batches:[]}),
     searchPdfFiles: async (filters: Record<string, any> = {}) => {
       if (scenario === 'loading') return new Promise(() => {});
       if (scenario === 'error') throw new Error('Mock：PDF 文件加载失败，切换场景可重试。');
-      // Mirror the real keyword scope, including its known historical-code TODO.
-      const keyword = String(filters.keyword ?? '').trim().toLowerCase();
-      const filtered = scenario === 'no-results' ? [] : rows.filter(row => (!keyword || [row.fileName, row.relativePath, row.drawingId ? row.fullCode : ''].some(value => value?.toLowerCase().includes(keyword)))
-        && (!filters.productId || row.productId === filters.productId) && (!filters.materialBatchId || row.materialBatchId === filters.materialBatchId)
-        && (!filters.matchStatus || row.matchStatus === filters.matchStatus) && (!filters.conversionType || row.conversionType === filters.conversionType)
-        && ((filters.presence ?? 'present') === 'all' || row.isPresent === ((filters.presence ?? 'present') === 'present')));
+      const filtered = filterRows(filters);
       const page = filters.page ?? 1; const pageSize = filters.pageSize ?? 50;
       return clone({ items: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, page, pageSize });
     },

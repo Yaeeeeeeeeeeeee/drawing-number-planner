@@ -132,8 +132,8 @@ function snapshot(file) {
     await page.screenshot({path:path.join(directory,'Windows-产品删除处理选项-1920.png')});
     await cleanup.getByLabel('释放占号',{exact:true}).check();
     await cleanup.getByLabel('永久清除业务历史',{exact:true}).check();
-    assert.equal(await cleanup.getByRole('button',{name:'核对处理结果',exact:true}).isDisabled(),true);
-    await cleanup.getByLabel('输入“永久清除历史”确认').scrollIntoViewIfNeeded();
+    assert.equal(await cleanup.getByRole('textbox').count(),1);
+    await cleanup.getByRole('button',{name:'核对处理结果',exact:true}).scrollIntoViewIfNeeded();
     await page.screenshot({path:path.join(directory,'Windows-产品释放与历史清除确认-1920.png')});
     await cleanup.getByRole('button',{name:'取消',exact:true}).click();
     if(await toggle.isVisible())await toggle.click();
@@ -143,8 +143,21 @@ function snapshot(file) {
     const projectFont=await page.locator('.drawing-project-name').first().evaluate(n=>getComputedStyle(n).fontSize);
     assert.equal(projectFont,'12px');
     await page.screenshot({path:path.join(directory,'Windows-图号来源与主类别标签-1920.png')});
+    if(await toggle.isVisible())await toggle.click();
+    await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'PDF 文件中心',exact:true}).click();
+    const pdfNav=page.getByRole('navigation',{name:'资料导航',exact:true});
+    await pdfNav.getByRole('button',{name:'全部文件',exact:true}).waitFor();
+    const pdfStatistics=await page.evaluate(async()=>{const response=await fetch('/api/files/navigation?presence=all');if(!response.ok)throw Error('PDF statistics failed');return response.json();});
+    await page.waitForFunction(total=>document.querySelector('.pdf-product-navigation button[aria-label="全部文件"] .pdf-nav-count')?.textContent===String(total),pdfStatistics.total);
+    assert.equal(await page.getByLabel('存在状态',{exact:true}).inputValue(),'all');
+    assert.equal(await page.locator('.files-page .files-filter').count(),1);
+    const pdfWidth=page.getByRole('separator',{name:'调整产品导航宽度',exact:true});
+    assert.equal(await pdfWidth.getAttribute('aria-valuenow'),'300');assert.equal(await pdfWidth.getAttribute('aria-valuemin'),'260');assert.equal(await pdfWidth.getAttribute('aria-valuemax'),'420');
+    await pdfWidth.focus();await page.keyboard.press('End');assert.equal(await pdfWidth.getAttribute('aria-valuenow'),'420');
+    await page.getByRole('button',{name:'恢复默认宽度',exact:true}).click();
+    await page.screenshot({path:path.join(directory,'Windows-PDF三级导航与真实数量-1920.png')});
     assert.equal(writes.length,4);
     assert.deepEqual(snapshot(path.join(root,'planner.db')),originalDatabase);assert.equal(hash(),before);
-    fs.writeFileSync(path.join(directory,'windows-floating-navigation.json'),JSON.stringify({ revision:process.env.PLANNER_ACCEPTANCE_REVISION, native, rows, dictionaryPreflight, actionSizes, editorSizes,cleanupButtons,projectFont,sourceColumn:true,productDictionaryOptions:true,productExitChoicesReadOnly:true, restoredKeyboardEdit:true, originalDatabaseRestored:true, filterPreserved:true, seedUnchanged:true, writes, scope:'Installed EXE on native Windows; controlled delete/restore/rename of one existing isolated sample, product exit choices inspected read-only, original database rows restored. Physical user IME/4K/DPI remain manual.' },null,2));
+    fs.writeFileSync(path.join(directory,'windows-floating-navigation.json'),JSON.stringify({ revision:process.env.PLANNER_ACCEPTANCE_REVISION, native, rows, dictionaryPreflight, actionSizes, editorSizes,cleanupButtons,projectFont,sourceColumn:true,pdfStatistics,pdfNavigationWidth:{default:300,min:260,max:420},productBulkConfirmation:true,productDictionaryOptions:true,productExitChoicesReadOnly:true, restoredKeyboardEdit:true, originalDatabaseRestored:true, filterPreserved:true, seedUnchanged:true, writes, scope:'Installed EXE on native Windows; controlled delete/restore/rename of one existing isolated sample, product exit choices and PDF statistics inspected read-only, original database rows restored. Physical user IME/4K/DPI remain manual.' },null,2));
   } finally { await app.close(); }
 })().catch(error=>{ console.error(error);process.exitCode=1; });
