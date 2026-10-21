@@ -63,8 +63,8 @@ Files: ProductsPage、products/*、样式，appearance-client UI绑定。
 
 ## Task 7：整合/审核/Windows升级交付
 Root owns shared PlannerApi组合、server路由组合、ProductCatalogNavigation版本适配、查询缓存公共组件、打包/升级/说明。
-- [ ] 验证相关测试全绿，调查既有相关失败；完整套件、tsc/build、真实临时PDF/E2E、旧v15升级/失败恢复。
-- [ ] 独立审查Schema/历史与端到端UI，修复重要问题并复审。
+- [x] 验证相关测试全绿，调查既有相关失败；完整套件、tsc/build、真实临时PDF/E2E、旧v15升级/失败恢复。
+- [x] 独立审查Schema/历史与端到端UI，修复重要问题并复审。
 - [ ] Windows构建安装、选择旧库副本升级、二维码原生选择/真实校验关联重启、各尺寸截图；数据路径不再每revision隔离导致无法升级。
 - [ ] 最终记录提交/变更/升级/恢复步骤、本地ZC100操作；不合并master；交付真实安装包。
 

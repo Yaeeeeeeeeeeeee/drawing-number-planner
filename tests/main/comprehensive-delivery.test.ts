@@ -28,3 +28,9 @@ it('fresh creation never clears an existing default data directory',async()=>{
  await expect(prepareProductionProfile({appData:root,chooseMode:async()=>'fresh',chooseDatabase:async()=>null,initializeDatabase(){initialized=true;}})).rejects.toThrow('不会覆盖');expect(initialized).toBe(false);expect(readFileSync(join(data,'planner.db'),'utf8')).toBe('existing');expect(existsSync(join(root,'DrawingNumberPlanner','profile.json'))).toBe(false);
  }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+it('surfaces a native dialog failure while Electron has no first window, instead of hiding it behind the window timeout',async()=>{
+ const {waitForNativeDesktopWindow}=createRequire(import.meta.url)('../../scripts/comprehensive-native-handshake.cjs');
+ const failure=Error('Native filename edit not found');
+ await expect(waitForNativeDesktopWindow({firstWindow:()=>new Promise(()=>{})},{done:Promise.reject(failure)})).rejects.toBe(failure);
+});
