@@ -20,7 +20,7 @@ $report=[ordered]@{mode=$Mode;database=$DatabasePath;stage='started';events=@();
 function Save-Stage([string]$Stage) {
  $report.stage=$Stage;$report.events+=@{stage=$Stage;at=[DateTime]::UtcNow.ToString('o')}
  $report|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ReportPath -Encoding utf8
- Write-Output (ConvertTo-Json -Compress -Depth 6 @{nativeDialogStage=$Stage;mode=$Mode;at=[DateTime]::UtcNow.ToString('o');matchedWindow=$report.matchedWindow;matchedControl=$report.matchedControl;filenameWriteMethod=$report.filenameWriteMethod;filenameCandidates=$report.filenameCandidates;openCandidates=$report.openCandidates;filenameReadBack=$report.filenameReadBack})
+ Write-Output (ConvertTo-Json -Compress -Depth 6 @{nativeDialogStage=$Stage;mode=$Mode;at=[DateTime]::UtcNow.ToString('o');matchedWindow=$report.matchedWindow;matchedControl=$report.matchedControl;filenameWriteMethod=$report.filenameWriteMethod;filenameCandidates=$report.filenameCandidates;openCandidates=$report.openCandidates;filenameReadBack=$report.filenameReadBack;windowDiscovery=$report.windowDiscovery;ownerWindow=$report.ownerWindow})
 }
 function Native-Class($Element) {
  $value=New-Object System.Text.StringBuilder 256
@@ -43,7 +43,14 @@ function Save-Diagnostics {
 function Wait-Window([string]$Title) {
  for($attempt=0;$attempt -lt 120;$attempt++){
   $windows=$root.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.Condition]::TrueCondition)
-  foreach($candidate in $windows){if($candidate.Current.Name -eq $Title){return $candidate}}
+  foreach($candidate in $windows){if($candidate.Current.Name -eq $Title -and $candidate.Current.NativeWindowHandle -ne 0){$report.windowDiscovery='desktop-child';return $candidate}}
+  # Main-owned QR file dialogs appear as a Window descendant of the Electron
+  # owner in the real UIA tree, unlike the unowned first-start database picker.
+  $nameCondition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$Title)
+  foreach($owner in $windows){
+   $owned=$owner.FindAll([System.Windows.Automation.TreeScope]::Descendants,$nameCondition)
+   foreach($candidate in $owned){if($candidate.Current.ControlType -eq [System.Windows.Automation.ControlType]::Window -and $candidate.Current.NativeWindowHandle -ne 0){$report.windowDiscovery='owned-descendant';$report.ownerWindow=$owner.Current.Name;return $candidate}}
+  }
   Start-Sleep -Milliseconds 250
  }
  throw "Native dialog missing: $Title"
