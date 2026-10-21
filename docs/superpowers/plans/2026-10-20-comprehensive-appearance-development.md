@@ -65,8 +65,8 @@ Files: ProductsPage、products/*、样式，appearance-client UI绑定。
 Root owns shared PlannerApi组合、server路由组合、ProductCatalogNavigation版本适配、查询缓存公共组件、打包/升级/说明。
 - [x] 验证相关测试全绿，调查既有相关失败；完整套件、tsc/build、真实临时PDF/E2E、旧v15升级/失败恢复。
 - [x] 独立审查Schema/历史与端到端UI，修复重要问题并复审。
-- [ ] Windows构建安装、选择旧库副本升级、二维码原生选择/真实校验关联重启、各尺寸截图；数据路径不再每revision隔离导致无法升级。
-- [ ] 最终记录提交/变更/升级/恢复步骤、本地ZC100操作；不合并master；交付真实安装包。
+- [x] Windows构建安装、选择旧库副本升级、二维码原生选择/真实校验关联重启、各尺寸截图；数据路径不再每revision隔离导致无法升级。
+- [x] 最终记录提交/变更/升级/恢复步骤、本地ZC100操作；不合并master；交付真实安装包。
 
 ## User-approved additions: planning attribution and outbound V2
 
@@ -74,3 +74,5 @@ Root owns shared PlannerApi组合、server路由组合、ProductCatalogNavigatio
 - Source requirements: `docs/outbound-v2-requirements-20261020.md` (uploaded by user). These explicitly supersede the earlier BOM-gated outbound proposal: batch files supply candidates; BOM is advisory only. Complete packages use only the selected batch, change packages compare a proven baseline; no implicit historical carry-forward.
 - Add additive v17 outbound batch scope/completeness/audit and immutable package snapshots; legacy rows remain unbound, pending and untouched. Manual binding must preview/confirm with revision. ZIP provenance, per-part count/hash and real source fingerprints are persisted; selected valid subset may proceed despite unselected warnings.
 - Extend end-to-end tests for no-BOM, full selected batch, exact hash changes, explicit baseline, version ambiguity, missing/ignored files, split manifests, stale source rejection and immutable history. Finish vertical UI, native Windows verification and installer only after these pass.
+
+最终证据：应用34bf336，完整152文件1270项通过，Windows39636465335全成功；交付说明及不可由自动化代替的本地操作见docs/comprehensive-redesign-delivery-20261021.md。

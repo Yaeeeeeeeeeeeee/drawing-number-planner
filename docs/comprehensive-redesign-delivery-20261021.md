@@ -1,4 +1,4 @@
-# 综合改版交付记录（开发中，尚未交付）
+# 综合改版交付记录（2026-10-21）
 
 本轮包含用户确认的综合改版、图号规划原子归属与独立沿用，以及上传的外发 V2.0。原第二轮30项看板仅为历史范围，不能代替本轮验收。
 
@@ -14,9 +14,34 @@
 - 缓存、最新请求守卫、记忆10/25/50/100分页、统一导航/表格；后台任务完成后刷新受影响查询。
 - v15/v16→v17事务升级、WAL一致备份、稳定数据目录；首次启动明确选择原数据或空库，不以新SHA静默创建替代空库。
 
-## 测试和构建状态
+## 测试和构建结果
 
-最终完整套件 `work/final-stable-suite.log`：152文件、1269项全部通过（2026-10-21 15:54:53 UTC开始，253.06秒）。TypeScript、Vite前端与Main/服务构建通过；暂有非阻塞的前端chunk体积提示。独立安全审查重要问题修复并复审。应用提交 `b59a94964263f372ea91bb3b77d787a68d016fee` 已推送，Windows Actions `39630754476` 的构建、中文安装、文件哈希、WAL与回滚helper通过；首启原生选择脚本未完成，主窗口等待超时，尚未通过原生验收。已修正原生按钮/文件名交互并补充逐阶段诊断，交付6项专项通过，等待重跑。安装器哈希和截图待真实完成后填入；没有真实Windows结果前不发布为已验收安装包。
+- 应用提交：`34bf3360f25a019f0124acf9fbd398993e6f7bba`；开发分支 `codex/comprehensive-appearance-20261020` 已推送，未合并master。
+- 完整套件：152文件、1270项全部通过；最终日志 `work/final-delivery-suite.log`，2026-10-21 16:35:43 UTC开始、249.38秒。TypeScript、Vite与Main构建通过；最终弹窗调整另有4文件16项回归通过。
+- [Windows Actions 39636465335](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39636465335) 全部成功：实际中文安装向导和可编辑路径、中文路径安装、158文件逐个哈希核验、旧v15→v17升级、原settings字节与历史行/快照保持、迁移前可读备份、WAL提交页、故障事务回滚和重启。
+- 实际Windows原生QR文件选择→校验→关联→重启→更换→解除→再重启全部通过；旧QR与BOM/PDF/外发记录保持，原始文件哈希不变。弹窗真实fixed遮罩和完整边界通过。
+- 六模块×五种真实renderer viewport：3840×2160、2560×1440、1920×1080、1366×768、720×600，30PNG尺寸逐一核验。runner物理screen为1024×768、DPR1，不能据此宣称物理4K/DPI/跨屏验收。
+- 原始报告见 [verification目录](verification/comprehensive-20261021/delivery.json) 及同目录的完整Windows JSON。隔离旧库夹具和真实临时PDF用于自动化；未取得或操作用户本地正式业务库。交付新建库不含这些夹具。
+
+## 安装包与提交记录
+
+安装ZIP为 `Comprehensive-Windows-Chinese-Setup-34bf3360f25a019f0124acf9fbd398993e6f7bba`，artifact `12362011165`，144,555,309字节，内含 `图号规划器-Windows-x64-安装包.exe`。
+
+ZIP SHA256：`760eac2658e7a0abd6d942b2b546e9b5182c36aa3ef6bc1ee0ccfe36969cccea`。这是GitHub产物ZIP校验值；实际安装后的158程序文件另逐一比对。产物保留至2026-11-04，主下载使用临时直链，过期时需重新生成。
+
+[应用提交](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/commit/34bf3360f25a019f0124acf9fbd398993e6f7bba)；[本轮全部提交](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/commits/codex/comprehensive-appearance-20261020)。主要实现为b59a949，后续提交完善原生验收和QR视觉；安装包严格固定上述应用SHA，文档归档提交不重新生成应用。
+
+## 实际Windows截图及视觉核对
+
+同一1920×1080窗口、同一旧Schema测试库，图号/PDF使用共享目录树、Lucide图标、标题行收起图标、行高/缩进和浅灰选中。图号树按型号/外观，PDF树保留SKU/型号及实际批次，分别按图号主记录与PDF索引统计；未确认的历史图号不能因PDF已有产品目录归属而冒充确认。
+
+| 图号库 | PDF文件中心 |
+|---|---|
+| ![图号库](screenshots/comprehensive-windows-20261021/drawings-1920.png) | ![PDF文件中心](screenshots/comprehensive-windows-20261021/pdf-1920.png) |
+
+![手动QR原生文件校验弹窗](screenshots/comprehensive-windows-20261021/qr-manual-validation.png)
+
+其余产品、QR、BOM、外发、安装向导与替换/重启截图保存在同一目录；全部30个尺寸截图另保存在验证artifact `12363175092`。
 
 ## 本地安装、替换与首次升级
 
@@ -39,4 +64,4 @@
 
 ## 安全审查
 
-已修复并专项验证：WAL checkpoint繁忙导致复制库缺已提交数据；归并成员引用漏检；纯扫描派生归属冒充确认；QR名称例外绕过PDF扩展名及新建预检上下文过期；外发历史来源伪造及范围变化后的旧异步结果回写。最终复审与Windows交付状态另记，不把未完成事项描述为完成。
+已修复并专项验证：WAL checkpoint繁忙导致复制库缺已提交数据；归并成员引用漏检；纯扫描派生归属冒充确认；QR名称例外绕过PDF扩展名及新建预检上下文过期；外发历史来源伪造及范围变化后的旧异步结果回写。上述安全问题已复审，最终Windows原生交付验证通过；用户本地真实数据核验和物理DPI条件仍由用户验收。
