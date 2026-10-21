@@ -20,7 +20,7 @@ $report=[ordered]@{mode=$Mode;database=$DatabasePath;stage='started';events=@();
 function Save-Stage([string]$Stage) {
  $report.stage=$Stage;$report.events+=@{stage=$Stage;at=[DateTime]::UtcNow.ToString('o')}
  $report|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ReportPath -Encoding utf8
- Write-Output (ConvertTo-Json -Compress -Depth 6 @{nativeDialogStage=$Stage;mode=$Mode;at=[DateTime]::UtcNow.ToString('o');matchedWindow=$report.matchedWindow;matchedControl=$report.matchedControl;filenameWriteMethod=$report.filenameWriteMethod;filenameCandidates=$report.filenameCandidates;filenameReadBack=$report.filenameReadBack})
+ Write-Output (ConvertTo-Json -Compress -Depth 6 @{nativeDialogStage=$Stage;mode=$Mode;at=[DateTime]::UtcNow.ToString('o');matchedWindow=$report.matchedWindow;matchedControl=$report.matchedControl;filenameWriteMethod=$report.filenameWriteMethod;filenameCandidates=$report.filenameCandidates;openCandidates=$report.openCandidates;filenameReadBack=$report.filenameReadBack})
 }
 function Native-Class($Element) {
  $value=New-Object System.Text.StringBuilder 256
@@ -108,9 +108,20 @@ try{
   if($actual.ToString() -ne $DatabasePath){throw 'Native filename edit did not retain the full path'}
   $report.filenameReadBack=$actual.ToString()
   Save-Stage 'filename-entered'
-  $open=$picker.FindFirst([System.Windows.Automation.TreeScope]::Descendants,(New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'1')))
-  if(!$open){throw 'Native Open button not found'}
-  $report.matchedControl=@{name=$open.Current.Name;id=$open.Current.AutomationId;handle=$open.Current.NativeWindowHandle};Save-Stage 'open-button-found'
+  # The real tree also contains shell items with id 1 and zero HWND. Select
+  # the native Open Button, rather than the first node sharing that numeric ID.
+  $open=$null
+  for($attempt=0;$attempt -lt 120;$attempt++){
+   $elements=$picker.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
+   $buttons=@($elements|Where-Object{$_.Current.AutomationId -eq '1'})
+   $report.openCandidates=@($buttons|ForEach-Object{@{name=$_.Current.Name;id=$_.Current.AutomationId;handle=$_.Current.NativeWindowHandle;nativeClass=(Native-Class $_)}})
+   $open=$buttons|Where-Object{$_.Current.NativeWindowHandle -ne 0 -and (Native-Class $_) -eq 'Button' -and $_.Current.Name -match '^(?:&?Open|打开)(?:\s*\(&?O\))?$' -and $_.Current.IsEnabled}|Select-Object -First 1
+   if($open){break}
+   if($attempt -eq 0){Write-Output (ConvertTo-Json -Compress -Depth 5 @{openCandidates=$report.openCandidates})}
+   Start-Sleep -Milliseconds 250
+  }
+  if(!$open){throw 'Native nonzero-HWND Open Button did not become ready'}
+  $report.matchedControl=@{name=$open.Current.Name;id=$open.Current.AutomationId;handle=$open.Current.NativeWindowHandle;nativeClass=(Native-Class $open)};Save-Stage 'open-button-found'
   Click-NativeButton $open
   Save-Stage 'open-button-posted'
   for($attempt=0;$attempt -lt 40 -and [ProfileDialogNative]::IsWindow($pickerHandle);$attempt++){Start-Sleep -Milliseconds 250}
