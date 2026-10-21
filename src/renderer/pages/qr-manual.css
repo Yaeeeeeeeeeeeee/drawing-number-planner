@@ -22,3 +22,31 @@
 .qr-manual-page .qr-filter { display: grid; grid-template-columns: minmax(160px,1.4fr) repeat(3,minmax(120px,1fr)) auto; gap: 12px; align-items: end; }
 .qr-manual-page .qr-manual-subtable button { min-height: 20px; height: 20px; line-height: 20px; padding-top: 0; padding-bottom: 0; }
 @media (max-width: 1000px) { .qr-manual-page .qr-filter { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+.qr-manual-page .modal-backdrop, .qr-manual-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: #00000033;
+}
+.qr-manual-page .qr-manual-dialog {
+  margin: 0;
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #00000014;
+}
+.qr-manual-page .qr-manual-dialog .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.qr-manual-page .qr-business-state { display: inline-block; padding: 2px 8px; border-radius: 4px; background: #f1f2f2; color: #666; }
+.qr-manual-page .qr-business-state[data-status="active"] { background: #e9f5ee; color: #25704c; }
+
+.qr-manual-page .qr-file-missing { color: #a33a30; font-size: 12px; }
