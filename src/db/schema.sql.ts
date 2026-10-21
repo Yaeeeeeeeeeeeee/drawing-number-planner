@@ -1179,3 +1179,120 @@ export const schemaVersionFourteen = `
   ALTER TABLE outbound_package_items ADD COLUMN part_number INTEGER NOT NULL DEFAULT 1 CHECK (part_number > 0);
   ALTER TABLE outbound_package_items ADD COLUMN change_details_snapshot TEXT;
 `;
+
+/** v16 adds version metadata; old domain rows remain unassigned until explicit evidence/confirmation. */
+export const schemaVersionSixteen = `
+ CREATE TABLE drawing_appearance_bindings(origin TEXT NOT NULL CHECK(origin IN ('planned','historical')),record_id INTEGER NOT NULL,product_id INTEGER NOT NULL REFERENCES products(id),appearance_version_id INTEGER NOT NULL REFERENCES product_appearance_versions(id),source TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL,PRIMARY KEY(origin,record_id));
+ CREATE TABLE drawing_association_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,origin TEXT NOT NULL,record_id INTEGER NOT NULL,previous_product_id INTEGER,previous_appearance_version_id INTEGER,product_id INTEGER,appearance_version_id INTEGER,evidence_json TEXT NOT NULL,reason TEXT NOT NULL,created_at TEXT NOT NULL);
+ ALTER TABLE material_batches ADD COLUMN display_name TEXT;
+ ALTER TABLE material_batches ADD COLUMN display_revision INTEGER NOT NULL DEFAULT 0;
+ ALTER TABLE pdf_files ADD COLUMN management_state TEXT NOT NULL DEFAULT 'included' CHECK(management_state IN ('included','ignored','needs_review'));
+ CREATE TABLE pdf_file_decisions(id INTEGER PRIMARY KEY AUTOINCREMENT,workspace_key TEXT NOT NULL,path_key TEXT NOT NULL,content_sha256 TEXT NOT NULL,decision TEXT NOT NULL CHECK(decision IN ('ignore','restored')),updated_at TEXT NOT NULL,UNIQUE(workspace_key,path_key,content_sha256));
+ CREATE TABLE product_identity_state(product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE, revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0));
+ CREATE TABLE product_identity_members(raw_product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE, canonical_product_id INTEGER NOT NULL REFERENCES products(id), merged_at TEXT);
+ CREATE INDEX product_identity_members_canonical_idx ON product_identity_members(canonical_product_id);
+ CREATE TABLE product_appearance_versions(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL REFERENCES products(id),
+  version_number INTEGER NOT NULL CHECK(version_number>0), appearance_id INTEGER REFERENCES dictionary_items(id),
+  label TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('draft','current','historical')),
+  predecessor_id INTEGER REFERENCES product_appearance_versions(id), revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0),
+  created_at TEXT NOT NULL, activated_at TEXT, UNIQUE(product_id,version_number));
+ CREATE UNIQUE INDEX product_appearance_one_current ON product_appearance_versions(product_id) WHERE status='current';
+ CREATE TRIGGER appearance_predecessor_insert BEFORE INSERT ON product_appearance_versions
+ WHEN NEW.predecessor_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM product_appearance_versions WHERE id=NEW.predecessor_id AND product_id=NEW.product_id)
+ BEGIN SELECT RAISE(ABORT,'外观前序必须属于同产品'); END;
+ CREATE TRIGGER appearance_predecessor_update BEFORE UPDATE OF predecessor_id,product_id ON product_appearance_versions
+ WHEN NEW.predecessor_id IS NOT NULL AND (NEW.predecessor_id=NEW.id OR NOT EXISTS(SELECT 1 FROM product_appearance_versions WHERE id=NEW.predecessor_id AND product_id=NEW.product_id))
+ BEGIN SELECT RAISE(ABORT,'外观前序必须属于同产品'); END;
+ INSERT INTO product_identity_state(product_id) SELECT id FROM products;
+ INSERT INTO product_identity_members(raw_product_id,canonical_product_id) SELECT id,id FROM products;
+ INSERT INTO product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at,activated_at)
+ SELECT id,1,default_appearance_id,'初始外观','current',created_at,created_at FROM products;
+ CREATE TABLE qr_manual_files(id TEXT PRIMARY KEY,absolute_path TEXT NOT NULL,file_name TEXT NOT NULL,size_bytes INTEGER NOT NULL,modified_ms REAL NOT NULL,content_sha256 TEXT NOT NULL,created_at TEXT NOT NULL);
+ CREATE TABLE qr_manual_links(id INTEGER PRIMARY KEY,qr_code_id INTEGER NOT NULL REFERENCES product_qr_codes(id),file_id TEXT NOT NULL REFERENCES qr_manual_files(id),linked_at TEXT NOT NULL,unlinked_at TEXT,exception_reason TEXT);
+ CREATE UNIQUE INDEX qr_manual_current_link ON qr_manual_links(qr_code_id) WHERE unlinked_at IS NULL;
+ CREATE TABLE qr_manual_audit(id INTEGER PRIMARY KEY,event TEXT NOT NULL,qr_code_id INTEGER NOT NULL REFERENCES product_qr_codes(id),file_id TEXT REFERENCES qr_manual_files(id),reason TEXT,details_json TEXT NOT NULL,created_at TEXT NOT NULL);
+ CREATE TABLE product_merge_events(id INTEGER PRIMARY KEY AUTOINCREMENT,canonical_product_id INTEGER NOT NULL REFERENCES products(id),fingerprint TEXT NOT NULL,before_json TEXT NOT NULL CHECK(json_valid(before_json)),after_json TEXT NOT NULL CHECK(json_valid(after_json)),created_at TEXT NOT NULL);
+ ALTER TABLE bom_versions ADD COLUMN appearance_version_id INTEGER REFERENCES product_appearance_versions(id);
+ CREATE TABLE appearance_bom_current(appearance_version_id INTEGER PRIMARY KEY REFERENCES product_appearance_versions(id),bom_version_id INTEGER NOT NULL REFERENCES bom_versions(id),revision INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL);
+ CREATE TABLE bom_revision_snapshots(id INTEGER PRIMARY KEY AUTOINCREMENT,bom_version_id INTEGER NOT NULL REFERENCES bom_versions(id),edit_revision INTEGER NOT NULL,before_snapshot_json TEXT NOT NULL CHECK(json_valid(before_snapshot_json)),after_snapshot_json TEXT NOT NULL CHECK(json_valid(after_snapshot_json)),created_at TEXT NOT NULL);
+ CREATE TRIGGER bom_revision_snapshots_immutable_update BEFORE UPDATE ON bom_revision_snapshots BEGIN SELECT RAISE(ABORT,'BOM纠错快照不可修改'); END;
+ CREATE TRIGGER bom_revision_snapshots_immutable_delete BEFORE DELETE ON bom_revision_snapshots BEGIN SELECT RAISE(ABORT,'BOM纠错快照不可删除'); END;
+ CREATE TRIGGER appearance_bom_current_insert BEFORE INSERT ON appearance_bom_current
+ WHEN NOT EXISTS(SELECT 1 FROM bom_versions b JOIN product_appearance_versions a ON a.id=NEW.appearance_version_id JOIN product_identity_members m ON m.raw_product_id=b.product_id WHERE b.id=NEW.bom_version_id AND b.appearance_version_id=a.id AND m.canonical_product_id=a.product_id AND b.deleted_at IS NULL)
+ BEGIN SELECT RAISE(ABORT,'BOM外观归属无效'); END;
+ CREATE TRIGGER appearance_bom_current_update BEFORE UPDATE ON appearance_bom_current
+ WHEN NOT EXISTS(SELECT 1 FROM bom_versions b JOIN product_appearance_versions a ON a.id=NEW.appearance_version_id JOIN product_identity_members m ON m.raw_product_id=b.product_id WHERE b.id=NEW.bom_version_id AND b.appearance_version_id=a.id AND m.canonical_product_id=a.product_id AND b.deleted_at IS NULL)
+ BEGIN SELECT RAISE(ABORT,'BOM外观归属无效'); END;
+ CREATE TRIGGER appearance_bom_revision_insert AFTER INSERT ON appearance_bom_current BEGIN UPDATE product_identity_state SET revision=revision+1 WHERE product_id=(SELECT product_id FROM product_appearance_versions WHERE id=NEW.appearance_version_id); END;
+ CREATE TRIGGER appearance_bom_revision_update AFTER UPDATE ON appearance_bom_current BEGIN UPDATE product_identity_state SET revision=revision+1 WHERE product_id=(SELECT product_id FROM product_appearance_versions WHERE id=NEW.appearance_version_id); END;
+ CREATE TRIGGER appearance_bom_revision_delete AFTER DELETE ON appearance_bom_current BEGIN UPDATE product_identity_state SET revision=revision+1 WHERE product_id=(SELECT product_id FROM product_appearance_versions WHERE id=OLD.appearance_version_id); END;
+ CREATE TRIGGER appearance_bom_edit_revision AFTER UPDATE OF edit_revision ON bom_versions WHEN NEW.appearance_version_id IS NOT NULL BEGIN UPDATE product_identity_state SET revision=revision+1 WHERE product_id=(SELECT product_id FROM product_appearance_versions WHERE id=NEW.appearance_version_id); END;
+ CREATE TRIGGER bom_appearance_owner_insert BEFORE INSERT ON bom_versions WHEN NEW.appearance_version_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM product_appearance_versions a JOIN product_identity_members m ON m.raw_product_id=NEW.product_id WHERE a.id=NEW.appearance_version_id AND a.product_id=m.canonical_product_id) BEGIN SELECT RAISE(ABORT,'BOM外观不属于同产品'); END;
+ CREATE TRIGGER bom_appearance_owner_update BEFORE UPDATE OF product_id,appearance_version_id ON bom_versions WHEN (NEW.appearance_version_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM product_appearance_versions a JOIN product_identity_members m ON m.raw_product_id=NEW.product_id WHERE a.id=NEW.appearance_version_id AND a.product_id=m.canonical_product_id)) OR EXISTS(SELECT 1 FROM appearance_bom_current c WHERE c.bom_version_id=NEW.id AND c.appearance_version_id IS NOT NEW.appearance_version_id) BEGIN SELECT RAISE(ABORT,'BOM外观不属于同产品或已被当前指针使用'); END;
+ CREATE TRIGGER qr_manual_audit_immutable_update BEFORE UPDATE ON qr_manual_audit BEGIN SELECT RAISE(ABORT,'二维码关联审计不可修改'); END;
+ CREATE TRIGGER qr_manual_audit_immutable_delete BEFORE DELETE ON qr_manual_audit BEGIN SELECT RAISE(ABORT,'二维码关联审计不可删除'); END;
+ CREATE TRIGGER qr_manual_files_immutable_update BEFORE UPDATE ON qr_manual_files BEGIN SELECT RAISE(ABORT,'二维码原始文件事实不可修改'); END;
+ CREATE TRIGGER qr_manual_files_immutable_delete BEFORE DELETE ON qr_manual_files BEGIN SELECT RAISE(ABORT,'二维码原始文件事实不可删除'); END;
+ CREATE TRIGGER qr_manual_links_immutable_update BEFORE UPDATE ON qr_manual_links WHEN OLD.unlinked_at IS NOT NULL OR NEW.unlinked_at IS NULL OR NEW.id IS NOT OLD.id OR NEW.qr_code_id IS NOT OLD.qr_code_id OR NEW.file_id IS NOT OLD.file_id OR NEW.linked_at IS NOT OLD.linked_at OR NEW.exception_reason IS NOT OLD.exception_reason BEGIN SELECT RAISE(ABORT,'二维码关联只允许解除当前关系'); END;
+ CREATE TRIGGER qr_manual_links_immutable_delete BEFORE DELETE ON qr_manual_links BEGIN SELECT RAISE(ABORT,'二维码关联历史不可删除'); END;
+`;
+
+/** Additive outbound V2 relationships; no historical assignments or snapshots are rewritten. */
+export const schemaVersionSeventeen = `
+        CREATE TABLE drawing_appearance_usages(
+          id INTEGER PRIMARY KEY,origin TEXT NOT NULL CHECK(origin IN ('planned','historical')),record_id INTEGER NOT NULL CHECK(record_id>0),
+          product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+          appearance_version_id INTEGER NOT NULL REFERENCES product_appearance_versions(id) ON DELETE RESTRICT,
+          reason TEXT NOT NULL CHECK(length(trim(reason))>0),created_at TEXT NOT NULL,
+          UNIQUE(origin,record_id,appearance_version_id));
+        CREATE TABLE drawing_appearance_usage_audit(
+          id INTEGER PRIMARY KEY,origin TEXT NOT NULL CHECK(origin IN ('planned','historical')),record_id INTEGER NOT NULL CHECK(record_id>0),
+          product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+          appearance_version_id INTEGER NOT NULL REFERENCES product_appearance_versions(id) ON DELETE RESTRICT,
+          reason TEXT NOT NULL CHECK(length(trim(reason))>0),evidence_json TEXT NOT NULL CHECK(json_valid(evidence_json)),created_at TEXT NOT NULL);
+        CREATE TRIGGER drawing_usage_owner_insert BEFORE INSERT ON drawing_appearance_usages
+          WHEN NOT EXISTS(SELECT 1 FROM product_appearance_versions a WHERE a.id=NEW.appearance_version_id AND a.product_id=NEW.product_id)
+          OR NOT EXISTS(SELECT 1 FROM product_identity_members m JOIN products p ON p.id=m.canonical_product_id WHERE m.raw_product_id=NEW.product_id AND m.canonical_product_id=NEW.product_id AND p.deleted_at IS NULL AND p.status='active')
+          OR (NEW.origin='planned' AND NOT EXISTS(SELECT 1 FROM drawing_numbers d LEFT JOIN drawing_appearance_bindings b ON b.origin='planned' AND b.record_id=d.id JOIN product_identity_members m ON m.raw_product_id=coalesce(b.product_id,d.product_id) WHERE d.id=NEW.record_id AND m.canonical_product_id=NEW.product_id AND d.deleted_at IS NULL AND d.status<>'voided'))
+          OR (NEW.origin='historical' AND NOT EXISTS(SELECT 1 FROM historical_drawing_numbers d LEFT JOIN drawing_appearance_bindings b ON b.origin='historical' AND b.record_id=d.id JOIN product_identity_members m ON m.raw_product_id=coalesce(b.product_id,d.product_id) WHERE d.id=NEW.record_id AND m.canonical_product_id=NEW.product_id AND d.deleted_at IS NULL AND d.status<>'voided'))
+          BEGIN SELECT RAISE(ABORT,'复用图号或目标外观归属无效'); END;
+        CREATE TRIGGER drawing_usage_immutable_update BEFORE UPDATE ON drawing_appearance_usages
+          WHEN NEW.id IS NOT OLD.id OR NEW.origin IS NOT OLD.origin OR NEW.record_id IS NOT OLD.record_id OR NEW.appearance_version_id IS NOT OLD.appearance_version_id OR NEW.reason IS NOT OLD.reason OR NEW.created_at IS NOT OLD.created_at
+          OR NOT EXISTS(SELECT 1 FROM product_identity_members m JOIN product_appearance_versions a ON a.product_id=m.canonical_product_id WHERE m.raw_product_id=OLD.product_id AND m.canonical_product_id=NEW.product_id AND a.id=NEW.appearance_version_id)
+          BEGIN SELECT RAISE(ABORT,'复用关系只允许规范产品身份归并'); END;
+        CREATE TRIGGER drawing_usage_immutable_delete BEFORE DELETE ON drawing_appearance_usages BEGIN SELECT RAISE(ABORT,'图号复用关系不可删除'); END;
+        CREATE TRIGGER drawing_usage_audit_immutable_update BEFORE UPDATE ON drawing_appearance_usage_audit BEGIN SELECT RAISE(ABORT,'图号复用审计不可修改'); END;
+        CREATE TRIGGER drawing_usage_audit_immutable_delete BEFORE DELETE ON drawing_appearance_usage_audit BEGIN SELECT RAISE(ABORT,'图号复用审计不可删除'); END;
+        CREATE TRIGGER drawing_usage_primary_binding_delete BEFORE DELETE ON drawing_appearance_bindings WHEN EXISTS(SELECT 1 FROM drawing_appearance_usages WHERE origin=OLD.origin AND record_id=OLD.record_id) BEGIN SELECT RAISE(ABORT,'图号复用依据的主归属不可删除'); END;
+        CREATE TRIGGER drawing_usage_primary_binding_update BEFORE UPDATE ON drawing_appearance_bindings
+          WHEN EXISTS(SELECT 1 FROM drawing_appearance_usages WHERE origin=OLD.origin AND record_id=OLD.record_id) AND
+          (NEW.origin IS NOT OLD.origin OR NEW.record_id IS NOT OLD.record_id OR NEW.appearance_version_id IS NOT OLD.appearance_version_id OR NOT EXISTS(SELECT 1 FROM product_identity_members m WHERE m.raw_product_id=OLD.product_id AND m.canonical_product_id=NEW.product_id))
+          BEGIN SELECT RAISE(ABORT,'图号复用依据的主归属不可改写'); END;
+        CREATE TRIGGER drawing_usage_planned_delete BEFORE DELETE ON drawing_numbers WHEN EXISTS(SELECT 1 FROM drawing_appearance_usages WHERE origin='planned' AND record_id=OLD.id) BEGIN SELECT RAISE(ABORT,'图号被外观复用引用'); END;
+        CREATE TRIGGER drawing_usage_historical_delete BEFORE DELETE ON historical_drawing_numbers WHEN EXISTS(SELECT 1 FROM drawing_appearance_usages WHERE origin='historical' AND record_id=OLD.id) BEGIN SELECT RAISE(ABORT,'图号被外观复用引用'); END;
+        CREATE TRIGGER drawing_usage_planned_update BEFORE UPDATE OF id,product_id,full_code,status,deleted_at,deletion_mode ON drawing_numbers
+          WHEN EXISTS(SELECT 1 FROM drawing_appearance_usages WHERE origin='planned' AND record_id=OLD.id) AND (NEW.id IS NOT OLD.id OR NEW.product_id IS NOT OLD.product_id OR NEW.full_code IS NOT OLD.full_code OR NEW.status='voided' OR NEW.deleted_at IS NOT NULL OR NEW.deletion_mode='release') BEGIN SELECT RAISE(ABORT,'图号被外观复用引用'); END;
+        CREATE TRIGGER drawing_usage_historical_update BEFORE UPDATE OF id,product_id,full_code,status,deleted_at,deletion_mode ON historical_drawing_numbers
+          WHEN EXISTS(SELECT 1 FROM drawing_appearance_usages WHERE origin='historical' AND record_id=OLD.id) AND (NEW.id IS NOT OLD.id OR NEW.product_id IS NOT OLD.product_id OR NEW.full_code IS NOT OLD.full_code OR NEW.status='voided' OR NEW.deleted_at IS NOT NULL OR NEW.deletion_mode='release') BEGIN SELECT RAISE(ABORT,'图号被外观复用引用'); END;
+        CREATE TABLE pdf_file_decisions_v17(id INTEGER PRIMARY KEY AUTOINCREMENT,workspace_key TEXT NOT NULL,path_key TEXT NOT NULL,content_sha256 TEXT NOT NULL,decision TEXT NOT NULL CHECK(decision IN ('ignore','restored','needs_review')),updated_at TEXT NOT NULL,UNIQUE(workspace_key,path_key,content_sha256));
+        INSERT INTO pdf_file_decisions_v17(id,workspace_key,path_key,content_sha256,decision,updated_at) SELECT id,workspace_key,path_key,content_sha256,decision,updated_at FROM pdf_file_decisions;
+        DROP TABLE pdf_file_decisions;
+        ALTER TABLE pdf_file_decisions_v17 RENAME TO pdf_file_decisions;
+        CREATE TABLE product_appearance_colors(appearance_version_id INTEGER NOT NULL REFERENCES product_appearance_versions(id) ON DELETE RESTRICT,color_id INTEGER NOT NULL REFERENCES dictionary_items(id) ON DELETE RESTRICT,PRIMARY KEY(appearance_version_id,color_id));
+        CREATE TABLE outbound_batch_scopes (
+          batch_id INTEGER PRIMARY KEY REFERENCES material_batches(id) ON DELETE RESTRICT,
+          appearance_version_id INTEGER REFERENCES product_appearance_versions(id) ON DELETE RESTRICT,
+          completeness TEXT NOT NULL DEFAULT 'pending' CHECK(completeness IN ('pending','complete','partial')),
+          baseline_batch_id INTEGER REFERENCES material_batches(id) ON DELETE RESTRICT,
+          revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0), updated_at TEXT NOT NULL, reason TEXT NOT NULL
+        );
+        CREATE TABLE outbound_batch_scope_audit(id INTEGER PRIMARY KEY,batch_id INTEGER NOT NULL REFERENCES material_batches(id) ON DELETE RESTRICT,
+          before_json TEXT CHECK(before_json IS NULL OR json_valid(before_json)),after_json TEXT NOT NULL CHECK(json_valid(after_json)),reason TEXT NOT NULL,created_at TEXT NOT NULL);
+        CREATE TABLE outbound_v2_snapshots(package_id INTEGER PRIMARY KEY REFERENCES outbound_packages(id) ON DELETE RESTRICT,
+          context_json TEXT NOT NULL CHECK(json_valid(context_json)),files_json TEXT NOT NULL CHECK(json_valid(files_json)),parts_json TEXT NOT NULL CHECK(json_valid(parts_json)));
+        CREATE TRIGGER outbound_v2_snapshot_immutable_update BEFORE UPDATE ON outbound_v2_snapshots BEGIN SELECT RAISE(ABORT,'外发快照不可修改'); END;
+        CREATE TRIGGER outbound_v2_snapshot_immutable_delete BEFORE DELETE ON outbound_v2_snapshots BEGIN SELECT RAISE(ABORT,'外发快照不可删除'); END;
+       CREATE TRIGGER outbound_batch_scope_audit_immutable_update BEFORE UPDATE ON outbound_batch_scope_audit BEGIN SELECT RAISE(ABORT,'外发批次确认审计不可修改'); END;
+ CREATE TRIGGER outbound_batch_scope_audit_immutable_delete BEFORE DELETE ON outbound_batch_scope_audit BEGIN SELECT RAISE(ABORT,'外发批次确认审计不可删除'); END;
+`;

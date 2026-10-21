@@ -63,3 +63,15 @@ describe('planning API', () => {
     expect(db.prepare('select count(*) as count from drawing_numbers').get()).toEqual({ count: 1 });
   });
 });
+
+it('reserves with an explicit version and exposes the same association in the scoped drawing library API',async()=>{
+  const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');
+  const {registerDrawingRoutes}=await import('../../src/server/routes/drawings');
+  registerDrawingRoutes(app,new DrawingQueryService(db));
+  const version=db.prepare('select id from product_appearance_versions where product_id=?').get(payload.productId) as {id:number};
+  const context={...payload,appearanceVersionId:version.id};
+  const preview=await app.inject({method:'POST',url:'/api/planning/preview',payload:context});expect(preview.statusCode).toBe(200);
+  const reserved=await app.inject({method:'POST',url:'/api/planning/reserve',payload:{...context,rows:[{...payload.rows[0],expectedFullCode:preview.json().rows[0].fullCode}]}});expect(reserved.statusCode).toBe(201);
+  const library=await app.inject({method:'GET',url:`/api/drawings?productId=${payload.productId}&appearanceVersionId=${version.id}`});expect(library.statusCode).toBe(200);expect(library.json().items).toEqual([expect.objectContaining({id:reserved.json().items[0].id,appearanceVersionId:version.id})]);
+  const counts=await app.inject({method:'GET',url:'/api/drawings/navigation-counts'});expect(counts.json().appearances).toContainEqual({appearanceVersionId:version.id,count:1});
+});

@@ -1,4 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { resolveCanonicalProductId } from '../products/appearance-identity.js';
 import { PlanningError } from './planning-errors.js';
 import { OccupiedNumberRepository } from './occupied-number-repository.js';
 import type { PlannedRow, PlanningContext, PlanningInput, ReservedDrawing, ResolvedPlanningRow } from './planning-types.js';
@@ -8,7 +9,7 @@ interface DictionaryRow {
 }
 
 interface ProductContextRow {
-  id: number; model: string; product_category: string; status: 'active' | 'inactive';
+  id: number; model: string; product_category: string; deleted_at:string|null; status: 'active' | 'inactive';
   brand_id: number; brand_code: string; brand_name: string; brand_status: 'active' | 'inactive'; brand_type: string;
   product_size_id: number; product_size_code: string; size_status: 'active' | 'inactive'; size_type: string;
   default_appearance_id: number | null;
@@ -31,22 +32,29 @@ export class PlanningRepository {
   }
 
   resolveContext(input: PlanningInput): PlanningContext {
-    const product = this.db.prepare(`select product.id, product.model, product.product_category, product.status,
+    const canonicalId = resolveCanonicalProductId(this.db, input.productId);
+    const product = this.db.prepare(`select product.id, product.model, product.product_category, product.status, product.deleted_at,
       brand.id as brand_id, brand.code as brand_code, brand.name as brand_name, brand.status as brand_status, brand.type as brand_type,
       size.id as product_size_id, size.code as product_size_code, size.status as size_status, size.type as size_type,
       product.default_appearance_id
       from products product
       join dictionary_items brand on brand.id = product.brand_id
       join dictionary_items size on size.id = product.product_size_id
-      where product.id = ?`).get(input.productId) as ProductContextRow | undefined;
-    if (!product || product.status !== 'active') {
+      where product.id = ?`).get(canonicalId) as ProductContextRow | undefined;
+    if (!product || product.status !== 'active' || product.deleted_at) {
       throw new PlanningError('PRODUCT_NOT_ACTIVE', '产品不存在或已停用');
     }
     if (product.brand_status !== 'active' || product.size_status !== 'active'
       || product.brand_type !== 'brand' || product.size_type !== 'product_size') {
       throw new PlanningError('DICTIONARY_NOT_ACTIVE', '产品引用的品牌或品类尺寸无效或已停用');
     }
-    const appearanceId = input.appearanceId ?? product.default_appearance_id;
+    const versions = this.db.prepare('select id, appearance_id from product_appearance_versions where product_id=? order by version_number').all(canonicalId) as Array<{id:number;appearance_id:number|null}>;
+    const version = input.appearanceVersionId !== undefined ? versions.find(v=>v.id===input.appearanceVersionId) : versions.length===1 && (input.appearanceId===undefined || input.appearanceId===versions[0].appearance_id) ? versions[0] : undefined;
+    if (input.appearanceVersionId !== undefined && !version) throw new PlanningError('APPEARANCE_REQUIRED', '外观版本不属于所选产品');
+    if (versions.length>1 && !version) throw new PlanningError('APPEARANCE_REQUIRED', '请明确选择外观版本');
+    if (version && input.appearanceId !== undefined && input.appearanceId !== version.appearance_id) throw new PlanningError('APPEARANCE_REQUIRED', '外观编码与版本不一致');
+    if (version && !version.appearance_id) throw new PlanningError('APPEARANCE_REQUIRED', '所选外观版本尚未配置有效外观编码');
+    const appearanceId = version?.appearance_id ?? input.appearanceId ?? product.default_appearance_id;
     if (!appearanceId) throw new PlanningError('APPEARANCE_REQUIRED', '产品没有默认外观，请选择外观');
     const appearance = this.activeDictionary(appearanceId, 'appearance');
     const rows: ResolvedPlanningRow[] = input.rows.map((source) => {
@@ -63,7 +71,7 @@ export class PlanningRepository {
       };
     });
     return {
-      productId: product.id, model: product.model, productCategory: product.product_category,
+      appearanceVersionId: version?.id, productId: product.id, model: product.model, productCategory: product.product_category,
       brandId: product.brand_id, brandCode: product.brand_code, brandName: product.brand_name,
       productSizeId: product.product_size_id, productSizeCode: product.product_size_code,
       appearanceId: appearance.id, appearanceCode: appearance.code, appearanceName: appearance.name, rows,
@@ -93,6 +101,7 @@ export class PlanningRepository {
         context.brandCode, context.productSizeCode, context.appearanceCode,
         row.colorCode, row.mainCategoryCode, row.projectItemCode, planned.sequence,
         row.notes?.trim() || null, new Date().toISOString());
+    if (context.appearanceVersionId) this.db.prepare(`insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,revision,updated_at) values('planned',?,?,?,'planning',1,?)`).run(Number(result.lastInsertRowid),context.productId,context.appearanceVersionId,new Date().toISOString());
     return { id: Number(result.lastInsertRowid), fullCode: planned.fullCode,
       displayName: planned.displayName, status: 'reserved' };
   }

@@ -229,7 +229,7 @@ describe('FileRepository', () => {
     expect(db.prepare('select detected_identifier as detectedIdentifier from qr_code_files').get())
       .toEqual({ detectedIdentifier: '网址编码' });
 
-    repository.replaceScan([], [], '2026-08-26T04:00:00.000Z');
+    repository.replaceScan([], [], '2026-08-26T04:00:00.000Z', []);
     expect(repository.scanChanges(2)?.changes.missing).toEqual([
       expect.objectContaining({ relativePath: qr.relativePath, indexKind: 'qr', type: 'missing' }),
     ]);
@@ -238,7 +238,9 @@ describe('FileRepository', () => {
   it('preserves a manually confirmed QR association when an uncertain rescan sees the same file', () => {
     drawingFixture();
     const qrService = new QrService(db);
-    const code = qrService.list({ search: 'ZC100' }).items.find((item) => item.key === 'user_manual')!;
+    const productId = (db.prepare('select product_id as id from drawing_numbers limit 1').get() as {id:number}).id;
+    const purposeId = qrService.listPurposes().items.find(item => item.key === 'user_manual')!.id;
+    const code = qrService.create({productId,purposeId,name:'历史手工二维码',targetUrl:null,status:'inactive'});
     const qr: QrFileScanRecord = {
       relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\待确认\\ZC100-User Manual（abc）.pdf',
       fileName: 'ZC100-User Manual（abc）.pdf', mimeType: 'application/pdf', sizeBytes: 120,
@@ -247,7 +249,8 @@ describe('FileRepository', () => {
     };
     repository.replaceScan([], [], '2026-08-25T04:00:00.000Z', [qr]);
     const fileId = (db.prepare('select id from qr_code_files').get() as { id: number }).id;
-    qrService.associateFile(code.id, fileId);
+    // Seed the pre-manual-PDF legacy association: new writes must use the native validation flow.
+    db.prepare("update qr_code_files set qr_code_id=?,match_status='matched',classification_warning='qr-manually-confirmed' where id=?").run(code.id,fileId);
 
     repository.replaceScan([], [], '2026-08-26T04:00:00.000Z', [{ ...qr, modifiedAt: '2026-08-26T01:00:00.000Z' }]);
 
@@ -367,7 +370,7 @@ describe('FileRepository', () => {
     })]);
   });
 
-  it('replaces a prior manual planned association when the rescan has a reliable historical match', () => {
+  it('retains manual attribution and requests review when a rescan proposes a different historical match', () => {
     const drawing = drawingFixture();
     const initial = { ...records(0)[1], relativePath: 'reclassified.pdf', fileName: 'reclassified.pdf' };
     repository.replaceScan([initial], [], '2026-08-25T04:00:00.000Z');
@@ -379,9 +382,9 @@ describe('FileRepository', () => {
       detectedCodes: [historical.fullCode], conversionType: 'outlined', classificationWarning: null }],
     [{ ...historical, directoryContext: null }], '2026-08-26T06:00:00.000Z');
 
-    expect(repository.search().items).toEqual([expect.objectContaining({ id: pdfId, drawingId: null,
-      historicalDrawingId: expect.any(Number), historicalFullCode: historical.fullCode,
-      matchStatus: 'matched', conversionType: 'outlined', detectedCodes: [historical.fullCode] })]);
+    expect(repository.search().items).toEqual([expect.objectContaining({ id: pdfId, drawingId: drawing.id,
+      historicalDrawingId: null, historicalFullCode: null, classificationWarning:'association-review-required',
+      matchStatus: 'matched', conversionType: 'source', detectedCodes: [historical.fullCode] })]);
   });
 
   it('does not preserve a planned drawing reference that no longer resolves', () => {
@@ -398,7 +401,7 @@ describe('FileRepository', () => {
       classificationWarning: '仍未匹配' })]);
   });
 
-  it('cleans selected missing index rows atomically without releasing historical occupancy', () => {
+  it('blocks cleanup of missing historical indices and retains historical identity', () => {
     const historical = parseDrawingCode('02.0404.010.0401007')!;
     const historicalPdf = { ...records(0)[1], relativePath: 'history.pdf', fileName: 'history.pdf',
       matchStatus: 'matched' as const, historicalFullCode: historical.fullCode, detectedCodes: [historical.fullCode] };
@@ -413,12 +416,12 @@ describe('FileRepository', () => {
     }));
     expect(repository.search({ presence: 'all' }).total).toBe(2);
 
-    expect(repository.cleanupMissing([missingId])).toEqual({ cleaned: 1 });
-    expect(repository.search({ presence: 'all' }).items).toEqual([expect.objectContaining({ id: presentId, isPresent: true })]);
+    expect(() => repository.cleanupMissing([missingId])).toThrow('保留稳定索引');
+    expect(repository.search({ presence: 'all' }).items).toEqual(expect.arrayContaining([expect.objectContaining({id:missingId,isPresent:false}),expect.objectContaining({ id: presentId, isPresent: true })]));
     expect(db.prepare('select full_code from historical_drawing_numbers').all()).toEqual([{ full_code: historical.fullCode }]);
   });
 
-  it('clears only scan index tables and retains permanent business records', () => {
+  it('blocks all-index clearing with established drawing history and retains every business/index row', () => {
     const drawing = drawingFixture();
     const historical = parseDrawingCode('02.0404.010.0401002')!;
     const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
@@ -442,12 +445,12 @@ describe('FileRepository', () => {
       boms: db.prepare('select count(*) as count from bom_versions').get(),
     };
 
-    expect(repository.clearIndex()).toEqual({ pdfFiles: 1, qrCodeFiles: 0, materialBatches: 1, scanChanges: 1, scanRuns: 1 });
+    expect(() => repository.clearIndex()).toThrow('存在已关联图号或业务引用');
 
-    expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 0 });
-    expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 0 });
-    expect(db.prepare('select count(*) as count from file_scan_changes').get()).toEqual({ count: 0 });
-    expect(db.prepare('select count(*) as count from file_scan_runs').get()).toEqual({ count: 0 });
+    expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 1 });
+    expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 1 });
+    expect(db.prepare('select count(*) as count from file_scan_changes').get()).toEqual({ count: 1 });
+    expect(db.prepare('select count(*) as count from file_scan_runs').get()).toEqual({ count: 1 });
     expect({
       dictionaries: db.prepare('select count(*) as count from dictionary_items').get(),
       products: db.prepare('select count(*) as count from products').get(),
@@ -458,7 +461,7 @@ describe('FileRepository', () => {
     expect(db.prepare('pragma foreign_key_check').all()).toEqual([]);
   });
 
-  it('clears the live scan index without deleting completed outbound history', () => {
+  it('blocks clearing live indices referenced by outbound history and retains exact foreign keys and snapshots', () => {
     const drawing = drawingFixture();
     const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
     const relativePath = `${batchPath}\\${drawing.fullCode}-LOGO.pdf`;
@@ -482,14 +485,14 @@ describe('FileRepository', () => {
       .run(packageId, file.projectItemId, drawing.id, file.id, file.batchId,
         drawing.fullCode, `${drawing.fullCode}-LOGO.pdf`, relativePath);
 
-    expect(repository.clearIndex()).toMatchObject({ pdfFiles: 1, materialBatches: 1 });
+    expect(() => repository.clearIndex()).toThrow('存在已关联图号或业务引用');
     expect(db.prepare(`select pdf_file_id as pdfFileId, source_material_batch_id as sourceBatchId,
       drawing_code_snapshot as drawingCode, relative_path_snapshot as relativePath
       from outbound_package_items where package_id = ?`).get(packageId)).toEqual({
-      pdfFileId: null, sourceBatchId: null, drawingCode: drawing.fullCode, relativePath,
+      pdfFileId: file.id, sourceBatchId: file.batchId, drawingCode: drawing.fullCode, relativePath,
     });
     expect(db.prepare('select selected_material_batch_id as selectedBatchId from outbound_packages where id = ?')
-      .get(packageId)).toEqual({ selectedBatchId: null });
+      .get(packageId)).toEqual({ selectedBatchId: file.batchId });
 
     repository.replaceScan([{ ...records(drawing.id)[0], relativePath,
       fileName: `${drawing.fullCode}-LOGO.pdf`, conversionType: 'outlined', materialBatch: parseMaterialBatch(relativePath)! }],
@@ -498,13 +501,13 @@ describe('FileRepository', () => {
       drawing_code_snapshot as drawingCode, file_name_snapshot as fileName,
       relative_path_snapshot as relativePath, source_batch_name_snapshot as sourceBatch
       from outbound_package_items where package_id = ?`).get(packageId)).toEqual({
-      pdfFileId: null, sourceBatchId: null, drawingCode: drawing.fullCode,
+      pdfFileId: file.id, sourceBatchId: file.batchId, drawingCode: drawing.fullCode,
       fileName: `${drawing.fullCode}-LOGO.pdf`, relativePath, sourceBatch: '01.20241210',
     });
     expect(db.pragma('foreign_key_check')).toEqual([]);
   });
 
-  it('cleans a missing PDF while retaining its completed outbound item snapshot', () => {
+  it('blocks cleaning missing PDF referenced by outbound history and retains its exact identity', () => {
     const drawing = drawingFixture();
     const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
     const relativePath = `${batchPath}\\missing-outbound.pdf`;
@@ -528,14 +531,14 @@ describe('FileRepository', () => {
        ?, '01.20241210')`)
       .run(packageId, drawingRow.projectItemId, drawing.id, fileId, batchId, drawing.fullCode, relativePath);
 
-    expect(repository.cleanupMissing([fileId])).toEqual({ cleaned: 1 });
+    expect(() => repository.cleanupMissing([fileId])).toThrow('outbound_package_items');
     expect(db.prepare(`select pdf_file_id as pdfFileId, file_name_snapshot as fileName,
       relative_path_snapshot as relativePath from outbound_package_items where package_id = ?`)
-      .get(packageId)).toEqual({ pdfFileId: null, fileName: 'missing-outbound.pdf', relativePath });
+      .get(packageId)).toEqual({ pdfFileId: fileId, fileName: 'missing-outbound.pdf', relativePath });
     expect(db.pragma('foreign_key_check')).toEqual([]);
   });
 
-  it('rolls index clearing back completely if a dependent batch cannot be removed', () => {
+  it('clears disposable PDFs while retaining stable batches and scan traces', () => {
     const batchPath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件\\01.20241210';
     const path = `${batchPath}\\kept.pdf`;
     const indexed = { ...records(0)[1], relativePath: path, fileName: 'kept.pdf', materialBatch: parseMaterialBatch(path)! };
@@ -544,9 +547,8 @@ describe('FileRepository', () => {
     db.exec(`create trigger reject_batch_clear before delete on material_batches
       begin select raise(abort, 'batch clear rejected'); end`);
 
-    expect(() => repository.clearIndex()).toThrow('batch clear rejected');
-
-    expect(repository.indexCounts()).toEqual(before);
+    expect(repository.clearIndex()).toEqual({pdfFiles:1,qrCodeFiles:0,materialBatches:0,scanChanges:0,scanRuns:0});
+    expect(repository.indexCounts()).toEqual({...before,pdfFiles:0});
     expect(db.prepare('pragma foreign_key_check').all()).toEqual([]);
   });
 

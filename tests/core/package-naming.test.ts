@@ -8,11 +8,11 @@ describe('buildOutboundPackageName', () => {
 
   it('uses the verified initial-material wording and local Chinese creation date', () => {
     expect(buildOutboundPackageName({ ...product, materialType: 'initial', createdAt: localDate }))
-      .toBe('D&D - SAMKYO F60空气炸锅 【包材资料-2026年9月10日】');
+      .toBe('D&D - SAMKYO F60 空气炸锅【初次包材资料-2026年9月10日】');
   });
 
   it('uses the verified update-material wording instead of silently sharing the initial name', () => {
     expect(buildOutboundPackageName({ ...product, materialType: 'update', createdAt: localDate }))
-      .toBe('D&D - SAMKYO F60空气炸锅 【更新包材资料-2026年9月10日】');
+      .toBe('D&D - SAMKYO F60 空气炸锅【更新包材资料-2026年9月10日】');
   });
 });

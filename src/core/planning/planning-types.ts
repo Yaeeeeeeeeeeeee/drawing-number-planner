@@ -9,6 +9,7 @@ export interface PlanningRowInput {
 export interface PlanningInput {
   productId: number;
   appearanceId?: number;
+  appearanceVersionId?: number;
   rows: PlanningRowInput[];
 }
 
@@ -22,6 +23,7 @@ export interface ResolvedPlanningRow extends PlanningRowInput {
 }
 
 export interface PlanningContext {
+  appearanceVersionId?: number;
   productId: number;
   model: string;
   productCategory: string;
@@ -46,6 +48,7 @@ export interface PlannedRow {
 }
 
 export interface PlanningPreview {
+  appearanceVersionId?: number;
   productId: number;
   appearanceId: number;
   rows: PlannedRow[];
@@ -58,6 +61,7 @@ export interface ReservePlanningRowInput extends PlanningRowInput {
 export interface ReservePlanningInput {
   productId: number;
   appearanceId?: number;
+  appearanceVersionId?: number;
   rows: ReservePlanningRowInput[];
 }
 

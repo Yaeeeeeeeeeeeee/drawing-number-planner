@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import { DrawingQueryError, type DrawingQueryService } from '../../core/drawings/drawing-query-service.js';
+import { DrawingAssociationError } from '../../core/drawings/drawing-association-service.js';
 import { DrawingDeletionError } from '../../core/drawings/drawing-deletion-service.js';
 
 const querySchema = z.object({
@@ -13,6 +14,7 @@ const querySchema = z.object({
   navigationProductCategory: z.string().optional(),
   brandId: z.coerce.number().int().positive().optional(),
   appearanceId: z.coerce.number().int().positive().optional(),
+  appearanceVersionId: z.coerce.number().int().positive().optional(),
   mainCategoryId: z.coerce.number().int().positive().optional(),
   projectItemId: z.coerce.number().int().positive().optional(),
   colorId: z.coerce.number().int().positive().optional(),
@@ -40,6 +42,7 @@ const deleteDrawingSchema = z.object({
 const scanResolutionSchema = z.object({ resolution: z.enum(['reimport', 'ignore']) }).strict();
 
 function sendDrawingError(reply: FastifyReply, error: unknown) {
+  if (error instanceof DrawingAssociationError) return reply.code(error.code==='ASSOCIATION_STALE'?409:422).send({error:{code:error.code,message:error.message}});
   if (error instanceof DrawingDeletionError) {
     const status = error.code === 'DRAWING_NOT_FOUND' ? 404
       : error.code === 'DRAWING_DELETE_BLOCKED' || error.code === 'DRAWING_RESTORE_CONFLICT' ? 409 : 422;
@@ -52,6 +55,25 @@ function sendDrawingError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQueryService): void {
+  const targetSchema = z.object({signedId:z.number().int().refine(id=>id!==0),productId:z.number().int().positive(),appearanceVersionId:z.number().int().positive()}).strict();
+  const reuseSchema=targetSchema.extend({reason:z.string().trim().min(1).max(1000)}).strict();
+  app.post('/api/drawings/reuse-preview',async(request,reply)=>{const parsed=reuseSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'沿用条件无效'}});try{return service.reuse.preview(parsed.data);}catch(error){return sendDrawingError(reply,error);}});
+  app.post('/api/drawings/reuse-confirm',async(request,reply)=>{const parsed=reuseSchema.extend({fingerprint:z.string().min(1),confirmed:z.literal(true)}).strict().safeParse(request.body);if(!parsed.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'沿用确认无效'}});try{return service.reuse.confirm(parsed.data);}catch(error){return sendDrawingError(reply,error);}});
+  app.post('/api/drawings/association-preview', async(request,reply)=>{
+    const input=z.object({productId:z.number().int().positive().optional(),signedIds:z.array(z.number().int()).optional()}).strict().safeParse(request.body);
+    if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'关联预览条件无效'}});
+    return service.associations.preview(input.data.productId,input.data.signedIds);
+  });
+  app.post('/api/drawings/association-confirm', async(request,reply)=>{
+    const input=z.object({targets:z.array(targetSchema).min(1).max(100),fingerprint:z.string().min(1),reason:z.string().trim().min(1),confirmed:z.literal(true)}).strict().safeParse(request.body);
+    if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'关联确认条件无效'}});
+    try{return service.associations.confirm(input.data);}catch(error){return sendDrawingError(reply,error);}
+  });
+  app.post('/api/drawings/association-correct', async(request,reply)=>{
+    const input=targetSchema.extend({reason:z.string().trim().min(1),confirmed:z.literal(true)}).strict().safeParse(request.body);
+    if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'人工关联条件无效'}});
+    try{return service.associations.correct(input.data,input.data.reason);}catch(error){return sendDrawingError(reply,error);}
+  });
   app.post('/api/drawings/batch-delete', async (request, reply) => {
     const parsed = z.object({ confirmed: z.literal(true), items: z.array(deleteDrawingSchema.extend({
       signedId: z.number().int().refine((id) => id !== 0),

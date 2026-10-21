@@ -1,3 +1,4 @@
+import type { ProductVersionTarget } from '../pages/products/ProductAppearancePanel';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { PlannerApi } from '../data/client';
@@ -55,9 +56,22 @@ export function AppShell({ api }: { api: PlannerApi }) {
     if (page === 'drawings' && next !== page && drawingLeaveGuard.current && !drawingLeaveGuard.current()) return;
     if (page === 'exports' && next !== page && outboundLeaveGuard.current && !outboundLeaveGuard.current()) return;
     setPage(next);
+    setVersionTarget(null);
+    if (next === 'drawings') setDrawingTarget(undefined);
     if (next === 'qr') setProductQrTarget(null);
     if (next === 'files') setDrawingPdfTarget(null);
     if (narrow) closeNavigation();
+  };
+  const [versionTarget, setVersionTarget] = useState<ProductVersionTarget | null>(null);
+  const [drawingTarget, setDrawingTarget] = useState<{productId:number;appearanceVersionId:number;revision?:number}>();
+  const [filesVisited, setFilesVisited] = useState(false);
+  useEffect(() => { if (page === 'files') setFilesVisited(true); }, [page]);
+  const openVersion = (target:ProductVersionTarget) => {
+    setVersionTarget(target);
+    if (target.section === 'drawings') setDrawingTarget({...target,revision:Date.now()});
+    if (target.section === 'pdf') setDrawingPdfTarget({...target});
+    if (target.section === 'qr') setProductQrTarget(null);
+    setPage(target.section === 'pdf' ? 'files' : target.section === 'outbound' ? 'exports' : target.section);
   };
   const [productQrTarget, setProductQrTarget] = useState<ProductQrTarget | null>(null);
   const [drawingPdfTarget, setDrawingPdfTarget] = useState<DrawingPdfNavigationTarget | null>(null);
@@ -120,7 +134,7 @@ export function AppShell({ api }: { api: PlannerApi }) {
       <p className="nav-group-label">{group.label}</p>{group.items.map((item) => <button className={`nav-item ${page === item.key ? 'active' : ''}`} disabled={!item.enabled || (previewPage !== null && item.key !== previewPage)} onClick={() => item.enabled && (!previewPage || item.key === previewPage) && navigatePage(item.key as Page)} key={item.key} type="button">
         <span className="nav-label"><i aria-hidden="true">{item.icon}</i>{item.label}</span></button>)}</section>)}</nav>
     <div className="sidebar-footer">{recoveryPreview ? <RecoveryMockPage docked/> : previewPage ? <small>开发 Mock · 未连接业务服务</small> : <SafeRecovery api={api} />}</div></aside>
-    <main className="workspace" inert={narrow && navigationOpen}>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage api={api} registerLeaveGuard={registerDrawingLeaveGuard} active={page === 'drawings'} onNavigatePdf={target => { if (drawingLeaveGuard.current && !drawingLeaveGuard.current()) return; setDrawingPdfTarget(target); setPage('files'); }} /></div>}{page === 'dictionaries' && <DictionariesPage api={api} />}
-      {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{page === 'import' && <ImportPage api={api} />}{page === 'planning' && <PlanningPage api={api} />}
-      {page === 'bom' && <BomPage api={api} />}{page === 'exports' && <OutboundPage api={api} registerLeaveGuard={registerOutboundLeaveGuard} />}{page === 'files' && <FilesPage key={drawingPdfTarget ? `${drawingPdfTarget.productId}:${drawingPdfTarget.materialBatchId}:${drawingPdfTarget.fullCode}` : 'all'} api={api} initialTarget={drawingPdfTarget} />}{page === 'qr' && <QrCodesPage key={productQrTarget ? `${productQrTarget.productId}:${productQrTarget.purposeKey}` : 'all'} api={api} productTarget={productQrTarget} onReturnProducts={() => { setPage('products'); setProductQrTarget(null); }} />}</main></div>;
+    <main className="workspace" inert={narrow && navigationOpen}>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage api={api} navigationTarget={drawingTarget} registerLeaveGuard={registerDrawingLeaveGuard} active={page === 'drawings'} onNavigatePdf={target => { if (drawingLeaveGuard.current && !drawingLeaveGuard.current()) return; setDrawingPdfTarget(target); setPage('files'); }} /></div>}{page === 'dictionaries' && <DictionariesPage api={api} />}
+      {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} onOpenVersion={openVersion} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{page === 'import' && <ImportPage api={api} />}{page === 'planning' && <PlanningPage api={api} onOpenDrawingLibrary={target => {setDrawingTarget({...target,revision:Date.now()});setPage('drawings');}} />}
+      {page === 'bom' && <BomPage api={api} target={versionTarget?.section === 'bom' ? versionTarget : undefined} />}{page === 'exports' && <OutboundPage api={api} target={versionTarget?.section === 'outbound' ? versionTarget : undefined} registerLeaveGuard={registerOutboundLeaveGuard} />}{(page === 'files' || filesVisited) && <div hidden={page !== 'files'} className="files-page-host"><FilesPage active={page === 'files'} api={api} initialTarget={drawingPdfTarget} /></div>}{page === 'qr' && <QrCodesPage key={productQrTarget ? `${productQrTarget.productId}:${productQrTarget.purposeKey}` : 'all'} api={api} versionTarget={versionTarget?.section === 'qr' ? versionTarget : null} productTarget={productQrTarget} onReturnProducts={() => { setPage('products'); setProductQrTarget(null); }} />}</main></div>;
 }

@@ -280,3 +280,20 @@ it('serves actual catalog counts and product-only unassociated filters without m
     expect(db.serialize().equals(before)).toBe(true);
   } finally { db.pragma('query_only = OFF'); await app.close(); }
 });
+
+it('previews and explicitly confirms reuse through real routes, preserving original ownership and an empty BOM',async()=>{
+ const seeded=seedPlannedDrawing(db);const raw=db.prepare('select product_id,appearance_id from drawing_numbers where id=?').get(seeded.id) as {product_id:number;appearance_id:number};
+ const {ensureProductAppearance}=await import('../../src/core/products/appearance-identity');ensureProductAppearance(db,raw.product_id);
+ const first=db.prepare('select id from product_appearance_versions where product_id=?').get(raw.product_id) as {id:number};
+ db.prepare("insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,revision,updated_at) values('planned',?,?,?,'planning',1,'now')").run(seeded.id,raw.product_id,first.id);
+ const target=Number(db.prepare("insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,?,'Second','draft','now')").run(raw.product_id,raw.appearance_id).lastInsertRowid);
+ const app=Fastify();registerDrawingRoutes(app,new DrawingQueryService(db));
+ try{
+ const input={signedId:seeded.id,productId:raw.product_id,appearanceVersionId:target,reason:'核验旧物料继续使用'};
+ const preview=await app.inject({method:'POST',url:'/api/drawings/reuse-preview',payload:input});expect(preview.statusCode).toBe(200);
+ const unconfirmed=await app.inject({method:'POST',url:'/api/drawings/reuse-confirm',payload:{...input,fingerprint:preview.json().fingerprint}});expect(unconfirmed.statusCode).toBe(400);
+ const confirm=await app.inject({method:'POST',url:'/api/drawings/reuse-confirm',payload:{...input,fingerprint:preview.json().fingerprint,confirmed:true}});expect(confirm.statusCode).toBe(200);expect(confirm.json()).toEqual({updated:1});
+ const list=await app.inject({method:'GET',url:`/api/drawings?productId=${raw.product_id}&appearanceVersionId=${target}`});expect(list.json().items.map((row:{id:number})=>row.id)).toEqual([seeded.id]);
+ expect(db.prepare('select appearance_version_id from drawing_appearance_bindings').get()).toEqual({appearance_version_id:first.id});expect(db.prepare('select * from bom_versions').all()).toEqual([]);
+ }finally{await app.close();}
+});

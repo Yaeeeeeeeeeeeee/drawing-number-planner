@@ -1,9 +1,11 @@
+import { listRawProductIds } from '../products/appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { CreatedOutboundPackage, OutboundPackageMaterialType, OutboundPackageMode,
-  OutboundPackagePreviewItem } from './outbound-types.js';
+  OutboundPackagePreviewItem, OutboundHistoryFilters } from './outbound-types.js';
 
 export interface OutboundProductIdentity {
   id: number;
+  sku:string|null;
   brand: string;
   model: string;
   productCategory: string;
@@ -59,23 +61,54 @@ function toFile(row: FileRow): OutboundIndexedFile {
 export class OutboundPackageRepository {
   constructor(private readonly db: PlannerDatabase) {}
 
-  listCompleted(productId?: number) {
-    const packages = this.db.prepare(`select package.id, package.package_name as packageName,
-      package.zip_relative_path as zipRelativePath, package.created_at as createdAt,
-      (select count(*) from outbound_package_items item where item.package_id = package.id) as fileCount
-      from outbound_packages package where (? is null or package.product_id = ?) and package.status = 'completed'
-      order by package.created_at desc, package.id desc`).all(productId ?? null, productId ?? null) as Array<Omit<CreatedOutboundPackage, 'parts'>>;
-    const parts = this.db.prepare(`select part_number as partNumber, zip_relative_path as zipRelativePath,
-      size_bytes as sizeBytes from outbound_package_parts where package_id = ? order by part_number`);
-    return packages.map((item) => ({ ...item, parts: parts.all(item.id) as Array<{
-      partNumber: number; zipRelativePath: string; sizeBytes: number | null;
-    }> }));
+  listCompleted(productId?: number, filters: OutboundHistoryFilters = {}) {
+    const ids=productId===undefined?[]:listRawProductIds(this.db,productId);if(productId!==undefined&&!ids.length)ids.push(productId);
+    const rows=this.db.prepare(`select package.id,package.product_id as productId,package.material_type as materialType,
+      package.package_mode as packageMode,package.selected_material_batch_id as selectedMaterialBatchId,
+      package.package_name as packageName,package.zip_relative_path as zipRelativePath,package.created_at as createdAt,
+      package.product_identity_json as identityJson,frozen.context_json as contextJson,frozen.files_json as filesJson,
+      frozen.parts_json as partsJson,(select count(*) from outbound_package_items item where item.package_id=package.id) as legacyFileCount
+      from outbound_packages package left join outbound_v2_snapshots frozen on frozen.package_id=package.id
+      where (? is null or package.product_id in (select value from json_each(?))) and package.status='completed'
+      order by package.created_at desc,package.id desc`).all(productId??null,JSON.stringify(ids)) as Array<{
+      id:number;productId:number;materialType:OutboundPackageMaterialType;packageMode:OutboundPackageMode;selectedMaterialBatchId:number;
+      packageName:string;zipRelativePath:string;createdAt:string;identityJson:string|null;contextJson:string|null;filesJson:string|null;partsJson:string|null;legacyFileCount:number;
+    }>;
+    const legacyParts=this.db.prepare(`select package_id as packageId,part_number as partNumber,zip_relative_path as zipRelativePath,
+      size_bytes as sizeBytes from outbound_package_parts where package_id in (select value from json_each(?)) order by package_id,part_number`)
+      .all(JSON.stringify(rows.filter(row=>!row.partsJson).map(row=>row.id))) as Array<{packageId:number;partNumber:number;zipRelativePath:string;sizeBytes:number}>;
+    const contains=(value:string|null|undefined,search?:string)=>!search||String(value??'').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+    return rows.map(row=>{
+      const identity=row.identityJson?JSON.parse(row.identityJson):null;
+      const context=row.contextJson?JSON.parse(row.contextJson):identity?.appearanceContext??null;
+      const product=context?.product??identity;
+      const appearance=context?.appearance;
+      return {id:row.id,productId:row.productId,packageName:row.packageName,zipRelativePath:row.zipRelativePath,createdAt:row.createdAt,
+        materialType:row.materialType,packageMode:row.packageMode,selectedMaterialBatchId:row.selectedMaterialBatchId,
+        fileCount:row.filesJson?JSON.parse(row.filesJson).length:row.legacyFileCount,
+        parts:row.partsJson?JSON.parse(row.partsJson):legacyParts.filter(part=>part.packageId===row.id).map(({packageId:_,...part})=>part),
+        context,brand:product?.brand??product?.brandName??null,model:product?.model??null,sku:product?.sku??null,
+        productCategory:product?.productCategory??null,appearanceVersionId:appearance?.id??context?.appearanceVersionId??null,
+        appearanceLabel:appearance?.label??null,batchName:context?.batch?.name??null};
+    }).filter(row=>contains(row.brand,filters.brand)&&contains(row.model,filters.model)&&contains(row.sku,filters.sku)
+      &&(filters.appearanceVersionId===undefined||row.appearanceVersionId===filters.appearanceVersionId)
+      &&(filters.batchId===undefined||row.selectedMaterialBatchId===filters.batchId)
+      &&(!filters.materialType||row.materialType===filters.materialType)
+      &&(!filters.dateFrom||row.createdAt.slice(0,10)>=filters.dateFrom)&&(!filters.dateTo||row.createdAt.slice(0,10)<=filters.dateTo));
+  }
+
+  historyDetail(id:number) {
+    const packageRow=this.db.prepare("select * from outbound_packages where id=? and status='completed'").get(id) as Record<string,unknown>|undefined;
+    if(!packageRow)return null;
+    const frozen=this.db.prepare('select * from outbound_v2_snapshots where package_id=?').get(id) as {context_json:string;files_json:string;parts_json:string}|undefined;
+    if(frozen)return {id,context:JSON.parse(frozen.context_json),files:JSON.parse(frozen.files_json),parts:JSON.parse(frozen.parts_json)};
+    return {id,context:{legacy:true,package:packageRow,identity:packageRow.product_identity_json?JSON.parse(String(packageRow.product_identity_json)):null},files:this.db.prepare('select * from outbound_package_items where package_id=? order by id').all(id),parts:this.listCompleted().find(row=>row.id===id)?.parts??[]};
   }
 
   getProduct(id: number): OutboundProductIdentity | null {
-    const row = this.db.prepare(`select product.id, brand.name as brand, product.model,
+    const row = this.db.prepare(`select product.id, product.sku, brand.name as brand, product.model,
       product.product_category as productCategory from products product
-      join dictionary_items brand on brand.id = product.brand_id where product.id = ?`).get(id) as OutboundProductIdentity | undefined;
+      join dictionary_items brand on brand.id = product.brand_id where product.id = ? and product.status='active' and product.deleted_at is null`).get(id) as OutboundProductIdentity | undefined;
     return row ?? null;
   }
 
@@ -101,10 +134,10 @@ export class OutboundPackageRepository {
     return (this.db.prepare(`${fileSelect} where batch.product_id = ? and batch.is_present = 1
       and batch.recognition_status = 'recognized' and batch.sequence_number is not null
       and batch.sequence_number <= ? and file.is_present = 1 and file.conversion_type = 'outlined'
-      and file.match_status = 'matched' order by file.id`).all(productId, through.sequenceNumber) as FileRow[]).map(toFile);
+      and file.match_status = 'matched' and file.management_state='included' order by file.id`).all(productId, through.sequenceNumber) as FileRow[]).map(toFile);
   }
 
-  saveCompleted(input: { productId: number; materialType: OutboundPackageMaterialType; packageMode: OutboundPackageMode;
+  saveCompleted(input: { workflowVersion?:2; appearanceFacts?: unknown; productId: number; materialType: OutboundPackageMaterialType; packageMode: OutboundPackageMode;
     selectedMaterialBatchId: number; packageName: string; zipRelativePath: string; createdAt: string;
     parts: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number }>;
     items: Array<OutboundPackagePreviewItem & { drawingId: number | null; historicalDrawingId: number | null; partNumber: number }>;
@@ -122,11 +155,18 @@ export class OutboundPackageRepository {
           'productCategory', product.product_category) from products product
         join dictionary_items brand on brand.id = product.brand_id where product.id = ?
       ) where id = ?`).run(input.productId, packageId);
+      if(input.appearanceFacts!==undefined) {
+        const identity=this.db.prepare('select product_identity_json as identity from outbound_packages where id=?').get(packageId) as {identity:string};
+        this.db.prepare('update outbound_packages set product_identity_json=? where id=?').run(JSON.stringify({...JSON.parse(identity.identity),appearanceContext:input.appearanceFacts}),packageId);
+      }
       const insertItem = this.db.prepare(`insert into outbound_package_items
         (package_id, project_item_id, drawing_id, historical_drawing_id, pdf_file_id, source_material_batch_id,
          project_item_name_snapshot, drawing_code_snapshot, file_name_snapshot, relative_path_snapshot,
          source_batch_name_snapshot, change_details_snapshot, part_number) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const item of input.items) {
+        // V2's immutable file manifest also supports explicitly confirmed unrecognized indexed PDFs.
+        // The legacy item table requires a drawing/project; never invent those identities to satisfy it.
+        if(input.workflowVersion===2 && (!item.projectItemId || !item.fullCode || item.drawingId===null && item.historicalDrawingId===null)) continue;
         insertItem.run(packageId, item.projectItemId, item.drawingId, item.historicalDrawingId, item.pdfFileId,
           item.sourceBatchId, item.projectItemName, item.fullCode, item.fileName, item.relativePath, item.sourceBatchName,
           item.bomContext?.changeDetails ?? null, item.partNumber);

@@ -20,6 +20,7 @@ export interface CreateQrPurposeInput {
 }
 
 export interface CreateProductQrCodeInput {
+  appearanceVersionId?: number | null;
   productId: number;
   purposeId: number;
   name: string;
@@ -31,6 +32,10 @@ export interface CreateProductQrCodeInput {
 export interface QrReferenceSummary { files: number; bomItems: number }
 
 export interface ProductQrCode {
+  hasFileHistory?: boolean;
+  canonicalProductId?: number;
+  appearanceVersionId?: number | null;
+  appearanceName?: string | null;
   id: number;
   productId: number;
   sku: string | null;
@@ -51,6 +56,7 @@ export interface ProductQrCode {
 }
 
 export interface ProductQrCodeFilters {
+  appearanceVersionId?: number;
   productId?: number;
   purposeId?: number;
   status?: QrStatus | 'all';
@@ -81,6 +87,7 @@ export interface QrFileScanRecord {
 }
 
 export interface QrFileReference {
+  externalFileId?: string;
   id: number;
   relativePath: string;
   fileName: string;

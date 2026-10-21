@@ -1,0 +1,24 @@
+.qr-manual-page .qr-main-table > .table-wrap > table { table-layout: fixed; }
+.qr-manual-page .qr-main-table > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td) { text-align: center; padding: 12px; }
+.qr-manual-page .qr-main-table > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(2) { text-align: left; }
+.qr-manual-page .qr-main-table > .table-wrap > table > thead > tr > th { width: auto; }
+.qr-manual-page .qr-main-table > .table-wrap > table > thead > tr > th:nth-child(2) { width: 22%; }
+.qr-manual-page .qr-manual-subtable { margin: 0; border-right: 1px solid var(--ws-line); border-radius: 4px; }
+.qr-manual-page .qr-manual-subtable::before { display: none; }
+.qr-manual-page .qr-manual-subtable table { width: 100%; table-layout: fixed; }
+.qr-manual-page.page-surface .qr-manual-subtable :is(th,td) { padding: 12px; height: 46px; text-align: center; vertical-align: middle; }
+.qr-manual-page.page-surface .qr-manual-subtable th:nth-child(n) { width: auto; }
+.qr-manual-page.page-surface .qr-manual-subtable :is(th,td):nth-child(2) { text-align: left; }
+.qr-manual-page .qr-manual-subtable .row-actions { justify-content: center; gap: 10px; flex-wrap: nowrap; }
+.qr-manual-page .qr-filename { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; display: block; }
+.qr-manual-page .qr-stored-url { display: inline-flex; align-items: center; max-width: 100%; gap: 5px; min-width: 0; }
+.qr-manual-page .qr-stored-url a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qr-manual-page .qr-copy { flex: 0 0 22px; min-width: 22px; padding: 0; }
+.qr-manual-page .qr-expand { display: inline-flex; align-items: center; gap: 8px; }
+.qr-manual-page .qr-manual-dialog { max-width: 720px; width: min(720px,90vw); max-height: 88vh; overflow-y: auto; background: #fff; padding: 24px; }
+.qr-manual-page .qr-manual-dialog small { display: block; overflow-wrap: anywhere; }
+.qr-manual-page .qr-manual-file-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 0; }
+.qr-manual-page .qr-manual-file-detail > span { width: 100%; overflow-wrap: anywhere; }
+.qr-manual-page .qr-filter { display: grid; grid-template-columns: minmax(160px,1.4fr) repeat(3,minmax(120px,1fr)) auto; gap: 12px; align-items: end; }
+.qr-manual-page .qr-manual-subtable button { min-height: 20px; height: 20px; line-height: 20px; padding-top: 0; padding-bottom: 0; }
+@media (max-width: 1000px) { .qr-manual-page .qr-filter { grid-template-columns: repeat(2,minmax(0,1fr)); } }

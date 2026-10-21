@@ -111,6 +111,7 @@ export class LocalServiceController {
 
   resolvePdfFilePath(id: unknown): Promise<string> { return this.request('resolvePdfFilePath', [id]); }
   resolveBomAssetPath(id: unknown): Promise<string> { return this.request('resolveBomAssetPath', [id]); }
+  qrManualAction(action: string, input: unknown): Promise<unknown> { return this.request('qrManualAction', [action, input]); }
   resolveQrFilePath(relativePath: string): Promise<{ path: string; mimeType: string }> { return this.request('resolveQrFilePath', [relativePath]); }
   setOutboundOutputRoot(path: string): Promise<string> { return this.request('setOutboundOutputRoot', [path]); }
   resolveOutboundPackagePath(id: unknown, partNumber?: unknown): Promise<string> { return this.request('resolveOutboundPackagePath', partNumber === undefined ? [id] : [id, partNumber]); }

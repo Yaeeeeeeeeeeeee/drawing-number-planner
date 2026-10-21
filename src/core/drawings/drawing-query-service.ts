@@ -1,4 +1,7 @@
+import {DrawingReuseService} from './drawing-reuse-service.js';
 import type { PlannerDatabase } from '../../db/database.js';
+import { resolveCanonicalProductId } from '../products/appearance-identity.js';
+import { DrawingAssociationService } from './drawing-association-service.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
 import { DrawingDeletionService } from './drawing-deletion-service.js';
 import type { DeleteDrawingInput } from './drawing-deletion-types.js';
@@ -10,16 +13,21 @@ export class DrawingQueryError extends Error {
 }
 
 export class DrawingQueryService {
+  readonly associations: DrawingAssociationService;
+  readonly reuse:DrawingReuseService;
   private readonly repository: DrawingRepository;
   private readonly batches: MaterialBatchService;
   private readonly deletion: DrawingDeletionService;
-  constructor(database: PlannerDatabase) {
+  constructor(private readonly database: PlannerDatabase) {
+    this.associations = new DrawingAssociationService(database);
+    this.reuse = new DrawingReuseService(database);
     this.repository = new DrawingRepository(database);
     this.batches = new MaterialBatchService(database);
     this.deletion = new DrawingDeletionService(database);
   }
 
   search(filters: DrawingSearchFilters = {}): PagedDrawingResult {
+    if (filters.productId!==undefined) filters={...filters,productId:resolveCanonicalProductId(this.database,filters.productId)};
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 20;
     const result = this.repository.search(filters, page, pageSize);
@@ -56,7 +64,7 @@ export class DrawingQueryService {
   get(id: number): DrawingDetailRecord {
     const drawing = this.repository.getDetail(id);
     if (!drawing) throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
-    return { ...drawing, batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
+    return { ...drawing, associationEvidence: this.associations.preview(undefined,[id]).records[0]?.evidence ?? [], associationHistory: this.associations.history(id), batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
   }
 
   transition(id: number, target: 'active' | 'voided'): DrawingDetailRecord {
@@ -70,6 +78,7 @@ export class DrawingQueryService {
       const labels: Record<string, string> = { reserved: '已占号', active: '正式使用', voided: '作废' };
       throw new DrawingQueryError('INVALID_TRANSITION', `不支持从${labels[drawing.status] ?? drawing.status}变更为${labels[target] ?? target}`);
     }
+    if(target==='voided'&&this.database.prepare("select 1 from drawing_appearance_usages where origin='planned' and record_id=?").get(id))throw new DrawingQueryError('INVALID_TRANSITION','该图号已有明确外观沿用关系，须保留有效占号与追溯');
     this.repository.updateStatus(id, target);
     return this.get(id);
   }

@@ -5,6 +5,7 @@ export const productQrPurposes = [
 ] as const;
 export interface ProductQrTarget {
   productId: number;
+  appearanceVersionId?: number;
   sku: string | null;
   model: string;
   productCategory: string;

@@ -107,3 +107,7 @@ Latest explicit request: see docs/p4-products-list-20261016.md. The real product
 ### 最新共享目录与空数据中文安装候选（2026-10-20）
 
 见docs/p4-unified-navigation-empty-installer-20261020.md。图号/PDF共用Lucide目录树，待关联入口处于树后同一滚动区，统计与真实查询共用谓词；图号默认七列且文件信息仍在详情。用户明确要求移除交付示例、中文并可自选安装路径，取代此前必须复用样例的交付要求：不携带原样例，仅新建隔离库移除预设示例模板/个人签名，系统用途定义保留，已存在用户库及旧版样例不清理。无Schema及原始PDF写入、自动关联变更或本轮master合并授权。
+
+### 综合改版完整开发授权（2026-10-20～21，当前）
+
+用户明确批准综合方案并授权连续完成源码、Schema、API、迁移、测试与中文自选路径安装包，不再分阶段等待批准。见 `docs/superpowers/plans/2026-10-20-comprehensive-appearance-development.md`、`docs/comprehensive-redesign-preflight-20261020.md` 和 `docs/outbound-v2-requirements-20261020.md`。上述仅限旧阶段的“不扩大二维码模型”“不允许Schema调整”“暂停打包”和阶段授权限制不再适用于本轮已确认范围。当前产品身份/多外观、独立BOM、图号原子归属/明确沿用、PDF索引管理、QR纯手动关联和外发V2规则以这些确认文档为准。用户真实库不在开发环境；升级须备份并事务执行，不清空旧库、不自动归并ZC100、不改磁盘原始PDF或历史占号/快照。真实产品归并必须在用户本地预览并明确确认。历史2026-10-17 master授权不自动涵盖本轮；开发分支可提交推送并执行Windows交付验证。

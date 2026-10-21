@@ -130,3 +130,18 @@ describe('PlanningPage', () => {
     expect(screen.getByRole('button', { name: '确认批量占号' })).toBeDisabled();
   });
 });
+
+it('carries selected appearance through preview and reservation and opens that exact library scope',async()=>{
+  const api={...apiFixture(),listAppearanceVersions:vi.fn().mockResolvedValue({productId:1,revision:0,items:[{id:41,productId:1,appearanceId:3,versionNumber:1,label:'一代',status:'historical'},{id:42,productId:1,appearanceId:3,versionNumber:2,label:'二代',status:'current'}]})};
+  const open=vi.fn();render(<PlanningPage api={api as never} onOpenDrawingLibrary={open}/>);
+  fireEvent.change(await screen.findByLabelText('产品型号'),{target:{value:'1'}});
+  await waitFor(()=>expect(screen.getByLabelText('外观版本')).toHaveValue('42'));
+  fireEvent.change(screen.getByLabelText('第 1 行主类别'),{target:{value:'5'}});
+  fireEvent.change(screen.getByLabelText('第 1 行项目明细'),{target:{value:'6'}});
+  fireEvent.change(screen.getByLabelText('第 1 行颜色'),{target:{value:'4'}});
+  fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));
+  await waitFor(()=>expect(api.previewPlan).toHaveBeenCalledWith(expect.objectContaining({productId:1,appearanceVersionId:42})));
+  fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));
+  fireEvent.click(await screen.findByRole('button',{name:'查看图号库'}));
+  expect(api.reservePlan).toHaveBeenCalledWith(expect.objectContaining({appearanceVersionId:42}));expect(open).toHaveBeenCalledWith({productId:1,appearanceVersionId:42});
+});

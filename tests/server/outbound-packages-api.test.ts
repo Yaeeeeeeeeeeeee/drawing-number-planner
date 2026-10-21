@@ -1,3 +1,4 @@
+import { ensureProductAppearance } from '../../src/core/products/appearance-identity';
 // @vitest-environment node
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -125,4 +126,28 @@ describe('outbound package API', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: { code: 'WORKSPACE_NOT_CONFIGURED', message: '请先设置资料根目录' } });
   });
+  it('connects V2 preflight, frozen history filters/details and safe regeneration preview',async()=>{
+    ensureProductAppearance(db,productId);
+    const appearanceVersionId=(db.prepare('select id from product_appearance_versions where product_id=?').get(productId) as {id:number}).id;
+    db.prepare("insert into outbound_batch_scopes(batch_id,appearance_version_id,completeness,revision,updated_at,reason) values(?,?,'complete',1,'2026-09-10','人工确认完整批次归属')").run(batchId,appearanceVersionId);
+    const drawing=(db.prepare('select drawing_id as id,relative_path as path from pdf_files where id=?').get(pdfId) as {id:number;path:string});
+    db.prepare("insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,updated_at) values('planned',?,?,?,'manual','2026-09-10')").run(drawing.id,productId,appearanceVersionId);
+    writeFileSync(join(root,'workspace',drawing.path),'%PDF-1.7\nreal source');
+    const input={workflowVersion:2,appearanceVersionId,productId,selectedMaterialBatchId:batchId,materialType:'initial',packageMode:'current_complete'};
+    const preview=await app.inject({method:'POST',url:'/api/outbound-packages/preview',payload:input});expect(preview.statusCode).toBe(200);
+    const create={...input,previewToken:preview.json().previewToken,selectedPdfFileIds:[pdfId]};
+    const checked=await app.inject({method:'POST',url:'/api/outbound-packages/preflight',payload:create});
+    expect(checked.statusCode).toBe(200);expect(checked.json()).toMatchObject({selectedCount:1,normalCount:1,blockingErrors:[]});
+    const saved=await app.inject({method:'POST',url:'/api/outbound-packages',payload:create});expect(saved.statusCode).toBe(201);
+    const id=saved.json().id;expect(saved.json().parts[0]).toMatchObject({fileCount:1,files:[{pdfFileId:pdfId}]});
+    const history=await app.inject({method:'GET',url:`/api/outbound-packages?sku=SKU&appearanceVersionId=${appearanceVersionId}&batchId=${batchId}&materialType=initial&dateFrom=2026-09-10&dateTo=2026-09-10`});
+    expect(history.statusCode).toBe(200);expect(history.json()).toHaveLength(1);
+    const detail=await app.inject({method:'GET',url:`/api/outbound-packages/${id}`});expect(detail.json().files[0].contentSha256).toMatch(/^[a-f0-9]{64}$/);
+    const regenerate=await app.inject({method:'POST',url:`/api/outbound-packages/${id}/regeneration-preview`});expect(regenerate.statusCode).toBe(200);expect(regenerate.json()).toMatchObject({sourcePackageId:id,selectedPdfFileIds:[pdfId]});
+    writeFileSync(join(root,'workspace',drawing.path),'%PDF-1.7\nchanged same name');
+    const stale=await app.inject({method:'POST',url:`/api/outbound-packages/${id}/regeneration-preview`});expect(stale.statusCode).toBe(409);expect(stale.json().error.code).toBe('PREVIEW_STALE');
+    const forged=await app.inject({method:'POST',url:'/api/outbound-packages/preview',payload:{...input,regeneratedFromPackageId:id}});expect(forged.statusCode).toBe(409);expect(forged.json().error.code).toBe('PREVIEW_STALE');
+    expect((await app.inject({method:'GET',url:`/api/outbound-packages/${id}`})).json()).toEqual(detail.json());
+  });
+
 });

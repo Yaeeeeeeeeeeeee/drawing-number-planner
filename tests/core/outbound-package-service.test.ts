@@ -1,3 +1,6 @@
+import { BomService } from '../../src/core/bom/bom-service';
+import { ensureProductAppearance } from '../../src/core/products/appearance-identity';
+import { AppearanceService } from '../../src/core/products/appearance-service';
 import { closeSync, existsSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -63,7 +66,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'outbound-package-'));
   workspace = join(root, 'workspace'); output = join(root, 'exports');
   mkdirSync(workspace); mkdirSync(output);
-  db = openDatabase(':memory:');
+  db = openDatabase(join(root,'planner.sqlite'));
   migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
   const brandId = dictionary('brand', '02', 'SAMKYO');
   const sizeId = dictionary('product_size', '0209', '洗碗机');
@@ -120,6 +123,27 @@ function decodedZipEntries(path: string): Map<string, Buffer> {
 }
 
 describe('OutboundPackageService', () => {
+  it('packages only the selected appearance effective BOM and freezes its identity and correction facts', async()=>{
+    ensureProductAppearance(db,productId);
+    const oldAppearance=(db.prepare("select id from product_appearance_versions where product_id=?").get(productId) as {id:number}).id;
+    const project=(db.prepare("select id from dictionary_items where type='project_item' limit 1").get() as {id:number}).id;
+    const oldDrawing=(db.prepare('select id from historical_drawing_numbers limit 1').get() as {id:number}).id;
+    const boms=new BomService(db);
+    const old=boms.saveVersion({productId,appearanceVersionId:oldAppearance,entryMode:'historical',businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[{projectItemId:project,drawingReference:{origin:'historical',historicalDrawingId:oldDrawing},usesWhiteMaterial:false,effectiveMaterialBatchId:batchId,changeDetails:'旧版'}]}).version;
+    const nextId=Number(db.prepare("insert into product_appearance_versions(product_id,version_number,label,status,created_at) values(?,2,'第二外观','draft','2026-10-20')").run(productId).lastInsertRowid);
+    const nextPdf=addOutlined({fullCode:'02.0209.020.0401001',relativePath:'new-appearance.pdf'});
+    const nextDrawing=(db.prepare("select id from historical_drawing_numbers where full_code='02.0209.020.0401001'").get() as {id:number}).id;
+    const next=boms.saveVersion({productId,appearanceVersionId:nextId,entryMode:'historical',businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[{projectItemId:project,drawingReference:{origin:'historical',historicalDrawingId:nextDrawing},usesWhiteMaterial:false,effectiveMaterialBatchId:batchId,changeDetails:'新版'}]}).version;
+    const input={...request(),appearanceVersionId:nextId};
+    const preview=service.previewPackage(input);
+    expect(preview.items).toEqual([expect.objectContaining({pdfFileId:nextPdf,fullCode:'02.0209.020.0401001',selectable:true})]);
+    const completed=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[nextPdf]});
+    const frozen=()=> (db.prepare('select product_identity_json as json from outbound_packages where id=?').get(completed.id) as {json:string}).json;
+    const original=frozen();expect(JSON.parse(original).appearanceContext.bom.id).toBe(next.id);
+    boms.updateVersion(next.id,{productId,appearanceVersionId:nextId,entryMode:'historical',expectedCurrentVersionId:next.id,items:[{projectItemId:project,drawingReference:{origin:'historical',historicalDrawingId:nextDrawing},usesWhiteMaterial:false,effectiveMaterialBatchId:batchId,changeDetails:'纠错'}]},0);
+    expect(frozen()).toBe(original);expect(boms.getCurrent(productId,oldAppearance)?.id).toBe(old.id);
+  });
+
   it('never records half a multipart publication as completed after abrupt process exit', async () => {
     const main = db.prepare("select id from dictionary_items where type = 'main_category'").get() as { id: number };
     dictionary('project_item', '02', '售后卡', main.id);
@@ -359,7 +383,7 @@ describe('OutboundPackageService', () => {
   });
   it('previews current complete materials with database-derived identity and an opaque version token', () => {
     const preview = service.previewPackage(request());
-    expect(preview.packageName).toBe('D&D - SAMKYO T40洗碗机 【包材资料-2026年9月10日】');
+    expect(preview.packageName).toBe('D&D - SAMKYO T40 洗碗机【初次包材资料-2026年9月10日】');
     expect(preview.previewToken).toMatch(/^[a-f0-9-]{20,}$/i);
     expect(preview.items).toEqual([expect.objectContaining({ pdfFileId: pdfId, projectItemName: '说明书',
       fullCode: '02.0209.010.0401001', sourceBatchName: '00.首批大货', status: 'normal', selectable: true })]);
@@ -431,9 +455,8 @@ describe('OutboundPackageService', () => {
 
   it('rejects two indexes resolving to the same canonical actual path', () => {
     const original = db.prepare('select relative_path as path from pdf_files where id = ?').get(pdfId) as { path: string };
-    const originalDirectory = join(workspace, original.path, '..');
-    symlinkSync(originalDirectory, join(workspace, 'same-directory'), 'junction');
-    const alias = 'same-directory\\manual（转曲）.pdf';
+    const alias = 'same-file.pdf';
+    symlinkSync(join(workspace,original.path),join(workspace,alias),'file');
     const aliasId = addOutlined({ relativePath: alias });
     db.prepare('update pdf_files set material_batch_id = ? where id = ?').run(batchId, aliasId);
     expect(() => service.previewPackage(request())).toThrowError(expect.objectContaining({ code: 'DUPLICATE_ACTUAL_PATH' }));
@@ -641,4 +664,207 @@ describe('OutboundPackageService', () => {
       selectedPdfFileIds: [pdfId] })).rejects.toThrow('fixture database failure');
     expect(readdirSync(output)).toEqual([]);
   });
+});
+
+describe('batch-first V2 workflow',()=>{
+  function version(){ensureProductAppearance(db,productId);return(db.prepare('select id from product_appearance_versions where product_id=?').get(productId) as {id:number}).id;}
+  function scope(id:number,appearanceVersionId:number,sequenceComplete=true){db.prepare(`insert into outbound_batch_scopes(batch_id,appearance_version_id,completeness,revision,updated_at,reason) values(?,?,?,1,?,'人工确认历史批次归属')`).run(id,appearanceVersionId,sequenceComplete?'complete':'pending',now);}
+  function bind(id:number,appearanceVersionId:number){const row=db.prepare('select historical_drawing_id as id from pdf_files where id=?').get(id) as {id:number};db.prepare("insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,updated_at) values('historical',?,?,?,'manual',?)").run(row.id,productId,appearanceVersionId,now);}
+  function pdfBytes(id:number,text:string){const file=db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string};writeFileSync(join(workspace,file.path),'%PDF-1.7\n'+text);}
+  it('packages selected batch without BOM and persists real part manifests',async()=>{
+    const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);pdfBytes(pdfId,'actual current');
+    const input={...request(),workflowVersion:2 as const,appearanceVersionId};const preview=service.previewPackage(input);
+    expect(preview.items[0].selectable).toBe(true);
+    const result=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    expect(result.parts?.[0].fileCount).toBe(1);expect(result.parts?.[0].files?.[0].contentSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(decodedZipEntries(join(output,result.zipRelativePath)).values().next().value?.toString()).toContain('actual current');
+    const resources=new AppearanceService(db).resources(appearanceVersionId);
+    expect(resources.outboundPackages.map(item=>item.id)).toEqual([result.id]);expect(resources.unboundCounts.outboundPackages).toBe(0);
+    expect(()=>db.prepare("update outbound_v2_snapshots set files_json='[]'").run()).toThrow('外发快照不可修改');
+  });
+  it('does not infer legacy batch appearance and does not require a BOM to preview',()=>{
+    const input={...request(),workflowVersion:2 as const,appearanceVersionId:version()};expect(()=>service.previewPackage(input)).toThrow('批次外观归属待确认');
+  });
+  it('does not backfill missing current files from historical batch',()=>{
+    const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);pdfBytes(pdfId,'old');const newer=addBatch('第二批',1);scope(newer,appearanceVersionId);
+    const missing=addOutlined({batch:newer,relativePath:'second\\manual（转曲）.pdf',present:false});pdfBytes(missing,'new');
+    const preview=service.previewPackage({...request(),workflowVersion:2,appearanceVersionId,selectedMaterialBatchId:newer});
+    expect(preview.items.filter(item=>item.selectable)).toEqual([]);expect(preview.items[0].sourceBatchId).toBe(newer);
+  });
+  it('compares actual content rather than indexed hash or modification dates',()=>{
+    const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);pdfBytes(pdfId,'same');const newer=addBatch('第二批',1);scope(newer,appearanceVersionId);
+    const copied=addOutlined({batch:newer,relativePath:'second\\manual（转曲）.pdf'});pdfBytes(copied,'same');
+    const input={...request(),workflowVersion:2 as const,appearanceVersionId,selectedMaterialBatchId:newer,packageMode:'change_only' as const};
+    expect(service.previewPackage(input).items[0]).toMatchObject({change:'copied',defaultSelected:false});pdfBytes(copied,'DIFF');
+    expect(service.previewPackage(input).items[0]).toMatchObject({status:'conflict',selectable:false});
+  });  function ready(){const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);pdfBytes(pdfId,'first');return {...request(),workflowVersion:2 as const,appearanceVersionId};}
+  it('rejects nonexistent explicit comparison baselines instead of silently choosing another',()=>{
+    const input=ready();expect(()=>service.previewPackage({...input,baselineBatchId:999999})).toThrowError(expect.objectContaining({code:'INVALID_BASELINE'}));
+  });
+  it('compares actual business projects and requires confirmation for same-content new drawing codes',()=>{
+    const input=ready();const next=addBatch('第二批',1);scope(next,input.appearanceVersionId);
+    const changed=addOutlined({batch:next,fullCode:'02.0209.010.0401002',relativePath:'second-new（转曲）.pdf'});bind(changed,input.appearanceVersionId);pdfBytes(changed,'first');
+    const preview=service.previewPackage({...input,selectedMaterialBatchId:next,packageMode:'change_only'});
+    expect(preview.items[0]).toMatchObject({change:'replaced',selectable:false,defaultSelected:false});expect(preview.items[0].detail).toMatch(/内容相同/);
+  });
+  it('makes manual file confirmation specific to the actual PDF hash',()=>{
+    const input=ready();const next=addBatch('第二批',1);scope(next,input.appearanceVersionId);const changed=addOutlined({batch:next,relativePath:'changed（转曲）.pdf'});pdfBytes(changed,'different');
+    const request={...input,selectedMaterialBatchId:next};const preview=service.previewPackage(request);const hash=preview.items[0].contentSha256!;
+    expect(service.previewPackage({...request,fileConfirmations:[{pdfFileId:changed,reason:'已经逐项核对内容',contentSha256:hash}]}).items[0].selectable).toBe(true);
+    pdfBytes(changed,'changed again');expect(service.previewPackage({...request,fileConfirmations:[{pdfFileId:changed,reason:'已经逐项核对内容',contentSha256:hash}]}).items[0].selectable).toBe(false);
+  });
+  it('does not package ignored files, even as manually confirmed extra material',()=>{
+    const input=ready();db.prepare("update pdf_files set management_state='ignored' where id=?").run(pdfId);const source=readFileSync(join(workspace,(db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string}).path));
+    expect(service.previewPackage(input).items).toEqual([]);const next=addBatch('第二批',1);scope(next,input.appearanceVersionId);
+    expect(()=>service.previewPackage({...input,selectedMaterialBatchId:next,extraPdfFileIds:[pdfId],fileConfirmations:[{pdfFileId:pdfId,reason:'不能绕过忽略状态',contentSha256:createHash('sha256').update(source).digest('hex')}]})).toThrowError(expect.objectContaining({code:'EXTRA_UNAVAILABLE'}));
+    expect(readFileSync(join(workspace,(db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string}).path))).toEqual(source);
+  });
+  it('allows valid selected files when an unselected index is missing or only has an unoutlined source',async()=>{
+    const input=ready();const source=addOutlined({conversionType:'source',fullCode:'02.0209.011.0401001',relativePath:'source-only.pdf'});pdfBytes(source,'source');
+    const missing=addOutlined({present:false,fullCode:'02.0209.012.0401001',relativePath:'missing（转曲）.pdf'});pdfBytes(missing,'missing');
+    const preview=service.previewPackage(input);expect(preview.items.find(item=>item.pdfFileId===source)).toMatchObject({selectable:false,defaultSelected:false,detail:'缺少转曲后文件'});
+    const result=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});expect(result.fileCount).toBe(1);
+  });
+  it('marks removed baseline projects without adding them to current complete ZIP',()=>{
+    const input=ready();const next=addBatch('第二批',1);scope(next,input.appearanceVersionId);
+    const preview=service.previewPackage({...input,selectedMaterialBatchId:next,packageMode:'change_only'});
+    expect(preview.items).toEqual([expect.objectContaining({source:'baseline_removed',change:'removed',selectable:false,pdfFileId:null})]);
+  });
+  it('requires an explicit reason for a cross-appearance comparison and keeps batch ownership intact',()=>{
+    const input=ready();const other=Number(db.prepare("insert into product_appearance_versions(product_id,version_number,label,status,created_at) values(?,2,'历史外观','historical',?)").run(productId,now).lastInsertRowid);
+    const next=addBatch('另一外观批次',1);scope(next,other);const nextPdf=addOutlined({batch:next,relativePath:'other（转曲）.pdf'});pdfBytes(nextPdf,'new');
+    expect(()=>service.previewPackage({...input,baselineBatchId:next})).toThrowError(expect.objectContaining({code:'INVALID_BASELINE'}));
+    const confirmed=service.previewPackage({...input,baselineBatchId:next,baselineConfirmationReason:'明确人工跨外观核查'});expect(confirmed.warnings?.join('')).toMatch(/跨外观/);
+    expect(db.prepare('select appearance_version_id from outbound_batch_scopes where batch_id=?').get(next)).toEqual({appearance_version_id:other});
+  });
+  it('cannot authorize an old exterior by referencing an arbitrary historical BOM revision',()=>{
+    const input=ready();const other=Number(db.prepare("insert into product_appearance_versions(product_id,version_number,label,status,created_at) values(?,2,'其他外观','historical',?)").run(productId,now).lastInsertRowid);
+    db.prepare('update drawing_appearance_bindings set appearance_version_id=?').run(other);
+    const project=(db.prepare('select id from dictionary_items where type=\'project_item\' limit 1').get() as {id:number}).id;
+    const drawing=(db.prepare('select historical_drawing_id as id from pdf_files where id=?').get(pdfId) as {id:number}).id;
+    const boms=new BomService(db);const old=boms.saveVersion({productId,appearanceVersionId:input.appearanceVersionId,entryMode:'historical',businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[{projectItemId:project,drawingReference:{origin:'historical',historicalDrawingId:drawing},usesWhiteMaterial:false}]}).version;
+    db.prepare('delete from appearance_bom_current where appearance_version_id=?').run(input.appearanceVersionId);db.prepare('delete from bom_current where version_id=?').run(old.id);
+    expect(service.previewPackage(input).items[0].selectable).toBe(false);
+  });
+  it('rejects unsafe source filenames before handing them to the ZIP writer',()=>{
+    const input=ready();db.prepare("update pdf_files set file_name='../escape（转曲）.pdf' where id=?").run(pdfId);
+    expect(service.previewPackage(input).items[0]).toMatchObject({selectable:false});
+  });
+  it('aborts a source mutation during ZIP writing without saving success or leaving an archive',async()=>{
+    const input=ready();const actual=new ArchiverOutboundArchiveWriter();const writer:OutboundArchiveWriter={write:async args=>{const count=await actual.write(args);pdfBytes(pdfId,'mutated during generation');return count;}};
+    const guarded=new OutboundPackageService(db,{workspaceRoot:()=>workspace,outputRoot:()=>output,now:fixedNow,archiveWriter:writer});const preview=guarded.previewPackage(input);
+    await expect(guarded.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]})).rejects.toThrowError(expect.objectContaining({code:'PREVIEW_STALE'}));expect(service.listCompleted(productId)).toEqual([]);expect(readdirSync(output)).toEqual([]);
+  });
+  it('rejects a corrupt ZIP writer despite a matching claimed file count',async()=>{
+    const input=ready();const writer:OutboundArchiveWriter={write:async args=>{writeFileSync(args.temporaryPath,'not zip');return args.entries.length;}};
+    const guarded=new OutboundPackageService(db,{workspaceRoot:()=>workspace,outputRoot:()=>output,now:fixedNow,archiveWriter:writer});const preview=guarded.previewPackage(input);
+    await expect(guarded.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]})).rejects.toThrow();expect(service.listCompleted(productId)).toEqual([]);expect(readdirSync(output)).toEqual([]);
+  });
+  it('keeps all V2 history facts stable after BOM, batch and PDF index changes or ZIP removal',async()=>{
+    const input=ready();const preview=service.previewPackage(input);const saved=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});const before=service.historyDetail(saved.id);
+    db.prepare("update material_batches set display_name='后来改名' where id=?").run(batchId);db.prepare("update pdf_files set file_name='后来索引（转曲）.pdf' where id=?").run(pdfId);
+    rmSync(join(output,saved.zipRelativePath));const after=service.historyDetail(saved.id);expect(after.context).toEqual(before.context);expect(after.files).toEqual(before.files);expect(after.parts[0]).toMatchObject({isPresent:false,fileCount:1});
+  });
+  it('adds old-exterior PDFs only as hash-confirmed extra material without changing their attribution',async()=>{
+    const input=ready();const newer=addBatch('第二批',1);scope(newer,input.appearanceVersionId);
+    const next=addOutlined({batch:newer,fullCode:'02.0209.011.0401001',relativePath:'new-color（转曲）.pdf'});bind(next,input.appearanceVersionId);pdfBytes(next,'newcolor');
+    const args={...input,selectedMaterialBatchId:newer,extraPdfFileIds:[pdfId]};const first=service.previewPackage(args);
+    expect(first.items.find(item=>item.pdfFileId===pdfId)).toMatchObject({source:'extra',selectable:false});
+    const hash=first.items.find(item=>item.pdfFileId===pdfId)!.contentSha256!;
+    const confirmed={...args,fileConfirmations:[{pdfFileId:pdfId,reason:'人工确认需要添加旧批次资料',contentSha256:hash}]};const preview=service.previewPackage(confirmed);
+    const result=await service.createPackage({...confirmed,previewToken:preview.previewToken,selectedPdfFileIds:[next,pdfId]});expect(result.fileCount).toBe(2);
+    expect(service.historyDetail(result.id).files.find((file:{pdfFileId:number})=>file.pdfFileId===pdfId)).toMatchObject({source:'extra',sourceBatchId:batchId,confirmationReason:'人工确认需要添加旧批次资料'});
+  });
+  it('accepts a manually confirmed unrecognized indexed PDF without inventing a drawing or BOM',async()=>{
+    const input=ready();db.prepare("update pdf_files set historical_drawing_id=null,match_status='unmatched' where id=?").run(pdfId);
+    const first=service.previewPackage(input);expect(first.items[0].selectable).toBe(false);
+    const args={...input,fileConfirmations:[{pdfFileId:pdfId,reason:'已人工核查此未识别项目',contentSha256:first.items[0].contentSha256!}]};const preview=service.previewPackage(args);
+    expect(preview.items[0].selectable).toBe(true);const result=await service.createPackage({...args,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    expect(service.listCompleted(productId)[0].fileCount).toBe(1);expect(service.historyDetail(result.id).files[0]).toMatchObject({fullCode:null,projectItemId:null,pdfFileId:pdfId});
+    expect(db.prepare('select count(*) as count from drawing_numbers').get()).toEqual({count:0});expect(db.prepare('select count(*) as count from bom_versions').get()).toEqual({count:0});
+  });
+  it('reports a partial BOM while allowing other correctly attributed batch files',async()=>{
+    const input=ready();const first=(db.prepare('select historical_drawing_id as id from pdf_files where id=?').get(pdfId) as {id:number}).id;
+    const project=(db.prepare("select id from dictionary_items where type='project_item' limit 1").get() as {id:number}).id;
+    new BomService(db).saveVersion({productId,appearanceVersionId:input.appearanceVersionId,entryMode:'historical',businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[{projectItemId:project,drawingReference:{origin:'historical',historicalDrawingId:first},usesWhiteMaterial:false}]});
+    const other=addOutlined({fullCode:'02.0209.011.0401001',relativePath:'other-color（转曲）.pdf'});bind(other,input.appearanceVersionId);pdfBytes(other,'othercolor');
+    const preview=service.previewPackage(input);expect(preview.bomCheck).toMatchObject({status:'partial',extraPdfFileIds:[other]});expect(preview.items.every(item=>item.selectable)).toBe(true);
+    const result=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId,other]});expect(result.fileCount).toBe(2);
+  });
+  it('freezes filterable history identity and returns all part details without live-data joins',async()=>{
+    const input=ready();const preview=service.previewPackage(input);const result=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    db.prepare("update products set sku='CHANGED',model='Changed model' where id=?").run(productId);db.prepare("update material_batches set display_name='Renamed batch' where id=?").run(batchId);
+    const rows=service.listCompleted(productId,{brand:'SAMKYO',model:'T40',sku:'SKDWT040JP',appearanceVersionId:input.appearanceVersionId,batchId,materialType:'initial',dateFrom:'2026-09-10',dateTo:'2026-09-10'});
+    expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({id:result.id,sku:'SKDWT040JP',model:'T40',batchName:'00.首批大货'});expect(rows[0].parts[0]).toMatchObject({fileCount:1});
+    expect(service.listCompleted(productId,{sku:'CHANGED'})).toEqual([]);expect(service.listCompleted(productId,{appearanceVersionId:999})).toEqual([]);
+  });
+  it('validates two independent ZIPs and exactly fourteen real source files with accurate per-part manifests',async()=>{
+    const input=ready();const main=(db.prepare("select id from dictionary_items where type='main_category' limit 1").get() as {id:number}).id;
+    const ids=[pdfId];const bytes=Buffer.alloc(4_000_000,65);bytes.write('%PDF-1.7\n');
+    for(let index=2;index<=14;index++){
+      const code=String(index).padStart(2,'0');dictionary('project_item',code,`项目${index}`,main);
+      const file=addOutlined({fullCode:`02.0209.010.04${code}001`,relativePath:`item-${index}（转曲）.pdf`});
+      const historical=(db.prepare('select historical_drawing_id as id from pdf_files where id=?').get(file) as {id:number}).id;
+      db.prepare('update historical_drawing_numbers set project_item_code=? where id=?').run(code,historical);bind(file,input.appearanceVersionId);ids.push(file);
+    }
+    for(const id of ids){const path=(db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string}).path;writeFileSync(join(workspace,path),bytes);}
+    const before=new Map(ids.map(id=>{const path=(db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string}).path;return[id,createHash('sha256').update(readFileSync(join(workspace,path))).digest('hex')];}));
+    const preview=service.previewPackage(input);expect(preview.items.filter(item=>item.selectable)).toHaveLength(14);
+    const result=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:ids});expect(result.parts).toHaveLength(2);
+    expect(result.parts!.reduce((total,part)=>total+(part.fileCount??0),0)).toBe(14);expect(new Set(result.parts!.flatMap(part=>part.files?.map(file=>file.pdfFileId)??[])).size).toBe(14);
+    for(const part of result.parts!){const entries=decodedZipEntries(join(output,part.zipRelativePath));expect(entries.size).toBe(part.fileCount);for(const file of part.files!){expect(createHash('sha256').update(entries.get(file.fileName)!).digest('hex')).toBe(before.get(file.pdfFileId));}}
+    for(const id of ids){const path=(db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string}).path;expect(createHash('sha256').update(readFileSync(join(workspace,path))).digest('hex')).toBe(before.get(id));}
+  },30000);
+
+  it('regenerates from immutable history into a new record after rechecking actual source hashes',async()=>{
+    const input=ready();const preview=service.previewPackage(input);
+    const original=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    const frozen=service.historyDetail(original.id);
+    const plan=service.prepareRegeneration(original.id);
+    expect(plan).toMatchObject({sourcePackageId:original.id,selectedPdfFileIds:[pdfId],request:{workflowVersion:2}});
+    expect(service.preflightPackage({...plan.request,previewToken:plan.preview.previewToken,selectedPdfFileIds:plan.selectedPdfFileIds}).blockingErrors).toEqual([]);
+    output=join(root,'regenerated');mkdirSync(output);
+    const second=await service.createPackage({...plan.request,previewToken:plan.preview.previewToken,selectedPdfFileIds:plan.selectedPdfFileIds});
+    expect(second.id).not.toBe(original.id);expect(service.listCompleted(productId)).toHaveLength(2);
+    expect(service.historyDetail(original.id)).toEqual(frozen);
+  });
+  it('rejects changed same-name source bytes during history regeneration without changing the original record',async()=>{
+    const input=ready();const preview=service.previewPackage(input);
+    const original=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    const frozen=service.historyDetail(original.id);pdfBytes(pdfId,'different bytes under the same original path');
+    expect(()=>service.prepareRegeneration(original.id)).toThrowError(expect.objectContaining({code:'PREVIEW_STALE'}));
+    expect(service.historyDetail(original.id)).toEqual(frozen);expect(service.listCompleted(productId)).toHaveLength(1);
+  });
+  it('rejects a preview token that became stale before server preflight',()=>{
+    const input=ready();const preview=service.previewPackage(input);pdfBytes(pdfId,'changed after preview');
+    expect(()=>service.preflightPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]})).toThrowError(expect.objectContaining({code:'PREVIEW_STALE'}));
+  });
+
+  it('accepts an explicit appearance usage without rewriting primary attribution or inventing BOM',()=>{
+    const input=ready();const other=Number(db.prepare("insert into product_appearance_versions(product_id,version_number,label,status,created_at) values(?,2,'其他外观','historical',?)").run(productId,now).lastInsertRowid);
+    db.prepare('update drawing_appearance_bindings set appearance_version_id=?').run(other);
+    expect(service.previewPackage(input).items[0].selectable).toBe(false);
+    const record=(db.prepare('select historical_drawing_id as id from pdf_files where id=?').get(pdfId) as {id:number}).id;
+    db.prepare("insert into drawing_appearance_usages(origin,record_id,product_id,appearance_version_id,reason,created_at) values('historical',?,?,?,'人工明确沿用旧图号',?)").run(record,productId,input.appearanceVersionId,now);
+    expect(service.previewPackage(input).items[0].selectable).toBe(true);
+    expect(db.prepare('select appearance_version_id as id from drawing_appearance_bindings').get()).toEqual({id:other});
+    expect(db.prepare('select count(*) as count from bom_versions').get()).toEqual({count:0});
+  });
+
+  it('cannot bypass historical hash validation by self-reporting regeneratedFromPackageId on ordinary preview',async()=>{
+    const input=ready();const preview=service.previewPackage(input);const original=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    pdfBytes(pdfId,'different source bytes');
+    expect(()=>service.previewPackage({...input,regeneratedFromPackageId:original.id})).toThrowError(expect.objectContaining({code:'PREVIEW_STALE'}));
+  });
+  it('rejects nonexistent regeneration provenance and altered historical selections',async()=>{
+    const input=ready();expect(()=>service.previewPackage({...input,regeneratedFromPackageId:999999})).toThrow();
+    const extra=addOutlined({fullCode:'02.0209.011.0401001',relativePath:'other（转曲）.pdf'});bind(extra,input.appearanceVersionId);pdfBytes(extra,'other');
+    const preview=service.previewPackage(input);const original=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    const plan=service.prepareRegeneration(original.id);
+    output=join(root,'regeneration-other');mkdirSync(output);
+    await expect(service.createPackage({...plan.request,previewToken:plan.preview.previewToken,selectedPdfFileIds:[extra]})).rejects.toThrow();
+    expect(()=>service.preflightPackage({...plan.request,previewToken:plan.preview.previewToken,selectedPdfFileIds:[extra]})).toThrow();
+    expect(service.listCompleted(productId)).toHaveLength(1);
+  });
+
 });

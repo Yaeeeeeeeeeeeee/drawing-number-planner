@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
+import { QrRepository } from '../../src/core/qr/qr-repository';
 import { ProductService } from '../../src/core/products/product-service';
 import { ProductRepository } from '../../src/core/products/product-repository';
 import { OccupiedNumberRepository } from '../../src/core/planning/occupied-number-repository';
@@ -108,10 +109,10 @@ describe('ProductService', () => {
     expect(products.list({ status: 'active' }).items.map((item) => item.id)).toContain(product.id);
   });
 
-  it('deletes an unreferenced product and its blank inactive default QR placeholders', () => {
+  it('deletes an unreferenced product without creating virtual QR placeholders', () => {
     const refs = validReferences();
     const product = products.create({ ...refs, sku: 'SKU-DELETE', model: 'ZC220', productCategory: '冰柜' });
-    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual({ count: 2 });
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual({ count: 0 });
 
     expect(products.delete(product.id)).toEqual({ deleted: true });
     expect(products.list({ status: 'all' }).items).toEqual([]);
@@ -121,6 +122,7 @@ describe('ProductService', () => {
   it('deletes v8-migrated English-name default QR placeholders for an unreferenced product', () => {
     const refs = validReferences();
     const product = products.create({ ...refs, sku: 'SKU-V8-QR', model: 'ZC221', productCategory: '冰柜' });
+    new QrRepository(db).ensureForProduct(product.id);
     db.prepare(`update product_qr_codes set name = (
       select purpose.english_name from qr_purposes purpose where purpose.id = product_qr_codes.purpose_id
     ) where product_id = ?`).run(product.id);
@@ -132,6 +134,7 @@ describe('ProductService', () => {
   it('preserves a renamed inactive QR record instead of treating it as a blank default placeholder', () => {
     const refs = validReferences();
     const product = products.create({ ...refs, sku: 'SKU-RENAMED-QR', model: 'ZC220', productCategory: '冰柜' });
+    new QrRepository(db).ensureForProduct(product.id);
     db.prepare(`update product_qr_codes set name = '自定义说明书' where id = (
       select id from product_qr_codes where product_id = ? order by id limit 1
     )`).run(product.id);
@@ -162,6 +165,7 @@ describe('ProductService', () => {
       .run(protectedProduct.id);
     db.prepare(`insert into bom_versions (product_id, version_number, created_at)
       values (?, 1, '2026-08-24')`).run(protectedProduct.id);
+    new QrRepository(db).ensureForProduct(protectedProduct.id);
     db.prepare(`update product_qr_codes set target_url = 'https://example.test/manual' where id = (
       select id from product_qr_codes where product_id = ? order by id limit 1
     )`).run(protectedProduct.id);

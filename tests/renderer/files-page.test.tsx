@@ -52,10 +52,12 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByText('文件筛选'));
     fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'manual' } });
     fireEvent.change(screen.getByLabelText('匹配状态'), { target: { value: 'pending' } });
+    fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'manual',matchStatus:'pending'})));
     fireEvent.click(screen.getByRole('button', { name: '待关联产品' }));
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'manual', matchStatus: 'pending', unassociatedProduct: 'true' })));
     fireEvent.click(screen.getByRole('button', { name: '全部文件' }));
-    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith({ keyword: 'manual', matchStatus: 'pending', conversionType: '', presence: 'all', page: 1, pageSize: 50 }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenCalledWith({ keyword: 'manual', matchStatus: 'pending', conversionType: '', presence: 'all', managementState:'included', page: 1, pageSize: 50 }));
     expect(screen.getAllByLabelText('文件关键词')).toHaveLength(1);
     expect(screen.getByLabelText('文件关键词').closest('nav')).toHaveAttribute('aria-label', '资料导航');
     expect(screen.queryByRole('button', { name: '待确认文件' })).not.toBeInTheDocument();
@@ -185,7 +187,7 @@ describe('FilesPage', () => {
       source: 3, outlined: 1, missing: 0, scanId: 11, currentTotal: 4,
       comparison: { added: 1, missing: 1, moved: 0, changed: 0, unchanged: 2 }, scannedAt: '2026-08-25T01:00:00Z' });
 
-    expect(await screen.findByText('4 个索引文件（PDF / 二维码）')).toBeVisible();
+    expect(await screen.findByText('4 个本次扫描 PDF 索引')).toBeVisible();
     expect(screen.getByText('2 已匹配')).toBeVisible();
     expect(screen.getByText('1 未匹配')).toBeVisible();
     expect(screen.getByText('1 待确认')).toBeVisible();
@@ -221,7 +223,7 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
 
     expect(await screen.findByText('当前索引统计')).toBeVisible();
-    expect(screen.getByText('本次扫描变化（PDF / 二维码）')).toBeVisible();
+    expect(screen.getByText('本次扫描变化（PDF）')).toBeVisible();
     expect(screen.getByText('1 新增')).toBeVisible();
     expect(screen.getByText('1 删除/缺失')).toBeVisible();
     expect(screen.getByText('1 路径变化')).toBeVisible();
@@ -289,7 +291,7 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
 
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith({ keyword: 'unknown', matchStatus: 'unmatched',
-      conversionType: '', presence: 'missing', page: 1, pageSize: 50 }));
+      conversionType: '', presence: 'missing', managementState:'included', page: 1, pageSize: 50 }));
   });
 
   it('pages through more than fifty matching PDF records', async () => {

@@ -53,7 +53,7 @@ describe('schema migrations', () => {
     const seeded = seedProduct(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 15 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 17 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select id, sku from products').get()).toEqual({ id: seeded.product, sku: null });
@@ -66,7 +66,7 @@ describe('schema migrations', () => {
     expect((database.pragma('table_info(bom_versions)') as Array<{ name: string }>).map((column) => column.name))
       .toEqual([
         'id', 'product_id', 'version_number', 'previous_version_id', 'business_change_date', 'legacy_color_id',
-        'notes', 'created_at', 'deleted_at', 'deleted_reason', 'updated_at', 'edit_revision',
+        'notes', 'created_at', 'deleted_at', 'deleted_reason', 'updated_at', 'edit_revision', 'appearance_version_id',
       ]);
     expect((database.pragma('table_info(bom_items)') as Array<{ name: string }>).map((column) => column.name))
       .toEqual([

@@ -25,9 +25,14 @@ function productInput(productCategory: string, sku: string, model: string) {
 }
 
 describe('QrService', () => {
-  it('backfills applicable inactive QR records when products are created without coupling them to drawings or BOM', () => {
+  it('does not create QR placeholders for new products and preserves explicit legacy backfill compatibility', () => {
     const ordinary = products.create(productInput('冰柜', 'SKUZC', 'ZC100'));
+    expect(new QrService(db).list({productId:ordinary.id}).items).toEqual([]);
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(ordinary.id);
     const airFryer = products.create(productInput('空气炸锅', 'SKUAF', 'AF30'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(airFryer.id);
     const service = new QrService(db);
 
     expect(service.list({ productId: ordinary.id }).items.map((item) => [item.englishName, item.status]))
@@ -40,6 +45,8 @@ describe('QrService', () => {
 
   it('keeps URL and file association when a QR record is deactivated and rejects non-http URLs', () => {
     const product = products.create(productInput('冰柜', 'SKUZC', 'ZC100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const service = new QrService(db);
     const code = service.list({ productId: product.id }).items[0];
     db.prepare(`insert into qr_code_files
@@ -61,6 +68,8 @@ describe('QrService', () => {
 
   it('creates extensible purposes and one QR record per product-purpose pair', () => {
     const product = products.create(productInput('冰柜', 'SKUEXT', 'EXT100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const service = new QrService(db);
     const purpose = service.createPurpose({ key: 'installation', englishName: 'Installation Guide',
       displayName: '安装指南', defaultForAll: false, productCategories: ['冰柜'] });
@@ -75,8 +84,10 @@ describe('QrService', () => {
       status: 'active' })).toThrowError(expect.objectContaining({ code: 'DUPLICATE_PRODUCT_PURPOSE' }));
   });
 
-  it('creates an active QR record and atomically associates an eligible pending file', () => {
+  it('blocks the legacy create-with-pending-file route without inserting a QR record', () => {
     const product = products.create(productInput('冰柜', 'SKUNEW', 'NEW100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const service = new QrService(db);
     const purpose = service.createPurpose({ key: 'installation', englishName: 'Installation Guide',
       displayName: '安装指南', defaultForAll: false, productCategories: [] });
@@ -88,19 +99,17 @@ describe('QrService', () => {
         'NEW100-Installation Guide（guide7）.pdf', 'application/pdf', 1, '2026-09-01', 'pending', 1,
         'guide7', '2026-09-01', '2026-09-01')`).run();
 
-    expect(service.listPendingFiles(product.id, purpose.id).items).toEqual([
-      expect.objectContaining({ id: Number(file.lastInsertRowid), detectedIdentifier: 'guide7' }),
-    ]);
-    const created = service.create({ productId: product.id, purposeId: purpose.id, name: 'NEW100 安装指南',
-      targetUrl: null, status: 'active', qrFileId: Number(file.lastInsertRowid) });
+    expect(service.listPendingFiles(product.id, purpose.id).items).toEqual([]);
+    expect(()=>service.create({ productId:product.id,purposeId:purpose.id,name:'NEW100 安装指南',targetUrl:null,status:'active',qrFileId:Number(file.lastInsertRowid) })).toThrowError(expect.objectContaining({code:'MANUAL_QR_REQUIRED'}));
+    expect(db.prepare('select count(*) as count from product_qr_codes where product_id=? and purpose_id=?').get(product.id,purpose.id)).toEqual({count:0});
+    expect(db.prepare('select qr_code_id from qr_code_files where id=?').get(file.lastInsertRowid)).toEqual({qr_code_id:null});
 
-    expect(created).toMatchObject({ status: 'active', files: [expect.objectContaining({ id: Number(file.lastInsertRowid) })] });
-    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ? and purpose_id = ?')
-      .get(product.id, purpose.id)).toEqual({ count: 1 });
   });
 
   it('deletes only unreferenced QR records and reports file and BOM references separately', () => {
     const product = products.create(productInput('冰柜', 'SKUDEL', 'DEL100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const service = new QrService(db);
     const codes = service.list({ productId: product.id }).items;
     const unused = codes.find((item) => item.key === 'warranty')!;
@@ -119,6 +128,8 @@ describe('QrService', () => {
 
   it('blocks deletion when a BOM item uses the QR record and reports that reference', () => {
     const product = products.create(productInput('冰柜', 'SKUBOM', 'BOM100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const main = dictionaries.create({ type: 'main_category', code: '04', name: '印刷件' });
     const project = dictionaries.create({ type: 'project_item', code: '01', name: '说明书', parentId: main.id });
     const service = new QrService(db); const code = service.list({ productId: product.id }).items[0];
@@ -142,6 +153,8 @@ describe('QrService', () => {
     db.prepare(`insert into qr_purposes (key, english_name, display_name, default_for_all, status, created_at, updated_at)
       values ('quick_start', 'Quick Start', '快速入门二维码', 1, 'active', '2026-09-01', '2026-09-01')`).run();
     const existing = products.create(productInput('冰柜', 'SKUDATA', 'DATA100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(existing.id);
     db.prepare("update qr_purposes set status = 'inactive' where key = 'quick_start'").run();
     const service = new QrService(db);
     expect(service.list({ productId: existing.id }).items.map((item) => item.englishName)).toContain('Quick Start');
@@ -155,6 +168,7 @@ describe('QrService', () => {
     const confirmed = products.confirmHistoricalCandidate({ productCategory: '冰柜', sku: 'SKUHIST', model: 'HIST100',
       brandId: refs.brandId, productSizeId: refs.productSizeId, defaultAppearanceId: refs.defaultAppearanceId });
 
+    new QrService(db).ensureForProduct(confirmed.product.id);
     expect(service.list({ productId: confirmed.product.id }).items.map((item) => item.englishName))
       .toEqual(['User Manual', 'Warranty']);
     expect(service.list({ productId: existing.id }).items.find((item) => item.englishName === 'Quick Start'))
@@ -163,6 +177,8 @@ describe('QrService', () => {
 
   it('exposes product context with associated and eligible pending file references for QR management', () => {
     const product = products.create(productInput('冰柜', 'SKUIQ', 'IQ100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const service = new QrService(db);
     const code = service.list({ productId: product.id }).items.find((item) => item.key === 'user_manual')!;
     db.prepare(`insert into qr_code_files
@@ -181,11 +197,13 @@ describe('QrService', () => {
 
     expect(detail).toMatchObject({ sku: 'SKUIQ', model: 'IQ100', productCategory: '冰柜' });
     expect(detail.files).toMatchObject([{ relativePath: '冰柜/SKUIQ-IQ100/IQ100-User Manual（网址编码）.png', isPresent: true }]);
-    expect(detail.pendingFiles).toMatchObject([{ relativePath: '冰柜\\SKUIQ-IQ100\\待确认\\IQ100-User Manual（网址编码）.png', isPresent: false }]);
+    expect(detail.pendingFiles).toEqual([]); // automatic candidates are no longer offered
   });
 
-  it('manually resolves only a compatible pending QR file without changing the QR business status', () => {
+  it('preserves legacy pending history while refusing unvalidated association', () => {
     const product = products.create(productInput('冰柜', 'SKUMAN', 'MAN100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const service = new QrService(db);
     const code = service.list({ productId: product.id }).items.find((item) => item.key === 'user_manual')!;
     const pending = db.prepare(`insert into qr_code_files
@@ -193,18 +211,16 @@ describe('QrService', () => {
       values ('冰柜/SKUMAN-MAN100/待确认/MAN100-User Manual（网址编码）.png', '冰柜\\skuman-man100\\待确认\\man100-user manual（网址编码）.png',
         'MAN100-User Manual（网址编码）.png', 'image/png', 1, '2026-09-01', 'pending', 1, '2026-09-01', '2026-09-01')`).run();
 
-    const resolved = (service as unknown as { associateFile(qrCodeId: number, qrFileId: number): unknown })
-      .associateFile(code.id, Number(pending.lastInsertRowid));
+    expect(()=>service.associateFile(code.id,Number(pending.lastInsertRowid))).toThrowError(expect.objectContaining({code:'MANUAL_QR_REQUIRED'}));
+    expect(service.get(code.id).status).toBe('inactive');
+    expect(db.prepare('select qr_code_id,match_status from qr_code_files where id=?').get(pending.lastInsertRowid)).toEqual({qr_code_id:null,match_status:'pending'});
 
-    expect(resolved).toMatchObject({ id: code.id, status: 'inactive' });
-    expect(db.prepare('select qr_code_id as qrCodeId, match_status as matchStatus from qr_code_files where id = ?')
-      .get(pending.lastInsertRowid)).toEqual({ qrCodeId: code.id, matchStatus: 'matched' });
-    expect(() => (service as unknown as { associateFile(qrCodeId: number, qrFileId: number): unknown })
-      .associateFile(code.id, Number(pending.lastInsertRowid))).toThrowError(expect.objectContaining({ code: 'QR_FILE_ALREADY_LINKED' }));
   });
 
-  it('requires an exact QR purpose boundary when offering or manually associating pending files', () => {
+  it('offers no automatic candidate and blocks the former pending association entrypoint', () => {
     const product = products.create(productInput('冰柜', 'SKUBOUND', 'BOUND100'));
+    // Seed pre-existing legacy QR history explicitly; new products no longer create placeholders.
+    new QrService(db).ensureForProduct(product.id);
     const service = new QrService(db);
     const code = service.list({ productId: product.id }).items.find((item) => item.key === 'user_manual')!;
     const exact = db.prepare(`insert into qr_code_files
@@ -217,8 +233,8 @@ describe('QrService', () => {
         'BOUND100-User Manual Extra（abc）.pdf', 'application/pdf', 1, '2026-09-01', 'pending', 1, '2026-09-01', '2026-09-01')`).run();
 
     expect(service.listPendingFiles(product.id, code.purposeId).items.map((file) => file.id))
-      .toEqual([Number(exact.lastInsertRowid)]);
+      .toEqual([]);
     expect(() => service.associateFile(code.id, Number(extra.lastInsertRowid)))
-      .toThrowError(expect.objectContaining({ code: 'QR_FILE_INCOMPATIBLE' }));
+      .toThrowError(expect.objectContaining({ code: 'MANUAL_QR_REQUIRED' }));
   });
 });

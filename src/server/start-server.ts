@@ -1,4 +1,8 @@
-import { existsSync, mkdirSync, realpathSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { AppearanceService } from '../core/products/appearance-service.js';
+import { registerAppearanceRoutes } from './routes/appearances.js';
+import { QrManualService, type QrManualInput } from '../core/qr/qr-manual-service.js';
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import Fastify from 'fastify';
@@ -53,6 +57,7 @@ export interface ServerOptions {
 export interface RunningServer {
   url: string;
   token: string;
+  qrManualAction(action: string, input: unknown): unknown;
   resolvePdfFilePath(id: unknown): string;
   resolveBomAssetPath(id: unknown): string;
   resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
@@ -101,7 +106,9 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database), new ProductCleanupService(database,
       () => tasks.list().some((task) => ['queued', 'running', 'finalizing'].includes(task.status))));
-    registerQrCodeRoutes(server, new QrService(database));
+    const qrManual = new QrManualService(database);
+    registerAppearanceRoutes(server, new AppearanceService(database));
+    registerQrCodeRoutes(server, new QrService(database), qrManual);
     registerDrawingRoutes(server, new DrawingQueryService(database));
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings), tasks);
     registerMaterialBatchRoutes(server, new MaterialBatchService(database));
@@ -129,6 +136,19 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     }
 
     return {
+      qrManualAction: (action, input) => {
+        if (!input || typeof input !== 'object') throw new Error('INVALID_QR_MANUAL_INPUT');
+        const data = input as Record<string, unknown>;
+        switch (action) {
+          case 'select': if (typeof data.path !== 'string') throw new Error('INVALID_QR_FILE'); return qrManual.selectTrustedFile(data.path);
+          case 'preview': return qrManual.preview(data as unknown as QrManualInput);
+          case 'commit': if (typeof data.previewId !== 'string') throw new Error('INVALID_QR_PREVIEW'); return qrManual.commit(data.previewId, data.exception as {confirmed:boolean;reason:string}|undefined);
+          case 'history': return qrManual.history(Number(data.id));
+          case 'unlink': return qrManual.unlink(Number(data.id), String(data.revision));
+          case 'resolve': if (typeof data.fileId !== 'string') throw new Error('INVALID_QR_FILE'); return qrManual.resolveFile(data.fileId);
+          default: throw new Error('INVALID_QR_MANUAL_ACTION');
+        }
+      },
       url: address,
       token,
       resolvePdfFilePath: (id) => indexedPdfResolver.resolve(id),
@@ -169,6 +189,8 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       resolveOutboundPackagePath: (id, partNumber) => {
         if (!Number.isInteger(id) || Number(id) <= 0) throw new Error('外发压缩包编号无效');
         if (partNumber !== undefined && (!Number.isInteger(partNumber) || Number(partNumber) <= 0)) throw new Error('分包序号无效');
+        const frozen=database.prepare('select parts_json as parts from outbound_v2_snapshots where package_id=?').get(id) as {parts:string}|undefined;
+        if(frozen){const parts=JSON.parse(frozen.parts) as Array<{partNumber:number;absolutePath:string;contentSha256:string}>;const part=parts.find(part=>part.partNumber===Number(partNumber??1));if(!part||!part.absolutePath?.toLowerCase().endsWith('.zip'))throw new Error('未找到外发分包');try{const canonical=realpathSync.native(part.absolutePath);if(!statSync(canonical).isFile()||createHash('sha256').update(readFileSync(canonical)).digest('hex')!==part.contentSha256)throw new Error();return canonical;}catch{throw new Error('原压缩包不存在或内容已变化，历史记录仍保留');}}
         const row = (partNumber === undefined ? database.prepare("select zip_relative_path as relativePath from outbound_packages where id = ? and status = 'completed'").get(id)
           : database.prepare(`select part.zip_relative_path as relativePath from outbound_package_parts part
             join outbound_packages package on package.id = part.package_id

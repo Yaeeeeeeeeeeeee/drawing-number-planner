@@ -176,6 +176,7 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
 
   return (
     <section className="outbound-panel email-composer" onChangeCapture={() => { generationRevision.current += 1; }}>
+      {mailContext?.appearanceLabel && <p className="muted-text">外观版本：{mailContext.appearanceLabel}{mailContext.bomVersionIds?.length ? ` · BOM 记录 ${mailContext.bomVersionIds.join('、')}` : ''}</p>}
       {pendingContext && <div className="info-banner">
         新压缩包已生成：{pendingContext.packageName}。当前邮件仍保留原资料和已编辑内容。
         <button type="button" className="text-button" onClick={() => {

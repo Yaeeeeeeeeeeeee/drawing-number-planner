@@ -1,3 +1,5 @@
+import { listRawProductIds } from '../products/appearance-identity.js';
+import { FileError } from './file-errors.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { resolveCurrentMaterialSet, MaterialBatchOrderAmbiguousError } from '../outbound/current-material-set.js';
 import type { DrawingStatus } from '../drawings/drawing-types.js';
@@ -31,6 +33,25 @@ interface OccurrenceRow {
 export class MaterialBatchService {
   constructor(private readonly db: PlannerDatabase) {}
 
+  rename(id: number, displayName: string, revision?: number): MaterialBatchView | null {
+    const name = displayName.trim();
+    if (!name || name.length > 200 || /[\r\n]/.test(name)) throw new FileError('SETTINGS_INVALID', '批次显示名称须为 1–200 个字符');
+    return this.db.transaction(() => {
+      const row = this.db.prepare('select display_revision as revision from material_batches where id = ?').get(id) as {revision:number}|undefined;
+      if (!row) return null;
+      if (revision !== undefined && revision !== row.revision) throw new FileError('PDF_PREVIEW_STALE', '批次名称已变化，请刷新后再修改');
+      this.db.prepare('update material_batches set display_name = ?, display_revision = display_revision + 1 where id = ?').run(name, id);
+      return this.list().find(batch => batch.id === id) ?? null;
+    }).immediate();
+  }
+
+  diagnostics() {
+    const batches = this.list();
+    return { batches: batches.map(batch => ({ id: batch.id, relativePath: batch.relativePath, name: batch.name, originalName: batch.originalName, productId: batch.productId,
+      sameDisplayNameIds: batches.filter(other => other.id !== batch.id && other.name === batch.name).map(other => other.id) })),
+      duplicatePaths: this.db.prepare('select lower(replace(relative_path, char(47), char(92))) as pathKey, group_concat(id) as ids, count(*) as count from material_batches group by pathKey having count(*) > 1').all() };
+  }
+
   getCurrentBatchSelection(productDirectory: string): CurrentBatchSelection {
     const rows = this.db.prepare(`select id, sequence_number as sequenceNumber
       from material_batches
@@ -50,24 +71,26 @@ export class MaterialBatchService {
     const params: Record<string, unknown> = {};
     if (filters.search?.trim()) {
       where.push(`(batch.product_directory like @search or batch.detected_sku like @search
-        or batch.detected_model like @search or batch.name like @search)`);
+        or batch.detected_model like @search or coalesce(batch.display_name, batch.name) like @search)`);
       params.search = `%${filters.search.trim()}%`;
     }
     if (filters.productId !== undefined) {
-      where.push('batch.product_id = @productId');
-      params.productId = filters.productId;
+      const ids = listRawProductIds(this.db, filters.productId);
+      where.push(`batch.product_id in (${ids.map(Number).join(',') || 'null'})`);
     }
     const whereSql = where.length > 0 ? `where ${where.join(' and ')}` : '';
     const rows = this.db.prepare(`select batch.id, batch.relative_path as relativePath,
-        batch.product_directory as productDirectory, batch.product_id as productId,
+        batch.product_directory as productDirectory, product.id as productId,
         coalesce(product.product_category, batch.detected_product_category) as productCategory,
         coalesce(product.sku, batch.detected_sku) as sku,
         coalesce(product.model, batch.detected_model) as model,
-        batch.name, batch.sequence_number as sequenceNumber, batch.business_date as businessDate,
+        coalesce(batch.display_name, batch.name) as name, batch.name as originalName,
+        batch.display_name as displayName, batch.display_revision as displayRevision, batch.sequence_number as sequenceNumber, batch.business_date as businessDate,
         batch.recognition_status as recognitionStatus, batch.classification_warning as classificationWarning,
         batch.is_present as isPresent, count(file.id) as fileCount
       from material_batches batch
-      left join products product on product.id = batch.product_id
+      left join product_identity_members identity on identity.raw_product_id = batch.product_id
+      left join products product on product.id = coalesce(identity.canonical_product_id, batch.product_id)
       left join pdf_files file on file.material_batch_id = batch.id
       ${whereSql}
       group by batch.id`).all(params) as Array<Omit<MaterialBatchView, 'isPresent' | 'currentState'> & { isPresent: number }>;
@@ -116,7 +139,7 @@ export class MaterialBatchService {
         and sequence_number is not null`).get(throughBatchId, productId) as { sequenceNumber: number } | undefined;
     if (!through) return null;
 
-    const batches = this.db.prepare(`select id, name, sequence_number as sequenceNumber, business_date as businessDate
+    const batches = this.db.prepare(`select id, coalesce(display_name, name) as name, sequence_number as sequenceNumber, business_date as businessDate
       from material_batches
       where product_id = ? and is_present = 1 and recognition_status = 'recognized'
         and sequence_number is not null and sequence_number <= ?
@@ -136,7 +159,7 @@ export class MaterialBatchService {
       left join drawing_numbers drawing on drawing.id = file.drawing_id
       left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
       where file.material_batch_id in (${placeholders}) and file.conversion_type = 'outlined'
-        and file.match_status = 'matched' and coalesce(drawing.full_code, historical.full_code) is not null
+        and file.management_state = 'included' and file.match_status = 'matched' and coalesce(drawing.full_code, historical.full_code) is not null
       order by file.material_batch_id, file.relative_path collate nocase, file.id`)
       .all(...result.map((batch) => batch.id)) as Array<{
         pdfIndexId: number; materialBatchId: number; fullCode: string; fileName: string;
@@ -213,7 +236,7 @@ export class MaterialBatchService {
 
   getDrawingUsage(fullCode: string, businessStatus: DrawingStatus): DrawingBatchUsage {
     const rows = this.db.prepare(`select batch.id as batch_id, batch.product_id, batch.product_directory,
-        batch.name as batch_name, batch.sequence_number, batch.recognition_status,
+        coalesce(batch.display_name, batch.name) as batch_name, batch.sequence_number, batch.recognition_status,
         file.id as pdf_index_id, file.file_name, file.relative_path, file.is_present, file.conversion_type
       from pdf_files file
       join material_batches batch on batch.id = file.material_batch_id

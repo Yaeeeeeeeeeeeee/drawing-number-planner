@@ -1,6 +1,8 @@
 import type { PlannerDatabase } from './database.js';
 import { toWorkspacePathKey } from '../core/files/workspace-paths.js';
 import {
+  schemaVersionSeventeen,
+  schemaVersionSixteen,
   schemaVersionFive,
   schemaVersionFourteen,
   schemaVersionFour,
@@ -723,10 +725,57 @@ function applyDrawingDeletionSchema(database: PlannerDatabase): void {
   `);
 }
 
+function rebuildVersionedQr(database: PlannerDatabase): void {
+  const triggers=database.prepare("select name,sql from sqlite_master where type='trigger' and instr(lower(sql),'product_qr_codes')>0 order by name").all() as Array<{name:string;sql:string}>;
+  const indexes=database.prepare("select sql from sqlite_master where type='index' and tbl_name='product_qr_codes' and sql is not null").all() as Array<{sql:string}>;
+  const highWater=database.prepare("select seq from sqlite_sequence where name='product_qr_codes'").get() as {seq:number}|undefined;
+  for(const t of triggers)database.exec(`drop trigger ${quoteIdentifier(t.name)}`);
+  database.exec(`CREATE TABLE product_qr_codes_v16(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,product_id INTEGER NOT NULL REFERENCES products(id),
+    purpose_id INTEGER NOT NULL REFERENCES qr_purposes(id),name TEXT NOT NULL,target_url TEXT,
+    status TEXT NOT NULL DEFAULT 'inactive' CHECK(status IN ('active','inactive')),
+    created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted_at TEXT,
+    appearance_version_id INTEGER REFERENCES product_appearance_versions(id),
+    UNIQUE(product_id,purpose_id,appearance_version_id));
+    INSERT INTO product_qr_codes_v16(id,product_id,purpose_id,name,target_url,status,created_at,updated_at,deleted_at)
+    SELECT id,product_id,purpose_id,name,target_url,status,created_at,updated_at,deleted_at FROM product_qr_codes;
+    DROP TABLE product_qr_codes;
+    ALTER TABLE product_qr_codes_v16 RENAME TO product_qr_codes;
+    CREATE UNIQUE INDEX product_qr_codes_shared_purpose_unique ON product_qr_codes(product_id,purpose_id) WHERE appearance_version_id IS NULL;`);
+  for(const index of indexes)database.exec(index.sql);
+  database.exec(`CREATE TRIGGER qr_appearance_owner_insert BEFORE INSERT ON product_qr_codes
+    WHEN NEW.appearance_version_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM product_appearance_versions a JOIN product_identity_members m ON m.raw_product_id=NEW.product_id WHERE a.id=NEW.appearance_version_id AND a.product_id=m.canonical_product_id)
+    BEGIN SELECT RAISE(ABORT,'二维码外观不属于同产品'); END;
+    CREATE TRIGGER qr_appearance_owner_update BEFORE UPDATE OF product_id,appearance_version_id ON product_qr_codes
+    WHEN NEW.appearance_version_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM product_appearance_versions a JOIN product_identity_members m ON m.raw_product_id=NEW.product_id WHERE a.id=NEW.appearance_version_id AND a.product_id=m.canonical_product_id)
+    BEGIN SELECT RAISE(ABORT,'二维码外观不属于同产品'); END;`);
+
+  if(highWater)restoreAutoincrementHighWater(database,'product_qr_codes',highWater.seq);
+  const canonical=(value:string)=>`coalesce((select canonical_product_id from product_identity_members where raw_product_id=${value}),${value})`;
+  for(const trigger of triggers){
+    let sql=trigger.sql;
+    sql=sql.replaceAll('version.product_id = qr.product_id',`${canonical('version.product_id')} = ${canonical('qr.product_id')} AND (qr.appearance_version_id IS NULL OR qr.appearance_version_id=version.appearance_version_id)`);
+    if(trigger.name==='product_qr_codes_bom_link_product_guard')sql=sql.replaceAll('version.product_id <> NEW.product_id',`(${canonical('version.product_id')} <> ${canonical('NEW.product_id')} OR (NEW.appearance_version_id IS NOT NULL AND NEW.appearance_version_id IS NOT version.appearance_version_id))`);
+    // bom_versions_product_guard has no NEW.appearance_version_id QR comparison: retain raw history guards there.
+    if(trigger.name==='bom_items_qr_product_guard')sql=sql.replaceAll('qr.product_id <> version.product_id',`(${canonical('qr.product_id')} <> ${canonical('version.product_id')} OR (qr.appearance_version_id IS NOT NULL AND qr.appearance_version_id IS NOT version.appearance_version_id))`);
+    if(trigger.name==='product_qr_codes_bom_link_product_guard')sql=sql.replace('BEFORE UPDATE OF product_id','BEFORE UPDATE OF product_id, appearance_version_id');
+    database.exec(sql);
+  }
+}
+
+/** Applies the retained v16 structural step inside the caller's migration transaction. */
+export function applyAppearanceVersionSchema(database: PlannerDatabase): void {
+  database.exec(schemaVersionSixteen);
+  database.pragma('defer_foreign_keys = ON');
+  rebuildVersionedQr(database);
+  if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('外观迁移关联校验失败');
+  database.pragma('defer_foreign_keys = OFF');
+}
+
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 15) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 15`);
-  if (from >= 15) {
+  if (from > 17) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 17`);
+  if (from >= 17) {
     const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
@@ -739,6 +788,7 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
     return { from, to: from };
   }
   if (safety.databaseExists) safety.createBackup();
+  if (database.inTransaction) throw new Error('Schema升级必须在独立事务中执行');
   database.transaction(() => {
     if (from < 1) database.exec(schemaVersionOne);
     if (from < 2) {
@@ -862,6 +912,38 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
         throw new Error('回收站升级校验失败，数据库未升级');
       }
     }
+    if (from < 16) {
+      if (!(database.pragma('table_info(bom_item_assets)') as {name:string}[]).some(c=>c.name==='deleted_at')) database.exec('alter table bom_item_assets add column deleted_at text');
+      const tables = (database.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' and name<>'schema_migrations' order by name").all() as {name:string}[]).map(row=>row.name);
+      const before = {tables, rows:Object.fromEntries(tables.map(table=>[table,database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all()]))};
+      applyAppearanceVersionSchema(database);
+      database.prepare('insert into schema_migrations(version,applied_at) values(16,?)').run(new Date().toISOString());
+      // Check every original field, including QR URLs, occupancy codes and frozen outbound JSON.
+      for (const table of before.tables) {
+        const columns = Object.keys((before.rows[table][0] ?? {}) as object);
+        if (columns.length) {
+          const rows = database.prepare(`select ${columns.map(quoteIdentifier).join(',')} from ${quoteIdentifier(table)} order by rowid`).all();
+          if (JSON.stringify(rows) !== JSON.stringify(before.rows[table])) throw new Error('外观迁移历史内容校验失败');
+        } else if (countRows(database, table) !== 0) throw new Error('外观迁移历史行数校验失败');
+      }
+      if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('外观迁移关联校验失败');
+      database.pragma('defer_foreign_keys = OFF');
+    }
+    if (from < 17) {
+      const tables = (database.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' and name<>'schema_migrations' order by name").all() as {name:string}[]).map(row=>row.name);
+      const before = {tables,rows:Object.fromEntries(tables.map(table=>[table,database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all()]))};
+      const registryObjects=database.prepare("select name,type,sql from sqlite_master where tbl_name='pdf_file_decisions' and type in ('index','trigger') and sql is not null order by type,name").all() as {name:string;type:string;sql:string}[];
+      const registrySequence=(database.prepare("select seq from sqlite_sequence where name='pdf_file_decisions'").get() as {seq:number}|undefined)?.seq;
+      database.exec(schemaVersionSeventeen);
+      for(const object of registryObjects)database.exec(object.sql);
+      if(registrySequence!==undefined)restoreAutoincrementHighWater(database,'pdf_file_decisions',registrySequence);
+      database.prepare('insert into schema_migrations(version,applied_at) values(17,?)').run(new Date().toISOString());
+      for (const table of before.tables) {
+        const rows=database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all();
+        if (JSON.stringify(rows)!==JSON.stringify(before.rows[table])) throw new Error('外发V2迁移历史内容校验失败');
+      }
+      if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('外发升级关联校验失败');
+    }
   })();
-  return { from, to: 15 };
+  return { from, to: 17 };
 }

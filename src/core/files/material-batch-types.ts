@@ -48,6 +48,9 @@ export interface DrawingBatchUsage {
 }
 
 export interface MaterialBatchView {
+  displayName?: string | null;
+  displayRevision?: number;
+  originalName?: string;
   id: number;
   relativePath: string;
   productDirectory: string;

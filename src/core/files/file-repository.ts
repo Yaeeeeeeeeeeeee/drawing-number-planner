@@ -1,3 +1,6 @@
+import {drawingAppearanceRelationsSql} from '../drawings/drawing-appearance-scope.js';
+import { PdfManagementRepository } from './pdf-management.js';
+import { listRawProductIds } from '../products/appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { DrawingCodeReference, FileNavigationFilters, FileNavigationResult, FileScanChangesView, FileScanRecord, FileScanRunView, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
 import { FileError } from './file-errors.js';
@@ -9,6 +12,7 @@ import type { QrFileScanRecord } from '../qr/qr-types.js';
 import { QrRepository } from '../qr/qr-repository.js';
 
 interface FileRow {
+  management_state: 'included' | 'ignored' | 'needs_review';
   id: number; relative_path: string; file_name: string; drawing_id: number | null; historical_drawing_id: number | null;
   match_status: PdfFileView['matchStatus']; detected_codes_json: string;
   conversion_type: PdfFileView['conversionType']; size_bytes: number; modified_at: string; scanned_at: string;
@@ -37,7 +41,7 @@ function toView(row: FileRow): PdfFileView {
   if (!Array.isArray(detected) || !detected.every((value) => typeof value === 'string')) {
     throw new Error(`PDF 文件 ${row.id} 的检测图号数据无效`);
   }
-  return { id: row.id, relativePath: row.relative_path, fileName: row.file_name, drawingId: row.drawing_id,
+  return { managementState: row.management_state, id: row.id, relativePath: row.relative_path, fileName: row.file_name, drawingId: row.drawing_id,
     historicalDrawingId: row.historical_drawing_id, historicalFullCode: row.historical_full_code,
     matchStatus: row.match_status, detectedCodes: detected, conversionType: row.conversion_type,
     classificationWarning: row.classification_warning,
@@ -52,20 +56,29 @@ function toView(row: FileRow): PdfFileView {
 const FILE_SEARCH_JOINS = `from pdf_files file
       left join drawing_numbers drawing on drawing.id = file.drawing_id
       left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
-      left join products product on product.id = coalesce(drawing.product_id, historical.product_id)
+      left join drawing_appearance_bindings planned_binding on planned_binding.origin='planned' and planned_binding.record_id=file.drawing_id
+      left join drawing_appearance_bindings historical_binding on historical_binding.origin='historical' and historical_binding.record_id=file.historical_drawing_id
+      left join product_identity_members identity on identity.raw_product_id = coalesce(planned_binding.product_id,historical_binding.product_id,drawing.product_id,historical.product_id)
+      left join products product on product.id = coalesce(identity.canonical_product_id,planned_binding.product_id,historical_binding.product_id,drawing.product_id,historical.product_id)
       left join dictionary_items brand on brand.id = product.brand_id
       left join dictionary_items project on project.id = drawing.project_item_id
       left join dictionary_items color on color.id = drawing.color_id
       left join material_batches batch on batch.id = file.material_batch_id`;
 
-function fileSearchPredicate(filters: FileSearchFilters): { whereSql: string; parameters: Record<string, unknown> } {
+function fileSearchPredicate(filters: FileSearchFilters, db: PlannerDatabase): { whereSql: string; parameters: Record<string, unknown> } {
   const where: string[] = []; const parameters: Record<string, unknown> = {};
+  if (filters.managementState !== 'all') { where.push('file.management_state = @managementState'); parameters.managementState = filters.managementState ?? 'included'; }
   if (filters.keyword?.trim()) {
     where.push(`(file.relative_path like @keyword escape '\\' or file.file_name like @keyword escape '\\'
       or drawing.full_code like @keyword escape '\\')`);
     parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
   }
-  if (filters.productId != null) { where.push('coalesce(drawing.product_id, historical.product_id) = @productId'); parameters.productId = filters.productId; }
+  if (filters.productId != null) { const ids = listRawProductIds(db, filters.productId); where.push(`coalesce(planned_binding.product_id,historical_binding.product_id,drawing.product_id,historical.product_id) in (${ids.map(Number).join(',') || 'null'})`); }
+  if (filters.appearanceVersionId != null) {
+    where.push(`exists(select 1 from ${drawingAppearanceRelationsSql} binding where binding.appearance_version_id = @appearanceVersionId and
+      ((binding.origin = 'planned' and binding.record_id = file.drawing_id) or (binding.origin = 'historical' and binding.record_id = file.historical_drawing_id)))`);
+    parameters.appearanceVersionId = filters.appearanceVersionId;
+  }
   if (filters.materialBatchId != null) { where.push('file.material_batch_id = @materialBatchId'); parameters.materialBatchId = filters.materialBatchId; }
   if (filters.productCategory != null) { where.push('product.product_category = @productCategory'); parameters.productCategory = filters.productCategory; }
   if (filters.unassociatedProduct != null) { where.push(`product.id is ${filters.unassociatedProduct ? '' : 'not '}null`); }
@@ -120,21 +133,21 @@ export class FileRepository {
   scanChanges(id: number): FileScanChangesView | null { return this.history.changes(id); }
 
   replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string,
-    qrRecords: QrFileScanRecord[] = []): {
+    qrRecords?: QrFileScanRecord[], workspaceKey?: string): {
     missing: number; historicalRegistered: number;
   } {
     for (const record of records) {
       validateWorkspaceRelativePath(record.relativePath);
       record.pathKey = toWorkspacePathKey(record.relativePath);
     }
-    for (const record of qrRecords) {
+    for (const record of qrRecords ?? []) {
       validateWorkspaceRelativePath(record.relativePath);
       record.pathKey = toWorkspacePathKey(record.relativePath);
     }
     if (new Set(records.map((record) => record.pathKey)).size !== records.length) {
       throw new Error('扫描结果包含重复的实际相对路径');
     }
-    if (new Set(qrRecords.map((record) => record.pathKey)).size !== qrRecords.length) {
+    if (new Set((qrRecords ?? []).map((record) => record.pathKey)).size !== (qrRecords?.length ?? 0)) {
       throw new Error('扫描结果包含重复的二维码相对路径');
     }
     return this.db.transaction(() => {
@@ -147,9 +160,9 @@ export class FileRepository {
       const previousQr = this.db.prepare(`select id, relative_path as relativePath, path_key as pathKey, file_name as fileName,
         size_bytes as sizeBytes, modified_at as modifiedAt, content_sha256 as contentSha256, is_present as isPresent
         from qr_code_files where is_present = 1`).all() as StoredFileSnapshotRow[];
-      const currentQr = qrRecords.map((record) => ({ relativePath: record.relativePath, pathKey: record.pathKey!, fileName: record.fileName,
+      const currentQr = (qrRecords ?? []).map((record) => ({ relativePath: record.relativePath, pathKey: record.pathKey!, fileName: record.fileName,
         sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, contentSha256: record.contentSha256 ?? null }));
-      const qrDifferences = diffFileScan(previousQr.map((file) => ({ ...file, isPresent: file.isPresent === 1 })), currentQr);
+      const qrDifferences = qrRecords === undefined ? [] : diffFileScan(previousQr.map((file) => ({ ...file, isPresent: file.isPresent === 1 })), currentQr);
       const allDifferences = [...differences, ...qrDifferences];
       const counts = { added: allDifferences.filter((change) => change.type === 'added').length,
         missing: allDifferences.filter((change) => change.type === 'missing').length,
@@ -159,20 +172,14 @@ export class FileRepository {
       const scanRun = this.db.prepare(`insert into file_scan_runs
         (started_at, completed_at, total_current, added_count, missing_count, moved_count, changed_count, unchanged_count)
         values (@scannedAt, @scannedAt, @totalCurrent, @added, @missing, @moved, @changed, @unchanged) returning id`).get({
-        scannedAt, totalCurrent: records.length + qrRecords.length, ...counts,
+        scannedAt, totalCurrent: records.length + (qrRecords?.length ?? 0), ...counts,
       }) as { id: number };
       this.db.prepare('update pdf_files set is_present = 0').run();
-      this.db.prepare('update qr_code_files set is_present = 0').run();
-      const qrRepository = new QrRepository(this.db);
-      for (const record of qrRecords) {
-        if (record.productId != null && record.purposeId != null) {
-          qrRepository.ensurePurposeForProduct(record.productId, record.purposeId);
-          const code = qrRepository.findByProductPurpose(record.productId, record.purposeId);
-          if (code) record.qrCodeId = code.id;
-          else {
-            record.qrCodeId = null; record.matchStatus = 'pending';
-            record.classificationWarning = 'qr-purpose-not-applicable';
-          }
+      if (qrRecords !== undefined) this.db.prepare('update qr_code_files set is_present = 0').run();
+      // Explicit legacy scan payloads may refresh indices, but never create or infer QR configurations.
+      for (const record of qrRecords ?? []) {
+        if (record.matchStatus === 'matched' && record.qrCodeId == null) {
+          record.matchStatus = 'pending'; record.classificationWarning = 'qr-manual-selection-required';
         }
       }
       this.batches.markAllMissing();
@@ -231,6 +238,25 @@ export class FileRepository {
           detectedSku: context?.sku ?? null, detectedModel: context?.model ?? null,
           detectedProductCategory: context?.productCategory ?? null, scannedAt });
         if (!existed) historicalRegistered += 1;
+      }
+      // A scan can report evidence, but cannot replace an established attribution.
+      const established = this.db.prepare(`select file.drawing_id as drawingId,
+          file.historical_drawing_id as historicalId, historical.full_code as historicalFullCode,
+          file.conversion_type as conversionType
+        from pdf_files file
+        left join drawing_numbers drawing on drawing.id=file.drawing_id and drawing.deleted_at is null
+        left join historical_drawing_numbers historical on historical.id=file.historical_drawing_id and historical.deleted_at is null
+        where file.path_key=? and (drawing.id is not null or historical.id is not null)`);
+      for (const record of records) {
+        const prior = established.get(record.pathKey!) as {drawingId:number|null;historicalId:number|null;historicalFullCode:string|null;conversionType:FileScanRecord['conversionType']}|undefined;
+        if (!prior) continue;
+        const differs = prior.drawingId !== record.drawingId || (prior.historicalFullCode ?? null) !== (record.historicalFullCode ?? null);
+        if (!differs) continue;
+        const hasNewProposal = record.drawingId != null || record.historicalFullCode != null;
+        record.drawingId = prior.drawingId;
+        record.historicalFullCode = prior.historicalFullCode;
+        record.matchStatus = 'matched'; record.conversionType = prior.conversionType;
+        if (hasNewProposal) record.classificationWarning = 'association-review-required';
       }
       const upsert = this.db.prepare(`insert into pdf_files
         (relative_path, path_key, material_batch_id, file_name, drawing_id, historical_drawing_id,
@@ -295,7 +321,7 @@ export class FileRepository {
             else excluded.classification_warning end,
           detected_identifier = excluded.detected_identifier, is_present = 1,
           last_seen_scan_run_id = excluded.last_seen_scan_run_id, last_seen_at = excluded.last_seen_at`);
-      for (const record of qrRecords) upsertQr.run({ relativePath: record.relativePath, pathKey: record.pathKey,
+      for (const record of qrRecords ?? []) upsertQr.run({ relativePath: record.relativePath, pathKey: record.pathKey,
         fileName: record.fileName, mimeType: record.mimeType, sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt,
         contentSha256: record.contentSha256 ?? null, qrCodeId: record.qrCodeId, matchStatus: record.matchStatus,
         classificationWarning: record.classificationWarning, detectedIdentifier: record.detectedIdentifier,
@@ -331,10 +357,16 @@ export class FileRepository {
         insertQrChange.run({ scanRunId: scanRun.id, changeType: difference.type, fileIndexId,
           relativePath: difference.relativePath, previousRelativePath: difference.previousRelativePath, fileName: snapshot.fileName });
       }
+      if (workspaceKey !== undefined) {
+        this.management().reconcileMoves(workspaceKey, previous.map(file => ({...file,isPresent:file.isPresent===1})), current, differences, scannedAt);
+        this.management().reconcile(workspaceKey);
+      }
       const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
       return { missing, historicalRegistered };
     }).immediate();
   }
+
+  management(): PdfManagementRepository { return new PdfManagementRepository(this.db); }
 
   cleanupMissing(ids: number[]): { cleaned: number } {
     return this.db.transaction(() => {
@@ -344,6 +376,8 @@ export class FileRepository {
       if (count !== ids.length) {
         throw new FileError('PDF_CLEANUP_NOT_ALLOWED', '只能清理已缺失的 PDF 索引记录');
       }
+      const preview = this.management().preview({ ids, action: 'clear' }, '');
+      if (preview.blocked) throw new FileError('PDF_CLEANUP_NOT_ALLOWED', preview.entries.filter(entry => !entry.allowed).map(entry => entry.reason).join('；'));
       const result = this.db.prepare(`delete from pdf_files where id in (${placeholders}) and is_present = 0`).run(...ids);
       return { cleaned: result.changes };
     }).immediate();
@@ -352,11 +386,13 @@ export class FileRepository {
   clearIndex(): FileIndexClearResult {
     return this.db.transaction(() => {
       const result = this.indexCounts();
+      const ids = (this.db.prepare('select id from pdf_files').all() as Array<{id:number}>).map(row => row.id);
+      for (let offset = 0; offset < ids.length; offset += 500) {
+        const preview = this.management().preview({ids: ids.slice(offset, offset + 500), action: 'clear'}, '');
+        if (preview.blocked) throw new FileError('PDF_CLEANUP_NOT_ALLOWED', '存在已关联图号或业务引用的 PDF，请按预览逐项清除');
+      }
       this.db.prepare('delete from pdf_files').run();
-      this.db.prepare('delete from qr_code_files').run();
-      this.db.prepare('delete from material_batches').run();
-      this.db.prepare('delete from file_scan_changes').run();
-      this.db.prepare('delete from file_scan_runs').run();
+      result.qrCodeFiles = 0; result.materialBatches = 0; result.scanChanges = 0; result.scanRuns = 0;
       const foreignKeyErrors = this.db.prepare('pragma foreign_key_check').all();
       if (foreignKeyErrors.length > 0) throw new Error('清空资料库索引后外键校验失败');
       return result;
@@ -377,8 +413,8 @@ export class FileRepository {
     // DEFERRED starts a read snapshot on the first SELECT without reserving a write lock.
     return this.db.transaction(() => {
       // Explicitly pick manual filters so a navigation selection cannot narrow its own counts.
-      const { whereSql, parameters } = fileSearchPredicate({ keyword: filters.keyword, matchStatus: filters.matchStatus,
-        conversionType: filters.conversionType, presence: filters.presence });
+      const { whereSql, parameters } = fileSearchPredicate({ managementState: filters.managementState, keyword: filters.keyword, matchStatus: filters.matchStatus,
+        conversionType: filters.conversionType, presence: filters.presence }, this.db);
       const scope = `${FILE_SEARCH_JOINS} ${whereSql}`;
       const totals = this.db.prepare(`select count(distinct file.id) as total,
         count(distinct case when product.id is null then file.id end) as unassociatedProducts ${scope}`)
@@ -394,19 +430,30 @@ export class FileRepository {
         count(distinct file.id) as count ${scope} ${whereSql ? 'and' : 'where'} file.material_batch_id is not null
         group by file.material_batch_id, product.id order by file.material_batch_id, product.id`)
         .all(parameters) as FileNavigationResult['batches'];
-      return { ...totals, categories, products, batches };
+      const appearances = this.db.prepare(`select binding.appearance_version_id as appearanceVersionId, count(distinct file.id) as count
+        ${FILE_SEARCH_JOINS}
+        join ${drawingAppearanceRelationsSql} binding on (binding.origin='planned' and binding.record_id=file.drawing_id) or (binding.origin='historical' and binding.record_id=file.historical_drawing_id)
+        ${whereSql} group by binding.appearance_version_id order by binding.appearance_version_id`).all(parameters) as Array<{appearanceVersionId:number;count:number}>;
+      const appearanceBatches = this.db.prepare(`select binding.appearance_version_id as appearanceVersionId,
+        file.material_batch_id as materialBatchId, product.id as productId, count(distinct file.id) as count
+        ${FILE_SEARCH_JOINS}
+        join ${drawingAppearanceRelationsSql} binding on (binding.origin='planned' and binding.record_id=file.drawing_id) or (binding.origin='historical' and binding.record_id=file.historical_drawing_id)
+        ${whereSql} ${whereSql ? 'and' : 'where'} file.material_batch_id is not null
+        group by binding.appearance_version_id, file.material_batch_id, product.id order by binding.appearance_version_id, file.material_batch_id`).all(parameters) as NonNullable<FileNavigationResult['appearanceBatches']>;
+      return { ...totals, categories, products, batches, appearances, appearanceBatches };
     }).deferred();
   }
 
   search(filters: FileSearchFilters = {}): FileSearchResult {
-    const page = Math.max(1, filters.page ?? 1); const pageSize = Math.min(200, Math.max(1, filters.pageSize ?? 50));
-    const { whereSql, parameters } = fileSearchPredicate(filters);
+    let page = Math.max(1, filters.page ?? 1); const pageSize = Math.min(200, Math.max(1, filters.pageSize ?? 50));
+    const { whereSql, parameters } = fileSearchPredicate(filters, this.db);
     const total = (this.db.prepare(`select count(*) as total ${FILE_SEARCH_JOINS} ${whereSql}`).get(parameters) as { total: number }).total;
+    page = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
     const rows = this.db.prepare(`select file.*, coalesce(drawing.full_code, historical.full_code) as full_code,
         historical.full_code as historical_full_code, drawing.display_name, product.id as product_id, product.sku, product.model,
         product.product_category,
         brand.name as brand_name, project.name as project_item_name, color.name as color_name,
-        batch.name as material_batch_name, batch.recognition_status as material_batch_status
+        coalesce(batch.display_name, batch.name) as material_batch_name, batch.recognition_status as material_batch_status
       ${FILE_SEARCH_JOINS} ${whereSql} order by file.file_name collate nocase, file.id limit @limit offset @offset`)
       .all({ ...parameters, limit: pageSize, offset: (page - 1) * pageSize }) as FileRow[];
     return { items: rows.map(toView), total, page, pageSize };

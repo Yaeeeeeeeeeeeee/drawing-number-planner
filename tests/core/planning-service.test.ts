@@ -103,3 +103,69 @@ describe('PlanningService preview', () => {
     })) })).toThrowError(expect.objectContaining({ code: 'INVALID_PLAN' }));
   });
 });
+
+describe('appearance version context',()=>{
+  it('requires an explicit version when the product has multiple appearances, binding only the chosen version',()=>{
+    const refs=fixture();
+    const appearance=dictionaries.create({type:'appearance',code:'02',name:'二号外观'});
+    const version=Number(db.prepare(`insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,?,'二代','draft','2026')`).run(refs.product.id,appearance.id).lastInsertRowid);
+    expect(()=>service.preview(input(refs))).toThrow('明确选择外观版本');
+    insertHistorical(4,'02');
+    const context={...input(refs),appearanceVersionId:version};
+    const preview=service.preview(context);expect(preview.rows[0].fullCode).toBe('02.0404.020.0401005');
+    const reserved=service.reserve({...context,rows:context.rows.map((row,i)=>({...row,expectedFullCode:preview.rows[i].fullCode}))});
+    expect(db.prepare('select record_id,appearance_version_id from drawing_appearance_bindings').get()).toEqual({record_id:reserved[0].id,appearance_version_id:version});
+  });
+});
+
+it('integrates an explicit plan, atomic reservation and appearance-scoped library without changing occupation',async()=>{
+  const refs=fixture();const version=db.prepare('select id from product_appearance_versions where product_id=?').get(refs.product.id) as {id:number};
+  const request={...input(refs),appearanceVersionId:version.id};const preview=service.preview(request);
+  const reserved=service.reserve({...request,rows:request.rows.map((row,i)=>({...row,expectedFullCode:preview.rows[i].fullCode}))});
+  const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');
+  const library=new DrawingQueryService(db);const found=library.search({productId:refs.product.id,appearanceVersionId:version.id});
+  expect(found.items).toHaveLength(1);expect(found.items[0]).toMatchObject({id:reserved[0].id,fullCode:preview.rows[0].fullCode,appearanceVersionId:version.id});
+  expect(service.preview(request).rows[0].sequence).toBe(2);
+});
+
+it('rejects a soft deleted product even when its legacy business status still says active',()=>{
+  const refs=fixture();db.prepare("update products set deleted_at='2026-10-20' where id=?").run(refs.product.id);
+  expect(()=>service.preview(input(refs))).toThrow('产品不存在或已停用');
+});
+
+it('rejects reserving a version without its own valid appearance code rather than falling back to product defaults',()=>{
+  const refs=fixture();const version=Number(db.prepare(`insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,null,'待补外观','draft','now')`).run(refs.product.id).lastInsertRowid);
+  expect(()=>service.preview({...input(refs),appearanceVersionId:version})).toThrow('外观');
+  expect(db.prepare('select * from drawing_numbers').all()).toEqual([]);
+});
+
+it('rolls back every reservation and occupancy when persisting the version binding fails',()=>{
+  const refs=fixture();const request=input(refs),preview=service.preview(request);
+  db.exec(`create trigger reject_planning_binding before insert on drawing_appearance_bindings begin select raise(abort,'binding persistence failed'); end`);
+  expect(()=>service.reserve({...request,rows:request.rows.map((row,i)=>({...row,expectedFullCode:preview.rows[i].fullCode}))})).toThrow('binding persistence failed');
+  expect(db.prepare('select * from drawing_numbers').all()).toEqual([]);
+  expect(service.preview(request).rows[0].fullCode).toBe(preview.rows[0].fullCode);
+});
+
+it('explicitly reuses a reserved drawing in a new version without changing attribution, occupation or creating BOM',async()=>{
+ const refs=fixture(),request=input(refs),preview=service.preview(request);
+ const reserved=service.reserve({...request,rows:request.rows.map((row,i)=>({...row,expectedFullCode:preview.rows[i].fullCode}))})[0];
+ const primary=db.prepare('select * from drawing_appearance_bindings where record_id=?').get(reserved.id);
+ const version=Number(db.prepare(`insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,?,'二代','draft','now')`).run(refs.product.id,refs.appearance.id).lastInsertRowid);
+ const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');const library=new DrawingQueryService(db);
+ const target={signedId:reserved.id,productId:refs.product.id,appearanceVersionId:version,reason:'新外观沿用已核验物料'};
+ expect(library.search({appearanceVersionId:version}).items).toEqual([]);
+ const reuse=library.reuse.preview(target);expect(db.prepare('select * from drawing_appearance_usages').all()).toEqual([]);
+ expect(library.reuse.confirm({...target,fingerprint:reuse.fingerprint,confirmed:true})).toEqual({updated:1});
+ expect(library.search({productId:refs.product.id,appearanceVersionId:version}).items.map(row=>row.id)).toEqual([reserved.id]);
+ expect(library.navigationCounts({}).appearances).toContainEqual({appearanceVersionId:version,count:1});
+ expect(db.prepare('select * from drawing_appearance_bindings where record_id=?').get(reserved.id)).toEqual(primary);
+ expect(db.prepare('select * from bom_versions').all()).toEqual([]);expect(service.preview({...request,appearanceVersionId:(primary as {appearance_version_id:number}).appearance_version_id}).rows[0].sequence).toBe(2);
+ expect(db.prepare('select count(*) as n from drawing_appearance_usage_audit').get()).toEqual({n:1});
+ expect(()=>library.transition(reserved.id,'voided')).toThrow('已有明确外观沿用关系');
+ expect(()=>library.associations.correct(target,'不允许改写沿用图号的原始归属')).toThrow('不能改写原始归属');
+ expect(library.previewDeletion(reserved.id)).toMatchObject({deletable:false,blockers:[expect.objectContaining({kind:'appearance_usage'})]});
+ expect(library.reuse.confirm({...target,fingerprint:library.reuse.preview(target).fingerprint,confirmed:true})).toEqual({updated:0});
+ const stale=library.reuse.preview(target);db.prepare("update product_appearance_versions set label='变更' where id=?").run(version);
+ expect(()=>library.reuse.confirm({...target,fingerprint:stale.fingerprint,confirmed:true})).toThrow('重新预览');
+});

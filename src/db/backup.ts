@@ -1,4 +1,4 @@
-import { constants, copyFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, realpathSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
@@ -34,20 +34,27 @@ export function createDatabaseBackup(
   dateKey?: string,
 ): string {
   mkdirSync(backupsDir, { recursive: true });
-  database.pragma('wal_checkpoint(TRUNCATE)');
+  if (database.inTransaction) throw new Error('备份必须在业务事务之外执行');
+  if (realpathSync(source) !== realpathSync(database.name)) throw new Error('备份源与当前数据库不一致');
   const precise = timestamp(now);
   const stem = dateKey ? `${purpose}-${dateKey}-${precise.slice(9)}` : `${purpose}-${precise}`;
   let suffix = 0;
   while (true) {
     const destination = join(backupsDir, `${stem}${suffix ? `-${suffix}` : ''}.db`);
+    let owned = false;
     try {
-      copyFileSync(source, destination, constants.COPYFILE_EXCL);
+      // Reserve the filename without overwriting an earlier backup. VACUUM INTO
+      // reads a consistent SQLite snapshot, including committed WAL pages even
+      // when another connection prevents a checkpoint.
+      closeSync(openSync(destination, 'wx'));
+      owned = true;
+      database.prepare('VACUUM main INTO ?').run(destination);
       if (!isValidDatabaseBackup(destination)) {
-        unlinkSync(destination);
         throw new Error('备份校验失败');
       }
       return destination;
     } catch (error) {
+      if (owned && existsSync(destination)) unlinkSync(destination);
       const code = error instanceof Error && 'code' in error ? (error as NodeJS.ErrnoException).code : undefined;
       if (code === 'EEXIST') {
         suffix += 1;

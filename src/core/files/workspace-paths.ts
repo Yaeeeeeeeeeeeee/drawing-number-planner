@@ -1,5 +1,5 @@
 import { existsSync, realpathSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, win32 } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve, win32 } from 'node:path';
 
 import { FileError } from './file-errors.js';
 
@@ -9,13 +9,15 @@ function normalizedForComparison(path: string): string {
 
 function assertInside(root: string, candidate: string): void {
   const difference = relative(normalizedForComparison(root), normalizedForComparison(candidate));
-  if (difference === '..' || difference.startsWith(`..${win32.sep}`) || isAbsolute(difference)) {
+  if (difference === '..' || /^\.\.[\\/]/.test(difference) || isAbsolute(difference)) {
     throw new FileError('PATH_OUTSIDE_WORKSPACE', '路径超出资料根目录');
   }
 }
 
 export function validateWorkspaceRoot(input: string): string {
-  const value = input.trim();
+  const raw = input.trim();
+  // Accept a Windows-style trailing separator when a native POSIX directory was pasted.
+  const value = process.platform !== 'win32' && !existsSync(raw) ? raw.replace(/\\+$/, '') : raw;
   if (!value || !isAbsolute(value) || !existsSync(value)) {
     throw new FileError('WORKSPACE_INVALID', '资料根目录必须是已存在的本机绝对目录');
   }
@@ -52,7 +54,7 @@ export function toWorkspacePathKey(relativePath: string): string {
 function canonicalizeWithExistingAncestor(input: string): string {
   let probe = input; const missing: string[] = [];
   while (!existsSync(probe) && probe !== dirname(probe)) {
-    missing.unshift(input.slice(dirname(probe).length + 1, probe.length));
+    missing.unshift(basename(probe));
     probe = dirname(probe);
   }
   return resolve(realpathSync.native(probe), ...missing);
@@ -60,11 +62,19 @@ function canonicalizeWithExistingAncestor(input: string): string {
 
 export function resolveWorkspacePath(rootInput: string, relativePath: string,
   options: { requireExistingParent?: boolean } = {}): string {
+  void options;
   validateWorkspaceRelativePath(relativePath);
   const root = validateWorkspaceRoot(rootInput);
-  const candidate = resolve(root, relativePath);
+  const nativeCandidate = resolve(root, ...relativePath.split(/[\\/]+/));
+  const literalCandidate = resolve(root, relativePath);
+  // Old POSIX fixtures/imports could contain a literal backslash in a filename. Only use it
+  // when that exact file exists and the normal separator interpretation does not.
+  if (nativeCandidate !== literalCandidate && existsSync(nativeCandidate) && existsSync(literalCandidate)) {
+    throw new FileError('PDF_FILE_UNAVAILABLE', '相对路径同时对应两个实际文件，请修正路径歧义后重扫');
+  }
+  const candidate = !existsSync(nativeCandidate) && existsSync(literalCandidate) ? literalCandidate : nativeCandidate;
   assertInside(root, candidate);
-  if (options.requireExistingParent) {
+  {
     let probe = candidate;
     while (!existsSync(probe) && probe !== dirname(probe)) probe = dirname(probe);
     const realProbe = realpathSync.native(probe);

@@ -1,0 +1,26 @@
+.products-integrated.products-compact .table-wrap > table > thead > tr > th,
+.products-integrated.products-compact .table-wrap > table > tbody > tr > td {padding:12px;text-align:center;}
+.products-integrated.products-compact .table-wrap > table > thead > tr > th:first-child,
+.products-integrated.products-compact .table-wrap > table > tbody > tr > td:first-child {text-align:left;}
+.product-version-toggle {display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.product-appearance-panel {padding:12px;text-align:left;border:1px solid var(--border-color,#dce2e9);border-radius:8px;margin:8px 0;background:var(--surface,#fff);}
+.product-appearance-panel h2 {font-size:15px;margin:0;}
+.product-version-row {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--border-color,#e6e9ef);flex-wrap:wrap;}
+.product-version-row small {display:block;margin-top:5px;color:var(--text-muted,#667085);}
+.product-version-row .row-actions {display:flex;gap:12px;flex-wrap:wrap;}
+.product-version-form {display:grid;gap:12px;max-width:680px;margin-top:16px;}
+.product-version-form label {display:flex;gap:10px;align-items:center;}
+.product-version-form input:not([type=checkbox]),.product-version-form select {flex:1;min-width:120px;}
+.product-activation-preview {margin-top:16px;padding:12px;background:var(--surface-subtle,#f6f8fa);}
+.product-appearance-panel fieldset {display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;border:1px solid var(--border-color,#ddd);}
+.product-version-resources {margin-top:12px;padding:12px;border:1px solid var(--border-color,#e6e9ef);border-radius:6px;}
+.product-version-resources [role=tablist] {display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--border-color,#e6e9ef);padding-bottom:8px;}
+.product-version-resources li {padding:8px 0;overflow-wrap:anywhere;}
+.product-version-resources small {display:block;color:var(--text-muted,#667085);}
+.products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(1) {width:18%;min-width:150px;}
+.products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(2) {width:12%;min-width:110px;}
+.products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(3) {width:10%;min-width:90px;}
+.products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(4) {width:12%;min-width:110px;}
+.products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(5) {width:8%;min-width:80px;}
+.products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(n+6) {width:10%;min-width:80px;}
+.products-integrated.products-compact > .table-wrap > table > tbody > .expanded-table-row > td {position:static;white-space:normal;width:auto;box-shadow:none;}

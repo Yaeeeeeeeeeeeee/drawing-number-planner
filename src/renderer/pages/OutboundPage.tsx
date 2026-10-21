@@ -1,3 +1,4 @@
+import './outbound/outbound-v2.css';
 import { PageHeader } from '../components/PageHeader';
 import { useCallback, useRef, useState } from 'react';
 import type { CreatedOutboundPackageView, PlannerApi } from '../data/client';
@@ -10,11 +11,11 @@ import { PackageBuilder, type OutboundMailContext } from './outbound/PackageBuil
 import { isOutboundMockEnabled } from './outbound/outbound-mock';
 import { OutboundMockPage } from './outbound/OutboundMockPage';
 
-export function OutboundPage({ api, registerLeaveGuard }: { api: PlannerApi; registerLeaveGuard?: RegisterLeaveGuard }) {
-  return isOutboundMockEnabled() ? <OutboundMockPage /> : <OutboundWorkspace api={api} registerLeaveGuard={registerLeaveGuard} />;
+export function OutboundPage({ api, registerLeaveGuard, target }: { api: PlannerApi; registerLeaveGuard?: RegisterLeaveGuard; target?:{productId:number;appearanceVersionId?:number} }) {
+  return isOutboundMockEnabled() ? <OutboundMockPage /> : <OutboundWorkspace api={api} registerLeaveGuard={registerLeaveGuard} target={target} />;
 }
 
-function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard }: { api: PlannerApi; registerLeaveGuard?: RegisterLeaveGuard }) {
+function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard, target }: { api: PlannerApi; registerLeaveGuard?: RegisterLeaveGuard; target?:{productId:number;appearanceVersionId?:number} }) {
   const [mailContext, setMailContext] = useState<OutboundMailContext | null>(null);
   const [settings, setSettings] = useState(false);
   const leaveGuard = useRef<LeaveGuard | null>(null);
@@ -34,19 +35,18 @@ function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard }: { ap
       </PageHeader>
       {settings && <MailConfiguration api={api} registerLeaveGuard={registerLeaveGuard} />}
       <div className="outbound-workflow" hidden={settings}>
-      <section className="ob-step" aria-label="资料打包步骤">
-        <h2><span aria-hidden="true">01</span> 选择外发范围</h2>
+
         <PackageBuilder
           api={api}
+          target={target}
           showResult={false}
           onResultChange={setCreatedPackage}
           onPackage={(_value, context) => setMailContext(context)}
         />
-      </section>
       <section className="ob-step" aria-label="外发生成结果">
-          <h2><span aria-hidden="true">02</span> 生成外发结果</h2>{createdPackage ? <PackageResult key={createdPackage.id} value={createdPackage}/> : <p className="muted-text">完成预览并打包后，在此核对真实生成结果。</p>}
+          <h2><span aria-hidden="true">03</span> 生成外发结果</h2>{createdPackage ? <PackageResult key={createdPackage.id} value={createdPackage}/> : <p className="muted-text">完成预览并打包后，在此核对真实生成结果。</p>}
       </section>
-      <section className="ob-step" aria-label="邮件编辑步骤"><h2><span aria-hidden="true">03</span> 邮件草稿</h2>
+      <section className="ob-step" aria-label="邮件编辑步骤"><h2><span aria-hidden="true">04</span> 邮件草稿</h2>
           {!mailContext && <p className="muted-text">生成外发包后显示邮件草稿；需要时可先展开编辑。</p>}
           <details className="ob-workbench-mail" open={mailContext !== null}>
             <summary>编辑邮件草稿</summary>

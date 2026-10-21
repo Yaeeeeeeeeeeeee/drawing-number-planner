@@ -1,3 +1,4 @@
+import { listRawProductIds } from './appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { HistoricalProductCandidateIdentity, Product, ProductFilters, ProductInput, ProductReferenceSummary } from './product-types.js';
 
@@ -55,7 +56,7 @@ export class ProductRepository {
   }
 
   list(filters: ProductFilters): Product[] {
-    const conditions: string[] = ['product.deleted_at is null'];
+    const conditions: string[] = ['product.deleted_at is null', 'not exists(select 1 from product_identity_members identity where identity.raw_product_id=product.id and identity.canonical_product_id<>product.id)'];
     const values: Array<string | number> = [];
     if ((filters.status ?? 'active') !== 'all') {
       conditions.push('product.status = ?'); values.push(filters.status ?? 'active');
@@ -97,8 +98,8 @@ export class ProductRepository {
   getReferenceSummary(id: number): ProductReferenceSummary {
     const row = this.db.prepare(`select
       (select count(*) from products where reference_product_id = @id) as reference_product_count,
-      (select count(*) from drawing_numbers where (product_id = @id or source_product_id = @id) and deleted_at is null) as planned_drawing_count,
-      (select count(*) from historical_drawing_numbers where product_id = @id and deleted_at is null) as historical_drawing_count,
+      (select count(*) from drawing_numbers where (product_id = @id or source_product_id = @id) and deleted_at is null)+(select count(*) from drawing_appearance_usages where product_id=@id and origin='planned') as planned_drawing_count,
+      (select count(*) from historical_drawing_numbers where product_id = @id and deleted_at is null)+(select count(*) from drawing_appearance_usages where product_id=@id and origin='historical') as historical_drawing_count,
       (select count(*) from material_batches where product_id = @id) as material_batch_count,
       (select count(*) from bom_versions where product_id = @id and deleted_at is null) as bom_count,
       (select count(*) from product_qr_codes code
@@ -109,6 +110,8 @@ export class ProductRepository {
           and coalesce(trim(code.target_url), '') = ''
           and not exists (select 1 from qr_code_files file where file.qr_code_id = code.id)
           and not exists (select 1 from bom_item_qr_codes bom_qr where bom_qr.qr_code_id = code.id)
+          and not exists (select 1 from qr_manual_links manual where manual.qr_code_id = code.id)
+          and not exists (select 1 from qr_manual_audit manual where manual.qr_code_id = code.id)
           and (purpose.default_for_all = 1 or exists (
             select 1 from qr_purpose_product_categories category
             where category.purpose_id = purpose.id and category.product_category = product.product_category
@@ -136,6 +139,8 @@ export class ProductRepository {
         and code.name in (purpose.display_name, purpose.english_name) and coalesce(trim(code.target_url), '') = ''
         and not exists (select 1 from qr_code_files file where file.qr_code_id = code.id)
         and not exists (select 1 from bom_item_qr_codes bom_qr where bom_qr.qr_code_id = code.id)
+          and not exists (select 1 from qr_manual_links manual where manual.qr_code_id = code.id)
+          and not exists (select 1 from qr_manual_audit manual where manual.qr_code_id = code.id)
         and (purpose.default_for_all = 1 or exists (
           select 1 from qr_purpose_product_categories category
           where category.purpose_id = purpose.id and category.product_category = product.product_category
@@ -144,6 +149,9 @@ export class ProductRepository {
   }
 
   delete(id: number): boolean {
+    this.db.prepare('delete from product_appearance_colors where appearance_version_id in(select id from product_appearance_versions where product_id=?)').run(id);
+    this.db.prepare('delete from product_appearance_versions where product_id=?').run(id);
+    this.db.prepare('delete from product_identity_members where raw_product_id=? and canonical_product_id=?').run(id,id);
     return this.db.prepare('delete from products where id = ?').run(id).changes === 1;
   }
 
@@ -154,9 +162,9 @@ export class ProductRepository {
   }
 
   hasDrawingReferences(id: number): boolean {
-    const row = this.db.prepare('select count(*) as count from drawing_numbers where product_id = ? or source_product_id = ?')
-      .get(id, id) as { count: number };
-    return row.count > 0;
+    const ids=listRawProductIds(this.db,id),marks=ids.map(()=>'?').join(',');
+    const row=this.db.prepare(`select (select count(*) from drawing_numbers where product_id in (${marks}) or source_product_id in (${marks}))+(select count(*) from historical_drawing_numbers where product_id in (${marks}))+(select count(*) from drawing_appearance_usages where product_id in (${marks})) as count`).get(...ids,...ids,...ids,...ids) as {count:number};
+    return row.count>0;
   }
 
   listHistoricalCandidateRows(): Array<HistoricalProductCandidateIdentity & { historicalDrawingCount: number }> {

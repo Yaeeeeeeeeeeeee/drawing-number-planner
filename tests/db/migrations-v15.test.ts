@@ -1,12 +1,11 @@
 import { expect, it, vi } from 'vitest';
-import { openDatabase } from '../../src/db/database';
+import { createV15Fixture } from './v15-fixture';
 import { migrateDatabase } from '../../src/db/migrations';
 
 it.each([false, true])('v14 recycle-bin upgrade backs up and rolls back on failure=%s', (fail) => {
-  const db = openDatabase(':memory:');
+  const db = createV15Fixture();
   try {
-    migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
-    db.exec('delete from schema_migrations where version > 14');
+    db.exec("delete from schema_migrations where version > 14; insert into schema_migrations(version,applied_at) values(14,'2026-10-19')");
     if ((db.pragma('table_info(dictionary_items)') as { name: string }[]).some(c => c.name === 'deleted_at')) {
       db.exec('alter table dictionary_items drop column deleted_at');
     }
@@ -15,10 +14,10 @@ it.each([false, true])('v14 recycle-bin upgrade backs up and rolls back on failu
     const backup = vi.fn(() => { expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:14}); });
     const run = () => migrateDatabase(db, { databaseExists: true, createBackup: backup });
     if (fail) expect(run).toThrow('v15-failed');
-    else expect(run()).toEqual({ from: 14, to: 15 });
+    else expect(run()).toEqual({ from: 14, to: 17 });
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare('select code,name from dictionary_items').all()).toEqual([{code:'02',name:'历史品牌'}]);
-    expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v: fail ? 14 : 15});
+    expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v: fail ? 14 : 17});
     expect((db.pragma('table_info(dictionary_items)') as {name:string}[]).some(c=>c.name==='deleted_at')).toBe(!fail);
     expect(db.pragma('foreign_key_check')).toEqual([]);
   } finally { db.close(); }

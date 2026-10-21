@@ -81,27 +81,25 @@ describe('PDF file API', () => {
     unlinkSync(removedQr); writeFileSync(addedQr, 'new QR');
     const secondScan = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
     expect(await secondScan.json()).toMatchObject({
-      total: 3, currentTotal: 4,
-      comparison: { added: 2, missing: 2, moved: 0, changed: 1, unchanged: 1 },
+      total: 3, currentTotal: 3,
+      comparison: { added: 1, missing: 1, moved: 0, changed: 1, unchanged: 1 },
     });
 
     const latest = await (await fetch(`${server.url}/api/files/scans/latest`)).json() as { id: number; currentTotal: number };
-    expect(latest.currentTotal).toBe(4);
+    expect(latest.currentTotal).toBe(3);
     const onePage = await (await fetch(`${server.url}/api/files?page=1&pageSize=1`)).json();
     expect(onePage).toMatchObject({ total: 3, items: [expect.any(Object)] });
     expect(onePage.items).toHaveLength(1);
-    expect(latest.currentTotal).toBe(4);
+    expect(latest.currentTotal).toBe(3);
     const changes = await (await fetch(`${server.url}/api/files/scans/${latest.id}/changes`)).json();
     expect(changes).toMatchObject({
-      scan: { id: latest.id, currentTotal: 4 },
+      scan: { id: latest.id, currentTotal: 3 },
       changes: {
         added: expect.arrayContaining([
           expect.objectContaining({ relativePath: 'added.pdf', indexKind: 'pdf' }),
-          expect.objectContaining({ relativePath: 'QR100-Warranty（网址编码）.png', indexKind: 'qr' }),
         ]),
         missing: expect.arrayContaining([
           expect.objectContaining({ relativePath: 'removed.pdf', indexKind: 'pdf' }),
-          expect.objectContaining({ relativePath: 'QR100-Manual（网址编码）.png', indexKind: 'qr' }),
         ]),
         changed: [expect.objectContaining({ relativePath: 'changed.pdf' })],
       },
@@ -113,7 +111,7 @@ describe('PDF file API', () => {
     const newest = await (await fetch(`${server.url}/api/files/scans/latest`)).json() as { id: number; currentTotal: number };
     const newestChanges = await (await fetch(`${server.url}/api/files/scans/${newest.id}/changes`)).json();
     expect(newest.currentTotal).toBe(0);
-    expect(newestChanges.changes.missing).toHaveLength(4);
+    expect(newestChanges.changes.missing).toHaveLength(3);
     expect(newestChanges.changes.missing.map((item: { relativePath: string }) => item.relativePath)).not.toContain('removed.pdf');
   });
 
@@ -177,7 +175,7 @@ describe('PDF file API', () => {
     expect((await fetch(`${server.url}/api/files?unknown=true`)).status).toBe(400);
   });
 
-  it('authenticates and atomically cleans only selected missing PDF index records', async () => {
+  it('authenticates cleanup and blocks missing historical PDF identity removal', async () => {
     const { server, workspace } = await serverFixture();
     const filePath = join(workspace, '02.0404.010.0401007-history.pdf');
     await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
@@ -203,12 +201,13 @@ describe('PDF file API', () => {
 
     const cleaned = await fetch(`${server.url}/api/files/cleanup`, { method: 'POST', headers: writeHeaders,
       body: JSON.stringify({ ids: [id] }) });
-    expect(cleaned.status).toBe(200);
-    expect(await cleaned.json()).toEqual({ cleaned: 1 });
-    expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(0);
+    expect(cleaned.status).toBe(422);
+    expect((await cleaned.json()).error.code).toBe('PDF_CLEANUP_NOT_ALLOWED');
+    const retained = await (await fetch(`${server.url}/api/files?presence=all`)).json();
+    expect(retained.total).toBe(1); expect(retained.items[0].id).toBe(id);
   });
 
-  it('previews and clears scan indexes only after the exact confirmation phrase', async () => {
+  it('requires exact confirmation and still blocks clearing established historical PDF identities', async () => {
     const { server, workspace } = await serverFixture();
     const filePath = join(workspace, '02.0404.010.0401002-history.pdf');
     await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
@@ -226,9 +225,9 @@ describe('PDF file API', () => {
 
     const cleared = await fetch(`${server.url}/api/files/index/clear`, { method: 'POST', headers: writeHeaders,
       body: JSON.stringify({ confirmation: '清空资料库索引' }) });
-    expect(cleared.status).toBe(200);
-    expect(await cleared.json()).toEqual({ pdfFiles: 1, qrCodeFiles: 0, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
-    expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(0);
+    expect(cleared.status).toBe(422);
+    expect((await cleared.json()).error.code).toBe('PDF_CLEANUP_NOT_ALLOWED');
+    expect((await (await fetch(`${server.url}/api/files?presence=all`)).json()).total).toBe(1);
     expect(await (await fetch(`${server.url}/api/files/settings`)).json()).toMatchObject({ workspaceRoot: realpathSync.native(workspace) });
     expect(await (await import('node:fs')).promises.readFile(filePath, 'utf8')).toBe('%PDF-1.4 unchanged');
 

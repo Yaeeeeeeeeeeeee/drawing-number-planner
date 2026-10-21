@@ -42,6 +42,7 @@ function linkedHistory() {
   const dictionary=new DictionaryService(db);const main=dictionary.create({type:'main_category',code:'04',name:'印刷'});
   const project=dictionary.create({type:'project_item',parentId:main.id,code:'01',name:'说明书'});
   const other=products.create({...product,sku:'OTHER',model:'OTHER'});
+  new QrRepository(db).ensurePurposeForProduct(product.id,1);
   db.prepare("insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,first_seen_at,last_seen_at) values ('batch','product',?,'batch','recognized','now','now')").run(product.id);
   db.exec("insert into qr_code_files(relative_path,path_key,file_name,mime_type,size_bytes,modified_at,qr_code_id,match_status,first_seen_at,last_seen_at) values ('qr.png','qr.png','qr.png','image/png',1,'now',1,'matched','now','now')");
   db.prepare('insert into bom_items(bom_version_id,project_item_id,historical_drawing_id,effective_material_batch_id) values (1,?,1,1)').run(project.id);
@@ -239,4 +240,17 @@ it('keeps newly discovered numbers unassigned rather than reconnecting an exited
     directoryContext: { productCategory: '冰柜', sku: 'SKU', model: 'T40' } }], new Date().toISOString());
   expect(db.prepare('select product_id from historical_drawing_numbers where full_code = ?').get(code.fullCode))
     .toEqual({ product_id: null });
+});
+it('blocks legacy cleanup from detaching batches used by outbound V2 scope or baseline',()=>{
+ const {product}=fixture();db.prepare("insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,first_seen_at,last_seen_at) values('V2batch','V2',?,'V2batch','recognized','then','now')").run(product.id);
+ const appearance=(db.prepare('select id from product_appearance_versions where product_id=?').get(product.id) as {id:number}).id;
+ db.prepare("insert into outbound_batch_scopes(batch_id,appearance_version_id,completeness,updated_at,reason) values(1,?,'complete','now','人工确认')").run(appearance);
+ const service=new ProductCleanupService(db);expect(service.preview(product.id).blockers.join('')).toContain('外发V2');expect(()=>service.cleanup(product.id,{confirmedModel:product.model})).toThrow(/外发V2/);expect(db.prepare('select product_id from material_batches where id=1').get()).toEqual({product_id:product.id});
+});
+it('blocks cleanup of immutable outbound V2 history and protects snapshots and confirmation audit from raw mutation',()=>{
+ const {product}=fixture();db.prepare("insert into outbound_packages(product_id,material_type,package_mode,package_name,zip_relative_path,status,created_at) values(?,'initial','current_complete','V2','V2.zip','completed','now')").run(product.id);
+ db.prepare("insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,first_seen_at,last_seen_at) values('V2immutable','V2',?,'V2immutable','recognized','then','now')").run(product.id);
+ db.exec("insert into outbound_v2_snapshots(package_id,context_json,files_json,parts_json) values(1,'{}','[]','[]');insert into outbound_batch_scope_audit(batch_id,after_json,reason,created_at) values(1,'{}','确认','now')");
+ const service=new ProductCleanupService(db);expect(service.preview(product.id).blockers.join('')).toContain('不可变历史快照');expect(()=>service.cleanup(product.id,{confirmedModel:product.model})).toThrow(/外发V2/);
+ expect(()=>db.exec("update outbound_v2_snapshots set files_json='[]' where package_id=1")).toThrow('外发快照不可修改');expect(()=>db.exec('delete from outbound_v2_snapshots')).toThrow('外发快照不可删除');expect(()=>db.exec('delete from outbound_batch_scope_audit')).toThrow('外发批次确认审计不可删除');
 });

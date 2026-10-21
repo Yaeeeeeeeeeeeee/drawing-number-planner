@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BomService } from '../../src/core/bom/bom-service';
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
@@ -8,13 +11,15 @@ import { DrawingRepository } from '../../src/core/drawings/drawing-repository';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 
+let temporaryRoot: string;
 let db: PlannerDatabase; let dictionaries: DictionaryService; let products: ProductService; let planning: PlanningService; let service: BomService;
-beforeEach(() => { db = openDatabase(':memory:'); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined }); dictionaries = new DictionaryService(db); products = new ProductService(db); planning = new PlanningService(db); service = new BomService(db); });
-afterEach(() => db.close());
+beforeEach(() => { temporaryRoot=mkdtempSync(join(tmpdir(),'bom-appearance-')); db = openDatabase(join(temporaryRoot,'planner.sqlite')); migrateDatabase(db, { databaseExists: false, createBackup: () => undefined }); dictionaries = new DictionaryService(db); products = new ProductService(db); planning = new PlanningService(db); service = new BomService(db); });
+afterEach(() => { db.close(); rmSync(temporaryRoot,{recursive:true,force:true}); });
 function setup() {
   const brand = dictionaries.create({ type: 'brand', code: '02', name: 'B' }); const size = dictionaries.create({ type: 'product_size', code: '0404', name: 'S' }); const appearance = dictionaries.create({ type: 'appearance', code: '01', name: 'A' });
   const white = dictionaries.create({ type: 'color', code: '0', name: '白' }); const gray = dictionaries.create({ type: 'color', code: '1', name: '灰' }); const main = dictionaries.create({ type: 'main_category', code: '04', name: 'M' }); const logo = dictionaries.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: main.id }); const manual = dictionaries.create({ type: 'project_item', code: '02', name: '说明书', parentId: main.id });
   const product = products.create({ sku: 'SKU1', brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id, model: 'X1', productCategory: '冰柜' }); const other = products.create({ sku: 'SKU2', brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id, model: 'X2', productCategory: '冰柜' });
+  db.prepare(`insert into product_qr_codes(product_id,purpose_id,name,status,created_at,updated_at) select product.id,purpose.id,product.model || purpose.display_name,'inactive','2026-10-20','2026-10-20' from products product cross join qr_purposes purpose where not exists(select 1 from product_qr_codes qr where qr.product_id=product.id and qr.purpose_id=purpose.id)`).run();
   const draw = (productId: number, colorId: number, projectItemId: number) => { const input = { productId, rows: [{ clientId: `${productId}-${colorId}-${projectItemId}-${Math.random()}`, colorId, mainCategoryId: main.id, projectItemId }] }; const preview = planning.preview(input); return planning.reserve({ ...input, rows: [{ ...input.rows[0], expectedFullCode: preview.rows[0].fullCode }] })[0]; };
   return { white, gray, logo, manual, product, other, draw };
 }
@@ -42,6 +47,38 @@ function insertHistorical(productId: number | null, projectItemCode: string, sta
     .run(fullCode, projectItemCode, sequence, productId, status).lastInsertRowid);
 }
 describe('product-level BOM service', () => {
+  it('explicitly reuses samecanonical alias drawings without rewriting raw historical identities',()=>{
+    const r=setup(); const aliasDrawing=r.draw(r.other.id,r.white.id,r.logo.id);
+    db.prepare('update product_identity_members set canonical_product_id=? where raw_product_id=?').run(r.product.id,r.other.id);
+    const appearance=(db.prepare("select id from product_appearance_versions where product_id=? and status='current'").get(r.product.id) as {id:number}).id;
+    const candidates=service.listCandidates({productId:r.product.id,appearanceVersionId:appearance,includeReusableMaterials:true,projectItemId:r.logo.id,usesWhiteMaterial:false});
+    expect(candidates).toEqual(expect.arrayContaining([expect.objectContaining({drawingId:aliasDrawing.id})]));
+    const saved=service.saveVersion({productId:r.product.id,appearanceVersionId:appearance,businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[{projectItemId:r.logo.id,drawingId:aliasDrawing.id,usesWhiteMaterial:false}]}).version;
+    expect(saved.items[0].fullCode).toBe(aliasDrawing.fullCode);
+    expect(db.prepare('select product_id from drawing_numbers where id=?').get(aliasDrawing.id)).toEqual({product_id:r.other.id});
+    expect(()=>service.saveVersion({productId:r.product.id,appearanceVersionId:appearance,businessChangeDate:'2026-10-20',expectedCurrentVersionId:saved.id,items:[{projectItemId:r.manual.id,drawingId:aliasDrawing.id,usesWhiteMaterial:false}]})).toThrow(/项目不一致/);
+  });
+  it('keeps an independent current BOM per appearance and records immutable correction snapshots', () => {
+    const r = setup(); const drawing = r.draw(r.product.id,r.white.id,r.logo.id);
+    const currentAppearance = db.prepare("select id from product_appearance_versions where product_id=? and status='current'").get(r.product.id) as {id:number};
+    const image=insertAsset('appearance-copy.png');
+    const item = {projectItemId:r.logo.id,drawingId:drawing.id,usesWhiteMaterial:false,assets:[{role:'image' as const,assetId:image}]};
+    const first = service.saveVersion({productId:r.product.id,appearanceVersionId:currentAppearance.id,businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[item]}).version;
+    const draftId = Number(db.prepare("insert into product_appearance_versions(product_id,version_number,label,status,created_at) values(?,2,'新版','draft','2026-10-20')").run(r.product.id).lastInsertRowid);
+    const copied = service.copyToAppearance(first.id,draftId,'2026-10-20');
+    expect(copied.diff.map(row=>row.type)).toEqual(['unchanged']);
+    expect(copied.version.items[0].assets[0]).toMatchObject({assetId:image,inherited:true});
+    expect(service.getCurrent(r.product.id,currentAppearance.id)?.id).toBe(first.id);
+    expect(service.getCurrent(r.product.id,draftId)?.id).toBe(copied.version.id);
+    expect(service.getCurrent(r.product.id)?.id).toBe(first.id);
+    const correction = service.updateVersion(first.id,{productId:r.product.id,appearanceVersionId:currentAppearance.id,expectedCurrentVersionId:first.id,items:[{...item,notes:'历史纠错'}]},0).version;
+    const audit = db.prepare('select before_snapshot_json,after_snapshot_json from bom_revision_snapshots where bom_version_id=?').get(first.id) as {before_snapshot_json:string;after_snapshot_json:string};
+    expect(JSON.parse(audit.before_snapshot_json)).toEqual(first);
+    expect(JSON.parse(audit.after_snapshot_json)).toEqual(correction);
+    expect(()=>db.prepare('delete from bom_revision_snapshots where bom_version_id=?').run(first.id)).toThrow(/不可删除/);
+    expect(correction).toMatchObject({id:first.id,createdAt:first.createdAt,businessChangeDate:first.businessChangeDate,previousVersionId:first.previousVersionId});
+  });
+
   it('allows editing notes with the same formerly valid drawing without allowing a new voided reference', () => {
     const r = setup(); const drawing = r.draw(r.product.id, r.white.id, r.logo.id);
     const replacement = r.draw(r.product.id, r.white.id, r.logo.id);

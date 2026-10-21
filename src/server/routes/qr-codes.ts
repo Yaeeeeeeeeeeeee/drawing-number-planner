@@ -1,11 +1,14 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
+import type { QrManualService } from '../../core/qr/qr-manual-service.js';
+import { QrManualError } from '../../core/qr/qr-manual-validation.js';
 import { QrError } from '../../core/qr/qr-errors.js';
 import type { QrService } from '../../core/qr/qr-service.js';
 
 const idSchema = z.object({ id: z.coerce.number().int().positive() });
 const filtersSchema = z.object({
+  appearanceVersionId: z.coerce.number().int().positive().optional(),
   productId: z.coerce.number().int().positive().optional(),
   purposeId: z.coerce.number().int().positive().optional(),
   status: z.enum(['active', 'inactive', 'all']).optional(),
@@ -14,7 +17,7 @@ const filtersSchema = z.object({
   fileStatus: z.enum(['present', 'missing', 'none', 'all']).optional(),
 }).strict();
 const updateSchema = z.object({ name: z.string().trim().min(1).max(500), targetUrl: z.string().trim().max(2000).nullable() }).strict();
-const createSchema = updateSchema.extend({ productId: z.number().int().positive(), purposeId: z.number().int().positive(),
+const createSchema = updateSchema.extend({ appearanceVersionId: z.number().int().positive().nullable().optional(), productId: z.number().int().positive(), purposeId: z.number().int().positive(),
   status: z.enum(['active', 'inactive']), qrFileId: z.number().int().positive().nullable().optional() }).strict();
 const createPurposeSchema = z.object({ key: z.string().trim().min(1).max(100), englishName: z.string().trim().min(1).max(200),
   displayName: z.string().trim().min(1).max(200), defaultForAll: z.boolean(),
@@ -22,6 +25,7 @@ const createPurposeSchema = z.object({ key: z.string().trim().min(1).max(100), e
 const associateFileSchema = z.object({ qrFileId: z.coerce.number().int().positive() }).strict();
 
 function sendQrError(reply: FastifyReply, error: unknown) {
+  if (error instanceof QrManualError) return reply.code(['RECORD_CHANGED','FILE_CHANGED'].includes(error.code) ? 409 : 400).send({error:{code:error.code,message:error.message}});
   if (!(error instanceof QrError)) throw error;
   const status = ['NOT_FOUND', 'PURPOSE_NOT_FOUND'].includes(error.code) ? 404
     : ['DUPLICATE_PURPOSE', 'DUPLICATE_PRODUCT_PURPOSE', 'QR_CODE_REFERENCED'].includes(error.code) ? 409 : 400;
@@ -29,7 +33,19 @@ function sendQrError(reply: FastifyReply, error: unknown) {
     ...(error.referenceSummary ? { referenceSummary: error.referenceSummary } : {}) } });
 }
 
-export function registerQrCodeRoutes(app: FastifyInstance, service: QrService): void {
+export function registerQrCodeRoutes(app: FastifyInstance, service: QrService, manual?: QrManualService): void {
+  if (manual) {
+    app.get('/api/qr-codes/:id/manual-history', async (request, reply) => {
+      const params=idSchema.safeParse(request.params);
+      if (!params.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'二维码编号无效'}});
+      try { return manual.history(params.data.id); } catch(error) { return sendQrError(reply,error); }
+    });
+    app.delete('/api/qr-codes/:id/manual-link', async (request, reply) => {
+      const params=idSchema.safeParse(request.params);const body=z.object({revision:z.string().min(1)}).strict().safeParse(request.body);
+      if (!params.success||!body.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'解除关联参数无效'}});
+      try { return manual.unlink(params.data.id,body.data.revision); } catch(error) { return sendQrError(reply,error); }
+    });
+  }
   app.get('/api/qr-purposes', async () => service.listPurposes());
   app.post('/api/qr-purposes', async (request, reply) => {
     const input = createPurposeSchema.safeParse(request.body);

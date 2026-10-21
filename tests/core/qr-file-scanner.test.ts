@@ -19,11 +19,11 @@ describe('scanQrWorkspace', () => {
 
     const files = await scanQrWorkspace(root);
 
-    expect(files.map((file) => file.relativePath)).toEqual([
+    expect(files.map((file) => file.relativePath.replaceAll('\\','/')).sort()).toEqual([
       '冰柜\\SKUZC-ZC100\\二维码\\ZC.100-Warranty（abc7）.pdf',
       '冰柜\\SKUZC-ZC100\\二维码\\ZC100-User Manual（二维码的网址编码）.png',
       '冰柜\\SKUZC-ZC100\\二维码\\ZC100-Warranty（网址编码）.pdf',
-    ]);
+    ].map(path=>path.replaceAll('\\','/')).sort());
     const after = statSync(qrFile);
     expect({ size: after.size, modifiedAt: after.mtimeMs }).toEqual({ size: before.size, modifiedAt: before.mtimeMs });
   });

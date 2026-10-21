@@ -80,5 +80,5 @@ export function createFilesMockApi(scenario: FilesScenario): PlannerApi {
     cleanupPdfFiles: async (ids: number[]) => { if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !rows.some(row => row.id === id && !row.isPresent))) throw new Error('Mock：只能清理已缺失的内存索引'); rows = rows.filter(row => !ids.includes(row.id)); return { cleaned: ids.length }; },
     clearFileIndex: async (confirmation: string) => { if (confirmation !== '清空资料库索引') throw new Error('Mock：确认短语不正确'); const result = counts(); rows = []; batches = []; qrCount = 0; scanCount = 0; return result; },
   };
-  return new Proxy(Object.create(null), { get: (_, name) => methods[String(name)] ?? (async () => { throw new Error(`Mock 已隔离：${String(name)} 未启用，不会调用真实服务。`); }) }) as PlannerApi;
+  return new Proxy(Object.create(null), { get: (_, name) => ['previewPdfManagement','applyPdfManagement','renameMaterialBatch','diagnoseMaterialBatches'].includes(String(name)) ? undefined : methods[String(name)] ?? (async () => { throw new Error(`Mock 已隔离：${String(name)} 未启用，不会调用真实服务。`); }) }) as PlannerApi;
 }

@@ -14,11 +14,13 @@ const rowSchema = z.object({
 const previewSchema = z.object({
   productId: z.number().int().positive(),
   appearanceId: z.number().int().positive().optional(),
+  appearanceVersionId: z.number().int().positive().optional(),
   rows: z.array(rowSchema).min(1).max(100),
 });
 const reserveSchema = z.object({
   productId: z.number().int().positive(),
   appearanceId: z.number().int().positive().optional(),
+  appearanceVersionId: z.number().int().positive().optional(),
   rows: z.array(rowSchema.extend({ expectedFullCode: z.string().trim().min(1).max(200) })).min(1).max(100),
 });
 

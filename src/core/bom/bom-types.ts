@@ -35,6 +35,8 @@ export type BomItemInput = BomItemInputFields & (
 );
 
 export interface SaveBomInput {
+  appearanceVersionId?: number;
+  copyFromVersionId?: number;
   productId: number;
   entryMode?: BomEntryMode;
   businessChangeDate?: string;
@@ -82,6 +84,7 @@ interface BomItemRecordFields {
 export type BomItemRecord = BomItemRecordFields & BomDrawingReference;
 
 export interface BomVersionSummary {
+  appearanceVersionId: number | null;
   updatedAt: string;
   editRevision: number;
   id: number;
@@ -122,6 +125,7 @@ export interface ProductBomDeletionResult {
 }
 
 export interface BomQueryFilters {
+  appearanceVersionId?: number;
   model?: string;
   businessChangeDate?: string;
   effectiveBatchRelativePath?: string;
@@ -151,6 +155,8 @@ export interface SavedBomVersion {
 }
 
 export interface BomCandidateInput {
+  appearanceVersionId?: number;
+  includeReusableMaterials?: boolean;
   productId: number;
   entryMode?: BomEntryMode;
   /** Deprecated compatibility field; candidate color is determined by the drawing. */

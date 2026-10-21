@@ -16,6 +16,9 @@ export interface DrawingRecord {
   productId: number | null;
   model: string;
   productCategory: string;
+  appearanceVersionId?: number | null;
+  appearanceVersionLabel?: string | null;
+  associationEvidence?: string[];
   appearanceId: number | null;
   appearanceName: string;
   brandId: number | null;
@@ -94,6 +97,7 @@ export interface DrawingNavigationBatch extends MaterialBatchView {
 }
 
 export interface DrawingDetailRecord extends DrawingRecord {
+  associationHistory?: unknown[];
   sourceFiles: DrawingFileRecord[];
   outlinedFiles: DrawingFileRecord[];
   currentBomUsage: DrawingBomUsage[];
@@ -112,6 +116,7 @@ export interface DrawingSearchFilters {
   navigationProductCategory?: string;
   brandId?: number;
   appearanceId?: number;
+  appearanceVersionId?: number;
   mainCategoryId?: number;
   projectItemId?: number;
   colorId?: number;
@@ -137,6 +142,7 @@ export interface PagedDrawingResult {
 
 /** Counts use the same read-only record identity and predicates as the list. */
 export interface DrawingNavigationCounts {
+  appearances: Array<{appearanceVersionId:number;count:number}>;
   total: number;
   categories: Array<{ name: string; count: number }>;
   products: Array<{ productId: number; count: number }>;

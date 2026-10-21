@@ -5,7 +5,7 @@ import { RecoveryMockPage } from '../../src/renderer/pages/recovery-mock';
 describe('isolated recovery panel',()=>{
  it('never mounts real recovery or queries API',()=>{
   window.history.replaceState({},'','/?mock=recovery');const calls=vi.fn(()=>{throw Error('forbidden');});const fetch=vi.spyOn(globalThis,'fetch');render(<AppShell api={new Proxy({} as never,{get:()=>calls})}/>);
-  expect(screen.getByRole('region',{name:'安全恢复面板'})).toBeVisible();expect(calls).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();fetch.mockRestore();
+  fireEvent.click(screen.getByRole('button',{name:'安全恢复'}));expect(screen.getByRole('region',{name:'安全恢复面板'})).toBeVisible();expect(calls).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();fetch.mockRestore();
  });
  it('protects finalizing tasks',()=>{
   render(<RecoveryMockPage/>);fireEvent.change(screen.getByLabelText('Mock 场景'),{target:{value:'finalizing'}});expect(screen.getByRole('button',{name:'请求取消'})).toBeDisabled();

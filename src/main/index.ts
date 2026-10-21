@@ -1,8 +1,10 @@
+import { acquireDesktopInstance } from './single-instance.js';
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createQrManualHandlers } from './qr-manual-actions.js';
 import { LocalServiceController } from './local-service-controller.js';
 import { minimumOuterSize } from './window-layout.js';
 import { loadDesktopSurface } from './desktop-startup.js';
@@ -42,6 +44,16 @@ async function createWindow() {
       sandbox: true,
       preload: fileURLToPath(new URL('./preload.cjs', import.meta.url)),
     },
+  });
+
+  // Stored HTTP(S) links open in the system browser; remote pages never inherit desktop capabilities.
+  mainWindow.webContents.setWindowOpenHandler(({url}) => {
+    try { if (['http:','https:'].includes(new URL(url).protocol)) void shell.openExternal(url); } catch { /* Invalid links are denied. */ }
+    return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    try { if (new URL(url).origin !== new URL(mainWindow!.webContents.getURL()).origin) event.preventDefault(); }
+    catch { event.preventDefault(); }
   });
 
   // Calibrate only window geometry after the renderer exists. No IPC or recovery changes.
@@ -140,7 +152,12 @@ function installRecoveryControls(): void {
   ipcMain.handle('planner:recovery-relaunch-app', () => result('relaunchApp'));
 }
 
-app.whenReady().then(() => {
+const primaryInstance = acquireDesktopInstance(app, () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show(); mainWindow.focus();
+});
+if (primaryInstance) void app.whenReady().then(() => {
   ipcMain.handle('planner:show-file-in-folder', createShowFileInFolderHandler({
     resolvePdfFilePath: (id) => {
       if (!localService) throw new Error('本机文件服务尚未启动');
@@ -155,6 +172,24 @@ app.whenReady().then(() => {
     },
     showItemInFolder: (path) => shell.showItemInFolder(path),
   }));
+  const manualQr = createQrManualHandlers({
+    isTrustedEvent: event => {
+      const sender=event as Electron.IpcMainInvokeEvent;
+      return Boolean(mainWindow && sender.sender===mainWindow.webContents && sender.senderFrame===mainWindow.webContents.mainFrame);
+    },
+    choosePdf: async () => {
+      const result = await dialog.showOpenDialog(mainWindow!, { title: '选择二维码原始PDF', properties: ['openFile'], filters: [{name:'PDF',extensions:['pdf']}] });
+      return result.canceled ? null : result.filePaths[0] ?? null;
+    },
+    execute: (action, input) => {
+      if (!localService) throw new Error('本机文件服务尚未启动');
+      return localService.qrManualAction(action, input);
+    },
+    openPath: path => shell.openPath(path),
+    showItemInFolder: path => shell.showItemInFolder(path),
+  });
+  ipcMain.handle('planner:qr-manual-select', event => manualQr.select(event));
+  ipcMain.handle('planner:qr-manual-action', manualQr.action);
   ipcMain.handle('planner:qr-file-action', createQrFileActionHandler({
     resolveQrFilePath: (relativePath) => {
       if (!localService) throw new Error('本机文件服务尚未启动');

@@ -19,7 +19,7 @@ export interface DrawingDeletionReferenceCounts {
 }
 
 export interface DrawingDeletionBlocker {
-  kind: 'current_bom' | 'current_material' | 'lineage';
+  kind: 'current_bom' | 'current_material' | 'lineage' | 'appearance_usage';
   count: number;
   message: string;
 }

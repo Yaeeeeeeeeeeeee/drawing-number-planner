@@ -1,5 +1,6 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import { QrRepository } from '../qr/qr-repository.js';
+import { ensureProductAppearance, listRawProductIds, resolveCanonicalProductId } from './appearance-identity.js';
+import { DrawingAssociationService } from '../drawings/drawing-association-service.js';
 import { ProductRepository } from './product-repository.js';
 import type { ConfirmHistoricalProductCandidateInput, HistoricalProductCandidate, Product, ProductFilters, ProductInput, ProductReferenceSummary } from './product-types.js';
 
@@ -29,28 +30,32 @@ export class ProductService {
     return this.database.transaction(() => {
       try {
         const product = this.repository.create(normalized);
-        new QrRepository(this.database).ensureForProduct(product.id);
+        ensureProductAppearance(this.database,product.id);
+        new DrawingAssociationService(this.database).diagnoseProduct(product.id,{autoApply:true});
         return product;
       } catch (error) { return this.mapDatabaseError(error); }
     })();
   }
 
   update(id: number, input: ProductInput): Product {
+    this.rejectMergedAliasMutation(id);
     const current = this.get(id);
     const normalized = this.validateAndNormalize(input, id);
     if (this.repository.hasDrawingReferences(id) && this.changesReferencedMeaning(current, normalized)) {
       throw new ProductError('PRODUCT_REFERENCED', '该产品已有图号记录，不能修改编码含义');
     }
-    try { return this.repository.update(id, normalized); }
+    try { const product=this.repository.update(id, normalized);new DrawingAssociationService(this.database).diagnoseProduct(id,{autoApply:false});return product; }
     catch (error) { return this.mapDatabaseError(error); }
   }
 
   deactivate(id: number): Product {
+    this.rejectMergedAliasMutation(id);
     this.get(id);
     return this.repository.deactivate(id);
   }
 
   activate(id: number): Product {
+    this.rejectMergedAliasMutation(id);
     this.get(id);
     return this.repository.activate(id);
   }
@@ -58,6 +63,7 @@ export class ProductService {
   delete(id: number): { deleted: true } {
     return this.database.transaction(() => {
       this.get(id);
+      if(resolveCanonicalProductId(this.database,id)!==id||listRawProductIds(this.database,id).length>1)throw new ProductError('PRODUCT_REFERENCED','归并档案必须保留全部原始身份');
       this.rejectIfReferenced(this.repository.getReferenceSummary(id));
       this.repository.deleteBlankDefaultQrPlaceholders(id);
       this.rejectIfReferenced(this.repository.getReferenceSummary(id));
@@ -107,6 +113,8 @@ export class ProductService {
       return { product, linkedHistoricalCount };
     })();
   }
+
+  private rejectMergedAliasMutation(id:number):void {if(resolveCanonicalProductId(this.database,id)!==id)throw new ProductError('PRODUCT_REFERENCED','归并后的原始身份仅供历史查询，请编辑规范主产品');}
 
   private validateAndNormalize(input: ProductInput, currentId?: number): ProductInput {
     const sku = input.sku?.trim();

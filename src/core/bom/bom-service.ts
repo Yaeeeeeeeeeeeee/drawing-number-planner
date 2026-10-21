@@ -1,3 +1,4 @@
+import { resolveCanonicalProductId } from '../products/appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { rmSync } from 'node:fs';
 import { resolveWorkspacePath, validateWorkspaceRelativePath } from '../files/workspace-paths.js';
@@ -88,8 +89,15 @@ export class BomService {
     return { linkId, status: asset ? 'archived' as const : 'unchanged' as const };
   }
 
-  getCurrent(productId: number, _legacyColorId?: number): BomVersionDetail | null {
-    const id = this.repository.getCurrentVersionId(productId);
+  getCurrent(productId: number, appearanceVersionId?: number): BomVersionDetail | null {
+    const explicitAppearance=appearanceVersionId!==undefined;
+    appearanceVersionId ??= this.currentAppearanceId(productId);
+    this.validateAppearance(productId, appearanceVersionId);
+    let id = this.repository.getCurrentVersionId(productId, appearanceVersionId);
+    if(id===null && !explicitAppearance) {
+      const legacy=this.repository.getCurrentVersionId(productId);
+      if(legacy!==null && this.getVersion(legacy).appearanceVersionId===null) id=legacy;
+    }
     return id === null ? null : this.getVersion(id);
   }
 
@@ -99,7 +107,7 @@ export class BomService {
     return version;
   }
 
-  listVersions(productId: number, _legacyColorId?: number): BomVersionSummary[] { return this.repository.listVersions(productId); }
+  listVersions(productId: number, appearanceVersionId?: number): BomVersionSummary[] { this.validateAppearance(productId, appearanceVersionId); return this.repository.listVersions(productId, appearanceVersionId); }
   queryVersions(filters: BomQueryFilters): BomVersionSummary[] { return this.repository.queryVersions(filters); }
 
   previewBomVersionDeletion(id: number): BomVersionDeletionPreview {
@@ -112,14 +120,15 @@ export class BomService {
   deleteBomVersion(id: number, confirmed: boolean): BomVersionDeletionResult {
     return this.db.transaction(() => {
       const preview = this.previewBomVersionDeletion(id);
+      const appearanceVersionId = this.getVersion(id).appearanceVersionId ?? undefined;
       if (!confirmed) throw new BomError('BOM_DELETE_CONFIRMATION_REQUIRED', '删除 BOM 变更记录需要二次确认');
       const now = new Date().toISOString();
       if (this.repository.markVersionDeleted(id, now, '用户删除单次 BOM 变更') !== 1) {
         throw new BomError('BOM_ALREADY_DELETED', '该 BOM 变更记录已经删除');
       }
       if (preview.isCurrent) {
-        if (preview.fallbackVersionId === null) this.repository.clearCurrent(preview.productId);
-        else this.repository.setCurrent(preview.productId, preview.fallbackVersionId, now);
+        if (preview.fallbackVersionId === null) this.repository.clearCurrent(preview.productId, appearanceVersionId);
+        else this.repository.setCurrent(preview.productId, preview.fallbackVersionId, now, appearanceVersionId);
       }
       return { deletedVersionId: id, productId: preview.productId, wasCurrent: preview.isCurrent,
         currentVersionId: preview.isCurrent ? preview.fallbackVersionId : this.repository.getCurrentVersionId(preview.productId),
@@ -143,12 +152,14 @@ export class BomService {
 
   listCandidates(input: BomCandidateInput): BomCandidate[] {
     this.validateProduct(input.productId);
+    this.validateAppearance(input.productId,input.appearanceVersionId);
     return this.repository.listCandidates(input, WHITE_COLOR_CODE);
   }
 
-  listActiveQrCandidates(productId: number) {
+  listActiveQrCandidates(productId: number,appearanceVersionId?:number) {
     this.validateProduct(productId);
-    return this.repository.listActiveQrCodes(productId);
+    this.validateAppearance(productId,appearanceVersionId);
+    return this.repository.listActiveQrCodes(productId,appearanceVersionId);
   }
   relinkMaterialBatch(batchId: number): { relinked: number } {
     const batch = this.repository.getCurrentBatch(batchId);
@@ -158,23 +169,32 @@ export class BomService {
 
   saveVersion(input: SaveBomInput): SavedBomVersion {
     return this.withArchiveTransaction((archive) => {
+      const explicitAppearance=input.appearanceVersionId!==undefined;
+      input = { ...input, appearanceVersionId: input.appearanceVersionId ?? this.currentAppearanceId(input.productId) };
       this.validateProduct(input.productId);
+      this.validateAppearance(input.productId, input.appearanceVersionId);
       if (!input.businessChangeDate || !validBusinessDate(input.businessChangeDate)) {
         throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '业务变更日期必须是有效的 ISO 日期');
       }
       if (input.items.length === 0) throw new BomError('INVALID_BOM_ITEM_COUNT', 'BOM 至少需要一个项目');
-      const currentId = this.repository.getCurrentVersionId(input.productId);
+      let currentId = this.repository.getCurrentVersionId(input.productId, input.appearanceVersionId);
+      if(currentId===null && !explicitAppearance) {
+        const legacy=this.repository.getCurrentVersionId(input.productId);
+        if(legacy!==null && this.getVersion(legacy).appearanceVersionId===null)currentId=legacy;
+      }
       if (currentId !== input.expectedCurrentVersionId) throw new BomError('BOM_STALE', '当前 BOM 已变化，请刷新后重新保存');
       const projectIds = new Set<number>();
       const entryMode = input.entryMode ?? 'current';
       const validated = input.items.map((item) => this.validateItem(item, input.productId, projectIds, entryMode));
-      const previous = currentId === null ? null : this.getVersion(currentId);
+      const sourceId = input.copyFromVersionId ?? currentId;
+      const previous = sourceId === null ? null : this.getVersion(sourceId);
+      if (previous && !this.sameProduct(previous.productId, input.productId)) throw new BomError('DRAWING_WRONG_PRODUCT', '不能复制其他产品 BOM');
       const now = new Date().toISOString();
       const versionId = this.repository.insertVersion(input.productId, this.repository.nextVersionNumber(input.productId),
-        currentId, input.businessChangeDate, normalizedNotes(input.notes), now);
+        currentId, input.businessChangeDate, normalizedNotes(input.notes), now, input.appearanceVersionId);
       validated.forEach((item, index) => {
         const bomItemId = this.repository.insertItem(versionId, item);
-        this.saveItemAssets(bomItemId, item.projectItemId, currentId, item.assets);
+        this.saveItemAssets(bomItemId, item.projectItemId, sourceId, item.assets);
         if (input.items[index].qrCodeIds === undefined) {
           const previousItem = previous?.items.find((old) => old.projectItemId === item.projectItemId);
           previousItem?.qrCodes.forEach((qr) => this.repository.insertItemQrCode(bomItemId, qr.id));
@@ -182,18 +202,31 @@ export class BomService {
       });
       this.repository.activateDrawings(validated.flatMap((item) => item.drawingReference.origin === 'planned'
         ? [item.drawingReference.drawingId] : []));
-      this.repository.setCurrent(input.productId, versionId, now);
+      this.repository.setCurrent(input.productId, versionId, now, input.appearanceVersionId);
       archive(versionId);
       const version = this.getVersion(versionId);
       return { version, diff: buildDiff(previous, version) };
     });
   }
 
+  copyToAppearance(sourceVersionId: number, appearanceVersionId: number, businessChangeDate: string): SavedBomVersion {
+    const source = this.getVersion(sourceVersionId);
+    const target = this.db.prepare('select product_id as productId,status from product_appearance_versions where id=?').get(appearanceVersionId) as {productId:number;status:string}|undefined;
+    if (!target || target.status !== 'draft' || !this.sameProduct(source.productId,target.productId)) throw new BomError('DRAWING_WRONG_PRODUCT','只能将同产品 BOM 复制到草稿外观');
+    return this.saveVersion({ productId:target.productId, appearanceVersionId, copyFromVersionId:sourceVersionId,
+      entryMode:'historical', businessChangeDate, expectedCurrentVersionId:this.repository.getCurrentVersionId(target.productId,appearanceVersionId),
+      notes:source.notes ?? undefined, items:source.items.map(item=>({projectItemId:item.projectItemId,drawingReference:referenceOf(item),usesWhiteMaterial:item.usesWhiteMaterial,
+        effectiveMaterialBatchId:item.effectiveMaterialBatchId,material:item.material ?? undefined, dimensions:item.dimensions ?? undefined,
+        position:item.position ?? undefined,notes:item.notes ?? undefined,changeDetails:item.changeDetails ?? undefined,
+        assets:item.assets.map(asset=>({role:asset.role,reusePrevious:true})),qrCodeIds:item.qrCodes.filter(qr=>qr.status==='active').map(qr=>qr.id)})) });
+  }
+
   updateVersion(id: number, input: SaveBomInput, expectedRevision: number): SavedBomVersion {
     return this.withArchiveTransaction((archive) => {
       const previous = this.getVersion(id);
-      if (previous.productId !== input.productId) throw new BomError('DRAWING_WRONG_PRODUCT', '不能改变 BOM 所属产品');
+      if (!this.sameProduct(previous.productId, input.productId)) throw new BomError('DRAWING_WRONG_PRODUCT', '不能改变 BOM 所属产品');
       this.validateProduct(input.productId);
+      if (input.appearanceVersionId !== undefined && previous.appearanceVersionId !== input.appearanceVersionId) throw new BomError('DRAWING_WRONG_PRODUCT', '不能改变 BOM 外观版本');
       if (previous.editRevision !== expectedRevision) throw new BomError('BOM_STALE', '该记录已被修改，请重新加载后编辑');
       if (input.businessChangeDate !== undefined && input.businessChangeDate !== previous.businessChangeDate) throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '编辑已有 BOM 不能更改原业务变更日期');
       if (!input.items.length) throw new BomError('INVALID_BOM_ITEM_COUNT', 'BOM 至少需要一个项目');
@@ -239,6 +272,11 @@ export class BomService {
           this.saveItemAssets(itemId, item.projectItemId, previous.previousVersionId, item.assets);
         }
       });
+      for (const [index,item] of validated.entries()) if(input.items[index].qrCodeIds!==undefined) {
+        const row=this.db.prepare('select id from bom_items where bom_version_id=? and project_item_id=? and deleted_at is null').get(id,item.projectItemId) as {id:number};
+        this.db.prepare('delete from bom_item_qr_codes where bom_item_id=?').run(row.id);
+        this.saveItemQrCodes(row.id,input.productId,item.qrCodeIds);
+      }
       // A legacy NULL date is immutable: retain managed associations without inventing a dated archive.
       if (previous.businessChangeDate !== null) archive(id);
       else if (this.workspaceRoot) {
@@ -249,6 +287,7 @@ export class BomService {
         }
       }
       const version = this.getVersion(id);
+      this.db.prepare(`insert into bom_revision_snapshots(bom_version_id,edit_revision,before_snapshot_json,after_snapshot_json,created_at) values(?,?,?,?,?)`).run(id,version.editRevision,JSON.stringify(previous),JSON.stringify(version),now);
       return { version, diff: buildDiff(previous, version) };
     });
   }
@@ -311,6 +350,18 @@ export class BomService {
     }
   }
 
+  private currentAppearanceId(productId: number): number | undefined {
+    return (this.db.prepare("select id from product_appearance_versions where product_id=? and status='current'").get(resolveCanonicalProductId(this.db,productId)) as {id:number}|undefined)?.id;
+  }
+
+  private sameProduct(left: number, right: number): boolean { return resolveCanonicalProductId(this.db,left) === resolveCanonicalProductId(this.db,right); }
+
+  private validateAppearance(productId: number, appearanceVersionId?: number): void {
+    if (appearanceVersionId === undefined) return;
+    const row = this.db.prepare('select product_id as productId from product_appearance_versions where id=?').get(appearanceVersionId) as {productId:number}|undefined;
+    if (!row || !this.sameProduct(row.productId,productId)) throw new BomError('DRAWING_WRONG_PRODUCT','外观版本不属于所选产品');
+  }
+
   private validateProduct(productId: number): void {
     const context = this.repository.getContext(productId);
     if (!context || context.productStatus !== 'active') throw new BomError('PRODUCT_NOT_ACTIVE', '产品不存在或已停用');
@@ -329,7 +380,7 @@ export class BomService {
     if (drawingReference.origin === 'planned') {
       const drawing = this.repository.getDrawing(drawingReference.drawingId);
       if (!drawing) throw new BomError('DRAWING_NOT_FOUND', '图号不存在');
-      if (drawing.productId !== productId) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
+      if (!this.sameProduct(drawing.productId, productId)) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
       if (drawing.projectItemId !== item.projectItemId) throw new BomError('DRAWING_WRONG_PROJECT', '图号与 BOM 项目不一致');
       if (drawing.status === 'voided' && drawingReference.drawingId !== retainedPlannedId) throw new BomError('DRAWING_NOT_ELIGIBLE', '已作废图号不能加入 BOM');
       colorCode = drawing.colorCode;
@@ -338,7 +389,7 @@ export class BomService {
       if (!drawing) throw new BomError('DRAWING_NOT_FOUND', '历史图号不存在');
       if (entryMode !== 'historical') throw new BomError('DRAWING_NOT_ELIGIBLE', '历史图号只能在历史 BOM 录入模式使用');
       if (drawing.productId === null) throw new BomError('DRAWING_PRODUCT_UNCONFIRMED', '历史图号尚未确认产品归属');
-      if (drawing.productId !== productId) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
+      if (!this.sameProduct(drawing.productId, productId)) throw new BomError('DRAWING_WRONG_PRODUCT', 'BOM 不允许引用其他型号图号');
       const project = this.repository.getProjectCodes(item.projectItemId);
       if (!project || drawing.projectItemCode !== project.projectItemCode || drawing.mainCategoryCode !== project.mainCategoryCode) {
         throw new BomError('DRAWING_WRONG_PROJECT', '图号与 BOM 项目不一致');
@@ -353,7 +404,7 @@ export class BomService {
     let effectiveMaterialBatchId = item.effectiveMaterialBatchId ?? null;
     if (effectiveMaterialBatchId !== null) {
       const batch = this.repository.getCurrentBatch(effectiveMaterialBatchId);
-      if (!batch || batch.productId !== productId || batch.isPresent !== 1) throw new BomError('BATCH_NOT_ELIGIBLE', '生效资料批次不存在、已缺失或不属于该产品');
+      if (!batch || (batch.productId === null || !this.sameProduct(batch.productId, productId)) || batch.isPresent !== 1) throw new BomError('BATCH_NOT_ELIGIBLE', '生效资料批次不存在、已缺失或不属于该产品');
       if ((effectiveBatchRelativePath && effectiveBatchRelativePath !== batch.relativePath) || (effectiveBatchName && effectiveBatchName !== batch.name)) {
         throw new BomError('BATCH_SNAPSHOT_MISMATCH', '生效资料批次快照必须由当前索引生成');
       }
@@ -380,7 +431,13 @@ export class BomService {
         }
         const source = this.repository.previousItemAsset(previousVersionId, projectItemId, asset.role);
         if (!source) throw new BomError('ASSET_REUSE_NOT_FOUND', '上一版对应项目没有可沿用的附件');
-        this.repository.insertItemAsset(bomItemId, source.assetId, asset.role, source.id);
+        const destination=this.db.prepare('select version.previous_version_id as previousId,version.product_id as productId from bom_items item join bom_versions version on version.id=item.bom_version_id where item.id=?').get(bomItemId) as {previousId:number|null;productId:number};
+        const sourceVersion=this.getVersion(previousVersionId);
+        if(destination.previousId===previousVersionId && destination.productId===sourceVersion.productId) this.repository.insertItemAsset(bomItemId,source.assetId,asset.role,source.id);
+        else {
+          this.repository.insertItemAsset(bomItemId,source.assetId,asset.role,null);
+          this.db.prepare('update bom_item_assets set inheritance_snapshot_json=? where bom_item_id=? and role=?').run(JSON.stringify({sourceVersionId:previousVersionId,sourceLinkId:source.id,assetId:source.assetId,sourceProductId:sourceVersion.productId}),bomItemId,asset.role);
+        }
       } else {
         if (asset.assetId === undefined || !Number.isInteger(asset.assetId) || !this.repository.assetExists(asset.assetId)) {
           throw new BomError('ASSET_NOT_FOUND', 'BOM 附件不存在');

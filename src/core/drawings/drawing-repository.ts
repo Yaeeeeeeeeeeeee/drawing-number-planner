@@ -1,3 +1,5 @@
+import {drawingAppearanceRelationsSql} from './drawing-appearance-scope.js';
+import { resolveCanonicalProductId } from '../products/appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { DrawingBusinessUsage, DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingNavigationCounts, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
 
@@ -24,7 +26,7 @@ interface DrawingBomUsageRow extends Omit<DrawingBomUsage, 'usesWhiteMaterial'> 
 const businessUsageCte = `with raw_business_usage as (
   select case when item.drawing_id is not null then 'planned' else 'historical' end as origin,
     coalesce(item.drawing_id, item.historical_drawing_id) as record_id,
-    version.product_id, item.effective_material_batch_id as batch_id, 'bom' as source,
+    coalesce((select canonical_product_id from product_identity_members where raw_product_id=version.product_id),version.product_id) as product_id, item.effective_material_batch_id as batch_id, 'bom' as source,
     version.id as source_id,
     exists(select 1 from bom_current current_bom where current_bom.product_id = version.product_id
       and current_bom.version_id = version.id) as is_current
@@ -32,7 +34,7 @@ const businessUsageCte = `with raw_business_usage as (
   where item.deleted_at is null and version.deleted_at is null
   union all
   select case when item.drawing_id is not null then 'planned' else 'historical' end,
-    coalesce(item.drawing_id, item.historical_drawing_id), package.product_id,
+    coalesce(item.drawing_id, item.historical_drawing_id), coalesce((select canonical_product_id from product_identity_members where raw_product_id=package.product_id),package.product_id),
     package.selected_material_batch_id, 'outbound', package.id, 0
   from outbound_package_items item join outbound_packages package on package.id = item.package_id
   where package.status = 'completed'
@@ -48,7 +50,7 @@ const exactUsageIdentity = `(usage.origin = record.origin and usage.record_id = 
 
 const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as (
   select drawing.id, 'planned' as origin, product.sku, coalesce(drawing.deleted_full_code, drawing.full_code) as full_code, drawing.display_name,
-    drawing.product_id, product.model, product.product_category, product.brand_id, brand.name as brand_name,
+    product.id as product_id, product.model, product.product_category, product.brand_id, brand.name as brand_name,
     drawing.appearance_id, appearance.name as appearance_name, drawing.color_id, color.name as color_name,
     drawing.main_category_id, main_category.name as main_category_name,
     drawing.project_item_id, project_item.name as project_item_name,
@@ -69,7 +71,8 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
         and (file.drawing_id = drawing.id or file_history.full_code = drawing.full_code)) as has_outlined_file,
     'mapped' as dictionary_mapping_status
   from drawing_numbers drawing
-  join products product on product.id = drawing.product_id
+  left join drawing_appearance_bindings binding on binding.origin='planned' and binding.record_id=drawing.id
+  join products product on product.id = coalesce((select canonical_product_id from product_identity_members where raw_product_id=coalesce(binding.product_id,drawing.product_id)),binding.product_id,drawing.product_id)
   join dictionary_items brand on brand.id = product.brand_id
   join dictionary_items appearance on appearance.id = drawing.appearance_id
   join dictionary_items color on color.id = drawing.color_id
@@ -83,8 +86,8 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
 
   select -historical.id as id, 'historical' as origin, coalesce(product.sku, historical.detected_sku) as sku,
     coalesce(historical.deleted_full_code, historical.full_code) as full_code,
-    coalesce(historical.deleted_full_code, historical.full_code) as display_name, historical.product_id,
-    coalesce(product.model, historical.detected_model, '待识别') as model,
+    coalesce(historical.deleted_full_code, historical.full_code) as display_name, product.id as product_id,
+    coalesce(product.model, case when historical.detected_model is not null then historical.detected_model || '（目录候选，未确认）' end, '待识别') as model,
     coalesce(product.product_category, historical.detected_product_category, '待识别') as product_category,
     coalesce(product.brand_id, brand.id) as brand_id, coalesce(brand.name, historical.brand_code) as brand_name,
     appearance.id as appearance_id, coalesce(appearance.name, historical.appearance_code) as appearance_name,
@@ -105,7 +108,10 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
       and color.id is not null and main_category.id is not null and project_item.id is not null
       then 'mapped' else 'unmapped' end as dictionary_mapping_status
   from historical_drawing_numbers historical
-  left join products product on product.id = historical.product_id
+  left join drawing_appearance_bindings binding on binding.origin='historical' and binding.record_id=historical.id
+  left join products product on product.id = coalesce(
+    (select canonical_product_id from product_identity_members where raw_product_id=binding.product_id),binding.product_id,
+    (select min(usage.product_id) from business_usage usage where usage.origin='historical' and usage.record_id=historical.id having count(distinct usage.product_id)=1))
   left join dictionary_items brand on brand.type = 'brand' and brand.code = historical.brand_code
   left join dictionary_items product_size on product_size.type = 'product_size' and product_size.code = historical.product_size_code
   left join dictionary_items appearance on appearance.type = 'appearance' and appearance.code = historical.appearance_code
@@ -136,6 +142,7 @@ const mapRow = (row: DrawingRow): DrawingRecord => ({
   deletedReason: row.deleted_reason, occupied: row.deleted_at === null || row.deletion_mode === 'retain_occupied',
 });
 
+const canonicalSql = (expression: string) => `coalesce((select canonical_product_id from product_identity_members where raw_product_id=${expression}),${expression})`;
 function buildConditions(filters: DrawingSearchFilters): { sql: string; values: Array<string | number> } {
   const conditions: string[] = []; const values: Array<string | number> = [];
   const deletionState = filters.deletionState ?? 'normal';
@@ -151,13 +158,17 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
   if (filters.model?.trim()) { conditions.push('record.model like ?'); values.push(`%${filters.model.trim()}%`); }
   if (filters.productCategory?.trim()) { conditions.push('record.product_category like ?'); values.push(`%${filters.productCategory.trim()}%`); }
   if (filters.navigationProductCategory !== undefined) {
-    conditions.push(`(exists(select 1 from products navigation_product where navigation_product.id = record.product_id
+    conditions.push(`(exists(select 1 from products navigation_product where navigation_product.id = ${canonicalSql('coalesce((select binding.product_id from drawing_appearance_bindings binding where binding.origin=record.origin and binding.record_id=abs(record.id)),record.product_id)')}
       and navigation_product.product_category = ?) or exists(select 1 from business_usage usage
       join products navigation_product on navigation_product.id = usage.product_id
       where ${exactUsageIdentity} and navigation_product.product_category = ?))`);
     values.push(filters.navigationProductCategory, filters.navigationProductCategory);
   }
-  if (filters.associationState === 'unassociated') conditions.push('record.product_id is null');
+  if (filters.associationState === 'unassociated') conditions.push(`record.product_id is null and not exists(select 1 from drawing_appearance_bindings binding where binding.origin=record.origin and binding.record_id=abs(record.id)) and not exists(select 1 from business_usage usage where ${exactUsageIdentity} and usage.product_id is not null)`);
+  if (filters.appearanceVersionId !== undefined) {
+    conditions.push(`exists(select 1 from ${drawingAppearanceRelationsSql} relation where relation.origin=record.origin and relation.record_id=abs(record.id) and relation.appearance_version_id=?)`);
+    values.push(filters.appearanceVersionId);
+  }
   if (filters.brandId !== undefined) { conditions.push('record.brand_id = ?'); values.push(filters.brandId); }
   if (filters.appearanceId !== undefined) { conditions.push('record.appearance_id = ?'); values.push(filters.appearanceId); }
   if (filters.mainCategoryId !== undefined) { conditions.push('record.main_category_id = ?'); values.push(filters.mainCategoryId); }
@@ -173,8 +184,8 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
     values.push(filters.materialBatchId);
   }
   if (filters.productId !== undefined) {
-    conditions.push(`(record.product_id = ? or exists(select 1 from business_usage usage
-      where ${exactUsageIdentity} and usage.product_id = ?))`);
+    conditions.push(`(${canonicalSql("coalesce((select product_id from drawing_appearance_bindings binding where binding.origin=record.origin and binding.record_id=abs(record.id)),record.product_id)")} = ? or exists(select 1 from business_usage usage
+      where ${exactUsageIdentity} and ${canonicalSql("usage.product_id")} = ?))`);
     values.push(filters.productId, filters.productId);
   }
   if (filters.usageBatchId !== undefined) {
@@ -206,6 +217,13 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
 export class DrawingRepository {
   constructor(private readonly db: PlannerDatabase) {}
 
+  private enrich(record: DrawingRecord): DrawingRecord {
+    const binding=this.db.prepare(`select binding.product_id, binding.appearance_version_id, version.label, product.model, product.sku from drawing_appearance_bindings binding join product_appearance_versions version on version.id=binding.appearance_version_id join products product on product.id=binding.product_id where binding.origin=? and binding.record_id=?`).get(record.origin,Math.abs(record.id)) as {product_id:number;appearance_version_id:number;label:string;model:string;sku:string}|undefined;
+    if(binding) Object.assign(record,{productId:binding.product_id,model:binding.model,sku:binding.sku,appearanceVersionId:binding.appearance_version_id,appearanceVersionLabel:binding.label});
+    if(record.productId!==null){const id=resolveCanonicalProductId(this.db,record.productId);const product=this.db.prepare('select model,sku,product_category as productCategory from products where id=?').get(id) as {model:string;sku:string|null;productCategory:string}|undefined;if(product)Object.assign(record,product,{productId:id});}
+    return record;
+  }
+
   search(filters: DrawingSearchFilters, page: number, pageSize: number): { items: DrawingRecord[]; total: number } {
     const condition = buildConditions(filters);
     const cte = unifiedCte(filters.productId !== undefined || filters.usageBatchId !== undefined
@@ -215,13 +233,13 @@ export class DrawingRepository {
     const rows = this.db.prepare(`${cte} select * from drawing_records record${condition.sql}
       order by record.created_at desc, record.id desc limit ? offset ?`)
       .all(...condition.values, pageSize, (page - 1) * pageSize) as DrawingRow[];
-    return { items: rows.map(mapRow), total };
+    return { items: rows.map(row=>this.enrich(mapRow(row))), total };
   }
 
   navigationCounts(filters: DrawingSearchFilters): DrawingNavigationCounts {
     // Navigation ranges must not leak into global counts. All compatible manual filters remain.
     const { productId: _product, usageBatchId: _batch, navigationProductCategory: _category,
-      associationState: _association, page: _page, pageSize: _size, deletionState: _deletion, ...manual } = filters;
+      appearanceVersionId: _appearanceVersion, associationState: _association, page: _page, pageSize: _size, deletionState: _deletion, ...manual } = filters;
     const base = { ...manual, deletionState: _deletion === 'all' ? 'all' as const : 'normal' as const };
     return this.db.transaction(() => {
       const count = (scope: DrawingSearchFilters = {}) => {
@@ -235,9 +253,9 @@ export class DrawingRepository {
       const catalogCte = `${unifiedCte(true)}, filtered_records as (
         select record.* from drawing_records record${manualCondition.sql}
       ), product_associations as (
-        select record.id as drawing_id, record.product_id from filtered_records record where record.product_id is not null
+        select record.id as drawing_id, ${canonicalSql("coalesce((select binding.product_id from drawing_appearance_bindings binding where binding.origin=record.origin and binding.record_id=abs(record.id)),record.product_id)")} as product_id from filtered_records record where record.product_id is not null or exists(select 1 from drawing_appearance_bindings binding where binding.origin=record.origin and binding.record_id=abs(record.id))
         union
-        select record.id, usage.product_id from filtered_records record join business_usage usage
+        select record.id, ${canonicalSql("usage.product_id")} from filtered_records record join business_usage usage
           on ${exactUsageIdentity} where usage.product_id is not null
       )`;
       const products = this.db.prepare(`${catalogCte} select product_id as productId,
@@ -253,7 +271,8 @@ export class DrawingRepository {
         where usage.product_id is not null and usage.batch_id is not null
         group by usage.product_id, usage.batch_id order by usage.product_id, usage.batch_id`)
         .all(...manualCondition.values) as DrawingNavigationCounts['batches'];
-      return { total: count(), categories, products, batches,
+      const appearances=this.db.prepare(`${catalogCte} select relation.appearance_version_id as appearanceVersionId,count(distinct record.id) as count from filtered_records record join ${drawingAppearanceRelationsSql} relation on relation.origin=record.origin and relation.record_id=abs(record.id) group by relation.appearance_version_id`).all(...manualCondition.values) as DrawingNavigationCounts['appearances'];
+      return { total: count(), categories, products, batches, appearances,
         unassociated: count({ associationState: 'unassociated' }),
         recycle: count({ deletionState: _deletion === 'deleted-retained' || _deletion === 'deleted-released' ? _deletion : 'deleted' }) };
     }).deferred();
@@ -261,7 +280,7 @@ export class DrawingRepository {
 
   get(id: number): DrawingRecord | undefined {
     const row = this.db.prepare(`${unifiedCte(true)} select * from drawing_records where id = ?`).get(id) as DrawingRow | undefined;
-    return row ? mapRow(row) : undefined;
+    return row ? this.enrich(mapRow(row)) : undefined;
   }
 
   getDetail(id: number): Omit<DrawingDetailRecord, 'batchUsage'> | undefined {
@@ -329,13 +348,13 @@ export class DrawingRepository {
       const drawing = this.db.prepare('select full_code as fullCode from drawing_numbers where id = ?')
         .get(drawingId) as { fullCode: string } | undefined;
       const pdf = this.db.prepare(`select detected_codes_json as detectedCodesJson from pdf_files
-        where id = ? and is_present = 1`).get(pdfIndexId) as { detectedCodesJson: string } | undefined;
+        where id = ? and is_present = 1 and management_state = 'included'`).get(pdfIndexId) as { detectedCodesJson: string } | undefined;
       if (!drawing || !pdf) return false;
       const parsed = JSON.parse(pdf.detectedCodesJson) as unknown;
       const detectedCodes = Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
       if (!detectedCodes.includes(drawing.fullCode)) detectedCodes.push(drawing.fullCode);
       this.db.prepare(`update pdf_files set drawing_id = ?, historical_drawing_id = null,
-        match_status = 'matched', conversion_type = ?, detected_codes_json = ? where id = ? and is_present = 1`)
+        match_status = 'matched', conversion_type = ?, detected_codes_json = ? where id = ? and is_present = 1 and management_state = 'included'`)
         .run(drawingId, conversionType, JSON.stringify(detectedCodes), pdfIndexId);
       return true;
     }).immediate();

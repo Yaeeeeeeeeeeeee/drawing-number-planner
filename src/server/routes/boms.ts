@@ -11,13 +11,15 @@ import { FileError } from '../../core/files/file-errors.js';
 import type { BomService } from '../../core/bom/bom-service.js';
 import { ensureMultipart } from '../multipart.js';
 
-const productQuery = z.object({ productId: z.coerce.number().int().positive() }).strict();
+const productQuery = z.object({ productId: z.coerce.number().int().positive(), appearanceVersionId: z.coerce.number().int().positive().optional() }).strict();
 const candidateQuery = z.object({
+  appearanceVersionId: z.coerce.number().int().positive().optional(), includeReusableMaterials: z.enum(['true','false']).transform(value=>value==='true').optional(),
   productId: z.coerce.number().int().positive(), projectItemId: z.coerce.number().int().positive(),
   usesWhiteMaterial: z.enum(['true', 'false']).transform((value) => value === 'true'),
   entryMode: z.enum(['current', 'historical']).default('current'),
 }).strict();
 const bomQuery = z.object({
+  appearanceVersionId: z.coerce.number().int().positive().optional(),
   model: z.string().trim().optional(), businessChangeDate: z.string().trim().optional(),
   effectiveBatchRelativePath: z.string().trim().optional(), projectItemId: z.coerce.number().int().positive().optional(),
   fullCode: z.string().trim().optional(),
@@ -38,6 +40,7 @@ const itemSchema = z.object({
   qrCodeIds: z.array(z.number().int().positive()).max(100).optional(),
 }).strict().refine((value) => Boolean(value.drawingReference) !== Boolean(value.drawingId));
 const saveFields = z.object({
+  appearanceVersionId: z.number().int().positive().optional(), copyFromVersionId: z.number().int().positive().optional(),
   productId: z.number().int().positive(), businessChangeDate: z.string().trim(),
   entryMode: z.enum(['current', 'historical']).default('current'),
   expectedCurrentVersionId: z.number().int().positive().nullable(), notes: z.string().max(1000).optional(),
@@ -61,6 +64,11 @@ function sendBomError(reply: FastifyReply, error: unknown) {
 
 export function registerBomRoutes(app: FastifyInstance, service: BomService): void {
   ensureMultipart(app);
+  app.post('/api/boms/versions/:id/copy-to-appearance', async (request,reply)=>{
+    const params=versionParams.safeParse(request.params); const body=z.object({appearanceVersionId:z.number().int().positive(),businessChangeDate:z.string()}).strict().safeParse(request.body);
+    if(!params.success || !body.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'BOM 复制条件无效'}});
+    try { return reply.code(201).send(service.copyToAppearance(params.data.id,body.data.appearanceVersionId,body.data.businessChangeDate)); } catch(error) { return sendBomError(reply,error); }
+  });
   app.get('/api/boms/assets/archive-preview', async (_request, reply) => {
     try { return { items: service.previewAssetArchive() }; } catch (error) { return sendBomError(reply, error); }
   });
@@ -98,12 +106,12 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
   app.get('/api/boms/current', async (request, reply) => {
     const query = productQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
-    return { version: service.getCurrent(query.data.productId) };
+    try{return { version: service.getCurrent(query.data.productId, query.data.appearanceVersionId) };}catch(error){return sendBomError(reply,error);}
   });
   app.get('/api/boms/versions', async (request, reply) => {
     const query = productQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
-    return { items: service.listVersions(query.data.productId) };
+    try{return { items: service.listVersions(query.data.productId, query.data.appearanceVersionId) };}catch(error){return sendBomError(reply,error);}
   });
   app.get('/api/boms/versions/:id/delete-preview', async (request, reply) => {
     const params = versionParams.safeParse(request.params);
@@ -133,7 +141,7 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
   app.get('/api/boms/qr-candidates', async (request, reply) => {
     const query = productQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '二维码查询条件无效' } });
-    try { return { items: service.listActiveQrCandidates(query.data.productId) }; } catch (error) { return sendBomError(reply, error); }
+    try { return { items: service.listActiveQrCandidates(query.data.productId,query.data.appearanceVersionId) }; } catch (error) { return sendBomError(reply, error); }
   });
   app.post('/api/boms/material-batches/:id/relink', async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).strict().safeParse(request.params);

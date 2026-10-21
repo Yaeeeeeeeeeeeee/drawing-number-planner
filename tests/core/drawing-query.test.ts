@@ -526,3 +526,18 @@ describe('drawing catalog counts', () => {
     expect(drawings.navigationCounts({ deletionState: 'all' }).total).toBe(drawings.search({ deletionState: 'all' }).total);
   });
 });
+
+it('shows explicit older material reuse in the new appearance without duplicating records or replacing original attribution',()=>{
+  const productId=(db.prepare('select product_id as id from drawing_numbers where id=?').get(ids.first) as {id:number}).id;
+  const initial=db.prepare('select id,appearance_id from product_appearance_versions where product_id=?').get(productId) as {id:number;appearance_id:number};
+  const next=Number(db.prepare(`insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,?,'New','draft','now')`).run(productId,initial.appearance_id).lastInsertRowid);
+  drawings.associations.correct({signedId:ids.first,productId,appearanceVersionId:initial.id},'核验原始版本');
+  const original=drawings.get(ids.first).fullCode;
+  for(const number of [1,2]){
+    const bom=Number(db.prepare(`insert into bom_versions(product_id,appearance_version_id,version_number,business_change_date,created_at) values(?,?,?,?,?)`).run(productId,next,number,'2026-10-20','now').lastInsertRowid);
+    db.prepare('insert into bom_items(bom_version_id,project_item_id,drawing_id,quantity) values(?,?,?,1)').run(bom,ids.logo,ids.first);
+  }
+  expect(drawings.search({productId,appearanceVersionId:next}).items).toEqual([expect.objectContaining({id:ids.first,fullCode:original,appearanceVersionId:initial.id})]);
+  expect(drawings.navigationCounts().appearances).toContainEqual({appearanceVersionId:next,count:1});
+  expect(db.prepare('select appearance_version_id from drawing_appearance_bindings where origin=\'planned\' and record_id=?').get(ids.first)).toEqual({appearance_version_id:initial.id});
+});

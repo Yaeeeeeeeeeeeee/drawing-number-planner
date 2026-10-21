@@ -17,6 +17,9 @@ const signature = { id: 5, name: '默认签名', content: '顺祝商祺\n田嘉�
 function apiFixture() {
   return {
     listProducts: vi.fn().mockResolvedValue([product]), listDictionaries: vi.fn().mockResolvedValue([{ id: 1, code: '02', name: 'SAMKYO', status: 'active' }]),
+    listAppearanceVersions: vi.fn().mockResolvedValue({items:[{id:31,label:'原外观',status:'current'}]}),
+    getOutboundBatchScopes: vi.fn().mockResolvedValue([{id:8,productId:3,name:batch.name,appearanceVersionId:31,completeness:'complete',revision:1}]),
+    preflightOutboundPackage: vi.fn().mockImplementation(async(input)=>({previewToken:input.previewToken,packageName:preview.packageName,selectedCount:input.selectedPdfFileIds.length,normalCount:input.selectedPdfFileIds.length,warningCount:0,blockingErrors:[],warnings:[],context:{}})),
     listMaterialBatches: vi.fn().mockResolvedValue([batch]), previewOutboundPackage: vi.fn().mockResolvedValue(preview),
     listOutboundPackages: vi.fn().mockResolvedValue([]),
     createOutboundPackage: vi.fn().mockResolvedValue({ id: 9, packageName: preview.packageName, zipRelativePath: `${preview.packageName}.zip`, fileCount: 1, createdAt: '' }),
@@ -25,6 +28,16 @@ function apiFixture() {
     createOutboundContact: vi.fn().mockResolvedValue(contact), updateOutboundContact: vi.fn(), activateOutboundContact: vi.fn(), deactivateOutboundContact: vi.fn(), deleteOutboundContact: vi.fn(),
     createOutboundTemplate: vi.fn(), updateOutboundTemplate: vi.fn(), activateOutboundTemplate: vi.fn(), deactivateOutboundTemplate: vi.fn(), deleteOutboundTemplate: vi.fn(), createOutboundTemplateBlock: vi.fn(), updateOutboundTemplateBlock: vi.fn(), activateOutboundTemplateBlock: vi.fn(), deactivateOutboundTemplateBlock: vi.fn(), deleteOutboundTemplateBlock: vi.fn(), createOutboundSignature: vi.fn(), updateOutboundSignature: vi.fn(), activateOutboundSignature: vi.fn(), deactivateOutboundSignature: vi.fn(), deleteOutboundSignature: vi.fn(),
   };
+}
+
+// The controls render before their asynchronous dictionary/product options.
+// Wait for the actual selectable product, rather than dispatching a change to
+// an empty native select (which coerces the requested value back to "").
+async function selectLoadedProduct() {
+  const control=await screen.findByLabelText('产品');
+  await within(control).findByRole('option',{name:`${product.sku} · ${product.model} · ${product.productCategory}`});
+  fireEvent.change(control,{target:{value:'3'}});
+  expect(control).toHaveValue('3');
 }
 
 afterEach(() => { delete window.plannerDesktop; vi.restoreAllMocks(); });
@@ -44,10 +57,14 @@ describe('OutboundPage', () => {
     api.previewOutboundPackage.mockResolvedValue({ ...preview, items: [{ ...preview.items[0],
       bomContext: { status, changeDetails: null, candidates: [] } }] } as never);
     render(<OutboundPage api={api as never} />);
-    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
-    expect(await screen.findByText(status === 'missing' ? /未找到对应 BOM/ : /BOM 未填写修改明细/)).toBeVisible();
+    await screen.findByText('铭牌（转曲）.pdf');
+    fireEvent.click(screen.getByRole('button',{name:'查看'}));
+    expect(await screen.findByText(status==='missing'?'未关联 BOM':'已关联 BOM')).toBeVisible();
+    expect(screen.getByRole('button',{name:'生成压缩包'})).toBeEnabled();
   });
   it('marks missing change details visibly in the generated draft and offers manual supplementation', async () => {
     const api = apiFixture();
@@ -97,8 +114,8 @@ describe('OutboundPage', () => {
     const showOutboundPackageInFolder = vi.fn().mockResolvedValue({ ok: true });
     window.plannerDesktop = { showOutboundPackageInFolder } as never;
     render(<OutboundPage api={api as never} />);
-    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.click(screen.getByText('已生成的压缩包'));
+    await selectLoadedProduct();
+    fireEvent.click(screen.getByText('已生成的压缩包',{selector:'summary'}));
     expect(await screen.findByText('历史包-2.zip')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '打开历史包第2份位置' }));
     await waitFor(() => expect(showOutboundPackageInFolder).toHaveBeenCalledWith(90, 2));
@@ -152,11 +169,13 @@ describe('OutboundPage', () => {
     const showOutboundPackageInFolder = vi.fn().mockResolvedValue({ ok: true });
     window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true }), showOutboundPackageInFolder } as never;
     render(<OutboundPage api={api as never} />);
-    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('铭牌（转曲）.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
     expect(await screen.findByText('资料-2.zip')).toBeVisible();
     expect(screen.queryByText('资料.zip')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '打开第2份位置' }));
@@ -212,25 +231,24 @@ describe('OutboundPage', () => {
     expect(screen.getByLabelText('主题')).toHaveValue('人工主题');
     expect(api.renderOutboundTemplate).not.toHaveBeenCalled();
   });
-  it('requires an explicit BOM conflict choice and a fresh preview before packaging', async () => {
-    const api = apiFixture();
-    api.previewOutboundPackage.mockResolvedValueOnce({ ...preview, items: [{ ...preview.items[0], selectable: false,
-      bomContext: { status: 'ambiguous', changeDetails: null, candidates: [
-        { bomVersionId: 10, bomItemId: 11, businessDate: '2026-09-01', revision: 1, changeDetails: '旧修改' },
-        { bomVersionId: 20, bomItemId: 21, businessDate: '2026-09-10', revision: 1, changeDetails: '更正功率' },
-      ] } }] } as never).mockResolvedValue({ ...preview, previewToken: 'resolved', items: [{ ...preview.items[0],
-        bomContext: { status: 'matched', changeDetails: '更正功率', candidates: [] } }] } as never);
-    render(<OutboundPage api={api as never} />);
-    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
-    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
-    const choice = await screen.findByLabelText('铭牌 BOM 修改记录');
-    expect(screen.getByRole('button', { name: '生成压缩包' })).toBeDisabled();
-    fireEvent.change(choice, { target: { value: '20' } });
-    expect(screen.getByRole('button', { name: '生成压缩包' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
-    await waitFor(() => expect(api.previewOutboundPackage).toHaveBeenLastCalledWith(expect.objectContaining({ bomSelections: { '1': 20 } })));
-    await waitFor(() => expect(screen.getByRole('button', { name: '生成压缩包' })).toBeEnabled());
+  it('requires a hash-bound manual file confirmation and fresh preview without a BOM gate', async () => {
+    const api=apiFixture();const hash='a'.repeat(64);
+    api.previewOutboundPackage.mockResolvedValueOnce({...preview,items:[{...preview.items[0],contentSha256:hash,selectable:false,status:'conflict'}]} as never)
+      .mockResolvedValue({...preview,previewToken:'resolved',items:[{...preview.items[0],contentSha256:hash}]} as never);
+    render(<OutboundPage api={api as never}/>);
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'),{target:{value:'8'}});
+    fireEvent.click(screen.getByRole('button',{name:'预览文件'}));
+    await screen.findByText('铭牌（转曲）.pdf');
+    expect(screen.getByRole('button',{name:'生成压缩包'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('button',{name:'查看'}));
+    fireEvent.change(screen.getByLabelText('人工确认依据'),{target:{value:'已核对相同图号的实际内容'}});
+    fireEvent.click(screen.getByRole('button',{name:'记录确认并重新预览'}));
+    expect(screen.getByRole('button',{name:'生成压缩包'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('button',{name:'预览文件'}));
+    await waitFor(()=>expect(api.previewOutboundPackage).toHaveBeenLastCalledWith(expect.objectContaining({workflowVersion:2,fileConfirmations:[{pdfFileId:41,reason:'已核对相同图号的实际内容',contentSha256:hash}]})));
+    await waitFor(()=>expect(screen.getByRole('button',{name:'生成压缩包'})).toBeEnabled());
   });
   it('generates supplier-facing fields from BOM changes without internal paths, batch names or PDF extensions', async () => {
     const api = apiFixture();
@@ -259,11 +277,13 @@ describe('OutboundPage', () => {
       window.plannerDesktop = { chooseOutboundDirectory, showOutboundPackageInFolder } as never;
       render(<OutboundPage api={api as never} />);
       fireEvent.change(await screen.findByLabelText('打包资料类型'), {target:{value:materialType}});
-      fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
-      fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+      await selectLoadedProduct();
+      await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
       fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
       await screen.findByText('铭牌（转曲）.pdf');
       fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
       await waitFor(() => expect(api.createOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({
         materialType, previewToken: 'preview-1', selectedPdfFileIds: [41],
       })));
@@ -278,38 +298,43 @@ describe('OutboundPage', () => {
   it('uses the brand dictionary before product and keeps product identity authoritative', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     const brand = await screen.findByLabelText('品牌');
+    await within(brand).findByRole('option',{name:'SAMKYO'});
     expect(brand.tagName).toBe('SELECT');
     fireEvent.change(brand, { target: { value: '1' } });
     expect(screen.getByRole('option', { name: 'SKU-F60 · F60 · 空气炸锅' })).toBeVisible();
     expect(api.listDictionaries).toHaveBeenCalledWith('brand', false);
   });
 
-  it('previews both explicit business dimensions and blocks missing materials', async () => {
+  it('previews both business dimensions and lets valid files proceed despite unselected missing materials', async () => {
     const api = apiFixture(); render(<OutboundPage api={api as never} />);
     expect(await screen.findByRole('heading', { name: '外发资料' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '选择外发范围' })).toBeVisible();
-    expect(screen.getByLabelText('本次变更资料')).toBeChecked();
-    fireEvent.click(screen.getByLabelText('当前完整包材资料'));
+    expect(screen.getByLabelText('打包模式')).toHaveValue('change_only');
+    fireEvent.change(screen.getByLabelText('打包模式'),{target:{value:'current_complete'}});
     fireEvent.change(screen.getByLabelText('打包资料类型'), {target:{value:'update'}});
-    fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
-    await waitFor(() => expect(api.previewOutboundPackage).toHaveBeenCalledWith({ productId: 3, selectedMaterialBatchId: 8, materialType: 'update', packageMode: 'current_complete' }));
+    await waitFor(() => expect(api.previewOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({ workflowVersion:2,appearanceVersionId:31,productId: 3, selectedMaterialBatchId: 8, materialType: 'update', packageMode: 'current_complete' })));
     expect(await screen.findByText('铭牌（转曲）.pdf')).toBeVisible();
     expect(screen.getAllByText('缺失').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '全选可用文件' })).toBeVisible();
-    expect(screen.getByRole('button', { name: '生成压缩包' })).toBeDisabled();
-    expect(screen.getByText('存在缺失、冲突或待确认资料，处理后才能打包。')).toBeVisible();
+    expect(screen.getByRole('button', { name: '生成压缩包' })).toBeEnabled();
+    expect(screen.getByText(/未选中的异常文件不会阻止其他有效文件外发/)).toBeVisible();
+    expect(screen.getByRole('table',{name:'外发文件预览'}).querySelectorAll('th')).toHaveLength(6);
   });
 
   it('explains desktop-only packaging without calling the API in browser preview', async () => {
     const api = apiFixture(); const safePreview = { ...preview, items: [preview.items[0]] }; api.previewOutboundPackage.mockResolvedValue(safePreview);
     render(<OutboundPage api={api as never} />);
-    fireEvent.change(await screen.findByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('铭牌（转曲）.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
     expect(await screen.findByText('生成 ZIP 仅支持 Windows 桌面版，请在桌面版选择输出目录。')).toBeVisible();
     expect(api.createOutboundPackage).not.toHaveBeenCalled();
   });
@@ -345,11 +370,13 @@ describe('OutboundPage', () => {
     window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true, path: 'D:\\temp' }), showOutboundPackageInFolder: vi.fn() } as never;
     render(<OutboundPage api={api as never} />);
     fireEvent.change(await screen.findByLabelText('打包资料类型'),{target:{value:'update'}});
-    fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('铭牌（转曲）.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
     await screen.findByText('压缩包已生成');
     expect(screen.getByRole('table',{name:'ZIP 分包结果'})).toBeVisible();
     expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
@@ -369,14 +396,16 @@ describe('OutboundPage', () => {
     window.plannerDesktop = { chooseOutboundDirectory: vi.fn().mockResolvedValue({ ok: true, path: 'D:\\temp' }), showOutboundPackageInFolder: vi.fn() } as never;
     render(<OutboundPage api={api as never} />);
     fireEvent.change(await screen.findByLabelText('打包资料类型'),{target:{value:'update'}});
-    fireEvent.change(screen.getByLabelText('产品'), { target: { value: '3' } });
-    fireEvent.change(await screen.findByLabelText('资料批次'), { target: { value: '8' } });
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('A铭牌.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
     await screen.findByText('压缩包已生成');
 
-    fireEvent.click(screen.getByLabelText('当前完整包材资料'));
+    fireEvent.change(screen.getByLabelText('打包模式'),{target:{value:'current_complete'}});
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('B说明书.pdf');
     expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
@@ -647,6 +676,69 @@ describe('OutboundPage', () => {
     expect(await screen.findByText('已保存，但列表刷新失败：列表读取失败')).toBeVisible();
     await waitFor(() => expect(screen.queryByRole('form')).not.toBeInTheDocument());
     expect(api.deleteOutboundTemplate).toHaveBeenCalledOnce();
+  });
+
+  it('uses actual server preflight blockers and never calls creation when blocked',async()=>{
+    const api=apiFixture();api.previewOutboundPackage.mockResolvedValue({...preview,items:[preview.items[0]]});
+    api.preflightOutboundPackage.mockResolvedValue({previewToken:'preview-1',packageName:preview.packageName,selectedCount:1,normalCount:0,warningCount:1,warnings:['批次完整性待确认'],blockingErrors:[{code:'FILE_UNAVAILABLE',message:'所选源文件已不可读取'}],context:{}});
+    render(<OutboundPage api={api as never}/>);
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('资料批次'),{target:{value:'8'}});fireEvent.click(screen.getByRole('button',{name:'预览文件'}));
+    await screen.findByText('铭牌（转曲）.pdf');fireEvent.click(screen.getByRole('button',{name:'生成压缩包'}));
+    expect(await screen.findByText('所选源文件已不可读取')).toBeVisible();
+    expect(api.preflightOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({workflowVersion:2,appearanceVersionId:31,previewToken:'preview-1',selectedPdfFileIds:[41]}));
+    expect(screen.getByRole('button',{name:'确认生成'})).toBeDisabled();expect(api.createOutboundPackage).not.toHaveBeenCalled();
+  });
+  it('reports stale preflight without showing a local success or confirmation',async()=>{
+    const api=apiFixture();api.previewOutboundPackage.mockResolvedValue({...preview,items:[preview.items[0]]});api.preflightOutboundPackage.mockRejectedValue(new Error('源文件内容已变化，请重新预览'));
+    render(<OutboundPage api={api as never}/>);await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());fireEvent.change(screen.getByLabelText('资料批次'),{target:{value:'8'}});
+    fireEvent.click(screen.getByRole('button',{name:'预览文件'}));await screen.findByText('铭牌（转曲）.pdf');fireEvent.click(screen.getByRole('button',{name:'生成压缩包'}));
+    expect(await screen.findByText('源文件内容已变化，请重新预览')).toBeVisible();expect(screen.queryByRole('dialog',{name:'外发预检'})).not.toBeInTheDocument();expect(api.createOutboundPackage).not.toHaveBeenCalled();
+  });
+  it('queries history through real server filters and reads immutable file/part snapshots',async()=>{
+    const api={...apiFixture(),getOutboundPackageDetails:vi.fn().mockResolvedValue({id:90,context:{warnings:['当时的警告'],request:{workflowVersion:2}},files:[{fileName:'历史原始文件.pdf',fullCode:'历史图号',contentSha256:'a'.repeat(64)}],parts:[{partNumber:1,zipRelativePath:'old.zip',fileCount:1,isPresent:false}]})};
+    api.listOutboundPackages.mockResolvedValue([{id:90,packageName:'冻结外发历史',zipRelativePath:'old.zip',fileCount:1,createdAt:'2026-10-20',parts:[{partNumber:1,zipRelativePath:'old.zip',sizeBytes:100,fileCount:1}]}] as never);
+    render(<OutboundPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查询全部外发历史（含退出产品）'}));
+    fireEvent.change(screen.getByLabelText('历史SKU'),{target:{value:'OLD-SKU'}});fireEvent.change(screen.getByLabelText('历史资料类型'),{target:{value:'update'}});fireEvent.click(screen.getByRole('button',{name:'查询历史'}));
+    await waitFor(()=>expect(api.listOutboundPackages).toHaveBeenLastCalledWith(undefined,expect.objectContaining({sku:'OLD-SKU',materialType:'update'})));
+    fireEvent.click(await screen.findByRole('button',{name:'查看历史详情 #90'}));
+    expect(await screen.findByText(/历史原始文件.pdf/,{selector:'summary'})).toBeVisible();expect(screen.getByText(/ZIP 已不存在或不可读取/)).toBeVisible();expect(api.getOutboundPackageDetails).toHaveBeenCalledWith(90);
+  });
+
+  it.each([['directory','product'],['create','product'],['directory','appearance'],['create','appearance']] as const)('ignores an old package operation while awaiting %s after switching %s',async(phase,scope)=>{
+    const api=apiFixture();api.previewOutboundPackage.mockResolvedValue({...preview,items:[preview.items[0]]});
+    api.listAppearanceVersions.mockResolvedValue({items:[{id:31,label:'原外观',status:'current'},{id:32,label:'新外观',status:'historical'}]});
+    let finish!: (value:any)=>void;
+    const pending=new Promise(resolve=>{finish=resolve;});
+    let finishPreflight!: (value:any)=>void;
+    api.preflightOutboundPackage.mockImplementation(()=>new Promise(resolve=>{finishPreflight=resolve;}));
+    const picked=vi.fn().mockImplementation(()=>phase==='directory'?pending:Promise.resolve({ok:true}));
+    if(phase==='create')api.createOutboundPackage.mockImplementation(()=>pending as never);
+    window.plannerDesktop={chooseOutboundDirectory:picked} as never;
+    render(<OutboundPage api={api as never}/>);
+    await selectLoadedProduct();
+    await waitFor(()=>expect(screen.getByRole('option',{name:batch.name})).toBeInTheDocument());fireEvent.change(screen.getByLabelText('资料批次'),{target:{value:'8'}});
+    fireEvent.click(screen.getByRole('button',{name:'预览文件'}));await screen.findByText('铭牌（转曲）.pdf');
+    // Settle each preceding step explicitly, so the test switches scope only after
+    // the intended desktop operation is pending, independently of DOM polling timers.
+    await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'生成压缩包'}));});
+    expect(api.preflightOutboundPackage).toHaveBeenCalledOnce();
+    expect(api.preflightOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({appearanceVersionId:31,selectedPdfFileIds:[41]}));
+    await act(async()=>{finishPreflight({previewToken:'preview-1',packageName:preview.packageName,selectedCount:1,normalCount:1,warningCount:0,blockingErrors:[],warnings:[],context:{}});});
+    await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'确认生成'}));});
+    expect(phase==='directory'?picked:api.createOutboundPackage).toHaveBeenCalledOnce();
+    if(phase==='create')expect(api.createOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({productId:3,appearanceVersionId:31,selectedPdfFileIds:[41]}));
+    const changedScope=screen.getByLabelText(scope==='product'?'产品':'外发外观版本');
+    await act(async()=>{fireEvent.change(changedScope,{target:{value:scope==='product'?'':'32'}});});
+    expect(changedScope).toHaveValue(scope==='product'?'':'32');
+    const renderedDrafts=api.renderOutboundTemplate.mock.calls.length;
+    await act(async()=>{finish(phase==='directory'?{ok:true}:{id:900,packageName:'旧产品迟到结果',zipRelativePath:'old.zip',fileCount:1,createdAt:''});await pending;});
+    expect(screen.queryByText('压缩包已生成')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table',{name:'ZIP 分包结果'})).not.toBeInTheDocument();
+    expect(api.renderOutboundTemplate).toHaveBeenCalledTimes(renderedDrafts);
+    if(phase==='directory')expect(api.createOutboundPackage).not.toHaveBeenCalled();
   });
 
 });

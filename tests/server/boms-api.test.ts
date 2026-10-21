@@ -12,6 +12,38 @@ function multipartAsset(productId: number, filename: string, content: Buffer, bo
 }
 beforeEach(() => { db=openDatabase(':memory:'); migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined}); const d=new DictionaryService(db), p=new ProductService(db), brand=d.create({type:'brand',code:'02',name:'B'}), size=d.create({type:'product_size',code:'0404',name:'S'}), appearance=d.create({type:'appearance',code:'01',name:'A'}), white=d.create({type:'color',code:'0',name:'W'}), main=d.create({type:'main_category',code:'04',name:'M'}), logo=d.create({type:'project_item',code:'01',name:'L',parentId:main.id}), product=p.create({sku:'SKU',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id,model:'X',productCategory:'冰柜'}), plan=new PlanningService(db), input={productId:product.id,rows:[{clientId:'x',colorId:white.id,mainCategoryId:main.id,projectItemId:logo.id}]}, preview=plan.preview(input), drawing=plan.reserve({...input,rows:[{...input.rows[0],expectedFullCode:preview.rows[0].fullCode}]})[0]; refs={product,logo,drawing}; app=Fastify(); registerBomRoutes(app,new BomService(db)); }); afterEach(async()=>{await app.close();db.close();});
 describe('product-level BOM API',()=>{
+ it('copies into a draft appearance and routes current/history queries using the selected version',async()=>{
+   const payload={productId:refs.product.id,businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[{projectItemId:refs.logo.id,drawingId:refs.drawing.id,usesWhiteMaterial:true}]};
+   const first=(await app.inject({method:'POST',url:'/api/boms/versions',payload})).json().version;
+   const appearanceId=Number(db.prepare("insert into product_appearance_versions(product_id,version_number,label,status,created_at) values(?,2,'API草稿','draft','2026-10-20')").run(refs.product.id).lastInsertRowid);
+   const copied=await app.inject({method:'POST',url:`/api/boms/versions/${first.id}/copy-to-appearance`,payload:{appearanceVersionId:appearanceId,businessChangeDate:'2026-10-20'}});
+   expect(copied.statusCode).toBe(201);expect(copied.json().diff[0].type).toBe('unchanged');
+   expect((await app.inject({method:'GET',url:`/api/boms/current?productId=${refs.product.id}&appearanceVersionId=${appearanceId}`})).json().version.id).toBe(copied.json().version.id);
+   expect((await app.inject({method:'GET',url:`/api/boms/current?productId=${refs.product.id}`})).json().version.id).toBe(first.id);
+   expect((await app.inject({method:'GET',url:`/api/boms/versions?productId=${refs.product.id}&appearanceVersionId=${appearanceId}`})).json().items).toHaveLength(1);
+   expect((await app.inject({method:'GET',url:`/api/boms/current?productId=${refs.product.id}&appearanceVersionId=999999`})).statusCode).toBe(422);
+ });
+ it('keeps alias-owned legacy history readable and auditable through the original ID contract', async () => {
+   const payload={productId:refs.product.id,businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,
+     items:[{projectItemId:refs.logo.id,drawingId:refs.drawing.id,usesWhiteMaterial:true,changeDetails:'旧版内容'}]};
+   const original=(await app.inject({method:'POST',url:'/api/boms/versions',payload})).json().version;
+   // Legacy snapshots can remain unbound after migration and identity merge.
+   db.prepare('delete from appearance_bom_current where bom_version_id=?').run(original.id);
+   db.prepare('update bom_versions set appearance_version_id=null where id=?').run(original.id);
+   const productRow=db.prepare('select * from products where id=?').get(refs.product.id) as Record<string,unknown>;
+   const primaryId=new ProductService(db).create({brandId:Number(productRow.brand_id),productSizeId:Number(productRow.product_size_id),defaultAppearanceId:Number(productRow.default_appearance_id),model:'PRIMARY',sku:'PRIMARY',productCategory:'冰柜'}).id;
+   db.prepare('update product_identity_members set canonical_product_id=? where raw_product_id=?').run(primaryId,refs.product.id);
+   const before=(await app.inject({method:'GET',url:`/api/boms/versions/${original.id}`})).json();
+   expect(before).toMatchObject({id:original.id,productId:refs.product.id,appearanceVersionId:null});
+   const updated=await app.inject({method:'PUT',url:`/api/boms/versions/${original.id}`,payload:{input:{...payload,items:[{...payload.items[0],changeDetails:'审计纠错'}]},expectedRevision:0}});
+   expect(updated.statusCode).toBe(200);
+   const after=updated.json().version;
+   expect(after).toMatchObject({id:before.id,productId:before.productId,appearanceVersionId:null,createdAt:before.createdAt,businessChangeDate:before.businessChangeDate,previousVersionId:before.previousVersionId,editRevision:1});
+   const audit=db.prepare('select before_snapshot_json,after_snapshot_json from bom_revision_snapshots where bom_version_id=?').get(before.id) as {before_snapshot_json:string;after_snapshot_json:string};
+   expect(JSON.parse(audit.before_snapshot_json)).toEqual(before);
+   expect(JSON.parse(audit.after_snapshot_json)).toEqual(after);
+   expect(db.prepare('select count(*) as count from bom_versions').get()).toEqual({count:1});
+ });
  it('requires explicit confirmation for attachment migration and reports an unconfigured root', async () => {
    expect((await app.inject({ method: 'POST', url: '/api/boms/assets/1/archive', payload: { confirmed: false } })).statusCode).toBe(400);
    const response = await app.inject({ method: 'POST', url: '/api/boms/assets/1/archive', payload: { confirmed: true } });

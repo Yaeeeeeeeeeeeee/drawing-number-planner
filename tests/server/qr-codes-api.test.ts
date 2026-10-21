@@ -19,12 +19,14 @@ async function appWithProduct() {
   const appearance = dictionaries.create({ type: 'appearance', code: '01', name: '外观' });
   const product = products.create({ sku: 'SKUAPI', model: 'API100', productCategory: '冰柜',
     brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id });
+  // Explicit legacy fixture, rather than product-creation side effects.
+  new QrService(db).ensureForProduct(product.id);
   const app = Fastify(); registerQrCodeRoutes(app, new QrService(db));
   return { app, product };
 }
 
 describe('QR code API', () => {
-  it('creates extensible purposes and product QR records with an optional pending file', async () => {
+  it('creates purposes but refuses the former pending association bypass', async () => {
     const { app, product } = await appWithProduct();
     const purposeResponse = await app.inject({ method: 'POST', url: '/api/qr-purposes', payload: {
       key: 'installation', englishName: 'Installation Guide', displayName: '安装指南', defaultForAll: false,
@@ -44,17 +46,15 @@ describe('QR code API', () => {
         'api7', '2026-09-01', '2026-09-01')`).run();
     const pendingResponse = await app.inject({ method: 'GET',
       url: `/api/qr-files/pending?productId=${product.id}&purposeId=${purpose.id}` });
-    expect(pendingResponse.json().items).toEqual([expect.objectContaining({ id: Number(pending.lastInsertRowid) })]);
+    expect(pendingResponse.json().items).toEqual([]);
 
     const created = await app.inject({ method: 'POST', url: '/api/qr-codes', payload: {
       productId: product.id, purposeId: purpose.id, name: 'API100 安装指南', targetUrl: null, status: 'active',
       qrFileId: Number(pending.lastInsertRowid),
     } });
-    expect(created.statusCode).toBe(201);
-    const code = created.json() as { id: number; status: string; files: unknown[] };
-    expect(code).toMatchObject({ status: 'active', files: [expect.objectContaining({ id: Number(pending.lastInsertRowid) })] });
-    const blocked = await app.inject({ method: 'DELETE', url: `/api/qr-codes/${code.id}` });
-    expect(blocked.statusCode).toBe(409);
+    expect(created.statusCode).toBe(400);
+    expect(created.json()).toMatchObject({error:{code:'MANUAL_QR_REQUIRED'}});
+    expect(db.prepare('select qr_code_id from qr_code_files where id=?').get(pending.lastInsertRowid)).toEqual({qr_code_id:null});
     await app.close();
   });
 
@@ -96,7 +96,7 @@ describe('QR code API', () => {
     await app.close();
   });
 
-  it('returns product and file context, then resolves a compatible pending QR file without changing business status', async () => {
+  it('returns product context but rejects old association writes without changing history or business state', async () => {
     const { app, product } = await appWithProduct();
     const listed = await app.inject({ method: 'GET', url: `/api/qr-codes?productId=${product.id}` });
     const code = listed.json().items.find((item: { key: string }) => item.key === 'user_manual') as { id: number; purposeId: number };
@@ -108,18 +108,18 @@ describe('QR code API', () => {
     const detail = await app.inject({ method: 'GET', url: `/api/qr-codes/${code.id}` });
     expect(detail.statusCode).toBe(200);
     expect(detail.json()).toMatchObject({ sku: 'SKUAPI', model: 'API100', productCategory: '冰柜',
-      pendingFiles: [{ id: Number(pending.lastInsertRowid), isPresent: true }] });
+      pendingFiles: [] });
 
     const associated = await app.inject({ method: 'POST', url: `/api/qr-codes/${code.id}/associate-file`,
       payload: { qrFileId: Number(pending.lastInsertRowid) } });
-    expect(associated.statusCode).toBe(200);
-    expect(associated.json()).toMatchObject({ id: code.id, status: 'inactive',
-      files: [{ id: Number(pending.lastInsertRowid), isPresent: true }] });
+    expect(associated.statusCode).toBe(400);
+    expect(associated.json()).toMatchObject({error:{code:'MANUAL_QR_REQUIRED'}});
+    expect(db.prepare('select qr_code_id from qr_code_files where id=?').get(pending.lastInsertRowid)).toEqual({qr_code_id:null});
 
     const repeated = await app.inject({ method: 'POST', url: `/api/qr-codes/${code.id}/associate-file`,
       payload: { qrFileId: Number(pending.lastInsertRowid) } });
     expect(repeated.statusCode).toBe(400);
-    expect(repeated.json()).toMatchObject({ error: { code: 'QR_FILE_ALREADY_LINKED' } });
+    expect(repeated.json()).toMatchObject({ error: { code: 'MANUAL_QR_REQUIRED' } });
 
     const incompatible = db.prepare(`insert into qr_code_files
       (relative_path, path_key, file_name, mime_type, size_bytes, modified_at, match_status, is_present, first_seen_at, last_seen_at)
@@ -128,7 +128,7 @@ describe('QR code API', () => {
     const rejected = await app.inject({ method: 'POST', url: `/api/qr-codes/${code.id}/associate-file`,
       payload: { qrFileId: Number(incompatible.lastInsertRowid) } });
     expect(rejected.statusCode).toBe(400);
-    expect(rejected.json()).toMatchObject({ error: { code: 'QR_FILE_INCOMPATIBLE' } });
+    expect(rejected.json()).toMatchObject({ error: { code: 'MANUAL_QR_REQUIRED' } });
     await app.close();
   });
 });

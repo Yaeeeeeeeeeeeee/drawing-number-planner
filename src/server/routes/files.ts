@@ -12,8 +12,10 @@ const cleanupSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length),
 }).strict();
 const searchSchema = z.object({
+  managementState: z.enum(['included', 'ignored', 'needs_review', 'all']).optional(),
   keyword: z.string().max(500).optional(),
   productId: z.coerce.number().int().positive().optional(),
+  appearanceVersionId: z.coerce.number().int().positive().optional(),
   materialBatchId: z.coerce.number().int().positive().optional(),
   productCategory: z.string().min(1).max(500).optional(),
   unassociatedProduct: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
@@ -23,7 +25,7 @@ const searchSchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 }).strict();
-const navigationSchema = searchSchema.pick({ keyword: true, matchStatus: true, conversionType: true, presence: true }).strict();
+const navigationSchema = searchSchema.pick({ managementState: true, keyword: true, matchStatus: true, conversionType: true, presence: true }).strict();
 const clearIndexSchema = z.object({ confirmation: z.string() }).strict();
 const scanIdSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
 
@@ -68,6 +70,18 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService, t
     if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '扫描请求不应包含额外参数' } });
     try { return await service.scan(); }
     catch (error) { return sendFileError(reply, error); }
+  });
+
+  const managementSchema = cleanupSchema.extend({ action: z.enum(['clear', 'ignore', 'restore']) });
+  app.post('/api/files/management/preview', async (request, reply) => {
+    const input = managementSchema.safeParse(request.body);
+    if (!input.success) return reply.code(400).send({ error: {code: 'INVALID_REQUEST', message: 'PDF 管理预览参数无效'} });
+    try { return service.previewManagement(input.data); } catch (error) { return sendFileError(reply, error); }
+  });
+  app.post('/api/files/management/apply', async (request, reply) => {
+    const input = managementSchema.extend({fingerprint: z.string().length(64), confirmation: z.string()}).safeParse(request.body);
+    if (!input.success) return reply.code(400).send({ error: {code: 'INVALID_REQUEST', message: 'PDF 管理确认参数无效'} });
+    try { return service.applyManagement(input.data); } catch (error) { return sendFileError(reply, error); }
   });
 
   app.post('/api/files/cleanup', async (request, reply) => {

@@ -8,6 +8,7 @@ export type ParentToServiceMessage =
   | { type: 'request'; id: number; method: ServiceRequestMethod; args: unknown[] };
 
 export type ServiceRequestMethod =
+  | 'qrManualAction'
   | 'resolvePdfFilePath'
   | 'resolveBomAssetPath'
   | 'resolveQrFilePath'

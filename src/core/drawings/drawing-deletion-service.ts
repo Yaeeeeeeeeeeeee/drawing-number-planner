@@ -168,6 +168,8 @@ export class DrawingDeletionService {
       lineage, outboundSnapshot, emailDraft: 0, qrCode: 0,
     };
     const blockers: DrawingDeletionBlocker[] = [];
+    const appearanceUsage=(this.db.prepare('select count(*) as n from drawing_appearance_usages where origin=? and record_id=?').get(row.origin,row.id) as {n:number}).n;
+    if(appearanceUsage)blockers.push({kind:'appearance_usage',count:appearanceUsage,message:`无法删除：该图号已明确沿用到 ${appearanceUsage} 个外观版本，须保留占号与追溯`});
     if (references.currentBom) blockers.push({ kind: 'current_bom', count: references.currentBom,
       message: `无法删除：该图号当前被 ${references.currentBom} 条 BOM 明细使用` });
     if (references.currentMaterial) blockers.push({ kind: 'current_material', count: references.currentMaterial,

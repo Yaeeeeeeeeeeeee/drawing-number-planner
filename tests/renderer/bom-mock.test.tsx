@@ -106,3 +106,12 @@ it('never requests the real attachment preview endpoint in Mock', () => {
   const { container } = render(<BomAssetPreview assetId={31} name="碰撞 ID" />);
   expect(container.querySelector('img')?.getAttribute('src') ?? '').not.toContain('/api/');
 });
+it('leaves unsupported optional appearance APIs absent while keeping unknown writes isolated', async () => {
+  const api = createBomMockApi('normal');
+  expect(api.listAppearanceVersions).toBeUndefined();
+  expect(api.getAppearanceBom).toBeUndefined();
+  expect(api.queryAppearanceBoms).toBeUndefined();
+  expect(api.listAppearanceBomCandidates).toBeUndefined();
+  expect(api.listAppearanceBomQrCandidates).toBeUndefined();
+  await expect(api.saveBomVersion({} as never)).rejects.toThrow('Mock 已隔离');
+});

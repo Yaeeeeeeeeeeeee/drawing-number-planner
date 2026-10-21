@@ -53,6 +53,61 @@ async function selectProduct(expectEmpty = true) {
 }
 
 describe('BomPage product-level BOM', () => {
+  it('opens the exact requested history as a read-only detail and keeps the latest navigation target', async () => {
+    let finishOld!: (value: unknown) => void;
+    const old = new Promise(resolve => { finishOld = resolve; });
+    const record = { ...activeCurrent, appearanceVersionId: 102, editRevision: 2 };
+    const api = { ...apiFixture(), getBomVersion: vi.fn().mockReturnValueOnce(old).mockResolvedValue(record),
+      listAppearanceVersions: vi.fn().mockResolvedValue({productId:1,items:[{id:102,label:'历史外观',status:'historical'}]}) };
+    const {rerender} = render(<BomPage api={api as never} target={{productId:1,appearanceVersionId:102,bomVersionId:19}} />);
+    await waitFor(() => expect(api.getBomVersion).toHaveBeenCalledWith(19));
+    rerender(<BomPage api={api as never} target={{productId:1,appearanceVersionId:102,bomVersionId:20}} />);
+    expect(await screen.findByRole('region', {name:'所选 BOM 记录'})).toHaveTextContent('BOM 记录详情');
+    expect(screen.getByRole('button',{name:'查询 BOM'})).toHaveAttribute('aria-selected','true');
+    finishOld({...record,id:19,appearanceVersionId:102});
+    await waitFor(() => expect(screen.getByRole('button',{name:'查看 BOM 20'})).toBeVisible());
+    expect(screen.queryByRole('button',{name:'查看 BOM 19'})).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('业务变更日期')).not.toBeInTheDocument();
+    expect(api.getCurrentBom).not.toHaveBeenCalled();
+    expect(api.saveBomVersion).not.toHaveBeenCalled();
+  });
+  it.each([{productId:1,appearanceVersionId:999},{productId:99,appearanceVersionId:102}])('rejects a history target outside its product or appearance: %j', async target => {
+    const api = {...apiFixture(),getBomVersion:vi.fn().mockResolvedValue({...activeCurrent,appearanceVersionId:102}),
+      listAppearanceVersions:vi.fn().mockImplementation(async (productId:number)=>({productId,items:[]}))};
+    render(<BomPage api={api as never} target={{...target,bomVersionId:20}}/>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('不匹配');
+    expect(screen.queryByRole('region',{name:'所选 BOM 记录'})).not.toBeInTheDocument();
+    expect(api.saveBomVersion).not.toHaveBeenCalled();
+  });
+  it('opens merged alias history and edits using its original owner without assigning an appearance', async () => {
+    const record = {...activeCurrent,productId:2,appearanceVersionId:null,editRevision:4};
+    const api = {...apiFixture(), getBomVersion:vi.fn().mockResolvedValue(record),
+      updateBomVersion:vi.fn().mockResolvedValue({version:record,diff:[]}),
+      listAppearanceVersions:vi.fn().mockResolvedValue({productId:1,items:[{id:101,label:'当前外观',status:'current'}]})};
+    render(<BomPage api={api as never} target={{productId:1,bomVersionId:20}}/>);
+    expect(await screen.findByRole('region',{name:'所选 BOM 记录'})).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'编辑 BOM 20'}));
+    const field = await screen.findByLabelText('第 1 行修改明细');
+    fireEvent.change(field,{target:{value:'保留历史归属'}});
+    const save=screen.getByRole('button',{name:'保存修改'});
+    await waitFor(()=>expect(save).toBeEnabled());
+    fireEvent.click(save);
+    await waitFor(()=>expect(api.updateBomVersion).toHaveBeenCalledWith(20,expect.objectContaining({productId:2,businessChangeDate:record.businessChangeDate}),4));
+    expect(api.updateBomVersion.mock.calls[0][1]).not.toHaveProperty('appearanceVersionId');
+    expect(api.saveBomVersion).not.toHaveBeenCalled();
+  });
+
+  it('uses the selected appearance context and requires explicit old-material candidate browsing',async()=>{
+    const api={...apiFixture(),listAppearanceVersions:vi.fn().mockResolvedValue({items:[{id:101,label:'初始',status:'current'},{id:102,label:'换代',status:'draft'}]}),getAppearanceBom:vi.fn().mockResolvedValue(null),listAppearanceBomCandidates:vi.fn().mockResolvedValue([candidate])};
+    render(<BomPage api={api as never} target={{productId:1,appearanceVersionId:102}}/>);
+    await waitFor(()=>expect(api.getAppearanceBom).toHaveBeenCalledWith(1,102));
+    expect(screen.getByLabelText('BOM 外观版本')).toHaveValue('102');
+    fireEvent.change(screen.getByLabelText('BOM 外观版本'),{target:{value:'101'}});
+    await waitFor(()=>expect(api.getAppearanceBom).toHaveBeenCalledWith(1,101));
+    expect(screen.getByLabelText('显式选择同产品其他外观或旧图号物料')).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText('显式选择同产品其他外观或旧图号物料'));
+    expect(screen.getByLabelText('显式选择同产品其他外观或旧图号物料')).toBeChecked();
+  });
   it('shows the retained missing batch while editing instead of displaying an empty selection', async () => {
     const api = apiFixture();
     api.listMaterialBatches.mockResolvedValue([{ id: 8, name: '01.20260901', relativePath: 'X/01.20260901', productId: 1, isPresent: false }]);

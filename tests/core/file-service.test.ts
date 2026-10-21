@@ -191,7 +191,7 @@ describe('FileService', () => {
     release([]); await activeScan;
   });
 
-  it('rebuilds an empty index without duplicating historical occupancy or changing library files', async () => {
+  it('blocks clearing established history and rescans without duplicating occupancy or changing PDF files', async () => {
     const drawing = createDrawing(); const workspace = join(dataDir, 'library'); mkdirSync(workspace);
     const historyPath = join(workspace, '02.0404.010.0401002-history.pdf'); writeFileSync(historyPath, '%PDF unchanged');
     const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
@@ -205,7 +205,9 @@ describe('FileService', () => {
       mainCategoryId: refs.mainCategoryId, projectItemId: refs.projectItemId }] }).rows[0].sequence;
     const contentBefore = readFileSync(historyPath, 'utf8'); const metadataBefore = statSync(historyPath);
 
-    expect(service.clearIndex('清空资料库索引')).toEqual({ pdfFiles: 1, qrCodeFiles: 0, materialBatches: 0, scanChanges: 1, scanRuns: 1 });
+    const indexedBefore = service.search({presence:'all'}).items[0];
+    expect(() => service.clearIndex('清空资料库索引')).toThrow('存在已关联图号或业务引用');
+    expect(service.search({presence:'all'}).items[0].id).toBe(indexedBefore.id);
     expect(readFileSync(historyPath, 'utf8')).toBe(contentBefore);
     expect(statSync(historyPath).mtimeMs).toBe(metadataBefore.mtimeMs);
     expect(await service.scan()).toMatchObject({ historicalRegistered: 0, total: 1 });
@@ -214,43 +216,20 @@ describe('FileService', () => {
       mainCategoryId: refs.mainCategoryId, projectItemId: refs.projectItemId }] }).rows[0].sequence).toBe(nextBefore);
   });
 
-  it('routes QR candidates before historical parsing, tracks their presence, and clears only their index rows', async () => {
-    const dictionaries = new DictionaryService(db); const products = new ProductService(db);
-    const brand = dictionaries.create({ type: 'brand', code: '03', name: 'QR brand' });
-    const size = dictionaries.create({ type: 'product_size', code: '0405', name: 'QR size' });
-    const appearance = dictionaries.create({ type: 'appearance', code: '02', name: 'QR appearance' });
-    const product = products.create({ sku: 'SKUQR', model: 'QR100', productCategory: '冰柜',
-      brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id });
-    const workspace = join(dataDir, 'library'); const directory = join(workspace, '冰柜', 'SKUQR-QR100');
-    mkdirSync(directory, { recursive: true });
-    const manual = join(directory, 'QR100-User Manual（二维码的网址编码）.png');
-    const warranty = join(directory, 'QR100-Warranty（网址编码）.pdf');
-    const custom = join(directory, 'QR100-Custom Guide（网址编码）.png');
-    const history = join(workspace, '02.0404.010.0401007-history.pdf');
-    db.prepare(`insert into qr_purposes (key, english_name, display_name, default_for_all, status, created_at, updated_at)
-      values ('custom_guide', 'Custom Guide', '自定义指南二维码', 0, 'active', '2026-09-01', '2026-09-01')`).run();
-    writeFileSync(manual, 'png'); writeFileSync(warranty, '%PDF warranty'); writeFileSync(custom, 'custom png'); writeFileSync(history, '%PDF history');
-    const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
-
-    expect(await service.scan()).toMatchObject({ total: 1, historicalRegistered: 1 });
-    expect(db.prepare('select count(*) as count from qr_code_files where match_status = ?').get('matched')).toEqual({ count: 3 });
-    expect(db.prepare(`select code.status, code.target_url as targetUrl from product_qr_codes code
-      join qr_purposes purpose on purpose.id = code.purpose_id where code.product_id = ? and purpose.key = 'custom_guide'`).get(product.id))
-      .toEqual({ status: 'inactive', targetUrl: null });
-    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
-    const firstCodes = db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id);
-    db.prepare("update qr_purposes set status = 'inactive' where english_name = 'Warranty'").run();
-    await service.scan();
-    expect(db.prepare(`select match_status as matchStatus, qr_code_id as qrCodeId from qr_code_files
-      where file_name like 'QR100-Warranty%'`).get()).toEqual({ matchStatus: 'pending', qrCodeId: null });
-    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
-    unlinkSync(manual); await service.scan();
-    expect(db.prepare(`select is_present as isPresent from qr_code_files where file_name like 'QR100-User Manual%'`).get())
-      .toEqual({ isPresent: 0 });
-    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
-
-    expect(service.clearIndex('清空资料库索引')).toMatchObject({ qrCodeFiles: 3 });
-    expect(db.prepare('select count(*) as count from qr_code_files').get()).toEqual({ count: 0 });
-    expect(db.prepare('select count(*) as count from product_qr_codes where product_id = ?').get(product.id)).toEqual(firstCodes);
-  });
-});
+  it('scans PDFs without inferring new QR configuration and retains historical QR indices unchanged', async () => {
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace);
+    writeFileSync(join(workspace,'QR100-User Manual（网址编码）.png'),'png');
+    writeFileSync(join(workspace,'QR100-Warranty（网址编码）.pdf'),'%PDF warranty');
+    writeFileSync(join(workspace,'02.0404.010.0401007-history.pdf'),'%PDF history');
+    db.prepare(`insert into qr_code_files(relative_path,path_key,file_name,mime_type,size_bytes,modified_at,match_status,is_present,first_seen_at,last_seen_at)
+      values('old.png','old.png','old.png','image/png',3,'old','pending',1,'old','old')`).run();
+    const oldQr = db.prepare('select * from qr_code_files').all();
+    const oldCodes = db.prepare('select * from product_qr_codes').all();
+    const service = new FileService(repository, settings); service.updateSettings({workspaceRoot:workspace});
+    expect(await service.scan()).toMatchObject({total:2,historicalRegistered:1});
+    expect(db.prepare('select * from qr_code_files').all()).toEqual(oldQr);
+    expect(db.prepare('select * from product_qr_codes').all()).toEqual(oldCodes);
+    expect(() => service.clearIndex('清空资料库索引')).toThrow('存在已关联图号或业务引用');
+    expect(db.prepare('select * from qr_code_files').all()).toEqual(oldQr);
+    await service.scan();expect(db.prepare('select * from qr_code_files').all()).toEqual(oldQr);
+  });});

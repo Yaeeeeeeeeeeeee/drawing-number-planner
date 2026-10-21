@@ -29,8 +29,10 @@ export interface HistoricalDrawingScanRecord extends ParsedDrawingCode {
 }
 
 export interface FileSearchFilters {
+  managementState?: 'included' | 'ignored' | 'needs_review' | 'all';
   keyword?: string;
   productId?: number;
+  appearanceVersionId?: number;
   materialBatchId?: number;
   productCategory?: string;
   unassociatedProduct?: boolean;
@@ -43,6 +45,7 @@ export interface FileSearchFilters {
 
 export interface PdfFileView extends FileScanRecord {
   id: number;
+  managementState?: 'included' | 'ignored' | 'needs_review';
   historicalDrawingId: number | null;
   historicalFullCode: string | null;
   classificationWarning: string | null;
@@ -89,9 +92,11 @@ export interface FileScanChangesView {
 }
 
 /** Manual filters shared by the file list and navigation counts; navigation scope is excluded. */
-export type FileNavigationFilters = Pick<FileSearchFilters, 'keyword' | 'matchStatus' | 'conversionType' | 'presence'>;
+export type FileNavigationFilters = Pick<FileSearchFilters, 'keyword' | 'matchStatus' | 'conversionType' | 'presence' | 'managementState'>;
 
 export interface FileNavigationResult {
+  appearances?: Array<{appearanceVersionId:number;count:number}>;
+  appearanceBatches?: Array<{appearanceVersionId:number;materialBatchId:number;productId:number|null;count:number}>;
   total: number;
   unassociatedProducts: number;
   categories: Array<{ name: string; count: number }>;

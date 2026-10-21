@@ -35,3 +35,9 @@
 
 .catalog-nav-orphans {font-size:12px;padding:4px 0;}
 .catalog-nav-orphans summary {cursor:pointer;padding:6px 8px;}
+
+.pdf-nav-batch {display:flex;align-items:center;min-width:0;}
+.pdf-nav-batch > button[data-navigation-select] {flex:1;}
+.pdf-nav-appearance {padding-left:23px;}
+.catalog-appearance-batches {padding-left:18px;}
+.catalog-appearance-node {min-width:0;}

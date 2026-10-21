@@ -1,0 +1,136 @@
+name: Comprehensive production Windows delivery
+on:
+  push:
+    branches: [codex/comprehensive-appearance-20261020]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - '.github/workflows/comprehensive-windows-delivery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: comprehensive-windows-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  PLANNER_ACCEPTANCE_REVISION: ${{ github.sha }}
+jobs:
+  package-and-verify:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: app-source
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Download only the explicitly verified original runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: P4-Windows-x64-8dc2112
+          run-id: 38697339387
+          github-token: ${{ github.token }}
+          path: existing-p4
+      - name: Build the exact clean application source
+        shell: pwsh
+        working-directory: app-source
+        run: |
+          if ((git rev-parse HEAD) -ne $env:PLANNER_ACCEPTANCE_REVISION -or (git status --porcelain)) { throw 'Source must be exact and clean' }
+          npx --yes pnpm@11.25.0 install --frozen-lockfile --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { throw 'Install failed' }
+          node node_modules/typescript/bin/tsc --noEmit
+          if ($LASTEXITCODE -ne 0) { throw 'Typecheck failed' }
+          node node_modules/vite/bin/vite.js build
+          if ($LASTEXITCODE -ne 0) { throw 'Renderer build failed' }
+          node node_modules/typescript/bin/tsc -p tsconfig.main.json
+          if ($LASTEXITCODE -ne 0) { throw 'Main/preload build failed' }
+      - name: Verify every original runtime hash and bundle current Main/service/preload/renderer
+        shell: pwsh
+        run: |
+          node scripts/repack-comprehensive-windows.mjs app-source existing-p4 Comprehensive-Windows
+          if ($LASTEXITCODE -ne 0) { throw 'Verified repack failed' }
+      - name: Build Chinese installer with custom directory page
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force installer | Out-Null
+          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $compiler)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+          & $compiler "/DPackageRoot=$((Resolve-Path Comprehensive-Windows).Path)" "/DInstallerOutput=$((Resolve-Path installer).Path)" scripts/comprehensive-windows-installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Chinese installer compilation failed' }
+          & ./scripts/verify-p4-chinese-installer.ps1 -SetupPath 'installer/图号规划器-Windows-x64-安装包.exe' -OutputDirectory 'installer'
+      - name: Refuse sample-bearing target without deleting its files
+        shell: pwsh
+        run: |
+          $oldTarget = Join-Path $env:RUNNER_TEMP 'comprehensive-old-sample-target'
+          $sentinel = Join-Path $oldTarget 'resources/app/acceptance-seed/planner.db'
+          New-Item -ItemType Directory -Force (Split-Path $sentinel) | Out-Null
+          Set-Content -Path $sentinel -Value 'existing data must remain untouched'
+          $before = (Get-FileHash $sentinel -Algorithm SHA256).Hash
+          $process = Start-Process (Resolve-Path 'installer/图号规划器-Windows-x64-安装包.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$oldTarget`"") -PassThru
+          if (!$process.WaitForExit(30000)) { $process.Kill(); throw 'Refusal timed out' }
+          if ($process.ExitCode -eq 0 -or (Get-FileHash $sentinel -Algorithm SHA256).Hash -ne $before) { throw 'Unsafe sample-target handling' }
+      - name: Install to a Chinese custom path and compare every installed file hash
+        shell: pwsh
+        run: |
+          $installed = Join-Path $env:RUNNER_TEMP '图号规划器-综合改版-自定义安装路径'
+          $process = Start-Process (Resolve-Path 'installer/图号规划器-Windows-x64-安装包.exe').Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -PassThru
+          if (!$process.WaitForExit(120000)) { $process.Kill(); throw 'Install timed out' }
+          if ($process.ExitCode -ne 0) { throw 'Install failed' }
+          $root = (Resolve-Path Comprehensive-Windows).Path
+          $count = 0
+          Get-ChildItem $root -File -Recurse -Force | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath($root, $_.FullName)
+            $target = Join-Path $installed $relative
+            if (!(Test-Path $target) -or (Get-FileHash $_.FullName -Algorithm SHA256).Hash -ne (Get-FileHash $target -Algorithm SHA256).Hash) { throw "Installed hash mismatch: $relative" }
+            $count++
+          }
+          @{ installed=$installed; verifiedFiles=$count; revision=$env:PLANNER_ACCEPTANCE_REVISION } | ConvertTo-Json | Set-Content installer/installed-file-hash-verification.json
+          "COMPREHENSIVE_INSTALLED=$installed" >> $env:GITHUB_ENV
+      - name: Bundle verification fixture only into runner temporary storage
+        shell: pwsh
+        run: |
+          $helper = Join-Path $env:RUNNER_TEMP 'verify-comprehensive-database.mjs'
+          node scripts/build-comprehensive-verifier.mjs app-source "$helper"
+          if ($LASTEXITCODE -ne 0) { throw 'Native database verification bundle failed' }
+          "COMPREHENSIVE_DB_HELPER=$helper" >> $env:GITHUB_ENV
+      - name: Run installed Electron; native profile selection, v15 upgrade, backup, WAL, rollback, restart and screenshots
+        shell: pwsh
+        run: |
+          node scripts/verify-comprehensive-windows.cjs app-source "$env:COMPREHENSIVE_INSTALLED/图号规划器.exe" installer "$env:COMPREHENSIVE_DB_HELPER"
+          if ($LASTEXITCODE -ne 0) { throw 'Native installed application verification failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Comprehensive-Windows-Verification-${{ github.sha }}
+          path: |
+            installer/*.json
+            installer/*.txt
+            installer/*.png
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Comprehensive-Windows-x64-${{ github.sha }}
+          path: Comprehensive-Windows/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Comprehensive-Windows-Chinese-Setup-${{ github.sha }}
+          path: installer/图号规划器-Windows-x64-安装包.exe
+          if-no-files-found: error
+          retention-days: 14

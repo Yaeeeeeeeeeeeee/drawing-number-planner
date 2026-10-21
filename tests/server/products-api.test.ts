@@ -131,9 +131,8 @@ describe('product API', () => {
   it('returns module counts instead of a foreign-key error when deletion is blocked', async () => {
     const service = new ProductService(db);
     const product = service.create({ ...refs, sku: 'SKU-QR', model: 'ZC220', productCategory: '冰柜' });
-    db.prepare(`update product_qr_codes set target_url = 'https://example.test/manual' where id = (
-      select id from product_qr_codes where product_id = ? order by id limit 1
-    )`).run(product.id);
+    db.prepare(`insert into product_qr_codes(product_id,purpose_id,name,target_url,status,created_at,updated_at)
+      values(?,1,'已配置二维码','https://example.test/manual','active','2026-10-20','2026-10-20')`).run(product.id);
     const app = Fastify(); registerProductRoutes(app, service);
 
     const response = await app.inject({ method: 'DELETE', url: `/api/products/${product.id}` });

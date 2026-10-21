@@ -1,8 +1,9 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { resolveCanonicalProductId } from '../products/appearance-identity.js';
 import { QrError } from './qr-errors.js';
 import { QrRepository } from './qr-repository.js';
 import type { CreateProductQrCodeInput, CreateQrPurposeInput, ProductQrCode, ProductQrCodeFilters, QrPurpose,
-  QrStatus, UpdateProductQrCodeInput } from './qr-types.js';
+  QrStatus, QrFileReference, UpdateProductQrCodeInput } from './qr-types.js';
 
 function normalizeUrl(value: string | null): string | null {
   if (value == null || value.trim() === '') return null;
@@ -34,11 +35,18 @@ export class QrService {
     if (duplicate) throw new QrError('DUPLICATE_PURPOSE', '二维码用途编码或英文名称已经存在');
     return this.repository.createPurpose(normalized);
   }
-  list(filters: ProductQrCodeFilters = {}): { items: ProductQrCode[] } { return { items: this.repository.list(filters) }; }
-  listPendingFiles(productId: number, purposeId: number) {
+  list(filters: ProductQrCodeFilters = {}): { items: ProductQrCode[] } {
+    if (filters.appearanceVersionId != null) {
+      const version=this.database.prepare('select product_id from product_appearance_versions where id=?').get(filters.appearanceVersionId) as {product_id:number}|undefined;
+      if (!version || (filters.productId!=null&&resolveCanonicalProductId(this.database,filters.productId)!==version.product_id)) throw new QrError('INVALID_APPEARANCE','外观版本不属于所选产品');
+      return {items:this.repository.list({...filters,productId:version.product_id})};
+    }
+    return { items: this.repository.list(filters) };
+  }
+  listPendingFiles(productId: number, purposeId: number): {items: QrFileReference[]} {
     if (!this.repository.productIsActive(productId)) throw new QrError('NOT_FOUND', '启用中的产品不存在');
     if (!this.repository.purposeIsActive(purposeId)) throw new QrError('PURPOSE_NOT_FOUND', '启用中的二维码用途不存在');
-    return { items: this.repository.pendingFilesForProductPurpose(productId, purposeId) };
+    return { items: [] };
   }
   get(id: number): ProductQrCode {
     const code = this.repository.get(id);
@@ -51,16 +59,23 @@ export class QrService {
     return this.repository.update(id, { name, targetUrl: normalizeUrl(input.targetUrl) });
   }
   create(input: CreateProductQrCodeInput): ProductQrCode {
+    if(input.qrFileId!=null)throw new QrError('MANUAL_QR_REQUIRED','请使用本地PDF选择、校验与确认流程关联文件');
     if (!this.repository.productIsActive(input.productId)) throw new QrError('NOT_FOUND', '启用中的产品不存在');
     if (!this.repository.purposeIsActive(input.purposeId)) throw new QrError('PURPOSE_NOT_FOUND', '启用中的二维码用途不存在');
-    if (this.repository.findByProductPurpose(input.productId, input.purposeId)) {
+    if (this.repository.findByProductPurpose(input.productId, input.purposeId, input.appearanceVersionId ?? null)) {
       throw new QrError('DUPLICATE_PRODUCT_PURPOSE', '该产品已经存在此二维码用途');
+    }
+    if (input.appearanceVersionId != null) {
+      const valid = this.database.prepare(`select 1 from product_appearance_versions a
+        join product_identity_members m on m.canonical_product_id=a.product_id
+        where a.id=? and m.raw_product_id=?`).get(input.appearanceVersionId,input.productId);
+      if (!valid) throw new QrError('INVALID_APPEARANCE','外观版本不属于该产品');
     }
     const name = input.name.trim();
     if (!name) throw new QrError('INVALID_NAME', '二维码名称不能为空');
     return this.database.transaction(() => {
       const created = this.repository.create({ ...input, name, targetUrl: normalizeUrl(input.targetUrl) });
-      return input.qrFileId == null ? created : this.associateFile(created.id, input.qrFileId);
+      return created;
     }).immediate();
   }
   activate(id: number): ProductQrCode { this.get(id); return this.repository.setStatus(id, 'active'); }
@@ -71,21 +86,7 @@ export class QrService {
     if (!result.deleted) throw new QrError('QR_CODE_REFERENCED', '二维码仍被文件或 BOM 引用，不能删除', result.references);
     return { deleted: true };
   }
-  associateFile(qrCodeId: number, qrFileId: number): ProductQrCode {
-    this.get(qrCodeId);
-    try {
-      const code = this.repository.associatePendingFile(qrCodeId, qrFileId);
-      if (!code) throw new QrError('QR_FILE_NOT_FOUND', '待关联二维码文件不存在');
-      return code;
-    } catch (error) {
-      if (error instanceof QrError) throw error;
-      const code = error instanceof Error ? error.message : '';
-      const messages = {
-        QR_FILE_ALREADY_LINKED: '二维码文件已关联到其他记录', QR_FILE_NOT_PENDING: '只有待确认二维码文件可以人工关联',
-        QR_FILE_MISSING: '二维码文件已缺失，请重新扫描资料库', QR_FILE_INCOMPATIBLE: '该文件与当前产品型号或用途不匹配',
-      } as const;
-      if (code in messages) throw new QrError(code as keyof typeof messages, messages[code as keyof typeof messages]);
-      throw error;
-    }
+  associateFile(_qrCodeId: number, _qrFileId: number): ProductQrCode {
+    throw new QrError('MANUAL_QR_REQUIRED','请使用本地PDF选择、校验与确认流程关联文件');
   }
 }

@@ -1,0 +1,27 @@
+.outbound-page.approved-outbound .outbound-workflow:not([hidden]) {display:block;}
+.outbound-page.approved-outbound .outbound-selection-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:none;align-items:start;}
+.outbound-page.approved-outbound .outbound-selection-grid select {max-width:none;width:100%;}
+.outbound-mode-select {display:block;max-width:420px;}
+.outbound-mode-select select {width:100%;}
+.outbound-list-tools,.outbound-pagination {display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0;}
+.outbound-list-tools input {width:min(300px,100%);}
+.outbound-full-file-list {width:100%;overflow-x:auto;}
+.outbound-full-file-list table {width:100%;table-layout:fixed;min-width:760px;}
+.outbound-full-file-list :is(th,td) {padding:12px;text-align:center;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.outbound-full-file-list :is(th,td):nth-child(2) {text-align:left;}
+.outbound-file-drawer {position:fixed;right:0;top:0;bottom:0;width:min(580px,100vw);background:#fff;border-left:1px solid #ddd;z-index:100;overflow:auto;padding:24px;box-shadow:-6px 0 24px #0001;}
+.outbound-file-drawer header {display:flex;justify-content:space-between;align-items:center;}
+.outbound-file-drawer dl>div {padding:10px 0;border-bottom:1px solid #eee;}
+.outbound-file-drawer dd {margin:4px 0;overflow-wrap:anywhere;}
+.outbound-confirm-dialog {width:min(560px,calc(100vw - 32px));max-height:90dvh;overflow:auto;background:#fff;border:1px solid #ddd;border-radius:12px;padding:24px;}
+.outbound-confirm-dialog label,.outbound-file-drawer label {display:block;margin:12px 0;}
+.outbound-confirm-dialog textarea,.outbound-file-drawer textarea {width:100%;}
+.outbound-pagination select {width:auto;}
+@media(max-width:850px){.outbound-page.approved-outbound .outbound-selection-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:560px){.outbound-page.approved-outbound .outbound-selection-grid{grid-template-columns:minmax(0,1fr);}}
+.outbound-history-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:12px 0;}
+.outbound-history-filters label{display:grid;gap:4px;max-width:180px;}
+.outbound-snapshot{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;}
+.outbound-page.approved-outbound .package-builder{padding:0;border:0;background:transparent;}
+.outbound-page.approved-outbound .ob-step{margin-bottom:18px;}
+.outbound-full-file-list .outbound-file-name{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;}

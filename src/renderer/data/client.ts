@@ -1,3 +1,10 @@
+import { createAppearanceApi, type AppearanceApi, type AppearanceVersion } from './appearance-client';
+import { createBomAppearanceApi, type BomAppearanceApi } from './bom-appearance-client';
+import { createDrawingAppearanceApi, type DrawingAppearanceApi } from './drawing-appearance-client';
+import { createPdfManagementApi, type PdfManagementApi } from './pdf-management-client';
+import { createQrManualApi, type QrManualApi } from './qr-manual-client';
+import { notifyPlannerMutation } from './query-cache';
+export type AppearanceVersionView = AppearanceVersion;
 import type { DrawingNavigationCounts } from '../../core/drawings/drawing-types.js';
 import type { FileNavigationResult } from '../../core/files/file-types.js';
 export type PdfNavigationCounts = FileNavigationResult;
@@ -14,6 +21,7 @@ export interface DictionaryItemView {
 }
 
 export interface ProductView {
+  appearanceVersions?: AppearanceVersion[]; currentAppearanceVersionId?: number | null; identityRevision?: number;
   id: number; sku: string | null; brandId: number; brandName: string; productSizeId: number; productSizeName: string;
   defaultAppearanceId: number | null; defaultAppearanceName: string | null;
   model: string; productCategory: string; referenceProductId: number | null;
@@ -30,6 +38,7 @@ export interface ConfirmHistoricalProductCandidateView {
 }
 
 export interface DrawingView {
+  appearanceVersionId?: number | null; appearanceVersionLabel?: string | null; associationEvidence?: string[];
   id: number; origin: 'planned' | 'historical'; sku: string | null; fullCode: string; displayName: string;
   productId: number | null; model: string; productCategory: string; brandName: string;
   colorName: string; mainCategoryName: string; projectItemName: string;
@@ -46,6 +55,7 @@ export interface DrawingBomUsageView {
   projectItemId: number; projectItemName: string; quantity: number; usesWhiteMaterial: boolean;
 }
 export interface DrawingDetailView extends DrawingView {
+  associationHistory?: unknown[];
   sourceFiles: DrawingFileView[]; outlinedFiles: DrawingFileView[]; currentBomUsage: DrawingBomUsageView[];
   businessUsage?: DrawingBusinessUsageView[];
   readOnly: boolean; readOnlyMessage: string | null;
@@ -69,6 +79,7 @@ export interface DrawingBatchUsageView {
   }>;
 }
 export interface MaterialBatchView {
+  displayName?: string | null; displayRevision?: number; originalName?: string;
   id: number; relativePath: string; productDirectory: string; productId: number | null;
   productCategory: string | null; sku: string | null; model: string | null; name: string;
   sequenceNumber: number | null; businessDate: string | null; recognitionStatus: 'recognized' | 'pending';
@@ -88,6 +99,7 @@ export interface PlanningRowInputView {
   clientId: string; colorId: number; mainCategoryId: number; projectItemId: number; notes?: string;
 }
 export interface PlanningPreviewView {
+  appearanceVersionId?: number;
   productId: number; appearanceId: number;
   rows: Array<{ clientId: string; fullCode: string; displayName: string; prefix: string; sequence: number; available: true }>;
 }
@@ -132,6 +144,7 @@ export type BomItemView = BomDrawingReferenceView & {
   changeDetails: string | null; assets: BomItemAssetView[]; qrCodes: BomQrCodeView[];
 };
 export interface BomVersionSummaryView {
+  appearanceVersionId?: number | null;
   id: number; productId: number; model: string; versionNumber: number; previousVersionId: number | null;
   businessChangeDate: string | null; businessChangeDateLabel: string; notes: string | null; createdAt: string;
   updatedAt: string; editRevision: number;
@@ -151,6 +164,7 @@ export interface BomDiffView {
   drawingId: number | null; drawingReference: BomDrawingReferenceView | null; fullCode: string | null;
 }
 export interface SaveBomView {
+  appearanceVersionId?: number; copyFromVersionId?: number;
   productId: number; entryMode?: BomEntryModeView; businessChangeDate: string; expectedCurrentVersionId: number | null; notes?: string;
   items: Array<{ projectItemId: number; drawingReference: BomDrawingReferenceView; usesWhiteMaterial: boolean; effectiveMaterialBatchId?: number | null;
     material?: string; dimensions?: string; position?: string; notes?: string; changeDetails?: string;
@@ -168,6 +182,7 @@ export interface PdfScanSummaryView {
 export type QrBusinessStatus = 'active' | 'inactive';
 export type QrFileStatus = 'present' | 'missing' | 'none' | 'all';
 export interface QrFileView {
+  externalFileId?: string;
   id: number; relativePath: string; fileName: string; mimeType: string; isPresent: boolean;
   matchStatus: 'matched' | 'pending' | 'unmatched';
   detectedIdentifier: string | null;
@@ -175,12 +190,14 @@ export interface QrFileView {
 export interface QrPurposeView { id: number; key: string; englishName: string; displayName: string;
   defaultForAll: boolean; status: QrBusinessStatus; productCategories: string[] }
 export interface ProductQrCodeView {
+  canonicalProductId?: number; appearanceVersionId?: number | null; appearanceName?: string | null;
   id: number; productId: number; sku: string | null; model: string; productCategory: string;
   purposeId: number; key: string; englishName: string; displayName: string; purposeStatus: QrBusinessStatus;
   name: string; targetUrl: string | null; status: QrBusinessStatus; createdAt: string; updatedAt: string;
   files: QrFileView[]; pendingFiles: QrFileView[];
 }
 export interface ProductQrCodeFilters {
+  appearanceVersionId?: number;
   productId?: number; purposeId?: number; status?: QrBusinessStatus | 'all'; search?: string;
   productCategory?: string; fileStatus?: QrFileStatus;
 }
@@ -216,20 +233,40 @@ export interface OutboundSignatureView {
 export interface OutboundSignatureInputView { name: string; content: string; isDefault: boolean }
 export type OutboundPackageModeView = 'change_only' | 'current_complete';
 export interface OutboundPackageRequestView {
+  regeneratedFromPackageId?:number;workflowVersion?:2; baselineBatchId?:number; baselineConfirmationReason?:string; extraPdfFileIds?:number[];fileConfirmations?:Array<{pdfFileId:number;reason:string;contentSha256?:string}>;
+  appearanceVersionId?: number; bomVersionId?: number;
   bomSelections?: Record<string, number>;
   productId: number; selectedMaterialBatchId: number; materialType: OutboundMaterialTypeView; packageMode: OutboundPackageModeView;
 }
 export interface OutboundPackagePreviewItemView {
+  contentSha256?:string|null;sizeBytes?:number|null;defaultSelected?:boolean;source?:string;confirmationReason?:string|null;detail?:string|null;
+  conversionType?:'source'|'outlined';appearanceVersionId?:number;
+  comparison?:{batchId:number;batchName:string;files:Array<{pdfFileId:number;fileName:string;relativePath:string;fullCode:string|null;contentSha256:string|null}>};
   bomContext?: OutboundBomContext;
   slotKey: string; fullCode: string | null; projectItemId: number | null; projectItemName: string;
   pdfFileId: number | null; fileName: string | null; relativePath: string | null; sourceBatchId: number;
   sourceBatchName: string; status: 'normal' | 'carried_forward' | 'needs_confirmation' | 'conflict' | 'missing';
-  change: 'new' | 'replaced' | 'copied' | 'carried_forward' | 'same_code_changed' | 'conflict';
+  change: 'new' | 'replaced' | 'copied' | 'carried_forward' | 'same_code_changed' | 'conflict' | 'removed';
   selectable: boolean; conflictFullCodes: string[];
 }
-export interface OutboundPackagePreviewView { previewToken: string; packageName: string; items: OutboundPackagePreviewItemView[] }
+export interface OutboundBatchScopeView {id:number;productId:number;name:string;originalName:string;relativePath:string;sequenceNumber:number|null;businessDate:string|null;appearanceVersionId:number|null;completeness:'pending'|'complete'|'partial';revision:number;baselineBatchId:number|null}
+export interface OutboundPackagePreviewView { warnings?:string[];baselineBatchId?:number|null;batchCompleteness?:'pending'|'complete'|'partial';bomCheck?:{status:'missing'|'matched'|'partial';missingFullCodes:string[];extraPdfFileIds:number[]};previewToken: string; packageName: string; items: OutboundPackagePreviewItemView[] }
 export interface CreatedOutboundPackageView { id: number; packageName: string; zipRelativePath: string; fileCount: number; createdAt: string;
-  parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number }> }
+  parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number;fileCount?:number;contentSha256?:string;files?:Array<{fileName:string;contentSha256:string;pdfFileId:number}> }> }
+export interface OutboundHistoryFiltersView {
+  brand?:string; model?:string; sku?:string; appearanceVersionId?:number; batchId?:number;
+  materialType?:OutboundMaterialTypeView; dateFrom?:string; dateTo?:string;
+}
+export interface OutboundPreflightView {
+  previewToken:string; packageName:string; selectedCount:number; normalCount:number; warningCount:number;
+  blockingErrors:Array<{code:string;message:string;pdfFileId?:number}>; warnings:string[]; context:unknown;
+}
+export interface OutboundHistoryDetailView {
+  id:number; context:Record<string,unknown>; files:Array<Record<string,unknown>>; parts:Array<Record<string,unknown>>;
+}
+export interface OutboundRegenerationView {
+  sourcePackageId:number; request:OutboundPackageRequestView; preview:OutboundPackagePreviewView; selectedPdfFileIds:number[];
+}
 export interface MaterialBatchLogicalMaterialView {
   fullCode: string | null; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
 }
@@ -242,6 +279,8 @@ export interface FileScanChangesView { scan: FileScanRunView;
 export interface FileIndexClearResultView { pdfFiles: number; qrCodeFiles: number; materialBatches: number; scanChanges: number; scanRuns: number }
 export interface FileIndexClearPreviewView { workspaceRoot: string | null; counts: FileIndexClearResultView }
 export interface PdfFileView {
+  contentSha256?:string|null;
+  managementState?: 'included' | 'ignored' | 'needs_review';
   id: number; relativePath: string; fileName: string; drawingId: number | null; historicalDrawingId: number | null;
   historicalFullCode: string | null; fullCode: string | null;
   displayName: string | null; productId: number | null; sku: string | null; model: string | null;
@@ -260,7 +299,7 @@ export interface LocalTaskView {
   startedAt?: string; finishedAt?: string; result?: unknown; error?: { code: string; message: string };
 }
 
-export interface PlannerApi {
+export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<DrawingAppearanceApi>, PdfManagementApi, QrManualApi {
   getDrawingNavigationCounts?(filters?: Record<string, string | number | boolean | undefined>): Promise<DrawingNavigationCounts>;
   getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[] }>;
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
@@ -336,17 +375,23 @@ export interface PlannerApi {
   activateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deactivateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deleteOutboundSignature(id: number): Promise<{ deleted: true }>;
-  listOutboundPackages(productId?: number): Promise<Array<Omit<CreatedOutboundPackageView, 'parts'> & {
-    parts: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number | null }>;
+  listOutboundPackages(productId?: number, filters?:OutboundHistoryFiltersView): Promise<Array<Omit<CreatedOutboundPackageView, 'parts'> & {
+    parts: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number | null; fileCount?:number; contentSha256?:string }> ;
+    brand?:string|null;model?:string|null;sku?:string|null;appearanceVersionId?:number|null;appearanceLabel?:string|null;selectedMaterialBatchId?:number;batchName?:string|null;materialType?:OutboundMaterialTypeView;
   }>>;
+  getOutboundPackageDetails?(id:number):Promise<OutboundHistoryDetailView>;
+  prepareOutboundRegeneration?(id:number):Promise<OutboundRegenerationView>;
+  preflightOutboundPackage?(input:OutboundPackageRequestView & {previewToken:string;selectedPdfFileIds:number[]}):Promise<OutboundPreflightView>;
+  getOutboundBatchScopes?(productId:number,appearanceVersionId?:number):Promise<OutboundBatchScopeView[]>;
+  setOutboundBatchScope?(batchId:number,input:import('../../core/outbound/outbound-batch-workflow').BatchScopeInput):Promise<unknown>;
   previewOutboundPackage(input: OutboundPackageRequestView): Promise<OutboundPackagePreviewView>;
   createOutboundPackage(input: OutboundPackageRequestView & { previewToken: string; selectedPdfFileIds: number[] }): Promise<CreatedOutboundPackageView>;
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
   confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
   confirmImport(auditId: string, selections: string[]): Promise<{ imported: number; skipped: number }>;
-  previewPlan(input: { productId: number; appearanceId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
-  reservePlan(input: { productId: number; appearanceId?: number;
+  previewPlan(input: { productId: number; appearanceId?: number; appearanceVersionId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
+  reservePlan(input: { productId: number; appearanceId?: number; appearanceVersionId?: number;
     rows: Array<PlanningRowInputView & { expectedFullCode: string }> }): Promise<ReservedDrawingView[]>;
   getCurrentBom(productId: number): Promise<BomVersionView | null>;
   listBomVersions(productId: number): Promise<BomVersionSummaryView[]>;
@@ -448,6 +493,7 @@ const queryString = (values: object) => {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = init?.method?.toUpperCase() ?? 'GET';
   const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  const dataMutation = write && !path.includes('preview') && !path.includes('preflight') && !/\/render(?:[?]|$)/.test(path) && !path.startsWith('/api/tasks/');
   const send = async (token = ''): Promise<{ response: Response; body: ResponseBody }> => {
     const headers = { ...(init?.headers as Record<string, string> | undefined), ...(write && token ? { 'x-planner-token': token } : {}) };
     const response = await fetchLocal(path, { ...init, headers });
@@ -461,10 +507,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const replay = await send(await sessionToken());
     if (!replay.response.ok) throw responseError(replay.response, replay.body);
     if (replay.body.kind === 'text') throw new ApiError('INVALID_RESPONSE', '本地服务返回了无法识别的数据');
+    if (dataMutation) notifyPlannerMutation();
     return (replay.body.kind === 'json' ? replay.body.value : undefined) as T;
   }
   if (!first.response.ok) throw responseError(first.response, first.body);
   if (first.body.kind === 'text') throw new ApiError('INVALID_RESPONSE', '本地服务返回了无法识别的数据');
+  if (dataMutation) notifyPlannerMutation();
   return (first.body.kind === 'json' ? first.body.value : undefined) as T;
 }
 
@@ -503,12 +551,14 @@ async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_i
     task = await request<LocalTaskView>(`/api/tasks/${task.id}`);
     if (taskInProgress(task.status)) await new Promise((resolve) => window.setTimeout(resolve, 200));
   }
-  if (task.status === 'completed') return task.result as T;
+  if (task.status === 'completed') { notifyPlannerMutation(); return task.result as T; }
   if (task.status === 'failed') throw new ApiError(task.error?.code ?? 'TASK_FAILED', task.error?.message ?? '任务执行失败');
   throw new ApiError('TASK_CANCELLED', '任务已取消');
 }
 
 export const apiClient: PlannerApi = {
+  ...createAppearanceApi(request), ...createBomAppearanceApi(request), ...createDrawingAppearanceApi(request),
+  ...createPdfManagementApi(request), ...createQrManualApi(request),
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),
   getDrawingNavigation: () => request('/api/drawings/navigation'),
   getDrawingNavigationCounts: (filters = {}) => request(`/api/drawings/navigation-counts${queryString(filters)}`),
@@ -590,7 +640,12 @@ export const apiClient: PlannerApi = {
   activateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/activate`, json('POST')),
   deactivateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/deactivate`, json('POST')),
   deleteOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`, { method: 'DELETE' }),
-  listOutboundPackages: (productId) => request(productId === undefined ? '/api/outbound-packages' : `/api/outbound-packages?productId=${productId}`),
+  listOutboundPackages: (productId, filters={}) => request(`/api/outbound-packages${queryString({productId,...filters})}`),
+  getOutboundPackageDetails:id=>request(`/api/outbound-packages/${id}`),
+  prepareOutboundRegeneration:id=>request(`/api/outbound-packages/${id}/regeneration-preview`,json('POST')),
+  preflightOutboundPackage:input=>request('/api/outbound-packages/preflight',json('POST',input)),
+  getOutboundBatchScopes:(productId,appearanceVersionId)=>request(`/api/outbound-batch-scopes${queryString({productId,appearanceVersionId})}`),
+  setOutboundBatchScope:(id,input)=>request(`/api/outbound-batch-scopes/${id}`,json('PATCH',input)),
   previewOutboundPackage: (input) => request('/api/outbound-packages/preview', json('POST', input)),
   createOutboundPackage: (input) => runLocalTask('outbound_package', input),
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(

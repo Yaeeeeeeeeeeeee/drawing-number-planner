@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { join, win32 } from 'node:path';
+import { join, win32, posix } from 'node:path';
 
 import { isSafeWindowsNameComponent } from './windows-safe-name.js';
 
@@ -46,14 +46,15 @@ export function parseOutboundClaim(text: string, claimFileName: string): Outboun
 
 export function resolveOwnedOutboundArtifacts(outputDirectory: string, claimPath: string,
   claim: OutboundClaimMetadata): { claimPath: string; temporaryPath: string; finalPath: string } | null {
-  if (!win32.isAbsolute(outputDirectory) || !win32.isAbsolute(claimPath)) return null;
-  const directory = win32.resolve(outputDirectory);
-  const resolvedClaim = win32.resolve(claimPath);
-  if (win32.dirname(resolvedClaim).toLocaleLowerCase('en-US') !== directory.toLocaleLowerCase('en-US')
-    || win32.basename(resolvedClaim) !== expectedOutboundClaimFileName(claim.finalFile)) return null;
-  const temporaryPath = win32.resolve(directory, claim.temporaryFile);
-  const finalPath = win32.resolve(directory, claim.finalFile);
-  if ([temporaryPath, finalPath].some((path) => win32.dirname(path).toLocaleLowerCase('en-US')
+  const paths = /^(?:[a-z]:[\\/]|\\\\)/i.test(outputDirectory) ? win32 : posix;
+  if (!paths.isAbsolute(outputDirectory) || !paths.isAbsolute(claimPath)) return null;
+  const directory = paths.resolve(outputDirectory);
+  const resolvedClaim = paths.resolve(claimPath);
+  if (paths.dirname(resolvedClaim).toLocaleLowerCase('en-US') !== directory.toLocaleLowerCase('en-US')
+    || paths.basename(resolvedClaim) !== expectedOutboundClaimFileName(claim.finalFile)) return null;
+  const temporaryPath = paths.resolve(directory, claim.temporaryFile);
+  const finalPath = paths.resolve(directory, claim.finalFile);
+  if ([temporaryPath, finalPath].some((path) => paths.dirname(path).toLocaleLowerCase('en-US')
       !== directory.toLocaleLowerCase('en-US'))) return null;
   return { claimPath: resolvedClaim, temporaryPath, finalPath };
 }

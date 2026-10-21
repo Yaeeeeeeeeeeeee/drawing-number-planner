@@ -72,7 +72,12 @@ export function createBomMockApi(scenario: BomScenario): PlannerApi {
     methods.saveBomVersion = conflict;
     methods.updateBomVersion = conflict;
   }
-  return new Proxy(Object.create(null), { get: (_, method) => methods[String(method)] ?? (async () => { throw new Error(`Mock 已隔离：${String(method)} 未启用，不会调用真实服务。`); }) }) as PlannerApi;
+  // Optional capabilities must stay absent: returning a rejecting function advertises
+  // support to feature detection and prevents the existing read-only fallback.
+  const unsupportedAppearanceReads = new Set(['listAppearanceVersions', 'getAppearanceBom', 'listAppearanceBoms',
+    'listAppearanceBomCandidates', 'listAppearanceBomQrCandidates', 'queryAppearanceBoms']);
+  return new Proxy(Object.create(null), { get: (_, method) => unsupportedAppearanceReads.has(String(method))
+    ? undefined : methods[String(method)] ?? (async () => { throw new Error(`Mock 已隔离：${String(method)} 未启用，不会调用真实服务。`); }) }) as PlannerApi;
 }
 
 export function bomMockPreviewSource(assetId: number): string | null {

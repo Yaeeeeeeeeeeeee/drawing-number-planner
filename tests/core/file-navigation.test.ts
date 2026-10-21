@@ -158,6 +158,6 @@ describe('PDF navigation statistics', () => {
     repository.replaceScan(Array.from({ length: 10_001 }, (_, i) => record(`indexed-${i}.pdf`)), [], timestamp);
     expect(repository.search({ pageSize: 200 }).items).toHaveLength(200);
     expect(repository.navigation({ presence: 'all' })).toEqual({ total: 10_001, unassociatedProducts: 10_001,
-      categories: [], products: [], batches: [] });
+      categories: [], products: [], batches: [], appearances: [], appearanceBatches: [] });
   });
 });

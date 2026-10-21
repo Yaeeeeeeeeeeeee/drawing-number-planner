@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
     }
     return ipcRenderer.invoke('planner:qr-file-action', relativePath, action);
   },
+  qrManualSelectFile() { return ipcRenderer.invoke('planner:qr-manual-select'); },
+  qrManualAction(action: unknown, input: unknown) {
+    if (!['preview','commit','history','unlink','open','show'].includes(String(action))) return Promise.reject(new Error('INVALID_QR_MANUAL_ACTION'));
+    return ipcRenderer.invoke('planner:qr-manual-action', action, input);
+  },
   chooseOutboundDirectory() { return ipcRenderer.invoke('planner:choose-outbound-directory'); },
   showOutboundPackageInFolder(packageId: unknown, partNumber?: unknown) {
     if (!Number.isInteger(packageId) || Number(packageId) <= 0) return Promise.resolve({ ok: false, error: { code: 'INVALID_PACKAGE_ID', message: '外发压缩包编号无效' } });

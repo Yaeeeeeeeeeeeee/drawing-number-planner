@@ -1,3 +1,4 @@
+import { listRawProductIds, resolveCanonicalProductId } from './appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { DrawingDeletionError, DrawingDeletionService } from '../drawings/drawing-deletion-service.js';
 import { productCleanupChoices, productHistoryPlan, purgeProductHistory, type ProductCleanupChoices, type ProductCleanupSelection } from './product-cleanup-options.js';
@@ -23,6 +24,13 @@ export class ProductCleanupService {
     if (!product) throw new ProductCleanupError('PRODUCT_NOT_FOUND', '产品不存在或已经退出当前业务');
     const count = (sql: string) => (this.db.prepare(sql).get({ id: productId }) as { n: number }).n;
     const blockers: string[] = [];
+    if(resolveCanonicalProductId(this.db,productId)!==productId||listRawProductIds(this.db,productId).length>1) blockers.push('归并档案必须保留全部原始身份与历史关系，不能按单产品清理');
+    const usages=count(`select count(*) as n from drawing_appearance_usages where product_id=@id or (origin='planned' and record_id in(select id from drawing_numbers where product_id=@id)) or (origin='historical' and record_id in(select id from historical_drawing_numbers where product_id=@id))`);
+    if(usages)blockers.push(`有 ${usages} 条外观图号复用关系，必须保留实际占号、产品与审计记录`);
+    const v2Scopes=count(`select count(*) as n from outbound_batch_scopes where batch_id in(select id from material_batches where product_id=@id) or baseline_batch_id in(select id from material_batches where product_id=@id) or appearance_version_id in(select id from product_appearance_versions where product_id=@id)`);
+    if(v2Scopes)blockers.push(`外发V2有 ${v2Scopes} 条批次归属或对比基准引用，必须保留产品、批次与资料关系`);
+    const v2Snapshots=count(`select count(*) as n from outbound_v2_snapshots snapshot join outbound_packages package on package.id=snapshot.package_id where package.product_id=@id`);
+    if(v2Snapshots)blockers.push(`外发V2有 ${v2Snapshots} 份不可变历史快照，不能按旧产品退出流程清理`);
     if (this.isTaskRunning()) blockers.push('后台任务正在执行，请先等待完成或取消任务');
     const dependentProducts = this.db.prepare(`select model from products
       where reference_product_id = ? and deleted_at is null and id <> ?`).all(productId, productId) as Array<{ model: string }>;
