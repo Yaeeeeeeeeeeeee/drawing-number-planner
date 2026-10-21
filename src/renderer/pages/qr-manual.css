@@ -50,3 +50,8 @@
 .qr-manual-page .qr-business-state[data-status="active"] { background: #e9f5ee; color: #25704c; }
 
 .qr-manual-page .qr-file-missing { color: #a33a30; font-size: 12px; }
+.qr-manual-page .qr-manual-dialog .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.qr-manual-page .qr-manual-dialog .form-grid :is(label,input,select,textarea) { min-width: 0; width: 100%; }
+@media (max-width: 560px) {
+  .qr-manual-page .qr-manual-dialog .form-grid { grid-template-columns: minmax(0, 1fr); }
+}
