@@ -4,7 +4,7 @@
 
 ## 下载与安装
 
-下载 `DrawingNumberPlanner-V3.1-Windows-x64-Setup.exe`，双击运行中文安装向导，可自定义安装路径。无需安装 Git、Node 或开发工具；Release 中的 Source code 是源码，不是安装包。
+下载[已验证安装包ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39746349189/artifacts/12411562830)，解压后运行 `图号规划器-Windows-x64-安装包.exe`，双击运行中文安装向导，可自定义安装路径。无需安装 Git、Node 或开发工具；Release 中的 Source code 是源码，不是安装包。
 
 已有用户先关闭旧程序，保留原数据目录，建议安装到新的程序目录。首次出现数据选择窗口时，选择原 `planner.db`，不要选择新建空库。程序升级前自动备份，再迁移至 Schema18；升级失败会回滚，不清库重建。已有稳定数据配置时继续使用原目录。
 
@@ -32,6 +32,6 @@
 
 完整记录：[本轮交付](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-delivery-20261022.md) · [安装、升级及回退](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-installation-20261022.md) · [Windows实际验证](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39746349189)。
 
-校验安装包请使用同一Release中的 `SHA256SUMS.txt`；其中记录独立EXE的SHA256。
+本次Releases发布返回GitHub权限403，尚未发布Release或独立EXE校验文件。已验证的Actions安装ZIP SHA256为 `c649ad4af95fd041d1cb65b4c19d7706d80f17c0dd790ea11311d2efb90988c5`，不是独立EXE摘要。
 
 本次Windows新增实际扫描→点击产品目录验证：导航2个PDF与右侧2条记录一致，图号匹配状态不变，未确认图号仍未确认，没有新增图号绑定，原PDF哈希保持。

@@ -4,10 +4,10 @@
 
 ## Windows 软件下载（V3.1 · 2026-10-22）
 
-日常使用无需安装 Git、Node 或下载源码：
+日常使用无需安装 Git、Node 或下载源码。V3.1已验证安装包位于下方Actions工件，解压后运行其中中文EXE；GitHub网页下载工件需登录，工件保留至2026-11-05。本次Releases发布受到GitHub权限403阻止，尚未发布到Releases：
 
-- **[下载最新版中文安装 EXE](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v2026.10.22-v3.1/DrawingNumberPlanner-V3.1-Windows-x64-Setup.exe)**：中文向导，可自定义安装路径。
-- [本版更新说明、安装指南及 SHA256 校验](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v2026.10.22-v3.1)
+- **[下载 V3.1 中文安装包 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39746349189/artifacts/12411562830)**：中文向导，可自定义安装路径。
+- [V3.1修正说明与验证结果](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/pdf-directory-zero-correction-20261022.md)
 - [完整升级、备份与回退步骤](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-installation-20261022.md)
 - [V3 最新源码与修改记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/tree/codex/v3-business-ui-20261022)
 
