@@ -1,4 +1,4 @@
-name: Publish verified V3 installer and instructions
+name: Publish verified V3.1 installer and instructions
 on:
   push:
     branches: [codex/v3-business-ui-20261022]
@@ -18,27 +18,27 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      SOURCE_SHA: 8a4275bec1bda49322fb037f53d07d20b0198b93
-      RELEASE_TAG: v2026.10.22-v3
+      SOURCE_SHA: fca99874dede4ef321d5732cb744e50f3eada869
+      RELEASE_TAG: v2026.10.22-v3.1
     steps:
       - uses: actions/checkout@v4
       - name: Require the exact successful verified source and installer artifact
         shell: bash
         run: |
           set -euo pipefail
-          gh api "repos/$GH_REPO/actions/runs/39741597713" > /tmp/verified-run.json
-          gh api "repos/$GH_REPO/actions/artifacts/12409622206" > /tmp/verified-artifact.json
+          gh api "repos/$GH_REPO/actions/runs/39746349189" > /tmp/verified-run.json
+          gh api "repos/$GH_REPO/actions/artifacts/12411562830" > /tmp/verified-artifact.json
           python3 - <<'PY'
           import json,os
           run=json.load(open('/tmp/verified-run.json'));artifact=json.load(open('/tmp/verified-artifact.json'))
           assert run['head_sha']==os.environ['SOURCE_SHA'] and run['conclusion']=='success'
           assert artifact['workflow_run']['head_sha']==os.environ['SOURCE_SHA'] and not artifact['expired']
-          assert artifact['digest']=='sha256:43a6809a21765b94ca1e785595e428273d361acb769107aabf93b05f61b87476'
+          assert artifact['digest']=='sha256:c649ad4af95fd041d1cb65b4c19d7706d80f17c0dd790ea11311d2efb90988c5'
           PY
       - uses: actions/download-artifact@v4
         with:
-          name: Comprehensive-Windows-Chinese-Setup-8a4275bec1bda49322fb037f53d07d20b0198b93
-          run-id: 39741597713
+          name: Comprehensive-Windows-Chinese-Setup-fca99874dede4ef321d5732cb744e50f3eada869
+          run-id: 39746349189
           github-token: ${{ github.token }}
           path: verified-installer
       - name: Prepare the unchanged installer, instructions and EXE checksum
@@ -50,7 +50,7 @@ jobs:
           import pathlib,hashlib,shutil
           source=pathlib.Path('verified-installer/图号规划器-Windows-x64-安装包.exe')
           assert source.is_file() and source.read_bytes()[:2]==b'MZ'
-          target=pathlib.Path('release-assets/DrawingNumberPlanner-V3-Windows-x64-Setup.exe')
+          target=pathlib.Path('release-assets/DrawingNumberPlanner-V3.1-Windows-x64-Setup.exe')
           shutil.copyfile(source,target)
           assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest()
           shutil.copyfile('docs/v3-release-notes-20261022.md','release-assets/README-Windows-V3.md')
@@ -65,7 +65,7 @@ jobs:
             existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
             test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace a release with another source'; exit 1; }
           else
-            gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" --title '图号规划器 V3 · 中文安装版' --notes-file docs/v3-release-notes-20261022.md --draft
+            gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" --title '图号规划器 V3.1 · 产品目录归类修正版' --notes-file docs/v3-release-notes-20261022.md --draft
           fi
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
           gh release edit "$RELEASE_TAG" --notes-file docs/v3-release-notes-20261022.md --draft=false --latest

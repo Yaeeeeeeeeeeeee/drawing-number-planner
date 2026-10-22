@@ -1,14 +1,20 @@
-# 图号规划器 V3 中文安装版
+# 图号规划器 V3.1 中文修正版
 
-本版应用源码：`8a4275bec1bda49322fb037f53d07d20b0198b93`。
+本版应用源码：`fca99874dede4ef321d5732cb744e50f3eada869`。
 
 ## 下载与安装
 
-下载 `DrawingNumberPlanner-V3-Windows-x64-Setup.exe`，双击运行中文安装向导，可自定义安装路径。无需安装 Git、Node 或开发工具；Release 中的 Source code 是源码，不是安装包。
+下载 `DrawingNumberPlanner-V3.1-Windows-x64-Setup.exe`，双击运行中文安装向导，可自定义安装路径。无需安装 Git、Node 或开发工具；Release 中的 Source code 是源码，不是安装包。
 
 已有用户先关闭旧程序，保留原数据目录，建议安装到新的程序目录。首次出现数据选择窗口时，选择原 `planner.db`，不要选择新建空库。程序升级前自动备份，再迁移至 Schema18；升级失败会回滚，不清库重建。已有稳定数据配置时继续使用原目录。
 
-## 本轮更新
+## 本次紧急修正
+
+修正PDF产品与批次导航全部显示0：PDF目录归类被错误地要求先完成图号正式归属确认，导致已能精确对应现有产品的目录也进入未关联分支。现在按唯一完整SKU-型号目录只读归类，产品/批次数量与点击后的列表一致，图号匹配状态和正式归属不变。
+
+无需清空索引、重建产品或逐个绑定图号。升级后重新进入PDF文件中心即可重新计算；歧义目录仍待核对。相同图号跨产品目录使用时，PDF实例分别归类，图号主记录不复制。此次无Schema变更，不改历史记录或源文件。
+
+## V3功能保留
 
 - 统一图号库和 PDF 的可靠产品归属查询、数量及关联诊断；目录候选和相同编码前缀不再等同于确认归属。新规划图号与产品归属原子保存。
 - 日常界面取消独立外观版本管理，保留原有字典外观编码及全部旧历史兼容。
@@ -20,10 +26,12 @@
 
 ## 验证与数据保护
 
-157个测试文件、1313项测试全部通过，类型与前端/Main构建通过。Windows实际中文安装、自定义中文路径、逐文件哈希核对、旧v15→18备份/升级/WAL/故障回滚、原生PDF关联/替换/解除和重启通过。
+157个测试文件、1316项测试全部通过，类型与前端/Main构建通过。Windows实际中文安装、自定义中文路径、逐文件哈希核对、旧v15→18备份/升级/WAL/故障回滚、原生PDF关联/替换/解除和重启通过。
 
 不捆绑示例业务库，不删除原PDF，不自动释放图号，不在启动时执行产品归并或历史关联修复。用户真实758条数据库未在开发环境，需在本机诊断和确认歧义；不能将夹具结果视作真实数据已修复。物理4K/DPI/输入法仍需本机核验。
 
-完整记录：[本轮交付](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-delivery-20261022.md) · [安装、升级及回退](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-installation-20261022.md) · [Windows实际验证](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39741597713)。
+完整记录：[本轮交付](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-delivery-20261022.md) · [安装、升级及回退](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-installation-20261022.md) · [Windows实际验证](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39746349189)。
 
 校验安装包请使用同一Release中的 `SHA256SUMS.txt`；其中记录独立EXE的SHA256。
+
+本次Windows新增实际扫描→点击产品目录验证：导航2个PDF与右侧2条记录一致，图号匹配状态不变，未确认图号仍未确认，没有新增图号绑定，原PDF哈希保持。
