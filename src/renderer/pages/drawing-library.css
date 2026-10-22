@@ -159,7 +159,7 @@
 .drawing-library-page .drawing-file-section > h3{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .drawing-library-page .drawing-file-section .drawing-file-presence{position:static;font-size:12px;white-space:nowrap;}
 .drawing-library-page .drawing-file-section > ul{list-style:none;padding:0;margin:6px 0;}
-.drawing-library-page .drawing-detail-group .drawing-file-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;height:52px;padding:8px 12px;box-sizing:border-box;}
+.drawing-library-page .drawing-detail-group .drawing-file-row{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px;min-height:48px;height:52px;padding:8px 12px;box-sizing:border-box;}
 .drawing-library-page .drawing-file-identity{flex:1;min-width:0;padding:0;}
 .drawing-library-page .drawing-file-row > button{flex-shrink:0;white-space:nowrap;margin:0;align-self:center;font-size:12px;}
 .drawing-library-page .drawing-business-summary{margin:0;}

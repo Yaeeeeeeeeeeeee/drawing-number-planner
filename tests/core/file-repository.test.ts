@@ -198,21 +198,21 @@ describe('FileRepository', () => {
     repository.replaceScan([file], history, '2026-08-25T04:00:00.000Z');
     const historicalId = (db.prepare('select id from historical_drawing_numbers where full_code = ?')
       .get(historical.fullCode) as { id: number }).id;
-    new DrawingDeletionService(db).delete({ signedId: -historicalId, mode: 'release', confirmedCode: historical.fullCode });
+    new DrawingDeletionService(db).delete({ signedId: -historicalId, mode: 'retain_occupied', confirmedCode: historical.fullCode });
 
     repository.replaceScan([file], history, '2026-08-26T04:00:00.000Z');
 
     expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 1 });
     expect(db.prepare(`select deleted_at is not null as deleted, deletion_mode, scan_resolution
       from historical_drawing_numbers where id = ?`).get(historicalId))
-      .toEqual({ deleted: 1, deletion_mode: 'release', scan_resolution: 'pending' });
+      .toEqual({ deleted: 1, deletion_mode: 'retain_occupied', scan_resolution: 'pending' });
     expect(repository.search().items).toEqual([expect.objectContaining({ historicalDrawingId: null,
-      matchStatus: 'pending', classificationWarning: 'drawing-released-pending' })]);
+      matchStatus: 'pending', classificationWarning: 'drawing-deleted-retained' })]);
 
     new DrawingDeletionService(db).resolveScan(-historicalId, 'ignore');
     repository.replaceScan([file], history, '2026-08-27T04:00:00.000Z');
     expect(repository.search().items).toEqual([expect.objectContaining({ historicalDrawingId: null,
-      matchStatus: 'pending', classificationWarning: 'drawing-released-ignored' })]);
+      matchStatus: 'pending', classificationWarning: 'drawing-deleted-retained' })]);
   });
 
   it('exposes QR additions and missing files in scan history with their index kind', () => {

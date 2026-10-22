@@ -27,7 +27,7 @@ export class DrawingAssociationService {
       if(!candidates.length&&row.productId!==null){candidates=[resolveCanonicalProductId(this.db,row.productId)];evidence.push(`原扫描产品 ID ${row.productId} 仅为候选`);}
       if(!candidates.length&&row.detectedSku&&row.detectedModel){
         candidates=[...new Set((this.db.prepare('select id from products where lower(sku)=lower(?) and model=? and deleted_at is null').all(row.detectedSku,row.detectedModel) as Array<{id:number}>).map(product=>resolveCanonicalProductId(this.db,product.id)))];
-        if(candidates.length)evidence.push(`目录 SKU ${row.detectedSku} / 型号 ${row.detectedModel} 精确候选，尚未人工确认`);
+        if(candidates.length)evidence.push(`目录 SKU ${row.detectedSku} / 型号 ${row.detectedModel} 精确候选，尚未归类`);
       }
       if(!trustworthyProducts.length&&!binding){
         const directoryProducts=this.db.prepare(`select distinct ${pdfDirectoryProductSql} as productId from pdf_files file
@@ -39,7 +39,7 @@ export class DrawingAssociationService {
         }
       }
       candidates=candidates.filter(id=>Boolean(this.db.prepare('select id from products where id=? and deleted_at is null').get(id)));
-      if(origin==='historical'&&!binding)evidence.push('目录、图号前缀及扫描匹配状态不能单独确认产品归属');
+      if(origin==='historical'&&!binding)evidence.push('扫描信息为归类候选；唯一产品可直接归类，多产品歧义保留待处理');
       const knownColor=Boolean(this.db.prepare("select id from dictionary_items where type='color' and code=?").get(row.colorCode));
       const knownAppearance=Boolean(this.db.prepare("select id from dictionary_items where type='appearance' and code=?").get(row.appearanceCode));
       if(!knownColor||!knownAppearance)evidence.push('图号外观或颜色编码尚缺少字典依据，请人工核验');

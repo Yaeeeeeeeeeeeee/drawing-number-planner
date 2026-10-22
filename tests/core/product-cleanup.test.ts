@@ -62,7 +62,7 @@ it.each(['retain','purge'] as const)('handles a complete linked product graph wi
   const countsBefore=Object.fromEntries(['bom_versions','bom_items','bom_item_assets','bom_asset_archive_mappings','bom_item_qr_codes','outbound_packages','outbound_package_parts','outbound_package_items','outbound_email_drafts','product_qr_codes','material_batches'].map(table=>[table,(db.prepare(`select count(*) n from ${table}`).get() as {n:number}).n]));
   const assetBefore=db.prepare('select * from bom_assets').all();
   const oldPackage=db.prepare('select * from outbound_packages').all();
-  service.cleanup(product.id,{confirmedModel:product.model,selection:selection(service,product.id,'release',history)});
+  service.cleanup(product.id,{confirmedModel:product.model,selection:selection(service,product.id,'retain_occupied',history)});
   for(const table of ['bom_versions','bom_items','bom_item_assets','bom_asset_archive_mappings','bom_item_qr_codes','outbound_packages','outbound_package_parts','outbound_package_items','outbound_email_drafts','product_qr_codes','material_batches']) {
     expect(db.prepare(`select count(*) n from ${table}`).get(),table).toEqual({n:history==='purge'?(table==='product_qr_codes'?otherQrBefore.length:0):countsBefore[table]});
   }
@@ -81,24 +81,23 @@ it('includes newly associated QR files in the impact fingerprint',()=>{
   expect(db.prepare('select deleted_at from products where id=?').get(product.id)).toEqual({deleted_at:null});
 });
 it('rolls back purged history, released numbers and detached indexes together on audit failure',()=>{
-  const {product}=linkedHistory();const service=new ProductCleanupService(db);const chosen=selection(service,product.id,'release','purge');
+  const {product}=linkedHistory();const service=new ProductCleanupService(db);const chosen=selection(service,product.id,'retain_occupied','purge');
   const snapshot=()=>Object.fromEntries((db.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' order by name").all() as Array<{name:string}>).map(({name})=>[name,db.prepare(`select * from "${name}" order by rowid`).all()]));
   const before=snapshot();
   db.exec("create trigger fail_product_exit before insert on product_cleanup_events begin select raise(abort,'audit-failed'); end");
   expect(()=>service.cleanup(product.id,{confirmedModel:product.model,selection:chosen})).toThrow('audit-failed');
   expect(snapshot()).toEqual(before);
 });
-it('lets release occupancy independently while preserving actual BOM history and drawing identity', () => {
-  const {product} = fixture(); const service = new ProductCleanupService(db);
-  const chosen = selection(service, product.id, 'release', 'retain');
-  service.cleanup(product.id, {confirmedModel:product.model, selection:chosen} as any);
-  expect(new OccupiedNumberRepository(db).hasFullCode('02.0209.010.0401001')).toBe(false);
-  expect(db.prepare('select count(*) n from bom_versions').get()).toEqual({n:1});
-  expect(db.prepare('select deletion_mode, deleted_full_code from historical_drawing_numbers').get()).toEqual({deletion_mode:'release',deleted_full_code:'02.0209.010.0401001'});
-  expect(db.pragma('foreign_key_check')).toEqual([]);
+it('rejects releasing real historical occupancy while retaining BOM and drawing identity',()=>{
+ const {product}=fixture();const service=new ProductCleanupService(db);const chosen=selection(service,product.id,'release','retain');
+ expect(()=>service.cleanup(product.id,{confirmedModel:product.model,selection:chosen})).toThrow(/历史扫描/);
+ expect(new OccupiedNumberRepository(db).hasFullCode('02.0209.010.0401001')).toBe(true);
+ expect(db.prepare('select count(*) n from bom_versions').get()).toEqual({n:1});
+ expect(db.prepare('select deleted_at from historical_drawing_numbers').get()).toEqual({deleted_at:null});
 });
 it.each(['retain_occupied', 'release'] as const)('purges only owned business history and honors %s independently', occupancy => {
   const {product} = fixture(); const service = new ProductCleanupService(db);
+  if(occupancy==='release'){expect(()=>service.cleanup(product.id,{confirmedModel:product.model,selection:selection(service,product.id,occupancy,'purge')})).toThrow(/历史扫描/);expect(db.prepare('select count(*) n from bom_versions').get()).toEqual({n:1});return;}
   service.cleanup(product.id,{confirmedModel:product.model,selection:selection(service, product.id,occupancy,'purge')} as any);
   expect(db.prepare('select count(*) n from bom_versions').get()).toEqual({n:0});
   expect(new OccupiedNumberRepository(db).hasFullCode('02.0209.010.0401001')).toBe(occupancy==='retain_occupied');
@@ -254,4 +253,33 @@ it('blocks cleanup of immutable outbound V2 history and protects snapshots and c
  db.exec("insert into outbound_v2_snapshots(package_id,context_json,files_json,parts_json) values(1,'{}','[]','[]');insert into outbound_batch_scope_audit(batch_id,after_json,reason,created_at) values(1,'{}','确认','now')");
  const service=new ProductCleanupService(db);expect(service.preview(product.id).blockers.join('')).toContain('不可变历史快照');expect(()=>service.cleanup(product.id,{confirmedModel:product.model})).toThrow(/外发V2/);
  expect(()=>db.exec("update outbound_v2_snapshots set files_json='[]' where package_id=1")).toThrow('外发快照不可修改');expect(()=>db.exec('delete from outbound_v2_snapshots')).toThrow('外发快照不可删除');expect(()=>db.exec('delete from outbound_batch_scope_audit')).toThrow('外发批次确认审计不可删除');
+});
+
+it('checks protected release before purging any product history',()=>{
+ const {product}=fixture();const service=new ProductCleanupService(db);const chosen=selection(service,product.id,'release','purge');
+ db.exec("create trigger reject_unsafe_purge before delete on bom_versions begin select raise(abort,'purge-started-before-qualification'); end");
+ expect(()=>service.cleanup(product.id,{confirmedModel:product.model,selection:chosen})).toThrow(/历史扫描/);
+ expect(db.prepare('select deleted_at from products where id=?').get(product.id)).toEqual({deleted_at:null});
+ expect(db.prepare('select count(*) n from bom_versions').get()).toEqual({n:1});
+});
+
+it('keeps deletion reference evidence even when product history is explicitly purged',()=>{
+ const {product}=linkedHistory();const service=new ProductCleanupService(db);
+ service.cleanup(product.id,{confirmedModel:product.model,selection:selection(service,product.id,'retain_occupied','purge')});
+ const audit=db.prepare("select reference_summary_json from drawing_deletion_events where origin='historical'").get() as {reference_summary_json:string};
+ expect(JSON.parse(audit.reference_summary_json)).toMatchObject({presentPdf:1,currentBom:1,outboundSnapshot:1});
+});
+
+it('preserves protected evidence for an already-retained drawing before product purge',()=>{
+ const {product}=fixture();const d=new DictionaryService(db);
+ const appearance=d.create({type:'appearance',code:'01',name:'A'}),color=d.create({type:'color',code:'0',name:'C'}),main=d.create({type:'main_category',code:'04',name:'M'}),project=d.create({type:'project_item',code:'01',name:'P',parentId:main.id});
+ const id=Number(db.prepare("insert into drawing_numbers(full_code,display_name,product_id,appearance_id,color_id,main_category_id,project_item_id,brand_code,product_size_code,appearance_code,color_code,main_category_code,project_item_code,sequence,status,created_at) values('02.0209.010.0401002','D',?,?,?,?,?,'02','0209','01','0','04','01',2,'reserved','now')").run(product.id,appearance.id,color.id,main.id,project.id).lastInsertRowid);
+ db.prepare("insert into bom_items(bom_version_id,project_item_id,drawing_id,deleted_at) values(1,?,?,'2026-01-01')").run(project.id,id);
+ const drawings=new DrawingDeletionService(db);drawings.delete({signedId:id,mode:'retain_occupied',confirmedCode:'02.0209.010.0401002'});
+ // Old versions did not snapshot soft-deleted references in the deletion audit.
+ db.prepare("update drawing_deletion_events set reference_summary_json='{}' where origin='planned' and record_id=?").run(id);
+ const service=new ProductCleanupService(db);service.cleanup(product.id,{confirmedModel:product.model,selection:selection(service,product.id,'retain_occupied','purge')});
+ expect(db.prepare('select * from bom_items').all()).toEqual([]);
+ expect(drawings.preview(id).releaseEligible).toBe(false);
+ expect(()=>drawings.delete({signedId:id,mode:'release',confirmedCode:'02.0209.010.0401002'})).toThrow(/历史引用/);
 });

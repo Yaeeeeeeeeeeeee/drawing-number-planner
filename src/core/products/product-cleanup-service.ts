@@ -96,16 +96,28 @@ export class ProductCleanupService {
           }
         }
       }
+      // Qualify before detaching/purging any evidence, not after history has disappeared.
+      const drawingService=new DrawingDeletionService(this.db);
+      const qualifications=new Map(choices.occupiedDrawings.map(row=>[row.signedId,drawingService.preview(row.signedId)]));
+      if(selection?.occupancy==='release'){
+        for(const row of choices.occupiedDrawings){
+          const qualification=qualifications.get(row.signedId)!;
+          if(!qualification.releaseEligible)throw new ProductCleanupError('PRODUCT_CLEANUP_BLOCKED',qualification.releaseBlockers.map(item=>item.message).join('；'));
+        }
+      }
       // Capture exact ownership before the existing exit detaches batches.
       const history = productHistoryPlan(this.db, productId);
       const now = new Date().toISOString(); const values = { id: productId, now };
       this.db.prepare('delete from bom_current where product_id = ?').run(productId);
       this.db.prepare('update bom_versions set deleted_at = @now where product_id = @id and deleted_at is null').run(values);
       for (const [table, origin] of [['drawing_numbers', 'planned'], ['historical_drawing_numbers', 'historical']] as const) {
-        this.db.prepare(`insert into drawing_deletion_events
-          (origin, record_id, full_code, deletion_mode, previous_status, reason, reference_summary_json, deleted_at)
-          select '${origin}', id, full_code, 'retain_occupied', status, '产品集中退出', '{}', @now
-          from ${table} where product_id = @id and deleted_at is null`).run(values);
+        const records=this.db.prepare(`select id,full_code,status from ${table} where product_id=? and (deleted_at is null or deletion_mode='retain_occupied')`).all(productId) as Array<{id:number;full_code:string;status:string}>;
+        for(const record of records){
+          const qualification=qualifications.get(origin==='planned'?record.id:-record.id)!;
+          const protectedEvidence=qualification.releaseBlockers.filter(item=>['protected_history','appearance_usage','lineage'].includes(item.kind)).reduce((count,item)=>count+item.count,0);
+          this.db.prepare(`insert into drawing_deletion_events(origin,record_id,full_code,deletion_mode,previous_status,reason,reference_summary_json,deleted_at) values(?,?,?,'retain_occupied',?,'产品集中退出',?,?)`)
+            .run(origin,record.id,record.full_code,record.status,JSON.stringify({...qualification.references,protectedReleaseEvidence:protectedEvidence}),now);
+        }
         this.db.prepare(`update ${table} set deleted_at = @now, deletion_mode = 'retain_occupied',
           deleted_full_code = full_code, deleted_previous_status = status, deleted_reason = '产品集中退出', scan_resolution = 'ignore'
           where product_id = @id and deleted_at is null`).run(values);

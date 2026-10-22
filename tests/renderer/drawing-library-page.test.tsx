@@ -871,3 +871,15 @@ it('keeps a reserved number distinct until the user explicitly marks it in use',
  fireEvent.change(selector,{target:{value:'active'}});
  await waitFor(()=>expect(api.activateDrawing).toHaveBeenCalledWith(5));
 });
+
+it('refreshes saved classification counts even when the open detail reload fails',async()=>{
+ let changed=false;
+ const row={id:-7,fullCode:'CLASSIFY-REFRESH-FAIL',origin:'historical',status:'active',productId:null,sourceFiles:[],outlinedFiles:[],currentBomUsage:[],readOnly:true};
+ const api={listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValue([{id:3,sku:'SKU',model:'T40',productCategory:'冰柜'}]),searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1}),getDrawingNavigationCounts:vi.fn().mockImplementation(()=>Promise.resolve({total:1,products:[{productId:3,count:changed?1:0}],categories:[],batches:[],unassociated:changed?0:1})),getDrawing:vi.fn().mockResolvedValueOnce(row).mockRejectedValue(new Error('详情刷新失败')),classifyDrawingAssociations:vi.fn().mockImplementation(()=>{changed=true;return Promise.resolve({updated:1});})};
+ render(<DrawingLibraryPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:row.fullCode}));
+ await screen.findByRole('complementary',{name:'图号详情'});
+ fireEvent.click(screen.getByRole('button',{name:'自动归类'}));
+ await waitFor(()=>expect(within(screen.getByRole('button',{name:'产品 T40'})).getByLabelText('1 个图号')).toBeInTheDocument());
+ expect(screen.getByRole('status')).toHaveTextContent('已更新 1 条关联');
+ expect(await screen.findByText('详情刷新失败')).toBeInTheDocument();
+});

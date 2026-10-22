@@ -72,7 +72,7 @@ export class DrawingDeletionService {
         (origin, record_id, full_code, deletion_mode, previous_status, reason, reference_summary_json, deleted_at)
         values (?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(row.origin, row.id, row.fullCode, input.mode, row.status, input.reason?.trim() || null,
-          JSON.stringify(preview.references), now);
+          JSON.stringify({...preview.references,protectedReleaseEvidence:preview.releaseBlockers.filter(item=>['protected_history','appearance_usage','lineage'].includes(item.kind)).reduce((count,item)=>count+item.count,0)}), now);
       const table = row.origin === 'planned' ? 'drawing_numbers' : 'historical_drawing_numbers';
       const archiveCode = `__deleted__:${row.origin}:${row.id}:${Number(event.lastInsertRowid)}`;
       this.db.prepare(`update ${table} set full_code = ?, deleted_at = ?, deletion_mode = ?, deleted_full_code = ?,
