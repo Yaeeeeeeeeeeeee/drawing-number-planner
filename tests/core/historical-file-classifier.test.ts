@@ -56,3 +56,8 @@ describe('historical PDF classification', () => {
       fileName: '02.0404.010.0401007（转曲）.pdf', drawings: [] }).conversionType).toBe('outlined');
   });
 });
+
+it('treats H10 change-details PDFs as outlined even without a filename suffix', () => {
+  expect(classifyHistoricalPdf({relativePath:'吸尘器/AKVCH010JP-H10/03.量产后的变更明细（已量产的产品看最新日期）/00.首批大货/铭牌.pdf',fileName:'铭牌.pdf',drawings:[]}))
+    .toMatchObject({conversionType:'outlined',matchStatus:'unmatched'});
+});

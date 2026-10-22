@@ -214,8 +214,8 @@ describe('drawing library API', () => {
     expect(retained.json()).toEqual({ outcome: 'deleted_retained', fullCode: reserved.fullCode, occupied: true });
     const released = await app.inject({ method: 'POST', url: `/api/drawings/${-historicalId}/delete`,
       payload: { mode: 'release', confirmedCode: historicalCode } });
-    expect(released.statusCode).toBe(200);
-    expect(released.json()).toEqual({ outcome: 'deleted_released', fullCode: historicalCode, occupied: false });
+    expect(released.statusCode).toBe(409);
+    expect(released.json().error.message).toContain('历史扫描');
     expect((await app.inject({ method: 'GET', url: '/api/drawings?deletionState=deleted-retained' })).json())
       .toEqual(expect.objectContaining({ total: 1, items: [expect.objectContaining({ fullCode: reserved.fullCode })] }));
     expect((await app.inject({ method: 'POST', url: `/api/drawings/${reserved.id}/restore`, payload: { confirmed: true } })).statusCode)
@@ -296,4 +296,22 @@ it('previews and explicitly confirms reuse through real routes, preserving origi
  const list=await app.inject({method:'GET',url:`/api/drawings?productId=${raw.product_id}&appearanceVersionId=${target}`});expect(list.json().items.map((row:{id:number})=>row.id)).toEqual([seeded.id]);
  expect(db.prepare('select appearance_version_id from drawing_appearance_bindings').get()).toEqual({appearance_version_id:first.id});expect(db.prepare('select * from bom_versions').all()).toEqual([]);
  }finally{await app.close();}
+});
+
+it('persists one-click classification through the real HTTP route and exposes it in library counts',async()=>{
+  const id=seedPlannedDrawing(db);
+  const historicalId=seedHistoricalDrawing(db);
+  const productId=(db.prepare('select product_id from drawing_numbers where id=?').get(id.id) as {product_id:number}).product_id;
+  db.prepare('update historical_drawing_numbers set product_id=? where id=?').run(productId,historicalId);
+  const app=Fastify();registerDrawingRoutes(app,new DrawingQueryService(db));
+  try {
+    const response=await app.inject({method:'POST',url:'/api/drawings/association-classify',payload:{}});
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({updated:2,after:{historicalAssociated:1}});
+    const library=await app.inject({method:'GET',url:`/api/drawings?productId=${productId}`});
+    expect(library.json().total).toBe(2);
+    const invalid=await app.inject({method:'POST',url:'/api/drawings/association-classify',payload:{signedIds:[0]}});
+    expect(invalid.statusCode).toBe(400);
+    expect(id).toBeDefined();
+  }finally{await app.close();}
 });

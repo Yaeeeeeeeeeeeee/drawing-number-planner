@@ -30,3 +30,8 @@ export function parseProductDirectory(relativePath: string): DirectoryProductCon
     model: segments[1].slice(separator + 1),
   };
 }
+
+/** Existing production libraries use both names; keep their paths and batch identities intact. */
+export function isProductionChangeDirectory(segment: string): boolean {
+  return ['03.量产后的变更文件', '03.量产后的变更明细'].some(prefix => segment.startsWith(prefix));
+}

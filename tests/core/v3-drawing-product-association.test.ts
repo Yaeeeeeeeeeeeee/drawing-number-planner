@@ -66,3 +66,66 @@ it('backs up explicit historical candidate repair before its outer transaction',
   expect(result.linkedHistoricalCount).toBe(1);expect(db.prepare('select product_id from drawing_appearance_bindings where record_id=?').get(id)).toEqual({product_id:result.product.id});expect(new DrawingAssociationService(db).history(-id)).toHaveLength(1);
  }finally{db.close();db=openDatabase(':memory:');rmSync(directory,{recursive:true,force:true});}
 });
+
+it('classifies unique scan candidates in one action and allows correction without changing occupation', async()=>{
+ const {product}=fixture(); const id=historical(); const before=db.prepare('select * from historical_drawing_numbers').all();
+ const service=new DrawingAssociationService(db);
+ const result=service.classify();
+ expect(result).toMatchObject({updated:1,after:{historicalAssociated:1,ready:0}});
+ const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');const library=new DrawingQueryService(db);
+ expect(library.navigationCounts().products).toEqual([{productId:product.id,count:1}]);
+ expect(library.search({productId:product.id}).total).toBe(1);
+ expect(service.classify().updated).toBe(0);
+ expect(service.history(-id)).toHaveLength(1);
+ expect(db.prepare('select * from historical_drawing_numbers').all()).toEqual(before);
+});
+it('classifies 697 candidates atomically and returns matching persisted navigation counts',async()=>{
+ const {product}=fixture();
+ const insert=db.prepare(`insert into historical_drawing_numbers(full_code,brand_code,product_size_code,appearance_code,color_code,main_category_code,project_item_code,sequence,product_id,first_seen_at,last_seen_at) values(?,'02','0404','01','0','04','01',?,?,'now','now')`);
+ db.transaction(()=>{for(let n=1;n<=697;n++)insert.run('02.0404.010.0401'+String(n).padStart(3,'0'),n,product.id);})();
+ const before=db.prepare('select * from historical_drawing_numbers').all();
+ const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');const library=new DrawingQueryService(db);
+ expect(library.navigationCounts().unassociated).toBe(697);
+ expect(library.associations.classify()).toMatchObject({updated:697,after:{historicalAssociated:697}});
+ expect(library.navigationCounts()).toMatchObject({products:[{productId:product.id,count:697}],unassociated:0});
+ expect(library.search({productId:product.id}).total).toBe(697);
+ expect(db.prepare('select * from historical_drawing_numbers').all()).toEqual(before);
+},60000);
+
+it('classifies a unique exact PDF directory product when old detected SKU fields are absent',()=>{
+ const {product}=fixture();const id=historical();db.prepare('update historical_drawing_numbers set detected_sku=null,detected_model=null where id=?').run(id);
+ db.prepare(`insert into pdf_files(relative_path,file_name,historical_drawing_id,match_status,detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present) values('Test/EXACT-ZC100/03.量产后的变更明细/00.首批大货/a.pdf','a.pdf',?,'matched','[]','outlined',1,'now','now',1)`).run(id);
+ const service=new DrawingAssociationService(db);
+ expect(service.classify()).toMatchObject({updated:1});
+ expect(service.preview().records[0].targets[0].productId).toBe(product.id);
+});
+it('does not choose the original scan product when the same drawing has two exact PDF directory products',()=>{
+ const {product}=fixture();const base=db.prepare('select brand_id,product_size_id,default_appearance_id from products where id=?').get(product.id) as {brand_id:number;product_size_id:number;default_appearance_id:number};
+ const other=new ProductService(db).create({sku:'OTHER-SKU',model:'OTHER',brandId:base.brand_id,productSizeId:base.product_size_id,defaultAppearanceId:base.default_appearance_id,productCategory:'Test'});
+ const id=historical();db.prepare('update historical_drawing_numbers set product_id=? where id=?').run(product.id,id);
+ const insert=db.prepare(`insert into pdf_files(relative_path,file_name,historical_drawing_id,match_status,detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present) values(?,'a.pdf',?,'matched','[]','outlined',1,'now','now',1)`);
+ for(const folder of ['EXACT-ZC100','OTHER-SKU-OTHER'])insert.run('Test/'+folder+'/03.量产后的变更文件/00.首批大货/a.pdf',id);
+ const service=new DrawingAssociationService(db);
+ expect(service.classify().updated).toBe(0);
+ expect(service.preview().records[0]).toMatchObject({state:'ambiguous'});
+ expect(service.preview().records[0].targets.map(t=>t.productId).sort()).toEqual([product.id,other.id].sort());
+});
+it('rolls back the full classification if a binding write fails',()=>{
+ fixture();historical();db.exec("create trigger reject_classification before insert on drawing_appearance_bindings begin select raise(abort,'cannot save classification'); end");
+ expect(()=>new DrawingAssociationService(db).classify()).toThrow('cannot save classification');
+ expect(db.prepare('select * from drawing_association_audit').all()).toEqual([]);
+ expect(db.prepare('select * from drawing_appearance_bindings').all()).toEqual([]);
+});
+
+it('returns only the earliest reliable batch and first actual BOM for compact details',async()=>{
+ const {product,item}=fixture();const id=historical();
+ const batchInsert=db.prepare("insert into material_batches(relative_path,product_directory,name,sequence_number,recognition_status,first_seen_at,last_seen_at) values(?,'Test/EXACT-ZC100',?,?,'recognized','now','now')");
+ for(const [sequence,name] of [[2,'02.20261022'],[0,'00.首批大货']] as const){
+   const batch=Number(batchInsert.run('batch'+sequence,name,sequence).lastInsertRowid);
+   db.prepare("insert into pdf_files(relative_path,file_name,historical_drawing_id,material_batch_id,match_status,detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present) values(?,'a.pdf',?,?,'matched','[]','outlined',1,'now','now',1)").run(name+'/a.pdf',id,batch);
+ }
+ const version=Number(db.prepare("insert into bom_versions(product_id,version_number,business_change_date,created_at) values(?,1,'2026-01-01','2026-01-02')").run(product.id).lastInsertRowid);
+ db.prepare('insert into bom_items(bom_version_id,project_item_id,historical_drawing_id,quantity) values(?,?,?,1)').run(version,item.id,id);
+ const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');
+ expect(new DrawingQueryService(db).get(-id)).toMatchObject({firstOccurrenceBatch:{name:'00.首批大货'},firstBom:{id:version,versionNumber:1,businessDate:'2026-01-01'}});
+});

@@ -146,3 +146,26 @@
 .drawing-library-page .drawing-association-editor :is(input,select) {min-width:0;flex:1 1 150px;}
 @media(min-width:2200px) {.drawing-library-page .drawing-workspace .module-detail.module-drawer {width:680px;}}
 @media(max-width:520px) {.drawing-library-page .workspace-drawing-detail {padding:12px;}.drawing-library-page .drawing-detail-header h2{font-size:17px;}.drawing-library-page .drawing-detail-group .drawing-detail-attributes{gap:10px;}}
+
+.drawing-association-records {max-height: min(40vh, 360px); overflow: auto; border-block: 1px solid #e5e7eb; margin-block: 8px;}
+.drawing-association-preview {min-height: 0; flex-shrink: 0;}
+.drawing-association-result {flex-shrink: 0;}
+
+/* Four compact detail groups; file actions never wrap below names. */
+.drawing-library-page .drawing-detail-group:nth-of-type(1){background:#f5f6f8;}
+.drawing-library-page .drawing-detail-group:nth-of-type(2){background:#f0f5fa;}
+.drawing-library-page .drawing-detail-group:nth-of-type(3){background:#f0f7f4;}
+.drawing-library-page .drawing-detail-group:nth-of-type(4){background:#f7f5f9;}
+.drawing-library-page .drawing-file-section > h3{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.drawing-library-page .drawing-file-section .drawing-file-presence{position:static;font-size:12px;white-space:nowrap;}
+.drawing-library-page .drawing-file-section > ul{list-style:none;padding:0;margin:6px 0;}
+.drawing-library-page .drawing-detail-group .drawing-file-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;height:52px;padding:8px 12px;box-sizing:border-box;}
+.drawing-library-page .drawing-file-identity{flex:1;min-width:0;padding:0;}
+.drawing-library-page .drawing-file-row > button{flex-shrink:0;white-space:nowrap;margin:0;align-self:center;font-size:12px;}
+.drawing-library-page .drawing-business-summary{margin:0;}
+.drawing-library-page .drawing-business-summary > div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;}
+.drawing-library-page .drawing-business-summary > div+div{border-top:1px solid #dce7e0;}
+.drawing-library-page .drawing-business-summary dt{color:#6c726f;flex-shrink:0;}
+.drawing-library-page .drawing-business-summary dd{margin:0;text-align:right;font-size:13px;}
+.drawing-library-page .drawing-business-status{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;}
+.drawing-library-page .drawing-business-status select{width:130px;min-width:0;}

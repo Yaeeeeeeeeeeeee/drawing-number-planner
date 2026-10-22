@@ -81,7 +81,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
     if(['产品档案','PDF 文件中心'].includes(label))assert.equal(await page.locator('.table-pagination').count(),0,`${label} must use scrolling rather than traditional paging`);
     if(width===1920&&label==='图号库'){
      await page.getByRole('button',{name:'查看 / 管理',exact:true}).first().click();
-     const drawer=page.locator('.drawing-maintenance');await drawer.waitFor();assert.equal(await drawer.locator(':scope > .drawing-detail-group').count(),5);
+     const drawer=page.locator('.drawing-maintenance');await drawer.waitFor();assert.equal(await drawer.locator(':scope > .drawing-detail-group').count(),4);
      const bounds=await drawer.evaluate(element=>{const r=element.closest('.module-detail').getBoundingClientRect();return {width:r.width,height:r.height};});
      assert.ok(bounds.width>=600&&bounds.width<=690,`Drawing detail width ${bounds.width}`);
      await page.screenshot({path:path.join(evidence,'Windows-V3-图号详情-1920.png')});await page.getByRole('button',{name:'关闭图号详情',exact:true}).click();
@@ -93,7 +93,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  }finally{dialog.child.kill();if(app)await app.close();}
  database('audit-upgrade',legacy);report.oldV15Upgrade={originalDirectoryRetained:true,settingsBytesPreserved:true,oldRowsAndSnapshotsPreserved:true,realMigrationBackupValidated:true,walAndRollback:JSON.parse(fs.readFileSync(path.join(legacy,'native-rollback-and-wal.json'),'utf8'))};
  // Exercise the reported zero-count failure through a real installed scan and navigation.
- const directoryRoot=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更文件','00.首批大货');
+ const directoryRoot=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更明细（已量产的产品看最新日期）','00.首批大货');
  const directoryPdf=path.join(directoryRoot,'02.0209.010.0401002-M1（转曲）.pdf'),unmatchedPdf=path.join(directoryRoot,'M1-补充资料（转曲）.pdf');
  const directoryHashes=[writePdf(directoryPdf,'Directory context matched drawing'),writePdf(unmatchedPdf,'Directory context unmatched drawing')];
  const bindingsBeforeScan=snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings;
@@ -102,12 +102,31 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   const counts=await page.evaluate(async()=>await(await fetch('/api/files/navigation?presence=present')).json());
   const list=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());
   assert.equal(counts.products.find(item=>item.productId===5)?.count,2);assert.equal(list.total,2);assert.deepEqual(list.items.map(item=>item.matchStatus).sort(),['matched','unmatched']);
+  assert.ok(list.items.every(item=>item.materialBatchId&&item.conversionType==='outlined'));assert.ok(list.items.every(item=>item.materialBatchName.includes('首批大货')));
   const product=page.getByRole('button',{name:'产品 SKU · M1',exact:true});if(!await product.isVisible())await page.getByRole('button',{name:'产品／批次导航',exact:true}).click();await product.click();
   await page.getByRole('button',{name:`文件详情 ${path.basename(directoryPdf)}`,exact:true}).waitFor();await page.getByRole('button',{name:`文件详情 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
   const unassociated=await page.evaluate(async()=>await(await fetch('/api/drawings?associationState=unassociated')).json());assert.ok(unassociated.items.some(item=>item.fullCode==='02.0209.010.0401002'));
   assert.deepEqual(snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings,bindingsBeforeScan);
   assert.equal(createHash('sha256').update(fs.readFileSync(directoryPdf)).digest('hex'),directoryHashes[0]);assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
   await page.screenshot({path:path.join(evidence,'Windows-PDF-目录归类-无图号确认.png')});report.pdfDirectoryClassification={actualScan:true,productCount:2,listCount:2,matchedAndUnmatchedPreserved:true,unconfirmedDrawingStillUnassociated:true,noBindingWrites:true,originalFileHashesPreserved:true};
+  await go(page,'图号库');await page.getByRole('button',{name:'自动归类',exact:true}).click();
+  await page.locator('.drawing-association-result').waitFor({timeout:45000});
+  const drawingList=await page.evaluate(async()=>await(await fetch('/api/drawings?productId=5')).json());
+  assert.ok(drawingList.items.some(item=>item.fullCode==='02.0209.010.0401002'&&item.productId===5));
+  const drawingCounts=await page.evaluate(async()=>await(await fetch('/api/drawings/navigation-counts')).json());
+  assert.ok(drawingCounts.products.some(item=>item.productId===5&&item.count>0));
+  assert.ok(snapshot(path.join(legacy,'planner.db')).drawing_association_audit.length>0);
+  await page.screenshot({path:path.join(evidence,'Windows-图号一键归类-真实保存.png')});
+  await page.getByRole('button',{name:'02.0209.010.0401002',exact:true}).click();
+  const compactDrawer=page.locator('.drawing-maintenance');await compactDrawer.waitFor();
+  assert.equal(await compactDrawer.locator(':scope > .drawing-detail-group').count(),4);
+  const fileGeometry=await compactDrawer.locator('.drawing-file-row').evaluateAll(rows=>rows.map(row=>{const name=row.querySelector('.drawing-file-name').getBoundingClientRect(),button=row.querySelector('button').getBoundingClientRect(),card=row.getBoundingClientRect();const style=getComputedStyle(row);return {display:style.display,height:card.height,nameY:name.y+name.height/2,buttonY:button.y+button.height/2,overlap:name.right>button.left};}));
+  assert.ok(fileGeometry.length>0);for(const row of fileGeometry){assert.equal(row.display,'flex');assert.ok(row.height>=48&&row.height<=56);assert.ok(Math.abs(row.nameY-row.buttonY)<3);assert.equal(row.overlap,false);}
+  await compactDrawer.getByRole('button',{name:'取消占号并删除',exact:true}).click();
+  await compactDrawer.getByText(/该图号存在历史扫描占用记录/).waitFor();
+  report.compactDrawingDrawer={fourGroups:true,fileGeometry,historicalReleaseQualificationReachable:true,protectedHistoryReleaseBlocked:true};
+  report.oneClickDrawingClassification={actualRendererClick:true,realDatabaseSaved:true,productFilteredListContainsDrawing:true,navigationCountsNonzero:true,auditRecorded:true};
+
  }catch(error){await captureFailure(app,'pdf-directory',error);throw error;}finally{await app.close();}
  const beforeQr=snapshot(path.join(legacy,'planner.db'));const qrName='Windows原生手动售后卡';
  const firstPdf=path.join(temporary,'原生QR首次','M1-warranty (qagp85g).pdf'),replacementPdf=path.join(temporary,'原生QR替换','M1-warranty (qagp85g).pdf');

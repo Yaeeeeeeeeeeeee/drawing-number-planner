@@ -64,6 +64,11 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
     if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'关联预览条件无效'}});
     return service.associations.preview(input.data.productId,input.data.signedIds);
   });
+  app.post('/api/drawings/association-classify', async(request,reply)=>{
+    const input=z.object({signedIds:z.array(z.number().int().refine(id=>id!==0)).min(1).max(10000).optional()}).strict().safeParse(request.body);
+    if(!input.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'自动归类条件无效'}});
+    try{return service.associations.classify(input.data.signedIds);}catch(error){return sendDrawingError(reply,error);}
+  });
   app.post('/api/drawings/association-confirm', async(request,reply)=>{
     const input=z.object({targets:z.array(targetSchema).min(1).max(10000),fingerprint:z.string().min(1),reason:z.string().trim().min(1),confirmed:z.literal(true)}).strict().safeParse(request.body);
     if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'关联确认条件无效'}});

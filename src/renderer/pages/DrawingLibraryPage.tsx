@@ -5,7 +5,6 @@ import { ProductCatalogNavigation, type CatalogNavigationScope, type CatalogNavi
 import { Copy, X } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { parseDrawingCode } from '../../core/drawings/drawing-code';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
 
 import type {
@@ -197,14 +196,14 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     } catch (reason) { if (request !== detailRequest.current) return; setError(reason instanceof Error ? reason.message : '历史图号状态更新失败'); }
     finally { if (request === detailRequest.current) setMaintaining(false); }
   };
-  const beginDrawingDeletion = async () => {
+  const beginDrawingDeletion = async (mode: 'retain_occupied'|'release' = 'retain_occupied') => {
     if (!selected || maintainingRef.current) return;
     const request = detailRequest.current;
     setMaintaining(true); setError('');
     try {
       const preview = await api.getDrawingDeletionPreview(selected.id);
       if (request !== detailRequest.current) return;
-      setDeletionPreview(preview); if (selected.deletedAt) setDeletionMode('release');
+      setDeletionPreview(preview); setDeletionMode(selected.deletedAt?'release':mode);
     }
     catch (reason) { if (request === detailRequest.current) setError(reason instanceof Error ? reason.message : '删除引用检查失败'); }
     finally { if (request === detailRequest.current) setMaintaining(false); }
@@ -212,6 +211,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const confirmDrawingDeletion = async () => {
     if (!selected || !deletionPreview || maintainingRef.current) return;
     if (!deletionPreview.deletable) { setError(deletionPreview.blockers.map((item) => item.message).join('；')); return; }
+    if (deletionMode === 'release' && deletionPreview.releaseEligible === false) {setError((deletionPreview.releaseBlockers??[]).map(item=>item.message).join('；'));return;}
     if (deletionMode === 'release' && deletionConfirmation.trim() !== selected.fullCode) {
       setError('彻底释放前，请完整输入当前图号进行确认'); return;
     }
@@ -314,8 +314,16 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
 
+    {!mockMode && api.classifyDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>{
+      if(maintainingRef.current)return;
+      setMaintaining(true);setError('');setAssociationResult(null);
+      void api.classifyDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})})
+        .then(async result=>{setAssociationResult(result);setRepairPreview(null);if(selected)await refreshDetail(selected.id);await refreshCurrentQuery();})
+        .catch(reason=>setError(reason instanceof Error?reason.message:'自动归类失败，未保存，请重试'))
+        .finally(()=>setMaintaining(false));
+    }}>{maintaining?'正在归类…':'自动归类'}</button>}
     {!mockMode && api.previewDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>void api.previewDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})}).then(setRepairPreview).catch(reason=>setError(reason.message))}>诊断图号关联</button>}
-    {repairPreview && <section className="drawing-association-preview" aria-label="关联诊断预览"><h3>关联诊断预览</h3>{repairPreview.summary && <p>历史图号已关联 {repairPreview.summary.historicalAssociated} / {repairPreview.summary.historicalTotal} · 正式图号已关联 {repairPreview.summary.plannedAssociated} / {repairPreview.summary.plannedTotal} · 待确认 {repairPreview.summary.ready} · 歧义 {repairPreview.summary.ambiguous} · 冲突 {repairPreview.summary.conflicts}</p>}{repairPreview.records.map(row=><p key={row.signedId}>{row.fullCode} · {{associated:'已确认',ready:'唯一候选，待人工核验','missing-product':'缺少产品依据','missing-version':'缺少关联依据',ambiguous:'候选有歧义',conflict:'依据冲突'}[row.state]} · {row.evidence.join('；')} · {row.targets.map(target=>products.find(product=>product.id===target.productId)?.model??`产品 #${target.productId}`).join('；')}</p>)}
+    {repairPreview && <section className="drawing-association-preview" aria-label="关联诊断预览"><h3>关联诊断预览</h3>{repairPreview.summary && <p>历史图号已关联 {repairPreview.summary.historicalAssociated} / {repairPreview.summary.historicalTotal} · 正式图号已关联 {repairPreview.summary.plannedAssociated} / {repairPreview.summary.plannedTotal} · 待确认 {repairPreview.summary.ready} · 歧义 {repairPreview.summary.ambiguous} · 冲突 {repairPreview.summary.conflicts}</p>}<div className="drawing-association-records">{repairPreview.records.map(row=><p key={row.signedId}>{row.fullCode} · {{associated:'已确认',ready:'唯一候选，待人工核验','missing-product':'缺少产品依据','missing-version':'缺少关联依据',ambiguous:'候选有歧义',conflict:'依据冲突'}[row.state]} · {row.evidence.join('；')} · {row.targets.map(target=>products.find(product=>product.id===target.productId)?.model??`产品 #${target.productId}`).join('；')}</p>)}</div>
       <button type="button" disabled={maintaining||!repairPreview.records.some(row=>row.state==='ready')} onClick={()=>{if(maintainingRef.current)return;setMaintaining(true);const targets=repairPreview.records.filter(row=>row.state==='ready').flatMap(row=>row.targets);void api.confirmDrawingAssociations?.({targets,fingerprint:repairPreview.fingerprint,reason:'核验诊断证据后批量确认',confirmed:true}).then(async(result)=>{setAssociationResult(result);setRepairPreview(null);await refreshCurrentQuery();}).catch(reason=>setError(reason.message)).finally(()=>setMaintaining(false));}}>人工确认候选关联</button><button type="button" onClick={()=>setRepairPreview(null)}>关闭预览</button></section>}
     {associationResult && <p role="status" className="drawing-association-result">已更新 {associationResult.updated} 条关联{associationResult.before && associationResult.after && <> · 历史已关联 {associationResult.before.historicalAssociated} → {associationResult.after.historicalAssociated} / {associationResult.after.historicalTotal} · 正式已关联 {associationResult.before.plannedAssociated} → {associationResult.after.plannedAssociated} / {associationResult.after.plannedTotal}</>}<button className="text-button" type="button" aria-label="关闭关联结果" onClick={()=>setAssociationResult(null)}>关闭</button></p>}
     <ModuleWorkspace drawingWorkspace resizable navigation={({ collapseControl }) => <ProductCatalogNavigation products={products} batches={catalogBatches} usageBatches={navigationBatches} counts={navigationCounts} scope={scope} onSelect={navigateScope} mode="drawings" collapseControl={collapseControl} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
@@ -388,20 +396,20 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
   onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
   onSearchPdf(keyword: string): Promise<void>; onAssociate(type: 'source' | 'outlined'): Promise<void>;
   onHistoricalStatus(target: 'active' | 'inactive'): Promise<void>;
-  onBeginDelete(): Promise<void>; deletionPreview: DrawingDeletionPreviewView | null;
+  onBeginDelete(mode?:'retain_occupied'|'release'): Promise<void>; deletionPreview: DrawingDeletionPreviewView | null;
   deletionMode: 'retain_occupied' | 'release'; setDeletionMode(value: 'retain_occupied' | 'release'): void;
   deletionReason: string; setDeletionReason(value: string): void;
   deletionConfirmation: string; setDeletionConfirmation(value: string): void;
   onConfirmDelete(): Promise<void>; onCancelDelete(): void; onRestore(): Promise<void>;
   onError(message: string): void;
 }) {
-  const parsedCode = parseDrawingCode(selected.fullCode);
+
   return <aside id={`drawing-detail-${selected.id}`} className="drawing-maintenance workspace-drawing-detail panel-enter" aria-label="图号详情"
     onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
     <header className="drawing-detail-header">
       <div className="drawing-code-inline"><h2 title={selected.fullCode}>{selected.fullCode}</h2><CopyDrawingCode key={selected.fullCode} code={selected.fullCode} /></div>
       <button className="panel-close drawing-close-icon" aria-label="关闭图号详情" disabled={maintaining} onClick={onClose} type="button"><X size={18} strokeWidth={1.8}/></button>
-      <div className="drawing-detail-badges"><span className="drawing-origin-label">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</span><span className={`status-text ${selected.status}`}>{statusLabel(selected.origin, selected.status)}</span></div>
+      <div className="drawing-detail-badges"><span className="drawing-origin-label">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</span><span className={`status-text ${selected.status}`}>{selected.status==='reserved'?'已占号':selected.status==='active'?'使用中':'历史版本'}</span></div>
       <p className="detail-name">{selected.displayName}</p>
     </header>
     {errorMessage && <p className="error-banner" role="alert">{errorMessage}</p>}
@@ -409,24 +417,8 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
       <div><dt>SKU</dt><dd>{selected.sku ?? '待补录'}</dd></div><div><dt>型号</dt><dd>{selected.model || '待关联'}</dd></div>
       <div><dt>品牌</dt><dd>{selected.brandName || '未记录'}</dd></div><div><dt>产品类别</dt><dd>{selected.productCategory || '未记录'}</dd></div>
       <div><dt>主类别</dt><dd>{selected.mainCategoryName || '未记录'}</dd></div><div><dt>项目明细</dt><dd>{selected.projectItemName || '未记录'}</dd></div>
-      {parsedCode && <div><dt>外观编码</dt><dd>{parsedCode.appearanceCode}</dd></div>}
     </dl></section>
-    <section className="drawing-detail-group"><h3>02 文件信息</h3><CurrentOutlinedFiles contextProductId={contextProductId} contextBatchId={contextBatchId} key={`${selected.origin}-${selected.id}`} selected={selected} onOpen={onOpen} previewOnly={previewOnly} /></section>
-    <section className="drawing-detail-group"><h3>03 业务关联</h3><p className="drawing-product-relation">{selected.productId ? selected.model : '尚未关联产品'}</p>
-    <details className="drawing-detail-section"><summary>关联批次（{new Set((selected.businessUsage ?? []).filter(usage => usage.batchId != null).map(usage => usage.batchId)).size}）</summary>
-      {(selected.businessUsage ?? []).length ? <ul>{(selected.businessUsage ?? []).map((usage,index) => <li key={`${usage.source}-${usage.sourceId}-${index}`}>{usage.model} · {usage.batchName ? materialBatchLabel(usage.batchName) : '未归批次'} · {usage.current ? '当前使用' : '历史使用'}<small>{usage.source === 'bom' ? 'BOM' : '已完成外发'}</small></li>)}</ul> : <p className="muted-text">暂无实际业务关联</p>}
-    </details>
-    <details className="drawing-detail-section"><summary>PDF 出现位置（{selected.batchUsage?.occurrences.length ?? 0}）</summary>{selected.batchUsage?.occurrences.map(occurrence => <p key={occurrence.batchId}>{materialBatchLabel(occurrence.batchName)} · {occurrence.files.length} 个文件实例</p>)}</details>
-    <section className="drawing-detail-section"><h3>当前 BOM 使用</h3>{(selected.currentBomUsage ?? []).length === 0 ? <p className="muted-text">当前 BOM 未使用此图号</p>
-      : <ul>{selected.currentBomUsage.map((usage) => <li key={`${usage.bomVersionId}-${usage.projectItemId}`}>{usage.model} · {usage.colorName} · 当前 BOM<small>{usage.projectItemName}{usage.usesWhiteMaterial ? ' · 引用白色物料' : ''}</small></li>)}</ul>}</section>
-    <details className="drawing-detail-section"><summary>历史 BOM 使用</summary>{(selected.businessUsage ?? []).filter(usage => usage.source === 'bom' && !usage.current).map((usage,index) => <p key={`${usage.sourceId}-${index}`}>{usage.model} · {usage.batchName ? materialBatchLabel(usage.batchName) : '未归批次'}</p>)}{!(selected.businessUsage ?? []).some(usage => usage.source === 'bom' && !usage.current) && <p className="muted-text">暂无历史 BOM 使用</p>}</details>
-    </section>
-    <section className="drawing-detail-group"><h3>04 关联维护</h3>
-      <p>{selected.occupied ? '保留占号' : '号码已释放'}</p>
-      {!!selected.associationEvidence?.length && <details><summary>关联依据</summary><ul>{selected.associationEvidence.map((evidence,index)=><li key={index}>{evidence}</li>)}</ul></details>}
-      {!!selected.associationHistory?.length && <details><summary>关联修正记录（{selected.associationHistory.length}）</summary>{(selected.associationHistory as Array<{id:number;reason:string;created_at:string;previous_product_id:number|null;product_id:number}>).map(event=><p key={event.id}>{event.created_at} · {event.reason}<small>产品 {event.previous_product_id??'未关联'} → 产品 {event.product_id}</small></p>)}</details>}
-      {associationEditor}
-    {editing && !selected.readOnly && !selected.deletedAt && <section className="drawing-detail-section pdf-association" aria-label="文件维护 / 索引维护"><h3>文件维护<span>关联现有 PDF 索引</span></h3>
+    <section className="drawing-detail-group"><h3>02 文件信息</h3><CurrentOutlinedFiles contextProductId={contextProductId} contextBatchId={contextBatchId} key={`${selected.origin}-${selected.id}`} selected={selected} onOpen={onOpen} previewOnly={previewOnly} />    {editing && !selected.readOnly && !selected.deletedAt && <section className="drawing-detail-section pdf-association" aria-label="文件维护 / 索引维护"><h3>文件维护<span>关联现有 PDF 索引</span></h3>
       <div className="pdf-search"><input aria-label="搜索现有 PDF" value={pdfKeyword} onChange={(event) => setPdfKeyword(event.target.value)} placeholder="文件名或相对路径" />
         <button className="secondary-button" onClick={() => void onSearchPdf(pdfKeyword).catch((reason) => onError(reason instanceof Error ? reason.message : 'PDF 搜索失败'))} type="button">搜索 PDF</button></div>
       <label><span>现有 PDF 索引</span><select aria-label="现有 PDF 索引" value={selectedPdfId} onChange={(event) => setSelectedPdfId(event.target.value)}><option value="">请选择当前存在的 PDF</option>
@@ -434,31 +426,27 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
       <div className="drawing-actions"><button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void onAssociate('source')} type="button">关联为源文件</button>
         <button className="secondary-button" disabled={!selectedPdfId || maintaining} onClick={() => void onAssociate('outlined')} type="button">关联为转曲后文件</button></div>
       {staged.length > 0 && <ul aria-label="待保存 PDF 关联">{staged.map(item => <li key={`${item.pdfId}-${item.type}`}>{pdfCandidates.find(file => file.id === item.pdfId)?.fileName ?? `PDF #${item.pdfId}`} · {item.type === 'source' ? '源文件' : '转曲后文件'} · 待保存</li>)}</ul>}
-</section>}
-    </section>
-    <section className="drawing-detail-group"><h3>05 其他操作</h3>
-    <div className="drawing-detail-toolbar">{editing ? <><button className="primary-button" disabled={maintaining} onClick={onSave} type="button">保存并返回详情</button><button className="secondary-button" disabled={maintaining} onClick={onCancelManage} type="button">取消编辑</button></> : <button className="secondary-button" disabled={previewOnly} onClick={onManage} type="button">管理图号</button>}{onNavigatePdf && <button className="text-button" type="button" onClick={onNavigatePdf}>查看 PDF 文件</button>}</div>    {editing && <section className="drawing-state-maintenance" aria-label="状态维护"><h3>业务状态</h3><span className={`status-text ${selected.status}`}>{statusLabel(selected.origin, selected.status)}</span>
-    {selected.deletedAt ? <p className="historical-read-only">该图号已删除 · {selected.deletionMode === 'release' ? '号码已释放' : '号码继续占用'} · {selected.deletedAt}</p>
-      : selected.origin === 'historical' ? <><div className="drawing-actions">
-      {selected.status === 'active'
-        ? <button className="text-button danger" disabled={maintaining} onClick={() => void onHistoricalStatus('inactive')} type="button">停用</button>
-        : <button className="primary-button" disabled={maintaining} onClick={() => void onHistoricalStatus('active')} type="button">启用</button>}
-    </div></> : <div className="drawing-actions">
-      {selected.status === 'reserved' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">正式使用</button>}
-      {selected.status === 'voided' && <button className="primary-button" disabled={maintaining} onClick={() => void onStatus('active')} type="button">恢复使用</button>}
-      {(selected.status === 'reserved' || selected.status === 'active') && <button className="text-button danger" disabled={maintaining} onClick={() => void onStatus('voided')} type="button">作废</button>}
-      </div>}{previewOnly && <p className="muted-text mock-maintenance-note">Mock 只读预览，维护和文件定位已禁用。</p>}</section>}
-    {editing && <section className={`drawing-detail-section danger-zone${!selected.deletedAt && !deletionPreview ? ' danger-compact' : ''}`}><h3>危险操作</h3>
+</section>}</section>
+    <section className="drawing-detail-group"><h3>03 业务关联</h3><dl className="drawing-business-summary">
+      <div><dt>出现批次</dt><dd>{selected.firstOccurrenceBatch ? materialBatchLabel(selected.firstOccurrenceBatch.name) : selected.firstBatchAmbiguous ? '待核实' : '未记录'}</dd></div>
+      <div><dt>首次 BOM</dt><dd>{selected.firstBom ? `${selected.firstBom.model} · BOM ${selected.firstBom.versionNumber}${selected.firstBom.businessDate ? ' · '+selected.firstBom.businessDate : ''}` : '未进入 BOM'}</dd></div>
+    </dl></section>
+    <section className="drawing-detail-group"><h3>04 状态与操作</h3>
+      <label className="drawing-business-status"><span>业务状态</span><select aria-label="图号业务状态" disabled={maintaining||Boolean(selected.deletedAt)} value={selected.status==='reserved'?'reserved':selected.status==='active'?'active':'historical'} onChange={event=>{
+        if(selected.origin==='historical')void onHistoricalStatus(event.target.value==='active'?'active':'inactive');
+        else void onStatus(event.target.value==='active'?'active':'voided');
+      }}>{selected.status==='reserved'&&<option value="reserved" disabled hidden>仅占号，未正式使用</option>}<option value="active">使用中</option><option value="historical">历史版本</option></select></label>{associationEditor}
+    <div className="drawing-detail-toolbar">{editing ? <><button className="primary-button" disabled={maintaining} onClick={onSave} type="button">保存并返回详情</button><button className="secondary-button" disabled={maintaining} onClick={onCancelManage} type="button">取消编辑</button></> : <button className="secondary-button" disabled={previewOnly} onClick={onManage} type="button">改变产品所属</button>}{onNavigatePdf && <button className="text-button" type="button" onClick={onNavigatePdf}>查看 PDF 文件</button>}</div>    {<section className={`drawing-detail-section danger-zone${!selected.deletedAt && !deletionPreview ? ' danger-compact' : ''}`}>
       {selected.deletedAt ? <><p>删除方式：{selected.deletionMode === 'release' ? '彻底删除并释放图号' : '删除记录并保留占号'}</p>
         {selected.deletedReason && <p className="muted-text">原因：{selected.deletedReason}</p>}
         <button className="secondary-button" disabled={maintaining} onClick={() => void onRestore()} type="button">恢复记录</button>
         {selected.deletionMode === 'retain_occupied' && !deletionPreview && <button className="text-button danger" disabled={maintaining} onClick={() => void onBeginDelete()} type="button">检查引用并释放占号</button>}</> : null}
       {(!selected.deletedAt || selected.deletionMode === 'retain_occupied') && (!deletionPreview ? !selected.deletedAt && <>
-          <button className="text-button danger" disabled={maintaining} onClick={() => void onBeginDelete()} type="button">删除图号</button></>
+          <button className="text-button danger" disabled={maintaining} onClick={() => void onBeginDelete('retain_occupied')} type="button">删除图号（保留占号）</button><button className="text-button danger" disabled={maintaining} onClick={()=>void onBeginDelete('release')} type="button">取消占号并删除</button></>
           : <div className="drawing-delete-panel">
             <p>{deletionPreview.origin === 'planned' ? '正式规划' : '历史扫描'}</p>
             <DeletionReferenceSummary preview={deletionPreview} />
-            {deletionPreview.blockers.length > 0 ? <div className="error-banner">{deletionPreview.blockers.map((item) => <p key={item.kind}>{item.message}</p>)}</div>
+            {deletionMode==='release'&&deletionPreview.releaseEligible===false ? <><div role="alert" className="error-banner">{(deletionPreview.releaseBlockers??[]).map(item=><p key={item.kind}>{item.message}</p>)}</div>{deletionPreview.deletable&&<button type="button" className="text-button" onClick={()=>setDeletionMode('retain_occupied')}>改为删除图号（保留占号）</button>}<button type="button" className="secondary-button" onClick={onCancelDelete}>取消</button></> : deletionPreview.blockers.length > 0 ? <div className="error-banner">{deletionPreview.blockers.map((item) => <p key={item.kind}>{item.message}</p>)}</div>
               : <>{!selected.deletedAt && <label className="choice-row"><input type="radio" name="drawing-delete-mode" checked={deletionMode === 'retain_occupied'}
                 onChange={() => setDeletionMode('retain_occupied')} />删除记录并保留占号</label>}
                 <label className="choice-row"><input type="radio" name="drawing-delete-mode" checked={deletionMode === 'release'}
@@ -509,22 +497,20 @@ function CurrentOutlinedFiles({ selected, contextBatchId, contextProductId, onOp
     {effectiveBatchId == null && directories.length > 1 && <label>当前文件所属资料目录<select aria-label="当前文件所属资料目录" value={directory} onChange={(event) => setDirectory(event.target.value)}>
       <option value="">存在多个资料目录，请选择</option>{directories.map((path) => <option key={path} value={path}>{path}</option>)}
     </select></label>}
-    <FileSection title="源文件" present={source.some(file => file.isPresent)} files={source} onOpen={onOpen} previewOnly={previewOnly} />
+    <FileSection title="转曲前文件" present={source.some(file => file.isPresent)} files={source} onOpen={onOpen} previewOnly={previewOnly} />
     <FileSection title="转曲后文件" present={current.some((file) => file.isPresent)} files={current} onOpen={onOpen} previewOnly={previewOnly} />
-    {current.length === 0 && <p className="muted-text">{effectiveBatchId != null ? '所选批次没有转曲后文件，不使用其他批次文件替代。' : '未找到当前有效批次的转曲后文件，不使用历史文件替代。'}</p>}
-    {current.length > 1 && <p className="info-banner">当前有效批次有多个文件实例，请核对路径后选择。</p>}
     {(history.length > 0 || sourceHistory.length > 0) && <details key={selected.id} className="drawing-detail-section">
       <summary>查看历史文件</summary>
-      <FileSection title="源文件" present={sourceHistory.some(file => file.isPresent)} files={sourceHistory} onOpen={onOpen} previewOnly={previewOnly} />
+      <FileSection title="转曲前文件" present={sourceHistory.some(file => file.isPresent)} files={sourceHistory} onOpen={onOpen} previewOnly={previewOnly} />
       <FileSection title="转曲后文件" present={history.some((file) => file.isPresent)} files={history} onOpen={onOpen} previewOnly={previewOnly} />
     </details>}
   </>;
 }
 
 function FileSection({ title, present, files, onOpen, previewOnly = false }: { title: string; present: boolean; files: DrawingFileView[]; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
-  return <section className="drawing-detail-section"><h3>{title}</h3>
-    {files.length === 0 ? <p className="muted-text">暂无索引记录</p> : <ul>{files.map((file) => <li key={file.pdfIndexId} className="drawing-file-row">
-      <span className="drawing-file-identity"><strong className="drawing-file-name" title={file.fileName}>{file.fileName}</strong><small className={`drawing-file-presence ${file.isPresent ? 'present' : 'missing'}`}>{file.isPresent ? '当前存在' : '当前缺失'}</small><details><summary>查看路径</summary><small>{file.relativePath}</small></details></span>
+  return <section className="drawing-detail-section drawing-file-section"><h3>{title}<span className={`drawing-file-presence ${present?'present':'missing'}`}>{present?'存在':'缺失'}</span></h3>
+    {files.length === 0 ? <p className="muted-text">暂无{title}</p> : <ul>{files.map((file) => <li key={file.pdfIndexId} className="drawing-file-row">
+      <span className="drawing-file-identity"><strong className="drawing-file-name" title={file.fileName}>{file.fileName}</strong></span>
       <button className="text-button" type="button" disabled={previewOnly || !file.isPresent} title={previewOnly ? 'Mock 不支持磁盘操作' : undefined}
         aria-label={`打开${title} ${file.fileName} 的位置`} onClick={() => void onOpen(file.pdfIndexId)}>打开位置</button>
     </li>)}</ul>}</section>;

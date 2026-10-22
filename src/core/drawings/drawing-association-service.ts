@@ -1,3 +1,4 @@
+import { pdfDirectoryProductSql } from '../files/pdf-product-context.js';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type { PlannerDatabase } from '../../db/database.js';
@@ -27,6 +28,15 @@ export class DrawingAssociationService {
       if(!candidates.length&&row.detectedSku&&row.detectedModel){
         candidates=[...new Set((this.db.prepare('select id from products where lower(sku)=lower(?) and model=? and deleted_at is null').all(row.detectedSku,row.detectedModel) as Array<{id:number}>).map(product=>resolveCanonicalProductId(this.db,product.id)))];
         if(candidates.length)evidence.push(`目录 SKU ${row.detectedSku} / 型号 ${row.detectedModel} 精确候选，尚未人工确认`);
+      }
+      if(!trustworthyProducts.length&&!binding){
+        const directoryProducts=this.db.prepare(`select distinct ${pdfDirectoryProductSql} as productId from pdf_files file
+          where ${origin==='planned'?'file.drawing_id':'file.historical_drawing_id'}=? and file.management_state='included'`).all(Math.abs(row.signedId)) as Array<{productId:number|null}>;
+        const directoryIds=directoryProducts.flatMap(product=>product.productId===null?[]:[product.productId]);
+        if(directoryIds.length){
+          candidates=[...new Set([...candidates,...directoryIds])];
+          evidence.push('关联 PDF 的完整 SKU-型号目录精确对应产品档案');
+        }
       }
       candidates=candidates.filter(id=>Boolean(this.db.prepare('select id from products where id=? and deleted_at is null').get(id)));
       if(origin==='historical'&&!binding)evidence.push('目录、图号前缀及扫描匹配状态不能单独确认产品归属');
@@ -76,6 +86,22 @@ export class DrawingAssociationService {
         this.write(target,input.reason,row.evidence);
       }
       return {updated:input.targets.length,before:preview.summary,after:this.preview().summary,backupPath};
+    }).immediate();
+  }
+  /** Explicit one-click classification authorized by the user. Never runs at startup. */
+  classify(signedIds?: number[]) {
+    const backupPath=this.backup();
+    return this.db.transaction(()=>{
+      const preview=this.preview(undefined,signedIds);
+      const ready=preview.records.filter(row=>row.state==='ready');
+      for(const row of ready)this.write(row.targets[0],'用户一键归类：唯一产品候选',row.evidence);
+      const after=this.preview(undefined,signedIds).summary;
+      for(const row of ready){
+        const saved=this.db.prepare('select product_id from drawing_appearance_bindings where origin=? and record_id=?').get(row.signedId>0?'planned':'historical',Math.abs(row.signedId)) as {product_id:number}|undefined;
+        if(!saved||resolveCanonicalProductId(this.db,saved.product_id)!==row.targets[0].productId)
+          throw new DrawingAssociationError('ASSOCIATION_SAVE_FAILED','图号归类保存校验失败，已回滚，请重新诊断');
+      }
+      return {updated:ready.length,before:preview.summary,after,backupPath};
     }).immediate();
   }
   correct(target:DrawingAssociationTarget,reason:string){return this.correctMany([target],reason);}

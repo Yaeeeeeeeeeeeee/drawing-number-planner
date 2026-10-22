@@ -64,7 +64,27 @@ export class DrawingQueryService {
   get(id: number): DrawingDetailRecord {
     const drawing = this.repository.getDetail(id);
     if (!drawing) throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
-    return { ...drawing, associationEvidence: this.associations.preview(undefined,[id]).records[0]?.evidence ?? [], associationHistory: this.associations.history(id), batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
+    return { ...drawing, ...this.firstBusinessReferences(id), associationEvidence: this.associations.preview(undefined,[id]).records[0]?.evidence ?? [], associationHistory: this.associations.history(id), batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
+  }
+
+  private firstBusinessReferences(signedId:number) {
+    const column=signedId<0?'historical_drawing_id':'drawing_id',id=Math.abs(signedId);
+    const batches=this.database.prepare(`select id,coalesce(display_name,name) as name,sequence_number as sequenceNumber,business_date as businessDate,product_directory as directory
+      from material_batches where recognition_status='recognized' and id in (
+        select material_batch_id from pdf_files where ${column}=@id
+        union select effective_material_batch_id from bom_items where ${column}=@id
+        union select package.selected_material_batch_id from outbound_package_items item join outbound_packages package on package.id=item.package_id where item.${column}=@id and package.status='completed'
+      )`).all({id}) as Array<{id:number;name:string;sequenceNumber:number|null;businessDate:string|null;directory:string}>;
+    const sameDirectory=new Set(batches.map(batch=>batch.directory)).size===1;
+    const bySequence=sameDirectory&&batches.every(batch=>batch.sequenceNumber!==null);
+    const byDate=batches.every(batch=>batch.businessDate!==null&&/^\d{4}-\d{2}-\d{2}$/.test(batch.businessDate)&&Number.isFinite(Date.parse(batch.businessDate)));
+    const comparable=bySequence||byDate;
+    const order=(batch:typeof batches[number])=>bySequence?batch.sequenceNumber!:Date.parse(batch.businessDate!);
+    const earliest=comparable&&batches.length?batches.filter(batch=>order(batch)===Math.min(...batches.map(order))):[];
+    const firstBom=this.database.prepare(`select version.id,version.version_number as versionNumber,version.business_change_date as businessDate,product.model
+      from bom_versions version join bom_items item on item.bom_version_id=version.id join products product on product.id=version.product_id
+      where item.${column}=? order by version.created_at,version.id limit 1`).get(id) as {id:number;versionNumber:number;businessDate:string|null;model:string}|undefined;
+    return {firstOccurrenceBatch:earliest.length===1?{id:earliest[0].id,name:earliest[0].name}:null,firstBatchAmbiguous:batches.length>0&&earliest.length!==1,firstBom:firstBom??null};
   }
 
   transition(id: number, target: 'active' | 'voided'): DrawingDetailRecord {

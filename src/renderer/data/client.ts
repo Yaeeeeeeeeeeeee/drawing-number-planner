@@ -55,6 +55,8 @@ export interface DrawingBomUsageView {
   projectItemId: number; projectItemName: string; quantity: number; usesWhiteMaterial: boolean;
 }
 export interface DrawingDetailView extends DrawingView {
+  firstOccurrenceBatch?:{id:number;name:string}|null;firstBatchAmbiguous?:boolean;
+  firstBom?:{id:number;versionNumber:number;businessDate:string|null;model:string}|null;
   associationHistory?: unknown[];
   sourceFiles: DrawingFileView[]; outlinedFiles: DrawingFileView[]; currentBomUsage: DrawingBomUsageView[];
   businessUsage?: DrawingBusinessUsageView[];
@@ -120,6 +122,7 @@ export interface DrawingReferenceSummaryView {
 }
 export interface DrawingDeletionPreviewView {
   signedId: number; origin: 'planned' | 'historical'; fullCode: string; status: DrawingView['status']; deletable: boolean;
+  releaseEligible?: boolean; releaseBlockers?: Array<{kind:string;count:number;message:string}>;
   references: Record<string, number>;
   blockers: Array<{ kind: 'current_bom' | 'current_material' | 'lineage'; count: number; message: string }>;
 }

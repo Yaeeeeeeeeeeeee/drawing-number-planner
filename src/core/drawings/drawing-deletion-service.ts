@@ -65,6 +65,8 @@ export class DrawingDeletionService {
       if (!preview.deletable) {
         throw new DrawingDeletionError('DRAWING_DELETE_BLOCKED', preview.blockers.map((item) => item.message).join('；'), preview);
       }
+      if(input.mode==='release'&&!preview.releaseEligible)
+        throw new DrawingDeletionError('DRAWING_DELETE_BLOCKED',preview.releaseBlockers.map(item=>item.message).join('；'),preview);
       const now = new Date().toISOString();
       const event = this.db.prepare(`insert into drawing_deletion_events
         (origin, record_id, full_code, deletion_mode, previous_status, reason, reference_summary_json, deleted_at)
@@ -176,8 +178,20 @@ export class DrawingDeletionService {
       message: `无法删除：该图号仍在 ${references.currentMaterial} 个最新有效资料批次中使用` });
     if (references.lineage) blockers.push({ kind: 'lineage', count: references.lineage,
       message: `无法删除：该图号仍被 ${references.lineage} 条图号版本关系引用` });
+    const releaseBlockers:DrawingDeletionBlocker[]=[...blockers];
+    if(row.origin==='historical')releaseBlockers.push({kind:'historical_occupation',count:1,message:'该图号存在历史扫描占用记录，无法释放号码；可删除图号并保留占号。'});
+    else if((row.previousStatus??row.status)!=='reserved')releaseBlockers.push({kind:'usage_unproven',count:1,message:'该正式图号已启用或缺少从未使用的可靠记录，无法确认属于未使用误占；可删除图号并保留占号。'});
+    const protectedRows=(this.db.prepare(`select
+      (select count(*) from pdf_files file where file.${referenceColumn}=@id or exists(select 1 from json_each(file.detected_codes_json) code where code.value=@code)) as pdf,
+      (select count(*) from bom_items item where item.${referenceColumn}=@id) as bom,
+      (select count(*) from outbound_package_items item where item.${referenceColumn}=@id or item.drawing_code_snapshot=@code) as outbound,
+      (select count(*) from drawing_deletion_events event where event.origin=@origin and event.record_id=@id and exists(select 1 from json_each(event.reference_summary_json) refs where cast(refs.value as integer)>0)) as previousReferences,
+      (select count(*) from drawing_numbers drawing where @origin='planned' and (drawing.previous_drawing_id=@id or drawing.source_drawing_id=@id)) as lineage
+    `).get({id:row.id,code:row.fullCode,origin:row.origin}) as Record<string,number>);
+    const protectedCount=Object.values(protectedRows).reduce((sum,count)=>sum+count,0);
+    if(protectedCount)releaseBlockers.push({kind:'protected_history',count:protectedCount,message:'该图号存在受保护的 PDF、BOM、外发、图号关系或删除前历史引用，无法释放号码；须保留占号与追溯。'});
     return { signedId, origin: row.origin, fullCode: row.fullCode, status: row.status,
-      deletable: blockers.length === 0, references, blockers };
+      deletable: blockers.length === 0, releaseEligible:releaseBlockers.length===0,releaseBlockers, references, blockers };
   }
 
   private detachPdfIndexes(row: DeletionRow, mode: 'retain_occupied' | 'release'): void {

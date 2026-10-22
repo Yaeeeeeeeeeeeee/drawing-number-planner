@@ -10,7 +10,7 @@ function legacy(db:ReturnType<typeof openDatabase>){return Object.fromEntries((d
 function verifyLegacy(db:ReturnType<typeof openDatabase>,before:ReturnType<typeof legacy>){for(const [name,{columns,rows}]of Object.entries(before))assert.deepEqual(db.prepare(`select ${columns.map(c=>'"'+c+'"').join(',')} from "${name}" order by rowid`).all(),rows,name);assert.equal(db.pragma('integrity_check',{simple:true}),'ok');assert.deepEqual(db.pragma('foreign_key_check'),[]);}
 if(mode==='prepare'){
  fs.mkdirSync(root,{recursive:true});if(fs.existsSync(file))throw Error('Fixture must be a new file');const db=createV15Fixture();try{
- db.exec(`insert into dictionary_items(id,type,code,name,created_at) values(1,'brand','02','品牌','2026-01-01'),(2,'product_size','0209','尺寸','2026-01-01'),(3,'appearance','01','外观','2026-01-01');
+ db.exec(`insert into dictionary_items(id,type,code,name,created_at) values(1,'brand','02','品牌','2026-01-01'),(2,'product_size','0209','尺寸','2026-01-01'),(3,'appearance','01','外观','2026-01-01'),(4,'color','0','白色','2026-01-01');
  insert into products(id,sku,brand_id,product_size_id,default_appearance_id,model,product_category,created_at) values(5,'SKU',1,2,3,'M1','冰柜','2026-01-01');
  insert into product_qr_codes(id,product_id,purpose_id,name,target_url,status,created_at,updated_at) values(7,5,1,'原QR','https://example.com/1234567','active','2026-01-01','2026-01-02');
  insert into bom_versions(id,product_id,version_number,business_change_date,created_at) values(8,5,1,'2026-01-02','2026-01-01');

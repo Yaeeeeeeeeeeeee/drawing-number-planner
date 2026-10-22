@@ -1,9 +1,7 @@
 import { win32 } from 'node:path';
 
-import { parseProductDirectory } from './directory-policy.js';
+import { isProductionChangeDirectory, parseProductDirectory } from './directory-policy.js';
 import type { ParsedMaterialBatch } from './material-batch-types.js';
-
-const productionDirectoryPrefix = '03.量产后的变更文件';
 
 function parseValidDate(value: string): string | null {
   const year = Number(value.slice(0, 4));
@@ -27,7 +25,7 @@ function dateClassification(name: string): { businessDate: string | null; warnin
 export function parseMaterialBatch(relativeFilePath: string): ParsedMaterialBatch | null {
   const normalized = win32.normalize(relativeFilePath.replace(/\//g, '\\'));
   const segments = normalized.split('\\').filter(Boolean);
-  if (segments.length < 5 || !segments[2].startsWith(productionDirectoryPrefix)) return null;
+  if (segments.length < 5 || !isProductionChangeDirectory(segments[2])) return null;
 
   const name = segments[3];
   const numbered = /^(\d{2})\.(.+)$/.exec(name);

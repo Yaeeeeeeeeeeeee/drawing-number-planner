@@ -19,7 +19,7 @@ export interface DrawingDeletionReferenceCounts {
 }
 
 export interface DrawingDeletionBlocker {
-  kind: 'current_bom' | 'current_material' | 'lineage' | 'appearance_usage';
+  kind: 'current_bom' | 'current_material' | 'lineage' | 'appearance_usage' | 'historical_occupation' | 'usage_unproven' | 'protected_history';
   count: number;
   message: string;
 }
@@ -30,6 +30,8 @@ export interface DrawingDeletionPreview {
   fullCode: string;
   status: DrawingStatus;
   deletable: boolean;
+  releaseEligible: boolean;
+  releaseBlockers: DrawingDeletionBlocker[];
   references: DrawingDeletionReferenceCounts;
   blockers: DrawingDeletionBlocker[];
 }

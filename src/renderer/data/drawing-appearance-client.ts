@@ -7,10 +7,11 @@ export interface DrawingAppearanceApi {
   previewDrawingReuse(input:DrawingReuseInput):Promise<DrawingReusePreview>;
   confirmDrawingReuse(input:DrawingReuseInput&{fingerprint:string;confirmed:true}):Promise<{updated:number}>;
   previewDrawingAssociations(input?:{productId?:number;signedIds?:number[]}):Promise<DrawingAssociationPreviewView>;
+  classifyDrawingAssociations(input?:{signedIds?:number[]}):Promise<DrawingAssociationResult>;
   confirmDrawingAssociations(input:{targets:DrawingAssociationTarget[];fingerprint:string;reason:string;confirmed:true}):Promise<DrawingAssociationResult>;
   correctDrawingAssociation(input:DrawingAssociationTarget&{reason:string;confirmed:true}):Promise<DrawingAssociationResult>;
 }
 export function createDrawingAppearanceApi(request:<T>(path:string,init?:RequestInit)=>Promise<T>):DrawingAppearanceApi {
   const post=<T>(path:string,input:unknown)=>request<T>(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});
-  return {previewDrawingReuse:input=>post('/api/drawings/reuse-preview',input),confirmDrawingReuse:input=>post('/api/drawings/reuse-confirm',input),previewDrawingAssociations:(input={})=>post('/api/drawings/association-preview',input),confirmDrawingAssociations:input=>post('/api/drawings/association-confirm',input),correctDrawingAssociation:input=>post('/api/drawings/association-correct',input)};
+  return {classifyDrawingAssociations:(input={})=>post('/api/drawings/association-classify',input),previewDrawingReuse:input=>post('/api/drawings/reuse-preview',input),confirmDrawingReuse:input=>post('/api/drawings/reuse-confirm',input),previewDrawingAssociations:(input={})=>post('/api/drawings/association-preview',input),confirmDrawingAssociations:input=>post('/api/drawings/association-confirm',input),correctDrawingAssociation:input=>post('/api/drawings/association-correct',input)};
 }

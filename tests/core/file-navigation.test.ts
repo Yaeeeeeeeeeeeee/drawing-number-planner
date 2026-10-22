@@ -195,3 +195,18 @@ it('does not choose between ambiguous SKU-model directory combinations or guess 
  repository.replaceScan([record('洗碗机\\A-B-C\\ambiguous.pdf'),record('洗碗机\\T40\\model-only.pdf'),record('洗碗机\\SKUX-T40\\unknown.pdf')],[],timestamp);
  expect(repository.navigation({presence:'all'})).toMatchObject({total:3,unassociatedProducts:3,products:[]});expect(repository.search({productId,presence:'all'}).total).toBe(0);
 });
+
+it('repairs existing unbatched H10 scan indexes on rescan without changing file IDs or drawing history',()=>{
+ db.prepare("update products set sku='AKVCH010JP',model='H10',product_category='吸尘器' where id=?").run(productId);
+ const path='吸尘器\\AKVCH010JP-H10\\03.量产后的变更明细（已量产的产品看最新日期）\\00.首批大货\\铭牌.pdf';
+ const old=record(path);old.materialBatch=null;
+ repository.replaceScan([old],[],timestamp);
+ const original=(db.prepare('select id from pdf_files').get() as {id:number}).id;
+ expect(repository.navigation({}).batches).toHaveLength(0);
+ repository.replaceScan([record(path)],[],timestamp);
+ const stats=repository.navigation({});expect(stats.products).toEqual([{productId,count:1}]);
+ expect(stats.batches).toHaveLength(1);expect(stats.batches[0]).toMatchObject({productId,count:1});
+ const batch=db.prepare('select id,name from material_batches').get() as {id:number;name:string};expect(batch.name).toBe('00.首批大货');
+ expect(repository.search({productId,materialBatchId:batch.id}).items).toContainEqual(expect.objectContaining({id:original}));
+ expect(db.prepare('select * from historical_drawing_numbers').all()).toEqual([]);
+});
