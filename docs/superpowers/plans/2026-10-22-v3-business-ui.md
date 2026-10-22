@@ -65,5 +65,5 @@ Files: DataTable optional virtualize/onEndReached, ProductsPage, PlanningPage, B
 - [x] Add reusable measured-row windowing with fixed header/spacer rows, expanded rows and bounded DOM; only3requested modules opt in.
 - [x] Remove product version management and product paging, version selectors in planning/BOM while retaining dictionary appearance and raw historical BOM context.
 - [x] Sidebar3groups9distinct Lucide18 icons, global concise spacing and single-line fields; clean permanent implementation notes within authorized UI.
-- [ ] Windows actual native old-schema upgrade/WAL/rollback, manual QR and V3 screenshots; API/types, independent review, complete tests/type/build are verified.
-- [ ] GitHub feature branch update and verified Chinese custom-path installer; report exact fixture repair counts separately from unavailable real758 counts and explain local confirmation steps.
+- [x] Windows actual native old-schema upgrade/WAL/rollback, manual QR and V3 screenshots; API/types, independent review, complete tests/type/build are verified.
+- [x] GitHub feature branch update and verified Chinese custom-path installer; report exact fixture repair counts separately from unavailable real758 counts and explain local confirmation steps.

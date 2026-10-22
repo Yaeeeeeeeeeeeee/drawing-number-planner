@@ -1,17 +1,51 @@
 {
   "date": "2026-10-22",
-  "scope": "V3 frozen source before Windows packaging",
+  "scope": "V3 final application source 8a4275bec1bda49322fb037f53d07d20b0198b93",
   "fullTests": {
     "command": "node node_modules/vitest/vitest.mjs run --maxWorkers=1 --testTimeout=15000",
     "files": 157,
-    "tests": 1312,
+    "tests": 1313,
     "failed": 0,
-    "durationSeconds": 263.32
+    "durationSeconds": 260.66
   },
   "typecheck": true,
   "rendererBuild": true,
   "mainBuild": true,
   "independentReview": "critical/important findings resolved and reverified",
   "realUser758DatabaseAvailable": false,
-  "windowsVerification": "pending"
+  "windowsVerification": {
+    "runId": 39741597713,
+    "jobId": 119699914309,
+    "conclusion": "success",
+    "schemaUpgrade": "v15 to v18",
+    "nativeQr": true,
+    "viewports": [
+      [
+        3840,
+        2160
+      ],
+      [
+        2560,
+        1440
+      ],
+      [
+        1920,
+        1080
+      ],
+      [
+        1366,
+        768
+      ],
+      [
+        720,
+        600
+      ]
+    ],
+    "physical4kDpiVerified": false,
+    "installerArtifactId": 12409622206,
+    "installerZipSha256": "43a6809a21765b94ca1e785595e428273d361acb769107aabf93b05f61b87476",
+    "verificationArtifactId": 12409089590,
+    "manualVisualPreviewCompleted": false
+  },
+  "sourceCommit": "8a4275bec1bda49322fb037f53d07d20b0198b93"
 }
