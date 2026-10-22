@@ -1,3 +1,4 @@
+import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 // @vitest-environment node
 import Fastify from 'fastify';
 import { expect, it } from 'vitest';
@@ -14,7 +15,7 @@ it('uses the renderer factory against real appearance routes and returns only sc
   try {
     db.exec("insert into dictionary_items(id,type,code,name,created_at) values(101,'brand','02','品牌','2026-01-01'),(102,'product_size','0209','尺寸','2026-01-01'),(103,'color','1','黑色','2026-01-01')");
     const p = new ProductService(db).create({sku:'CONTRACT',model:'合同型号',brandId:101,productSizeId:102,productCategory:'冰柜'});
-    registerAppearanceRoutes(app, new AppearanceService(db));
+    ensureProductAppearance(db,p.id);registerAppearanceRoutes(app, new AppearanceService(db));
     const api = createAppearanceApi(async <T,>(url: string, init?: RequestInit) => {
       const response = await app.inject({ method: (init?.method ?? 'GET') as 'GET'|'POST'|'PUT', url,
         ...(init?.headers ? {headers:init.headers as Record<string,string>} : {}),

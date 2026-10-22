@@ -14,3 +14,20 @@ describe('manual QR validation', () => {
     expect(() => qrUrlTail('https://qrs.ly/')).toThrow();
   });
 });
+
+// V3: case/spacing are filename presentation, never product identity or URL-tail changes.
+describe('V3 legacy QR filenames',()=>{
+ it.each(['B500-Warranty（hwh0kd9）.pdf','B500-warranty（hwh0kd9）.pdf','B500-Warranty(hwh0kd9).pdf','B500-warranty (hwh0kd9).pdf','B500-WARRANTY （hwh0kd9）.PDF'])('accepts %s without an exception',name=>{
+  expect(validateQrManualFilename(name,'B500','Warranty','https://qrs.ly/hwh0kd9/?a=1')).toEqual([]);
+  expect(parseQrManualFilename(name)?.purpose).toBe('Warranty');
+ });
+ it.each([['B500-uSeR mAnUaL (hwh0kd9).pdf','User Manual'],['B500-rECIPE（hwh0kd9）.pdf','Recipe']])('normalizes only the supported English purpose in %s',(name,purpose)=>{
+  expect(validateQrManualFilename(name,'B500',purpose,'https://qrs.ly/hwh0kd9')).toEqual([]);
+ });
+ it('keeps model and URL-tail case significant and unknown suffixes controlled',()=>{
+  expect(validateQrManualFilename('b500-warranty (hwh0kd9).pdf','B500','Warranty','https://qrs.ly/hwh0kd9')).toEqual(['文件型号与产品型号不一致']);
+  expect(validateQrManualFilename('B500-warranty (HWH0KD9).pdf','B500','Warranty','https://qrs.ly/hwh0kd9')).toEqual(['文件尾码与网址不一致']);
+  expect(parseQrManualFilename('H10-warranty-avakyo（g8gwcl6）.pdf')).toBeNull();
+  expect(qrManualDisplayName('B500-warranty (hwh0kd9).pdf')).toBe('B500-warranty');
+ });
+});

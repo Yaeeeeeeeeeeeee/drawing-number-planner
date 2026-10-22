@@ -21,7 +21,7 @@ function files(root) {
   walk(root); return result.sort((a,b)=>a.path.localeCompare(b.path));
 }
 if (git('rev-parse','HEAD') !== revision || git('status','--porcelain')) throw Error('Source must be clean and exactly pinned; no reset or overwrite');
-// This authorized release includes additive v16/v17 migrations; native verification checks the old-schema upgrade.
+// This authorized release includes additive v16/v17/v18 migrations; native verification checks the old-schema upgrade.
 const mainSource=git('show',`${revision}:src/main/index.ts`);
 for(const security of ['contextIsolation: true','nodeIntegration: false','sandbox: true','installRecoveryControls()'])if(!mainSource.includes(security))throw Error('Desktop security/recovery setting missing: '+security);
 assertRendererIconDependencyOnly(git('show',`${baseRevision}:package.json`),git('show',`${revision}:package.json`),git('show',`${baseRevision}:pnpm-lock.yaml`),git('show',`${revision}:pnpm-lock.yaml`));
@@ -51,7 +51,7 @@ fs.cpSync(path.join(source,'dist/renderer'),path.join(app,'dist/renderer'),{recu
 fs.copyFileSync(path.join(source,'dist/main/preload.cjs'),path.join(app,'dist/main/preload.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-entry.cjs'),path.join(app,'acceptance-entry.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-profile.cjs'),path.join(app,'production-profile.cjs'));
-fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,schemaVersion:17,profile:'stable-user-selected',bundledSample:false},null,2));
+fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,schemaVersion:18,profile:'stable-user-selected',bundledSample:false},null,2));
 fs.renameSync(path.join(output,'图号规划器验收版.exe'),path.join(output,'图号规划器.exe'));
 if(fs.existsSync(path.join(app,'acceptance-seed')))throw Error('Example data must not be included');
 for(const entry of files(output))if(/\.(db|sqlite|sqlite3|pdf)(-wal|-shm)?$/i.test(entry.path))throw Error('Database/PDF data must not be bundled: '+entry.path);
@@ -72,7 +72,7 @@ const instructions=`图号规划器 Windows x64
 `;
 fs.writeFileSync(path.join(output,'先看这里-验收说明.txt'),instructions);
 fs.writeFileSync(path.join(output,'验收说明.txt'),instructions);
-fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:17,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
+fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:18,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
 fs.writeFileSync(path.join(output,'delivery-manifest.json'),JSON.stringify({revision,platform:'win32-x64',baseRevision,files:files(output)},null,2));
 verifyManifest(output,JSON.parse(fs.readFileSync(path.join(output,'delivery-manifest.json'),'utf8')));
-console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:17,bundledSample:false}));
+console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:18,bundledSample:false}));

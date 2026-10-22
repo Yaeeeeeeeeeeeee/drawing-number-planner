@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-22",
+  "scope": "V3 frozen source before Windows packaging",
+  "fullTests": {
+    "command": "node node_modules/vitest/vitest.mjs run --maxWorkers=1 --testTimeout=15000",
+    "files": 157,
+    "tests": 1312,
+    "failed": 0,
+    "durationSeconds": 263.32
+  },
+  "typecheck": true,
+  "rendererBuild": true,
+  "mainBuild": true,
+  "independentReview": "critical/important findings resolved and reverified",
+  "realUser758DatabaseAvailable": false,
+  "windowsVerification": "pending"
+}

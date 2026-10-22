@@ -4,13 +4,13 @@ import { migrateDatabase } from '../../src/db/migrations';
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { ProductService } from '../../src/core/products/product-service';
 import { AppearanceService } from '../../src/core/products/appearance-service';
-import { resolveCanonicalProductId } from '../../src/core/products/appearance-identity';
+import { ensureProductAppearance, resolveCanonicalProductId } from '../../src/core/products/appearance-identity';
 import { ProductCleanupService } from '../../src/core/products/product-cleanup-service';
 let db:PlannerDatabase,service:AppearanceService,products:ProductService;
 beforeEach(()=>{db=openDatabase(':memory:');migrateDatabase(db,{databaseExists:false,createBackup(){}});service=new AppearanceService(db);products=new ProductService(db);});
 afterEach(()=>db.close());
-function product(model='M1'){const d=new DictionaryService(db);let brand=(db.prepare("select id from dictionary_items where type='brand'").get() as {id:number}|undefined)?.id;let size=(db.prepare("select id from dictionary_items where type='product_size'").get() as {id:number}|undefined)?.id;if(!brand)brand=d.create({type:'brand',code:'02',name:'品牌'}).id;if(!size)size=d.create({type:'product_size',code:'0209',name:'尺寸'}).id;return products.create({sku:model,model,brandId:brand,productSizeId:size,productCategory:'冰柜'});}
-it('ordinary create initializes exactly one current version with no fake QR records; draft activation is optimistic',()=>{
+function product(model='M1'){const d=new DictionaryService(db);let brand=(db.prepare("select id from dictionary_items where type='brand'").get() as {id:number}|undefined)?.id;let size=(db.prepare("select id from dictionary_items where type='product_size'").get() as {id:number}|undefined)?.id;if(!brand)brand=d.create({type:'brand',code:'02',name:'品牌'}).id;if(!size)size=d.create({type:'product_size',code:'0209',name:'尺寸'}).id;const result=products.create({sku:model,model,brandId:brand,productSizeId:size,productCategory:'冰柜'});ensureProductAppearance(db,result.id);return result;}
+it('legacy initialized product retains exactly one current version with no fake QR records; draft activation is optimistic',()=>{
  const p=product();const first=service.list(p.id);expect(first.items).toHaveLength(1);expect(first.items[0].status).toBe('current');expect(db.prepare('select * from product_qr_codes').all()).toEqual([]);
  const draft=service.createDraft(p.id,{label:'第二代',predecessorId:first.items[0].id});expect(service.list(p.id).items[0].status).toBe('current');
  expect(()=>service.activate(draft.id,{expectedRevision:0,expectedIdentityRevision:0})).toThrowError(expect.objectContaining({code:'STALE_REVISION'}));

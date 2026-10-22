@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { drawingAppearanceRelationsSql } from '../drawings/drawing-appearance-scope.js';
 import type { PlannerDatabase } from '../../db/database.js';
-import { ensureProductAppearance, listRawProductIds, resolveCanonicalProductId } from './appearance-identity.js';
+import { ensureProductIdentity, listRawProductIds, resolveCanonicalProductId } from './appearance-identity.js';
 import type { AppearanceResources, AppearanceVersion, AppearanceDraftInput, AppearanceDraftUpdate, AppearanceActivationInput, AppearanceList, ProductMergeInput, ProductMergePreview, ProductMergeConfirm } from './appearance-types.js';
 export class AppearanceError extends Error { constructor(public readonly code: 'NOT_FOUND'|'INVALID_INPUT'|'STALE_REVISION'|'MERGE_BLOCKED', message:string){super(message);} }
 const select = `select id,product_id as productId,version_number as versionNumber,appearance_id as appearanceId,label,status,predecessor_id as predecessorId,revision,created_at as createdAt,activated_at as activatedAt from product_appearance_versions`;
@@ -93,7 +93,7 @@ export class AppearanceService {
  }
  private colors(id:number):number[]{return (this.db.prepare('select color_id from product_appearance_colors where appearance_version_id=? order by color_id').all(id) as {color_id:number}[]).map(row=>row.color_id);}
  private setColors(id:number,ids:number[]):void{this.db.prepare('delete from product_appearance_colors where appearance_version_id=?').run(id);for(const color of [...new Set(ids)].sort((a,b)=>a-b))this.db.prepare('insert into product_appearance_colors(appearance_version_id,color_id) values(?,?)').run(id,color);}
- private identity(id:number):number {if(!this.db.prepare('select 1 from products where id=? and deleted_at is null').get(id))throw new AppearanceError('NOT_FOUND','产品不存在');const canonical=resolveCanonicalProductId(this.db,id);ensureProductAppearance(this.db,canonical);return canonical;}
+ private identity(id:number):number {if(!this.db.prepare('select 1 from products where id=? and deleted_at is null').get(id))throw new AppearanceError('NOT_FOUND','产品不存在');const canonical=resolveCanonicalProductId(this.db,id);ensureProductIdentity(this.db,canonical);return canonical;}
  private revision(id:number):number{return (this.db.prepare('select revision from product_identity_state where product_id=?').get(id) as {revision:number}).revision;}
  private bump(id:number){this.db.prepare('update product_identity_state set revision=revision+1 where product_id=?').run(id);}
  private validate(input:AppearanceDraftInput,productId:number){if(input.colorIds!==undefined&&(!Array.isArray(input.colorIds)||input.colorIds.some(color=>!Number.isSafeInteger(color)||color<=0||!this.db.prepare("select 1 from dictionary_items where id=? and type='color' and status='active' and deleted_at is null").get(color))))throw new AppearanceError('INVALID_INPUT','颜色配置引用了无效或已停用的颜色');if(!input.label?.trim())throw new AppearanceError('INVALID_INPUT','请填写外观名称');if(input.appearanceId!=null&&!this.db.prepare("select 1 from dictionary_items where id=? and type='appearance' and status='active' and deleted_at is null").get(input.appearanceId))throw new AppearanceError('INVALID_INPUT','外观编码无效');if(input.predecessorId!=null&&this.get(input.predecessorId).productId!==productId)throw new AppearanceError('INVALID_INPUT','前序外观不属于该产品');}

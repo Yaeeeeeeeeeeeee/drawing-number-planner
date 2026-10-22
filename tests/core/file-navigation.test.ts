@@ -43,6 +43,8 @@ function seed() {
   repository.replaceScan(rows, [{ ...known, directoryContext: { sku: 'SKU', model: 'T40', productCategory: '洗碗机' } },
     { ...orphan, directoryContext: null }], timestamp);
   repository.replaceScan(rows.slice(0, -1), [], timestamp);
+  const historical=db.prepare('select id from historical_drawing_numbers where full_code=?').get(known.fullCode) as {id:number};
+  db.prepare("insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,revision,updated_at) values('historical',?,?,null,'manual',1,?)").run(historical.id,productId,timestamp);
 }
 
 describe('PDF navigation statistics', () => {
@@ -113,11 +115,10 @@ describe('PDF navigation statistics', () => {
       productSizeId: template.productSizeId, defaultAppearanceId: template.defaultAppearanceId });
     expect(repository.navigation({ presence: 'all' })).toMatchObject({ total: 1, unassociatedProducts: 1, products: [] });
     expect(repository.search({ unassociatedProduct: true }).total).toBe(1);
-    // The existing scanner may reliably resolve the stored historical directory context on a later scan.
+    // Re-scanning directory evidence must remain a candidate, never a confirmed product.
     repository.replaceScan(rows, [{ ...code, directoryContext: context }], timestamp);
-    expect(repository.navigation({ presence: 'all' })).toMatchObject({ total: 1, unassociatedProducts: 0,
-      products: [{ productId: product.id, count: 1 }] });
-    expect(repository.search({ unassociatedProduct: true }).total).toBe(0);
+    expect(repository.navigation({ presence: 'all' })).toMatchObject({ total: 1, unassociatedProducts: 1, products: [] });
+    expect(repository.search({ unassociatedProduct: true }).total).toBe(1);
   });
 
   it('keeps every aggregate on one read snapshot while another connection commits a change', () => {

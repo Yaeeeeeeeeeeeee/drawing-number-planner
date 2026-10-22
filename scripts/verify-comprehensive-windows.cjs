@@ -23,6 +23,16 @@ function writePdf(file,text){
 function assertPreservedRows(before,after){for(const [table,rows]of Object.entries(before))for(const row of rows)assert.ok(after[table].some(candidate=>Object.keys(row).every(key=>candidate[key]===row[key])),`Historical row changed in ${table}`);}
 function qrState(file,name){const all=snapshot(file),code=all.product_qr_codes.find(row=>row.name===name);assert.ok(code,'Committed QR must exist in actual SQLite');const links=all.qr_manual_links.filter(row=>row.qr_code_id===code.id);return{code,links,files:links.map(link=>all.qr_manual_files.find(row=>row.id===link.file_id)),audit:all.qr_manual_audit.filter(row=>row.qr_code_id===code.id)};}
 async function go(page,label){const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();await page.getByRole('heading',{name:label,exact:true}).waitFor();}
+async function assertQrListLayout(page,label){
+ const table=page.locator('.qr-main-table > .table-wrap > table');await table.waitFor();
+ const expected=['SKU','型号','产品类别','说明书','售后卡','菜谱','操作'];
+ assert.deepEqual((await table.locator(':scope > thead > tr > th').allTextContents()).map(text=>text.trim()),expected);
+ assert.equal(await page.getByLabel('二维码每页数量',{exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'下一页',exact:true}).count(),0);
+ const layout=await table.evaluate(element=>({alignments:[...element.querySelectorAll(':scope > thead > tr > th')].map(cell=>getComputedStyle(cell).textAlign),viewportRegion:element.parentElement.classList.contains('viewport-region'),visiblePrimaryRows:[...element.querySelectorAll(':scope > tbody > tr')].filter(row=>!row.classList.contains('expanded-table-row')&&!row.classList.contains('virtual-table-spacer')).length}));
+ assert.deepEqual(layout.alignments,['left','center','center','center','center','center','center']);assert.equal(layout.viewportRegion,true);
+ // Only real migrated fixture records are used here. Large-list DOM bounds are separately tested with 1000 product fixtures in Vitest.
+ (report.qrListLayouts??=[]).push({label,columns:expected,traditionalPagination:false,...layout,longListStress:false});
+}
 async function assertQrModalLayout(modal,label,stage){
  const layout=await modal.evaluate(element=>{const backdrop=element.closest('.modal-backdrop');if(!backdrop)throw Error('QR modal backdrop missing');const rect=node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};return{position:getComputedStyle(backdrop).position,backdrop:rect(backdrop),modal:rect(element),viewport:{width:innerWidth,height:innerHeight},documentScroll:{top:document.scrollingElement.scrollTop,left:document.scrollingElement.scrollLeft},workspaceScroll:document.querySelector('main.workspace')?.scrollTop??null};});
  assert.equal(layout.position,'fixed','QR backdrop must overlay the viewport');const tolerance=2;
@@ -51,7 +61,7 @@ async function launch(){
 async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow(app,dialog);await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});return page;}catch(error){await captureFailure(app,app.__verificationLabel,error);throw error;}}
 (async()=>{
  fs.mkdirSync(evidence,{recursive:true});assert.equal(fs.existsSync(profileHome),false,'Refuse to touch any pre-existing runner/user production profile');
- const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,17);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
+ const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,18);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
  const legacy=path.join(temporary,'旧版原始数据目录');database('prepare',legacy);database('rollback-and-wal',legacy);const settingsBefore=fs.readFileSync(path.join(legacy,'settings.json'));
  const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));let app;
  try{app=await launch();const page=await ready(app,dialog);
@@ -67,24 +77,33 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
    for(const label of ['产品档案','图号库','PDF 文件中心','二维码管理','BOM 管理','外发资料']){
     const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();
     await page.getByRole('heading',{name:label,exact:true}).waitFor();
-    await page.waitForTimeout(150);const shot=`Windows-综合改版-${label.replaceAll(' ','')}-${width}.png`;await page.screenshot({path:path.join(evidence,shot)});const png=fs.readFileSync(path.join(evidence,shot));const actualPng={width:png.readUInt32BE(16),height:png.readUInt32BE(20)};assert.equal(actualPng.width,Math.round(viewport.width*viewport.devicePixelRatio));assert.equal(actualPng.height,Math.round(viewport.height*viewport.devicePixelRatio));report.screenshots.push({file:shot,png:actualPng,viewport});fs.writeFileSync(path.join(evidence,'windows-comprehensive-viewports.json'),JSON.stringify({revision:report.revision,viewports:report.viewports,screenshots:report.screenshots},null,2));
+    await page.waitForTimeout(150);if(label==='二维码管理')await assertQrListLayout(page,`${width}x${height}`);
+    if(['产品档案','PDF 文件中心'].includes(label))assert.equal(await page.locator('.table-pagination').count(),0,`${label} must use scrolling rather than traditional paging`);
+    if(width===1920&&label==='图号库'){
+     await page.getByRole('button',{name:'查看 / 管理',exact:true}).first().click();
+     const drawer=page.locator('.drawing-maintenance');await drawer.waitFor();assert.equal(await drawer.locator(':scope > .drawing-detail-group').count(),5);
+     const bounds=await drawer.evaluate(element=>{const r=element.closest('.module-detail').getBoundingClientRect();return {width:r.width,height:r.height};});
+     assert.ok(bounds.width>=600&&bounds.width<=690,`Drawing detail width ${bounds.width}`);
+     await page.screenshot({path:path.join(evidence,'Windows-V3-图号详情-1920.png')});await page.getByRole('button',{name:'关闭图号详情',exact:true}).click();
+    }
+    const shot=`Windows-综合改版-${label.replaceAll(' ','')}-${width}.png`;await page.screenshot({path:path.join(evidence,shot)});const png=fs.readFileSync(path.join(evidence,shot));const actualPng={width:png.readUInt32BE(16),height:png.readUInt32BE(20)};assert.equal(actualPng.width,Math.round(viewport.width*viewport.devicePixelRatio));assert.equal(actualPng.height,Math.round(viewport.height*viewport.devicePixelRatio));report.screenshots.push({file:shot,png:actualPng,viewport});fs.writeFileSync(path.join(evidence,'windows-comprehensive-viewports.json'),JSON.stringify({revision:report.revision,viewports:report.viewports,screenshots:report.screenshots},null,2));
    }
   }
   assert.deepEqual(errors,[]);report.rendererErrors=errors;
  }finally{dialog.child.kill();if(app)await app.close();}
  database('audit-upgrade',legacy);report.oldV15Upgrade={originalDirectoryRetained:true,settingsBytesPreserved:true,oldRowsAndSnapshotsPreserved:true,realMigrationBackupValidated:true,walAndRollback:JSON.parse(fs.readFileSync(path.join(legacy,'native-rollback-and-wal.json'),'utf8'))};
- const beforeQr=snapshot(path.join(legacy,'planner.db'));const qrName='Windows原生手动说明书';
- const firstPdf=path.join(temporary,'原生QR首次','M1-User Manual（qagp85g）.pdf'),replacementPdf=path.join(temporary,'原生QR替换','M1-User Manual（qagp85g）.pdf');
+ const beforeQr=snapshot(path.join(legacy,'planner.db'));const qrName='Windows原生手动售后卡';
+ const firstPdf=path.join(temporary,'原生QR首次','M1-warranty (qagp85g).pdf'),replacementPdf=path.join(temporary,'原生QR替换','M1-warranty (qagp85g).pdf');
  const firstHash=writePdf(firstPdf,'Native QR first PDF'),replacementHash=writePdf(replacementPdf,'Native QR replacement PDF');assert.notEqual(firstHash,replacementHash);
  let linkedState,replacedState;
  app=await launch();try{
   const page=await ready(app);assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeQr);report.restartPreservesDatabase=true;
-  await go(page,'二维码管理');await page.getByRole('button',{name:'新增用途',exact:true}).click();
+  await go(page,'二维码管理');await assertQrListLayout(page,'before-native-association');await page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).locator('xpath=ancestor::tr').getByRole('button',{name:'新增用途',exact:true}).click();
   const modal=page.getByRole('dialog',{name:'手动关联二维码PDF'});await modal.waitFor();
-  const purpose=await page.evaluate(async()=>{const result=await(await fetch('/api/qr-purposes')).json();return result.items.find(p=>p.key==='user_manual');});assert.ok(purpose);
-  const appearance=await page.evaluate(async()=>{const result=await(await fetch('/api/products/5/appearances')).json();return result.items.find(item=>item.status==='current');});assert.ok(appearance);
-  await modal.getByLabel('手动二维码外观版本',{exact:true}).selectOption(String(appearance.id));await modal.getByLabel('手动二维码用途',{exact:true}).selectOption(String(purpose.id));await modal.getByLabel('手动二维码名称',{exact:true}).fill(qrName);await modal.getByLabel('手动二维码网址',{exact:true}).fill('https://qrs.ly/qagp85g');
-  await chooseAndCommitQr(page,firstPdf,'QR首次关联');linkedState=qrState(path.join(legacy,'planner.db'),qrName);assert.equal(linkedState.code.status,'inactive');assert.equal(linkedState.code.target_url,'https://qrs.ly/qagp85g');assert.equal(linkedState.files.length,1);assert.equal(linkedState.files[0].absolute_path,firstPdf);assert.equal(linkedState.files[0].content_sha256,firstHash);assert.equal(linkedState.links[0].unlinked_at,null);assert.equal(linkedState.audit.length,1);assert.equal(linkedState.audit[0].event,'link');assertPreservedRows(beforeQr,snapshot(path.join(legacy,'planner.db')));
+  const purpose=await page.evaluate(async()=>{const result=await(await fetch('/api/qr-purposes')).json();return result.items.find(p=>p.key==='warranty'&&p.englishName==='Warranty');});assert.ok(purpose);
+  assert.equal(await modal.getByLabel('手动二维码外观版本',{exact:true}).count(),0);assert.ok(!beforeQr.product_qr_codes.some(row=>row.product_id===5&&row.purpose_id===purpose.id&&row.deleted_at==null&&row.appearance_version_id==null),'Native test must not replace an existing shared Warranty QR');
+  await modal.getByLabel('手动二维码用途',{exact:true}).selectOption(String(purpose.id));await modal.getByLabel('手动二维码名称',{exact:true}).fill(qrName);await modal.getByLabel('手动二维码网址',{exact:true}).fill('https://qrs.ly/qagp85g');
+  await chooseAndCommitQr(page,firstPdf,'QR首次关联');linkedState=qrState(path.join(legacy,'planner.db'),qrName);assert.equal(linkedState.code.product_id,5);assert.equal(linkedState.code.purpose_id,purpose.id);assert.equal(linkedState.code.appearance_version_id,null);assert.equal(linkedState.code.status,'inactive');assert.equal(linkedState.code.target_url,'https://qrs.ly/qagp85g');assert.equal(linkedState.files.length,1);assert.equal(linkedState.files[0].absolute_path,firstPdf);assert.equal(linkedState.files[0].content_sha256,firstHash);assert.equal(linkedState.links[0].unlinked_at,null);assert.equal(linkedState.audit.length,1);assert.equal(linkedState.audit[0].event,'link');assertPreservedRows(beforeQr,snapshot(path.join(legacy,'planner.db')));
  }finally{await app.close();}
  // A fresh real Electron process must reload the new external file and metadata.
  app=await launch();try{
@@ -96,7 +115,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   await page.getByRole('button',{name:'解除关联',exact:true}).click();await page.getByText('已解除当前文件关联，历史记录保留。',{exact:true}).waitFor();
   const unlinked=qrState(path.join(legacy,'planner.db'),qrName);assert.deepEqual(unlinked.code,linkedState.code);assert.equal(unlinked.links.length,2);assert.ok(unlinked.links.every(link=>link.unlinked_at));assert.deepEqual(unlinked.files,replacedState.files);assert.deepEqual(unlinked.audit.slice(0,2),replacedState.audit);assert.equal(unlinked.audit[2].event,'unlink');assertPreservedRows(beforeQr,snapshot(path.join(legacy,'planner.db')));
   assert.equal(createHash('sha256').update(fs.readFileSync(firstPdf)).digest('hex'),firstHash);assert.equal(createHash('sha256').update(fs.readFileSync(replacementPdf)).digest('hex'),replacementHash);
-  report.nativeQrPdfPicker={actualNativeDialog:true,rendererSelectionPreviewCommit:true,fullWidthFilename:true,firstFileHash:firstHash,replacementFileHash:replacementHash,restartPreservesLinkAndMetadata:true,replacementPreservesMetadataAndHistory:true,unlinkPreservesFilesAndAudit:true,oldV15RowsPreserved:true,qrCodeId:linkedState.code.id};
+  report.nativeQrPdfPicker={actualNativeDialog:true,rendererSelectionPreviewCommit:true,fullWidthFilename:true,sevenColumnProductList:true,noIndependentAppearancePicker:true,newRecordProductScoped:true,lowercasePurposeAndParenthesisSpaceValidated:true,firstFileHash:firstHash,replacementFileHash:replacementHash,restartPreservesLinkAndMetadata:true,replacementPreservesMetadataAndHistory:true,unlinkPreservesFilesAndAudit:true,oldV15RowsPreserved:true,qrCodeId:linkedState.code.id};
  }finally{await app.close();}
  const beforeRestart=snapshot(path.join(legacy,'planner.db'));app=await launch();try{await ready(app);assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeRestart);}finally{await app.close();}report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
  // New-user path uses the real native first-start choice; the old selected DB remains intact.

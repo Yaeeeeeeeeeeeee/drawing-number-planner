@@ -18,14 +18,14 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const catalogWorkspace = fileWorkspace || drawingWorkspace;
   const defaultNavigation = catalogWorkspace ? 300 : 220;
   const minimumNavigation = catalogWorkspace ? 260 : 180;
-  const [preferredNavigation, setPreferredNavigation] = useState(defaultNavigation), [preferredDetail, setPreferredDetail] = useState(drawingWorkspace ? 560 : 380);
+  const [preferredNavigation, setPreferredNavigation] = useState(defaultNavigation), [preferredDetail, setPreferredDetail] = useState(drawingWorkspace ? 640 : 380);
   const closeRef = useRef(onCloseDetail); closeRef.current = onCloseDetail;
   const maxNavigation = Math.max(minimumNavigation, Math.min(catalogWorkspace ? 420 : 280, width - 820));
   const navigationWidth = clamp(preferredNavigation, minimumNavigation, maxNavigation);
   const navigationDocked = width >= navigationWidth + 820 && !navigationCollapsed;
   const centerWidth = width - (navigation && navigationDocked ? navigationWidth + 10 : 0);
-  const maxDetail = Math.max(300, Math.min(drawingWorkspace ? 600 : 480, centerWidth - 810));
-  const detailWidth = clamp(drawingWorkspace && width < 1800 ? Math.min(520, preferredDetail) : preferredDetail, 300, maxDetail);
+  const maxDetail = Math.max(300, Math.min(drawingWorkspace ? 680 : 480, centerWidth - 810));
+  const detailWidth = clamp(preferredDetail, 300, maxDetail);
   const detailDocked = centerWidth >= 800 + detailWidth + 10;
   const detailModal = Boolean(detail) && !detailDocked;
   const navigationModal = Boolean(navigation) && navigationOpen && !navigationDocked && !detailModal;
@@ -87,9 +87,9 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const collapseControl = <button type="button" className="text-button navigation-fold" aria-label={navigationDocked ? '收起产品导航' : '关闭产品导航'} title={navigationDocked ? '收起产品导航' : '关闭产品导航'} onClick={closeNavigation}><ChevronsLeft size={18} strokeWidth={1.8} aria-hidden="true"/></button>;
   const integratedNavigation = typeof navigation === 'function';
   return <div ref={root} className={`module-workspace-viewport p4-workspace adaptive-data-workspace ${fileWorkspace ? 'file-workspace' : ''} ${drawingWorkspace ? 'drawing-workspace' : ''}`} style={{ '--workspace-available-height': `${height}px` } as CSSProperties}>
-    {(navigation && !navigationDocked || resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 560 : 380))) && <div className="module-workspace-tools">
+    {(navigation && !navigationDocked || resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 640 : 380))) && <div className="module-workspace-tools">
       {navigation && !navigationDocked && <button ref={toggle} className="secondary-button module-navigation-toggle" type="button" aria-expanded={navigationModal} onClick={() => { const canDock = width >= navigationWidth + 820; if (canDock) navigationFocus.current = 'panel'; setNavigationCollapsed(false); setNavigationOpen(!canDock); }}>产品／批次导航</button>}
-      {resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 560 : 380)) && <button className="text-button" type="button" onClick={() => { setPreferredNavigation(defaultNavigation); setPreferredDetail(drawingWorkspace ? 560 : 380); }}>恢复默认宽度</button>}
+      {resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 640 : 380)) && <button className="text-button" type="button" onClick={() => { setPreferredNavigation(defaultNavigation); setPreferredDetail(drawingWorkspace ? 640 : 380); }}>恢复默认宽度</button>}
     </div>}
     <div className={`p4-workspace-grid ${navigation && navigationDocked ? 'has-navigation' : ''}`} style={{ gridTemplateColumns: navigation && navigationDocked ? `${navigationWidth}px 10px minmax(0,1fr)` : 'minmax(0,1fr)' }}>
       {navigation && <div ref={navigationModal ? panel : undefined} className={`module-navigation ${navigationModal ? 'module-drawer' : ''}`} hidden={!navVisible}

@@ -1,3 +1,4 @@
+import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
@@ -242,7 +243,7 @@ it('keeps newly discovered numbers unassigned rather than reconnecting an exited
     .toEqual({ product_id: null });
 });
 it('blocks legacy cleanup from detaching batches used by outbound V2 scope or baseline',()=>{
- const {product}=fixture();db.prepare("insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,first_seen_at,last_seen_at) values('V2batch','V2',?,'V2batch','recognized','then','now')").run(product.id);
+ const {product}=fixture();ensureProductAppearance(db,product.id);db.prepare("insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,first_seen_at,last_seen_at) values('V2batch','V2',?,'V2batch','recognized','then','now')").run(product.id);
  const appearance=(db.prepare('select id from product_appearance_versions where product_id=?').get(product.id) as {id:number}).id;
  db.prepare("insert into outbound_batch_scopes(batch_id,appearance_version_id,completeness,updated_at,reason) values(1,?,'complete','now','人工确认')").run(appearance);
  const service=new ProductCleanupService(db);expect(service.preview(product.id).blockers.join('')).toContain('外发V2');expect(()=>service.cleanup(product.id,{confirmedModel:product.model})).toThrow(/外发V2/);expect(db.prepare('select product_id from material_batches where id=1').get()).toEqual({product_id:product.id});

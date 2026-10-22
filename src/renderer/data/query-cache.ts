@@ -3,15 +3,15 @@ export class QueryCache {
  private results=new Map<string,Cached>();
  private pending=new Map<string,{epoch:number;promise:Promise<unknown>}>();
  private epoch=0;
- constructor(private ttl=30_000,private clock:()=>number=Date.now){}
- get<T>(key:string):T|undefined{const entry=this.results.get(key);if(!entry)return;if(entry.expires<=this.clock()){this.results.delete(key);return;}return entry.value as T;}
+ constructor(private ttl=30_000,private clock:()=>number=Date.now,private maxEntries=160){}
+ get<T>(key:string):T|undefined{const entry=this.results.get(key);if(!entry)return;if(entry.expires<=this.clock()){this.results.delete(key);return;}this.results.delete(key);this.results.set(key,entry);return entry.value as T;}
  fetch<T>(key:string,loader:()=>Promise<T>):Promise<T>{
   const value=this.get<T>(key);if(value!==undefined)return Promise.resolve(value);
   const previous=this.pending.get(key);if(previous)return previous.promise as Promise<T>;
   const epoch=this.epoch;
   // Call loader synchronously; register its promise before any continuation runs.
   let result:Promise<T>;try{result=loader();}catch(error){return Promise.reject(error);}
-  const promise=result.then(value=>{if(this.pending.get(key)?.promise===promise&&this.pending.get(key)?.epoch===epoch)this.results.set(key,{value,epoch,expires:this.clock()+this.ttl});return value;}).finally(()=>{if(this.pending.get(key)?.promise===promise)this.pending.delete(key);});
+  const promise=result.then(value=>{if(this.pending.get(key)?.promise===promise&&this.pending.get(key)?.epoch===epoch){const now=this.clock();for(const [cachedKey,entry] of this.results)if(entry.expires<=now)this.results.delete(cachedKey);this.results.delete(key);this.results.set(key,{value,epoch,expires:now+this.ttl});while(this.results.size>Math.max(1,this.maxEntries))this.results.delete(this.results.keys().next().value!);}return value;}).finally(()=>{if(this.pending.get(key)?.promise===promise)this.pending.delete(key);});
   this.pending.set(key,{epoch,promise});return promise;
  }
  invalidate(prefix=''):void{this.epoch++;for(const key of this.results.keys())if(key.startsWith(prefix))this.results.delete(key);for(const key of this.pending.keys())if(key.startsWith(prefix))this.pending.delete(key);}

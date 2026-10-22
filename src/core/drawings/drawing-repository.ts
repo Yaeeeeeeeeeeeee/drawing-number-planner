@@ -1,3 +1,4 @@
+import {effectiveDrawingProductSql} from './drawing-product-evidence.js';
 import {drawingAppearanceRelationsSql} from './drawing-appearance-scope.js';
 import { resolveCanonicalProductId } from '../products/appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
@@ -109,9 +110,7 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
       then 'mapped' else 'unmapped' end as dictionary_mapping_status
   from historical_drawing_numbers historical
   left join drawing_appearance_bindings binding on binding.origin='historical' and binding.record_id=historical.id
-  left join products product on product.id = coalesce(
-    (select canonical_product_id from product_identity_members where raw_product_id=binding.product_id),binding.product_id,
-    (select min(usage.product_id) from business_usage usage where usage.origin='historical' and usage.record_id=historical.id having count(distinct usage.product_id)=1))
+  left join products product on product.id = ${effectiveDrawingProductSql("'historical'",'historical.id')}
   left join dictionary_items brand on brand.type = 'brand' and brand.code = historical.brand_code
   left join dictionary_items product_size on product_size.type = 'product_size' and product_size.code = historical.product_size_code
   left join dictionary_items appearance on appearance.type = 'appearance' and appearance.code = historical.appearance_code
@@ -164,7 +163,7 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
       where ${exactUsageIdentity} and navigation_product.product_category = ?))`);
     values.push(filters.navigationProductCategory, filters.navigationProductCategory);
   }
-  if (filters.associationState === 'unassociated') conditions.push(`record.product_id is null and not exists(select 1 from drawing_appearance_bindings binding where binding.origin=record.origin and binding.record_id=abs(record.id)) and not exists(select 1 from business_usage usage where ${exactUsageIdentity} and usage.product_id is not null)`);
+  if (filters.associationState === 'unassociated') conditions.push(`${effectiveDrawingProductSql('record.origin','abs(record.id)')} is null`);
   if (filters.appearanceVersionId !== undefined) {
     conditions.push(`exists(select 1 from ${drawingAppearanceRelationsSql} relation where relation.origin=record.origin and relation.record_id=abs(record.id) and relation.appearance_version_id=?)`);
     values.push(filters.appearanceVersionId);
@@ -218,7 +217,7 @@ export class DrawingRepository {
   constructor(private readonly db: PlannerDatabase) {}
 
   private enrich(record: DrawingRecord): DrawingRecord {
-    const binding=this.db.prepare(`select binding.product_id, binding.appearance_version_id, version.label, product.model, product.sku from drawing_appearance_bindings binding join product_appearance_versions version on version.id=binding.appearance_version_id join products product on product.id=binding.product_id where binding.origin=? and binding.record_id=?`).get(record.origin,Math.abs(record.id)) as {product_id:number;appearance_version_id:number;label:string;model:string;sku:string}|undefined;
+    const binding=this.db.prepare(`select binding.product_id, binding.appearance_version_id, version.label, product.model, product.sku from drawing_appearance_bindings binding left join product_appearance_versions version on version.id=binding.appearance_version_id join products product on product.id=binding.product_id where binding.origin=? and binding.record_id=?`).get(record.origin,Math.abs(record.id)) as {product_id:number;appearance_version_id:number;label:string;model:string;sku:string}|undefined;
     if(binding) Object.assign(record,{productId:binding.product_id,model:binding.model,sku:binding.sku,appearanceVersionId:binding.appearance_version_id,appearanceVersionLabel:binding.label});
     if(record.productId!==null){const id=resolveCanonicalProductId(this.db,record.productId);const product=this.db.prepare('select model,sku,product_category as productCategory from products where id=?').get(id) as {model:string;sku:string|null;productCategory:string}|undefined;if(product)Object.assign(record,product,{productId:id});}
     return record;

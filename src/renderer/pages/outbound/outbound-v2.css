@@ -1,7 +1,7 @@
 .outbound-page.approved-outbound .outbound-workflow:not([hidden]) {display:block;}
-.outbound-page.approved-outbound .outbound-selection-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:none;align-items:start;}
+.outbound-page.approved-outbound .outbound-selection-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:none;align-items:stretch;}
 .outbound-page.approved-outbound .outbound-selection-grid select {max-width:none;width:100%;}
-.outbound-mode-select {display:block;max-width:420px;}
+.outbound-mode-select {display:block;max-width:none;}
 .outbound-mode-select select {width:100%;}
 .outbound-list-tools,.outbound-pagination {display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0;}
 .outbound-list-tools input {width:min(300px,100%);}
@@ -25,3 +25,7 @@
 .outbound-page.approved-outbound .package-builder{padding:0;border:0;background:transparent;}
 .outbound-page.approved-outbound .ob-step{margin-bottom:18px;}
 .outbound-full-file-list .outbound-file-name{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;}
+
+.outbound-page.approved-outbound .outbound-selection-grid > :is(label,.outbound-product-field){display:grid;grid-template-rows:auto 40px;gap:6px;align-content:start;}
+.outbound-page.approved-outbound .outbound-selection-grid select{height:40px;min-height:40px;margin:0;}
+.outbound-overlay{position:fixed;inset:0;z-index:210;display:grid;place-items:center;background:#0005;padding:16px;}

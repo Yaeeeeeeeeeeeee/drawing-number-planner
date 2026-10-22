@@ -108,3 +108,16 @@ describe('floating workspace navigation', () => {
   });
 
 });
+
+it('groups the nine workflows into daily work, product details and data sources with distinct icons',()=>{
+ viewport(false);
+ try{
+  const {container}=render(<AppShell api={{} as PlannerApi}/>);
+  const expected=[['日常工作','图号规划 / 更新包材','BOM 管理','外发资料'],['产品明细','产品档案','图号库','二维码管理'],['数据来源','PDF 文件中心','编码字典','迁移检查']];
+  const groups=container.querySelectorAll('nav[aria-label="主导航"] .nav-group');
+  expect(Array.from(groups).map(group=>group.querySelector('p')?.textContent)).toEqual(expected.map(group=>group[0]));
+  expected.forEach((group,index)=>expect(Array.from(groups[index].querySelectorAll('button')).map(button=>button.textContent)).toEqual(group.slice(1)));
+  const icons=Array.from(container.querySelectorAll('nav[aria-label="主导航"] button svg'));
+  expect(icons).toHaveLength(9);expect(new Set(icons.map(icon=>icon.innerHTML)).size).toBe(9);
+ }finally{vi.unstubAllGlobals();}
+});

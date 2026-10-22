@@ -344,8 +344,8 @@ describe('FileRepository', () => {
     const productId = (db.prepare('select product_id as productId from drawing_numbers where id = ?').get(drawing.id) as { productId: number }).productId;
     expect(repository.search({ productId }).items).toEqual(expect.arrayContaining([
       expect.objectContaining({ fileName: 'planned.pdf', productId, sku: 'TEST-FILE-REPOSITORY', model: 'ZC100', productCategory: '冰柜' }),
-      expect.objectContaining({ fileName: 'historical.pdf', productId, sku: 'TEST-FILE-REPOSITORY', model: 'ZC100', productCategory: '冰柜' }),
     ]));
+    expect(repository.search({unassociatedProduct:true}).items).toContainEqual(expect.objectContaining({fileName:'historical.pdf',productId:null}));
     expect(repository.search({ productId: productId + 1000 }).items).toHaveLength(0);
   });
 

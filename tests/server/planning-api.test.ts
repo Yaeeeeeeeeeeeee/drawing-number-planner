@@ -1,3 +1,4 @@
+import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 // @vitest-environment node
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -68,7 +69,7 @@ it('reserves with an explicit version and exposes the same association in the sc
   const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');
   const {registerDrawingRoutes}=await import('../../src/server/routes/drawings');
   registerDrawingRoutes(app,new DrawingQueryService(db));
-  const version=db.prepare('select id from product_appearance_versions where product_id=?').get(payload.productId) as {id:number};
+  ensureProductAppearance(db,payload.productId);const version=db.prepare('select id from product_appearance_versions where product_id=?').get(payload.productId) as {id:number};
   const context={...payload,appearanceVersionId:version.id};
   const preview=await app.inject({method:'POST',url:'/api/planning/preview',payload:context});expect(preview.statusCode).toBe(200);
   const reserved=await app.inject({method:'POST',url:'/api/planning/reserve',payload:{...context,rows:[{...payload.rows[0],expectedFullCode:preview.json().rows[0].fullCode}]}});expect(reserved.statusCode).toBe(201);

@@ -120,7 +120,7 @@ it('uses explicit confirmed drawing attribution for PDF product/version filters 
  writeFileSync(join(dir,'02.0404.010.0401001.pdf'),'%PDF attributed');await service.scan();const file=service.search().items[0];
  const dict=new DictionaryService(db);const brand=dict.create({type:'brand',code:'02',name:'Brand'});const size=dict.create({type:'product_size',code:'0404',name:'Size'});const appearance=dict.create({type:'appearance',code:'01',name:'Appearance'});
  const product=new ProductService(db).create({sku:'MANUAL-PDF',model:'Manual',productCategory:'分类',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id});
- const version=db.prepare('select id from product_appearance_versions where product_id=?').get(product.id) as {id:number};
+ const version={id:Number(db.prepare("insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,1,?,'旧版兼容','current','now')").run(product.id,appearance.id).lastInsertRowid)};
  const {DrawingAssociationService}=await import('../../src/core/drawings/drawing-association-service');
  new DrawingAssociationService(db).correct({signedId:-file.historicalDrawingId!,productId:product.id,appearanceVersionId:version.id},'人工核验');
  expect(service.search({productId:product.id,appearanceVersionId:version.id}).items).toEqual([expect.objectContaining({id:file.id,productId:product.id,model:'Manual'})]);
@@ -146,7 +146,6 @@ it('keeps a real directory-matched scan unconfirmed in the drawing library until
  expect(library.search({productId:product.id}).items).toEqual([]);expect(library.navigationCounts({}).products).toEqual([]);expect(library.navigationCounts({}).unassociated).toBe(1);
  const preview=library.associations.preview(undefined,[-raw.id]);expect(preview.records[0]).toMatchObject({state:'ready',automaticEligible:false});
  library.associations.confirm({targets:preview.records[0].targets,fingerprint:preview.fingerprint,reason:'人工核验目录与产品外观',confirmed:true});
- const version=db.prepare('select id from product_appearance_versions where product_id=?').get(product.id) as {id:number};
- expect(library.search({productId:product.id,appearanceVersionId:version.id}).items.map(row=>row.id)).toEqual([-raw.id]);expect(library.navigationCounts({}).products).toEqual([{productId:product.id,count:1}]);expect(library.navigationCounts({}).unassociated).toBe(0);
+ expect(library.search({productId:product.id}).items.map(row=>row.id)).toEqual([-raw.id]);expect(library.navigationCounts({}).products).toEqual([{productId:product.id,count:1}]);expect(library.navigationCounts({}).unassociated).toBe(0);
  expect(db.prepare('select id,product_id,detected_sku,detected_model from historical_drawing_numbers').get()).toEqual(raw);
 });

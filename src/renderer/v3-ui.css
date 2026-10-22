@@ -1,0 +1,14 @@
+/* Shared V3 rhythm. Module-specific data semantics and alignments remain local. */
+@layer workspace {
+ .engineering-workspace .nav-label { gap: 12px; min-width: 0; }
+ .engineering-workspace .nav-label > svg { flex: 0 0 18px; color: currentColor; }
+ .engineering-workspace .nav-group + .nav-group { margin-top: 20px; }
+ .engineering-workspace .nav-group-label { margin-bottom: 8px; }
+ .engineering-workspace .nav-item { min-height: 40px; }
+ .engineering-workspace .navigation-close, .engineering-workspace .navigation-toggle { display: inline-flex; align-items: center; justify-content: center; }
+ .engineering-workspace :is(th,td) { padding-inline: 12px; vertical-align: middle; }
+ .engineering-workspace th, .engineering-workspace :is(button,.badge,.status-badge) { white-space: nowrap; }
+ .engineering-workspace :is(.row-actions,.actions-cell,.action-buttons) { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: nowrap; }
+ .engineering-workspace :is(.code-cell,.sku-cell,.model-cell,.date-cell,.batch-name) { white-space: nowrap; }
+ .engineering-workspace .virtual-table-spacer > td { padding: 0; border: 0; }
+}

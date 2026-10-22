@@ -6,7 +6,7 @@ beforeEach(() => vi.stubGlobal('innerWidth', 1920));
 afterEach(() => vi.unstubAllGlobals());
 
 describe('drawing library origin column', () => {
-  it.each(['default', 'appearance', 'recycle'] as const)('separates actual origin from full code in the %s list', async (scope) => {
+  it.each(['default', 'product', 'recycle'] as const)('separates actual origin from full code in the %s list', async (scope) => {
     const rows = [
       { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'reserved' },
       { id: -2, fullCode: '02.0209.010.0501002', origin: 'historical', status: 'active' },
@@ -20,10 +20,9 @@ describe('drawing library origin column', () => {
         usageProducts: [{ productId: 5, state: 'current', drawingCount: 2 }] }] }) };
     render(<DrawingLibraryPage api={api as never} />);
     await screen.findByRole('button', { name: rows[0].fullCode });
-    if (scope === 'appearance') {
-      fireEvent.click(await screen.findByRole('button', { name: '展开产品 T40' }));
-      fireEvent.click(await screen.findByRole('button', { name: '外观 一代' }));
-      await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 5, appearanceVersionId: 71 })));
+    if (scope === 'product') {
+      fireEvent.click(await screen.findByRole('button', { name: '产品 T40' }));
+      await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 5, appearanceVersionId: '' })));
     } else if (scope === 'recycle') {
       fireEvent.click(screen.getByRole('button', { name: '回收站' }));
       await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ deletionState: 'deleted' })));
@@ -43,7 +42,7 @@ describe('drawing library origin column', () => {
 });
 
 it('shows an available recorded version without making up a default version', async () => {
-  const rows = [{id:1,fullCode:'VERSIONED',origin:'planned',status:'active',appearanceVersionLabel:'R2'}, {id:2,fullCode:'UNVERSIONED',origin:'historical',status:'active'}];
+  const rows = [{id:1,fullCode:'02.0209.010.0501002',origin:'planned',status:'active',appearanceVersionLabel:'旧外观',version:'R2'}, {id:2,fullCode:'UNVERSIONED',origin:'historical',status:'active'}];
   render(<DrawingLibraryPage api={{searchDrawings:vi.fn().mockResolvedValue({items:rows,total:2}),listDictionaries:vi.fn().mockResolvedValue([])} as never} />);
   const table=await screen.findByRole('table');
   expect(within(within(table).getAllByRole('row')[1]).getAllByRole('cell')[5]).toHaveTextContent('R2');

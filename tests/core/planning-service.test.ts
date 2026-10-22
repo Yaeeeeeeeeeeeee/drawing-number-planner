@@ -1,3 +1,4 @@
+import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
@@ -105,11 +106,11 @@ describe('PlanningService preview', () => {
 });
 
 describe('appearance version context',()=>{
-  it('requires an explicit version when the product has multiple appearances, binding only the chosen version',()=>{
+  it('accepts dictionary-only planning while preserving explicitly requested legacy versions',()=>{
     const refs=fixture();
     const appearance=dictionaries.create({type:'appearance',code:'02',name:'二号外观'});
     const version=Number(db.prepare(`insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,?,'二代','draft','2026')`).run(refs.product.id,appearance.id).lastInsertRowid);
-    expect(()=>service.preview(input(refs))).toThrow('明确选择外观版本');
+    expect(service.preview(input(refs)).rows[0].fullCode).toBe('02.0404.010.0401001');
     insertHistorical(4,'02');
     const context={...input(refs),appearanceVersionId:version};
     const preview=service.preview(context);expect(preview.rows[0].fullCode).toBe('02.0404.020.0401005');
@@ -119,7 +120,7 @@ describe('appearance version context',()=>{
 });
 
 it('integrates an explicit plan, atomic reservation and appearance-scoped library without changing occupation',async()=>{
-  const refs=fixture();const version=db.prepare('select id from product_appearance_versions where product_id=?').get(refs.product.id) as {id:number};
+  const refs=fixture();ensureProductAppearance(db,refs.product.id);const version=db.prepare('select id from product_appearance_versions where product_id=?').get(refs.product.id) as {id:number};
   const request={...input(refs),appearanceVersionId:version.id};const preview=service.preview(request);
   const reserved=service.reserve({...request,rows:request.rows.map((row,i)=>({...row,expectedFullCode:preview.rows[i].fullCode}))});
   const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');
@@ -148,7 +149,7 @@ it('rolls back every reservation and occupancy when persisting the version bindi
 });
 
 it('explicitly reuses a reserved drawing in a new version without changing attribution, occupation or creating BOM',async()=>{
- const refs=fixture(),request=input(refs),preview=service.preview(request);
+ const refs=fixture();ensureProductAppearance(db,refs.product.id);const firstVersion=(db.prepare('select id from product_appearance_versions where product_id=?').get(refs.product.id) as {id:number}).id;const request={...input(refs),appearanceVersionId:firstVersion},preview=service.preview(request);
  const reserved=service.reserve({...request,rows:request.rows.map((row,i)=>({...row,expectedFullCode:preview.rows[i].fullCode}))})[0];
  const primary=db.prepare('select * from drawing_appearance_bindings where record_id=?').get(reserved.id);
  const version=Number(db.prepare(`insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,?,'二代','draft','now')`).run(refs.product.id,refs.appearance.id).lastInsertRowid);

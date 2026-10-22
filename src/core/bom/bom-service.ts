@@ -91,7 +91,6 @@ export class BomService {
 
   getCurrent(productId: number, appearanceVersionId?: number): BomVersionDetail | null {
     const explicitAppearance=appearanceVersionId!==undefined;
-    appearanceVersionId ??= this.currentAppearanceId(productId);
     this.validateAppearance(productId, appearanceVersionId);
     let id = this.repository.getCurrentVersionId(productId, appearanceVersionId);
     if(id===null && !explicitAppearance) {
@@ -170,7 +169,6 @@ export class BomService {
   saveVersion(input: SaveBomInput): SavedBomVersion {
     return this.withArchiveTransaction((archive) => {
       const explicitAppearance=input.appearanceVersionId!==undefined;
-      input = { ...input, appearanceVersionId: input.appearanceVersionId ?? this.currentAppearanceId(input.productId) };
       this.validateProduct(input.productId);
       this.validateAppearance(input.productId, input.appearanceVersionId);
       if (!input.businessChangeDate || !validBusinessDate(input.businessChangeDate)) {

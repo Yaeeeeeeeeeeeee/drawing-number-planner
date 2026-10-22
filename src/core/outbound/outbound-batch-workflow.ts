@@ -3,6 +3,7 @@ import { closeSync, constants, fstatSync, openSync, readFileSync, realpathSync }
 import { win32 } from 'node:path';
 import type { PlannerDatabase } from '../../db/database.js';
 import { BomService } from '../bom/bom-service.js';
+import { codeScopeFromFullCode, selectLatestBusinessBatch } from '../files/batch-business-order.js';
 import { parseDrawingCode } from '../drawings/drawing-code.js';
 import { listRawProductIds, resolveCanonicalProductId } from '../products/appearance-identity.js';
 import { resolveWorkspacePath, toWorkspaceRelativePath } from '../files/workspace-paths.js';
@@ -88,21 +89,29 @@ export class OutboundBatchWorkflow {
 
   resolve(input: OutboundPackageRequest, root: string, now: Date) {
     const repository = new OutboundPackageRepository(this.db);
+    const simplified = input.appearanceVersionId === undefined;
     const canonical = resolveCanonicalProductId(this.db, input.productId);
     const product = repository.getProduct(canonical);
     const appearance = this.db.prepare("select * from product_appearance_versions where id=? and product_id=? and status<>'draft'")
       .get(input.appearanceVersionId ?? 0, canonical);
-    if (!product || !appearance) throw new BatchWorkflowError('INVALID_APPEARANCE', '请选择有效产品及明确的外观版本');
+    if (!product || (!simplified && !appearance)) throw new BatchWorkflowError('INVALID_APPEARANCE', '请选择有效产品及明确的外观版本');
     const packageName = buildOutboundPackageName({ ...product, materialType: input.materialType, createdAt: now });
     if (![product.brand, product.model, product.productCategory].every(isSafeWindowsNameComponent) || `${packageName}-9999.zip`.length > 255) {
       throw new BatchWorkflowError('UNSAFE_PACKAGE_NAME', '产品档案包含不安全的压缩包名称，请先修正');
     }
     const batches = this.scopes(canonical);
     const batch = batches.find(item => item.id === input.selectedMaterialBatchId);
-    if (!batch || batch.appearanceVersionId !== input.appearanceVersionId) throw new BatchWorkflowError('BATCH_UNCONFIRMED', '批次外观归属待确认，请先明确关联');
+    if (!batch || (!simplified && batch.appearanceVersionId !== input.appearanceVersionId)) throw new BatchWorkflowError('BATCH_UNCONFIRMED', '批次外观归属待确认，请先明确关联');
     if (!batch.isPresent || batch.recognitionStatus !== 'recognized') throw new BatchWorkflowError('BATCH_UNAVAILABLE', '所选资料批次已缺失或尚未识别');
     const warnings: string[] = [];
-    const baselineId = input.baselineBatchId ?? batch.baselineBatchId;
+    const batchFileCache=new Map<number,OutboundIndexedFile[]>();
+    const read = (id: number):OutboundIndexedFile[] => {
+      const cached=batchFileCache.get(id);if(cached)return cached;
+      const files=(this.db.prepare("select id from pdf_files where material_batch_id=? and management_state='included' order by id")
+      .all(id) as Array<{ id: number }>).map(row => repository.getFile(row.id)!).filter(Boolean);
+      batchFileCache.set(id,files);return files;
+    };
+    const baselineId = simplified ? undefined : input.baselineBatchId ?? batch.baselineBatchId;
     let baseline = baselineId ? batches.find(item => item.id === baselineId) : undefined;
     if (baselineId && (!baseline || baseline.id === batch.id || baseline.completeness !== 'complete' || !baseline.isPresent || baseline.recognitionStatus !== 'recognized')) {
       throw new BatchWorkflowError('INVALID_BASELINE', '对比基准必须是本产品已确认完整的有效批次');
@@ -113,7 +122,7 @@ export class OutboundBatchWorkflow {
       }
       warnings.push('已人工确认跨外观比较；不会改变批次或图号归属');
     }
-    if (!baseline && batch.sequenceNumber !== null) {
+    if (!simplified && !baseline && batch.sequenceNumber !== null) {
       const earlier = batches.filter(item => item.appearanceVersionId === input.appearanceVersionId && item.completeness === 'complete'
         && item.isPresent && item.recognitionStatus === 'recognized' && item.sequenceNumber !== null && item.sequenceNumber < batch.sequenceNumber!);
       const max = Math.max(...earlier.map(item => item.sequenceNumber!));
@@ -121,13 +130,31 @@ export class OutboundBatchWorkflow {
       if (nearest.length === 1) baseline = nearest[0];
       else if (nearest.length > 1) warnings.push('上一完整批次顺序存在歧义，请手动选择对比基准；当前未完成历史差异对比');
     }
-    if (batch.completeness !== 'complete') warnings.push(batch.completeness === 'partial' ? '当前批次标记为部分资料，请核对所选范围' : '当前批次完整性尚未确认');
-    if (!baseline && input.packageMode === 'change_only') warnings.push('没有可用的上一批次；本批有效文件为初次候选，未完成历史差异对比');
+    if (simplified && input.packageMode === 'change_only') {
+      const group = (id:number) => {
+        const files=read(id).filter(file=>file.conversionType==='outlined');
+        const groups=new Set(files.map(file=>file.fullCode?codeScopeFromFullCode(file.fullCode):null));
+        return files.length && groups.size===1 && !groups.has(null) ? [...groups][0] : null;
+      };
+      const currentGroup=group(batch.id);
+      const comparable=currentGroup?batches.filter(candidate=>candidate.isPresent && candidate.recognitionStatus==='recognized' && group(candidate.id)===currentGroup):[];
+      const allSequence=comparable.every(candidate=>candidate.sequenceNumber!==null && Number.isFinite(candidate.sequenceNumber));
+      const validDate=(value:string|null)=>Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10)===value);
+      const allDates=comparable.every(candidate=>validDate(candidate.businessDate));
+      const order=(candidate:BatchScope)=>allSequence?candidate.sequenceNumber!:Date.parse(candidate.businessDate!);
+      const reliable=currentGroup && (allSequence || allDates);
+      const sameOrder=reliable?comparable.filter(candidate=>order(candidate)===order(batch)):[];
+      const earlier=reliable?comparable.filter(candidate=>order(candidate)<order(batch)):[];
+      // Keep the chronology chosen for the complete comparison scope. A subset must not switch back to sequences.
+      const selection=selectLatestBusinessBatch(allSequence?earlier:earlier.map(candidate=>({...candidate,sequenceNumber:null})));
+      if(sameOrder.length===1 && selection.status==='selected') baseline=batches.find(candidate=>candidate.id===selection.batchId);
+      if(!baseline) warnings.push(!currentGroup?'本批图号外观编码不唯一，无法可靠对比；请手动选择文件。':'没有顺序可靠的同外观上一批次；请手动选择文件。');
+    }
+    if (!simplified && batch.completeness !== 'complete') warnings.push(batch.completeness === 'partial' ? '当前批次标记为部分资料，请核对所选范围' : '当前批次完整性尚未确认');
+    if (!simplified && !baseline && input.packageMode === 'change_only') warnings.push('没有可用的上一批次；本批有效文件为初次候选，未完成历史差异对比');
 
-    const read = (id: number) => (this.db.prepare("select id from pdf_files where material_batch_id=? and management_state='included' order by id")
-      .all(id) as Array<{ id: number }>).map(row => repository.getFile(row.id)!).filter(Boolean);
     const batchFiles = read(batch.id);
-    const current = batchFiles.filter(file => file.conversionType === 'outlined' || !batchFiles.some(other => slot(other) === slot(file) && other.conversionType === 'outlined'));
+    const current = batchFiles.filter(file => file.conversionType === 'outlined' || !simplified && !batchFiles.some(other => slot(other) === slot(file) && other.conversionType === 'outlined'));
     const previous = baseline ? read(baseline.id).filter(file => file.conversionType === 'outlined') : [];
     const extras = input.extraPdfFileIds ?? [];
     if (new Set(extras).size !== extras.length) throw new BatchWorkflowError('DUPLICATE_EXTRA', '额外资料不能重复添加');
@@ -155,7 +182,7 @@ export class OutboundBatchWorkflow {
         if (current.some(item => item.id === file.id)) liveFiles.set(file.id, { indexed: file, absolutePath: inspection.fact.path });
       }
     }
-    const pointer = this.db.prepare('select bom_version_id as id from appearance_bom_current where appearance_version_id=?').get(input.appearanceVersionId!) as { id: number } | undefined;
+    const pointer = (simplified ? this.db.prepare('select version_id as id from bom_current where product_id=?').get(canonical) : this.db.prepare('select bom_version_id as id from appearance_bom_current where appearance_version_id=?').get(input.appearanceVersionId!)) as { id: number } | undefined;
     const bom = pointer ? new BomService(this.db).getVersion(pointer.id) : null;
     if (!bom) warnings.push('该产品尚未维护 BOM，当前根据资料批次整理外发文件。');
     const items: OutboundPackagePreviewItem[] = current.map(file => {
@@ -174,7 +201,9 @@ export class OutboundBatchWorkflow {
       const relations=recordId?this.db.prepare(`select product_id as productId,appearance_version_id as versionId from drawing_appearance_bindings where origin=? and record_id=?
         union select product_id as productId,appearance_version_id as versionId from drawing_appearance_usages where origin=? and record_id=?`)
         .all(origin,recordId,origin,recordId) as Array<{productId:number;versionId:number}>:[];
-      const belongs=relations.some(binding=>resolveCanonicalProductId(this.db,binding.productId)===canonical&&binding.versionId===input.appearanceVersionId);
+      // Batch ownership is sufficient when drawing attribution is absent. An explicit conflicting binding still needs review.
+      const belongs=simplified ? relations.length===0 || relations.some(binding=>resolveCanonicalProductId(this.db,binding.productId)===canonical)
+        : relations.some(binding=>resolveCanonicalProductId(this.db,binding.productId)===canonical&&binding.versionId===input.appearanceVersionId);
       const bomItem = bom?.items.find(item => sameReference(file, item));
       const confirmation = confirmations.find(item => item.pdfFileId === file.id && item.reason.trim().length >= 5 && !!hash && item.contentSha256 === hash);
       const isExtra = extras.includes(file.id);
@@ -187,7 +216,7 @@ export class OutboundBatchWorkflow {
         : inspections.get(file.id)?.problem ?? (!drawingAvailable ? '关联图号已删除或作废，须在文件中心重新确认'
           : conflict ? '同项目多版本或同图号内容不同' : differentCodeSameContent ? '不同图号但内容相同，请核查图号版本和业务关系'
             : unresolvedBaseline ? '对比基准文件缺失或存在多个版本，请人工核查'
-              : isExtra ? '额外资料需明确确认其实际来源' : !belongs && !bomItem ? '产品或外观归属需人工确认'
+              : isExtra ? '额外资料需明确确认其实际来源' : !belongs && !bomItem ? simplified ? '产品关联冲突，需人工核对' : '产品或外观归属需人工确认'
                 : !bomItem ? '未关联 BOM' : null);
       return {
         slotKey: slot(file), fullCode: file.fullCode, projectItemId: file.projectItemId, projectItemName: file.projectItemName ?? '项目待确认',
@@ -197,9 +226,9 @@ export class OutboundBatchWorkflow {
         change: changedSameCode ? 'same_code_changed' : identical ? 'copied' : old.length ? 'replaced' : 'new',
         selectable, conflictFullCodes: conflict ? [...new Set(same.flatMap(item => item.fullCode ? [item.fullCode] : []))] : [],
         contentSha256: hash ?? null, sizeBytes: fact?.size ?? null,
-        defaultSelected: selectable && (input.packageMode === 'current_complete' || !identical), source: isExtra ? 'extra' : 'current_batch',
+        defaultSelected: selectable && (input.packageMode === 'current_complete' || (!simplified || !!baseline) && !identical), source: isExtra ? 'extra' : 'current_batch',
         comparison:baseline?{batchId:baseline.id,batchName:baseline.name,files:old.map(oldFile=>({pdfFileId:oldFile.id,fileName:oldFile.fileName,relativePath:oldFile.relativePath,fullCode:oldFile.fullCode,contentSha256:inspections.get(oldFile.id)?.fact?.hash??null}))}:undefined,
-        confirmationReason: confirmation?.reason.trim() ?? null, conversionType: file.conversionType, appearanceVersionId: input.appearanceVersionId!,
+        confirmationReason: confirmation?.reason.trim() ?? null, conversionType: file.conversionType, appearanceVersionId: input.appearanceVersionId,
         bomContext: bomItem && bom ? { status: 'matched', changeDetails: bomItem.changeDetails, candidates: [{ bomVersionId: bom.id, bomItemId: bomItem.bomItemId, businessDate: bom.businessChangeDate, revision: bom.editRevision, changeDetails: bomItem.changeDetails }] }
           : { status: 'missing', changeDetails: null, candidates: [] }, detail,
       };

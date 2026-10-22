@@ -126,6 +126,22 @@ describe('outbound package API', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: { code: 'WORKSPACE_NOT_CONFIGURED', message: '请先设置资料根目录' } });
   });
+  it('previews, preflights and saves a batch package without independent appearance objects or BOM',async()=>{
+    const file=db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string};
+    writeFileSync(join(root,'workspace',file.path),'%PDF-1.7\nactual indexed batch PDF');
+    const request={workflowVersion:2,productId,selectedMaterialBatchId:batchId,materialType:'update',packageMode:'current_complete'};
+    const preview=await app.inject({method:'POST',url:'/api/outbound-packages/preview',payload:request});
+    expect(preview.statusCode).toBe(200);expect(preview.json().items[0]).toMatchObject({pdfFileId:pdfId,selectable:true});
+    const input={...request,previewToken:preview.json().previewToken,selectedPdfFileIds:[pdfId]};
+    const preflight=await app.inject({method:'POST',url:'/api/outbound-packages/preflight',payload:input});
+    expect(preflight.statusCode).toBe(200);expect(preflight.json().blockingErrors).toEqual([]);
+    const saved=await app.inject({method:'POST',url:'/api/outbound-packages',payload:input});
+    expect(saved.statusCode).toBe(201);expect(saved.json()).toMatchObject({fileCount:1,parts:[{fileCount:1}]});
+    expect(db.prepare('select count(*) as count from product_appearance_versions').get()).toEqual({count:0});
+    const detail=await app.inject({method:'GET',url:`/api/outbound-packages/${saved.json().id}`});
+    expect(detail.statusCode).toBe(200);expect(detail.json().files).toHaveLength(1);
+  });
+
   it('connects V2 preflight, frozen history filters/details and safe regeneration preview',async()=>{
     ensureProductAppearance(db,productId);
     const appearanceVersionId=(db.prepare('select id from product_appearance_versions where product_id=?').get(productId) as {id:number}).id;

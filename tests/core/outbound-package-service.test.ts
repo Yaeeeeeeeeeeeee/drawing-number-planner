@@ -868,3 +868,79 @@ describe('batch-first V2 workflow',()=>{
   });
 
 });
+
+// V3 uses indexed batch ownership and dictionary appearance codes, without creating a version object.
+describe('simplified outbound batch workflow', () => {
+  const bytes=(id:number,text='real PDF content')=>{
+    const file=db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string};
+    writeFileSync(join(workspace,file.path),`%PDF-1.7\n${text}`);
+  };
+  const input=()=>({...request(),workflowVersion:2 as const});
+  it('packages selected outlined PDFs without BOM, independent version or drawing attribution',async()=>{
+    db.prepare('update historical_drawing_numbers set product_id=null').run();bytes(pdfId);
+    addOutlined({relativePath:'source.pdf',conversionType:'source',fullCode:'02.0209.010.0402001'});
+    const preview=service.previewPackage(input());
+    expect(preview.items.map(item=>item.pdfFileId)).toEqual([pdfId]);
+    expect(preview.items[0]).toMatchObject({selectable:true,defaultSelected:true});
+    const result=await service.createPackage({...input(),previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    expect(decodedZipEntries(join(output,result.zipRelativePath)).size).toBe(1);
+    expect(db.prepare('select count(*) as count from product_appearance_versions').get()).toEqual({count:0});
+    expect(db.prepare('select product_id as productId from historical_drawing_numbers where full_code=?').get('02.0209.010.0401001')).toEqual({productId:null});
+  });
+  it('compares only the unique previous business batch with the same dictionary appearance code',()=>{
+    bytes(pdfId,'identical');const next=addBatch('new batch',2);
+    const current=addOutlined({batch:next,relativePath:'new（转曲）.pdf'});bytes(current,'identical');
+    const foreign=addBatch('other appearance',1);
+    const other=addOutlined({batch:foreign,relativePath:'foreign（转曲）.pdf',fullCode:'02.0209.020.0401001'});bytes(other,'different');
+    const preview=service.previewPackage({...input(),selectedMaterialBatchId:next,packageMode:'change_only'});
+    expect(preview.baselineBatchId).toBe(batchId);
+    expect(preview.items[0]).toMatchObject({pdfFileId:current,change:'copied',selectable:true,defaultSelected:false});
+  });
+  it('uses explicit business dates when sequences are unavailable and never guesses from path or mtime',()=>{
+    bytes(pdfId,'identical');const next=addBatch('older looking folder',99);
+    const current=addOutlined({batch:next,relativePath:'dated（转曲）.pdf'});bytes(current,'identical');
+    db.prepare('update material_batches set sequence_number=null,business_date=? where id=?').run('2026-09-01',batchId);
+    db.prepare('update material_batches set sequence_number=null,business_date=? where id=?').run('2026-09-10',next);
+    const preview=service.previewPackage({...input(),selectedMaterialBatchId:next,packageMode:'change_only'});
+    expect(preview.baselineBatchId).toBe(batchId);expect(preview.items[0].defaultSelected).toBe(false);
+    db.prepare('update material_batches set business_date=null where id=?').run(batchId);
+    const unknown=service.previewPackage({...input(),selectedMaterialBatchId:next,packageMode:'change_only'});
+    expect(unknown.baselineBatchId).toBeNull();expect(unknown.items[0]).toMatchObject({selectable:true,defaultSelected:false});
+  });
+  it('keeps date ordering when only the current batch lacks a sequence',()=>{
+    bytes(pdfId,'older');const newer=addBatch('newer by date',-1);
+    bytes(addOutlined({batch:newer,relativePath:'date-newer（转曲）.pdf'}),'newer');
+    const current=addBatch('current without sequence',3);bytes(addOutlined({batch:current,relativePath:'date-current（转曲）.pdf'}),'newer');
+    db.prepare('update material_batches set sequence_number=2,business_date=? where id=?').run('2026-10-20',batchId);
+    db.prepare('update material_batches set sequence_number=1,business_date=? where id=?').run('2026-10-21',newer);
+    db.prepare('update material_batches set sequence_number=null,business_date=? where id=?').run('2026-10-22',current);
+    const preview=service.previewPackage({...input(),selectedMaterialBatchId:current,packageMode:'change_only'});
+    expect(preview.baselineBatchId).toBe(newer);
+    expect(preview.items[0]).toMatchObject({change:'copied',selectable:true,defaultSelected:false});
+  });
+  it('does not compare a mixed appearance batch and preserves manual ZIP selection and immutable regeneration',async()=>{
+    bytes(pdfId);const next=addBatch('mixed',1);
+    const first=addOutlined({batch:next,relativePath:'mixed-first（转曲）.pdf'});bytes(first);
+    const second=addOutlined({batch:next,relativePath:'mixed-second（转曲）.pdf',fullCode:'02.0209.021.0402001'});bytes(second,'other appearance');
+    const req={...input(),selectedMaterialBatchId:next,packageMode:'change_only' as const};const preview=service.previewPackage(req);
+    expect(preview.baselineBatchId).toBeNull();expect(preview.warnings?.join('')).toMatch(/外观编码不唯一/);
+    expect(preview.items.every(item=>item.selectable&&!item.defaultSelected)).toBe(true);
+    const created=await service.createPackage({...req,previewToken:preview.previewToken,selectedPdfFileIds:[first]});
+    const frozen=JSON.stringify(service.historyDetail(created.id));
+    const plan=service.prepareRegeneration(created.id);expect(plan.request).not.toHaveProperty('appearanceVersionId');
+    bytes(first,'changed actual file');expect(()=>service.prepareRegeneration(created.id)).toThrow();
+    expect(JSON.stringify(service.historyDetail(created.id))).toBe(frozen);
+  });
+  it('leaves files manually selectable without defaulting to new when prior batch order is tied',async()=>{
+    bytes(pdfId);const tied=addBatch('another initial batch',0);
+    bytes(addOutlined({batch:tied,relativePath:'tie（转曲）.pdf'}));
+    const next=addBatch('new batch',1);const current=addOutlined({batch:next,relativePath:'current（转曲）.pdf'});bytes(current,'updated');
+    const request={...input(),selectedMaterialBatchId:next,packageMode:'change_only' as const};
+    const preview=service.previewPackage(request);
+    expect(preview.baselineBatchId).toBeNull();
+    expect(preview.items[0]).toMatchObject({selectable:true,defaultSelected:false});
+    expect(preview.warnings?.join('')).toMatch(/顺序|可靠/);
+    const result=await service.createPackage({...request,previewToken:preview.previewToken,selectedPdfFileIds:[current]});
+    expect(result.fileCount).toBe(1);
+  });
+});

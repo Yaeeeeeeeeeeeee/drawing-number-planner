@@ -97,16 +97,13 @@ describe('BomPage product-level BOM', () => {
     expect(api.saveBomVersion).not.toHaveBeenCalled();
   });
 
-  it('uses the selected appearance context and requires explicit old-material candidate browsing',async()=>{
-    const api={...apiFixture(),listAppearanceVersions:vi.fn().mockResolvedValue({items:[{id:101,label:'初始',status:'current'},{id:102,label:'换代',status:'draft'}]}),getAppearanceBom:vi.fn().mockResolvedValue(null),listAppearanceBomCandidates:vi.fn().mockResolvedValue([candidate])};
-    render(<BomPage api={api as never} target={{productId:1,appearanceVersionId:102}}/>);
-    await waitFor(()=>expect(api.getAppearanceBom).toHaveBeenCalledWith(1,102));
-    expect(screen.getByLabelText('BOM 外观版本')).toHaveValue('102');
-    fireEvent.change(screen.getByLabelText('BOM 外观版本'),{target:{value:'101'}});
-    await waitFor(()=>expect(api.getAppearanceBom).toHaveBeenCalledWith(1,101));
-    expect(screen.getByLabelText('显式选择同产品其他外观或旧图号物料')).not.toBeChecked();
-    fireEvent.click(screen.getByLabelText('显式选择同产品其他外观或旧图号物料'));
-    expect(screen.getByLabelText('显式选择同产品其他外观或旧图号物料')).toBeChecked();
+  it('loads ordinary BOM by product without creating an independent appearance workflow',async()=>{
+    const api={...apiFixture(),listAppearanceVersions:vi.fn().mockResolvedValue({items:[]}),getAppearanceBom:vi.fn()};
+    render(<BomPage api={api as never} target={{productId:1}}/>);
+    await waitFor(()=>expect(api.getCurrentBom).toHaveBeenCalledWith(1));
+    expect(screen.queryByLabelText('BOM 外观版本')).toBeNull();
+    expect(screen.queryByLabelText('显式选择同产品其他外观或旧图号物料')).toBeNull();
+    expect(api.listAppearanceVersions).not.toHaveBeenCalled();expect(api.getAppearanceBom).not.toHaveBeenCalled();
   });
   it('shows the retained missing batch while editing instead of displaying an empty selection', async () => {
     const api = apiFixture();

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { FilesPage } from '../../src/renderer/pages/FilesPage';
 import { plannerQueryCache } from '../../src/renderer/data/query-cache';
@@ -6,24 +6,25 @@ const item = {id:1,fileName:'first.pdf',relativePath:'first.pdf',drawingId:null,
 function fixture() { return {
  getWorkspaceSettings:vi.fn().mockResolvedValue({workspaceRoot:'/temp',configured:true,available:true}),
  listProducts:vi.fn().mockResolvedValue([]),listMaterialBatches:vi.fn().mockResolvedValue([]),
- searchPdfFiles:vi.fn().mockImplementation(async (q:any)=>({items:[{...item,id:q.page,fileName:`page-${q.page}.pdf`}],total:120,page:q.page,pageSize:q.pageSize})),
+ searchPdfFiles:vi.fn().mockImplementation(async (q:any)=>({items:[{...item,id:q.page,fileName:`page-${q.page}.pdf`}],total:1,page:q.page,pageSize:q.pageSize})),
  previewPdfManagement:vi.fn().mockResolvedValue({ids:[1],action:'ignore',fingerprint:'f'.repeat(64),confirmation:'暂不纳入 PDF',entries:[{id:1,relativePath:'first.pdf',allowed:true,reason:null}],allowed:1,blocked:0}),
  applyPdfManagement:vi.fn().mockResolvedValue({changed:1,blocked:[]}),
  }; }
 beforeEach(()=>{localStorage.clear();plannerQueryCache.invalidate();Object.defineProperty(window,'innerWidth',{configurable:true,value:1600});});
-it('keeps headers and previous rows mounted while pagination loads, applies saved filters, and caches full page/size queries',async()=>{
+it('loads the next 100-file chunk without replacing rows or losing selection',async()=>{
  const api=fixture();let resolveNext!:(value:unknown)=>void;
- api.searchPdfFiles.mockImplementation(async(q:any)=>q.page===2?new Promise(resolve=>{resolveNext=resolve;}):({items:[{...item,fileName:'first.pdf'}],total:120,page:q.page,pageSize:q.pageSize}));
- render(<FilesPage api={api as never}/>);await screen.findByText('first',{selector:'.file-primary'});
- const header=screen.getByRole('columnheader',{name:'文件名'});
- fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'unsaved'}});
- fireEvent.click(screen.getByRole('button',{name:'下一页'}));
- expect(screen.getByRole('columnheader',{name:'文件名'})).toBe(header);expect(screen.getByText('first',{selector:'.file-primary'})).toBeVisible();
- expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'',page:2,pageSize:50}));
- resolveNext({items:[{...item,id:2,fileName:'second.pdf'}],total:120,page:2,pageSize:50});await screen.findByText('second',{selector:'.file-primary'});
- const calls=api.searchPdfFiles.mock.calls.length;fireEvent.click(screen.getByRole('button',{name:'上一页'}));await screen.findByText('first',{selector:'.file-primary'});expect(api.searchPdfFiles).toHaveBeenCalledTimes(calls);
- fireEvent.change(screen.getByLabelText('PDF 每页条数'),{target:{value:'25'}});await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'',page:1,pageSize:25})));
- expect(localStorage.getItem('planner:page-size:pdf')).toBe('25');
+ const records=Array.from({length:100},(_,i)=>({...item,id:i+1,fileName:`file-${i+1}.pdf`}));
+ api.searchPdfFiles.mockImplementation(async(q:any)=>q.page===2?new Promise(resolve=>{resolveNext=resolve;}):({items:records,total:101,page:1,pageSize:100}));
+ const view=render(<FilesPage api={api as never}/>);await screen.findByText('file-1',{selector:'.file-primary'});
+ const table=screen.getByRole('table');const header=screen.getByRole('columnheader',{name:'文件名'});
+ fireEvent.click(screen.getByRole('checkbox',{name:'选择 file-1.pdf'}));
+ const scroll=view.container.querySelector('.table-wrap')!;fireEvent.scroll(scroll,{target:{scrollTop:4400}});
+ await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({page:2,pageSize:100,keyword:''})));
+ expect(screen.getByRole('columnheader',{name:'文件名'})).toBe(header);
+ resolveNext({items:[{...item,id:101,fileName:'last.pdf'}],total:101,page:2,pageSize:100});await screen.findByText('last',{selector:'.file-primary'});
+ expect(screen.getByRole('table')).toBe(table);expect(screen.getByText('已选 1 条')).toBeVisible();
+ fireEvent.scroll(scroll,{target:{scrollTop:0}});expect(screen.getByRole('checkbox',{name:'选择 file-1.pdf'})).toBeChecked();
+ expect(screen.queryByRole('navigation',{name:'PDF 分页'})).not.toBeInTheDocument();
 });
 it('uses one preview and explicit confirmation for a current PDF; sends only the confirmed API payload',async()=>{
  const api=fixture();render(<FilesPage api={api as never}/>);await screen.findByText('page-1',{selector:'.file-primary'});
@@ -41,4 +42,27 @@ it('keeps the latest search result when scopes change rapidly and refreshes meta
  release({items:[{...item,fileName:'old.pdf'}],total:1,page:1,pageSize:50});await Promise.resolve();expect(screen.queryByText('old',{selector:'.file-primary'})).not.toBeInTheDocument();
  const calls=api.getWorkspaceSettings.mock.calls.length;view.rerender(<FilesPage api={api as never} active={false}/>);view.rerender(<FilesPage api={api as never} active/>);
  await waitFor(()=>expect(api.getWorkspaceSettings).toHaveBeenCalledTimes(calls+1));
+});
+it('discards an old incremental response after changing the navigation scope',async()=>{
+ const api=fixture();let release!:(value:unknown)=>void;
+ const records=Array.from({length:100},(_,i)=>({...item,id:i+1,fileName:`old-${i+1}.pdf`}));
+ api.searchPdfFiles.mockImplementation(async(q:any)=>q.unassociatedProduct
+   ?{items:[{...item,id:300,fileName:'new-scope.pdf'}],total:1,page:1,pageSize:100}
+   :q.page===2?new Promise(resolve=>{release=resolve;})
+   :{items:records,total:101,page:1,pageSize:100});
+ const view=render(<FilesPage api={api as never}/>);await screen.findByText('old-1',{selector:'.file-primary'});
+ fireEvent.scroll(view.container.querySelector('.table-wrap')!,{target:{scrollTop:4400}});
+ await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.objectContaining({page:2})));
+ fireEvent.click(screen.getByRole('button',{name:'待关联产品'}));
+ await screen.findByText('new-scope',{selector:'.file-primary'});
+ await act(async()=>{release({items:[{...item,id:101,fileName:'late-old.pdf'}],total:101,page:2,pageSize:100});});
+ await waitFor(()=>expect(screen.getByText('已加载 1 / 1 条')).toBeVisible());
+ expect(screen.queryByText('late-old',{selector:'.file-primary'})).not.toBeInTheDocument();
+ expect(view.container.querySelector('.table-wrap')!.scrollTop).toBe(0);
+});
+it('shows unmatched file counts independently of pending product attribution in the compact toolbar',async()=>{
+ const api={...fixture(),getPdfFileNavigation:vi.fn().mockImplementation(async(q:any)=>({total:q.matchStatus==='unmatched'?2:8,unassociatedProducts:5,categories:[],products:[],batches:[]}))};
+ const view=render(<FilesPage api={api as never}/>);
+ await waitFor(()=>expect(view.container.querySelector('.files-scan-toolbar')).toHaveTextContent('未匹配 2'));
+ expect(view.container.querySelector('.files-scan-toolbar')).toHaveTextContent('PDF 8');
 });

@@ -774,8 +774,8 @@ export function applyAppearanceVersionSchema(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 17) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 17`);
-  if (from >= 17) {
+  if (from > 18) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 18`);
+  if (from >= 18) {
     const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
@@ -944,6 +944,28 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       }
       if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('外发升级关联校验失败');
     }
+    if (from < 18) {
+      const protectedTables=(database.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' and name<>'schema_migrations' order by name").all() as Array<{name:string}>).map(row=>row.name);
+      const protectedRows=Object.fromEntries(protectedTables.map(table=>[table,database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all()]));
+      // Product attribution is independent of legacy managed appearance versions.
+      // Rebuild only this constraint; retain every binding value, audit and custom schema object.
+      const tableSql = (database.prepare("select sql from sqlite_master where type='table' and name='drawing_appearance_bindings'").get() as {sql:string}).sql;
+      const rows = database.prepare('select * from drawing_appearance_bindings order by rowid').all() as Array<Record<string,unknown>>;
+      const objects = database.prepare("select sql from sqlite_master where tbl_name='drawing_appearance_bindings' and type in ('index','trigger') and sql is not null order by type,name").all() as Array<{sql:string}>;
+      const nullableSql = tableSql.replace(/appearance_version_id\s+INTEGER\s+NOT\s+NULL/i, 'appearance_version_id INTEGER');
+      if (nullableSql === tableSql) throw new Error('产品关联兼容升级未找到预期约束');
+      database.exec('drop table drawing_appearance_bindings');
+      database.exec(nullableSql);
+      for (const row of rows) {
+        const columns=Object.keys(row);
+        database.prepare(`insert into drawing_appearance_bindings(${columns.map(quoteIdentifier).join(',')}) values(${columns.map(()=>'?').join(',')})`).run(...Object.values(row) as Array<string|number|null>);
+      }
+      for (const object of objects) database.exec(object.sql);
+      if (JSON.stringify(database.prepare('select * from drawing_appearance_bindings order by rowid').all())!==JSON.stringify(rows)) throw new Error('产品关联兼容迁移历史内容校验失败');
+      if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('产品关联兼容迁移引用校验失败');
+      database.prepare('insert into schema_migrations(version,applied_at) values(18,?)').run(new Date().toISOString());
+      for(const table of protectedTables)if(JSON.stringify(database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all())!==JSON.stringify(protectedRows[table]))throw new Error('产品关联兼容迁移历史内容校验失败');
+    }
   })();
-  return { from, to: 17 };
+  return { from, to: 18 };
 }

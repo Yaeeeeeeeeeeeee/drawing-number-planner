@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 import { ProductCatalogNavigation } from '../../src/renderer/components/ProductCatalogNavigation';
 import { PdfProductBatchNavigation } from '../../src/renderer/components/PdfProductBatchNavigation';
 
-it('uses explicit business usage instead of inferred sequence state and expands search ancestors', () => {
+it('uses reliable code-scoped batch chronology and expands search ancestors', () => {
   const select = vi.fn();
   render(<PdfProductBatchNavigation products={[{id:9,sku:'SKU-LONG',model:'T40',productCategory:'洗碗机'}] as never}
     batches={[{id:2,productId:9,name:'06.20260309',recognitionStatus:'recognized',currentState:'current'}] as never}
@@ -14,8 +14,8 @@ it('uses explicit business usage instead of inferred sequence state and expands 
   fireEvent.change(screen.getByLabelText('搜索产品 SKU 或型号'),{target:{value:'t40'}});
   expect(screen.getByRole('button',{name:'收起分类 洗碗机'})).toHaveAttribute('aria-expanded','true');
   const batch = screen.getByRole('button',{name:'批次 20260309'});
-  expect(batch).toHaveTextContent('历史使用');
-  expect(batch).not.toHaveTextContent('当前使用');
+  expect(batch).toHaveTextContent('当前批次');
+  expect(batch).not.toHaveTextContent('历史批次');
   expect(within(batch).getByLabelText('6000 个文件')).toBeVisible();
   expect(screen.getByRole('button',{name:'产品 SKU-LONG · T40'})).toHaveAttribute('title','SKU-LONG · T40');
   fireEvent.click(batch);
@@ -27,7 +27,7 @@ it('shows unavailable counts and indeterminate usage when actual data is unavail
     batches={[{id:2,productId:9,name:'01.首批',recognitionStatus:'recognized',currentState:'current'}] as never}
     counts={null} scope={{kind:'all'}} onSelect={vi.fn()} filters={null} />);
   fireEvent.click(screen.getByRole('button',{name:'展开产品 SKU · T40'}));
-  expect(screen.getByRole('button',{name:'批次 首批'})).toHaveTextContent('使用未确定');
+  expect(screen.getByRole('button',{name:'批次 首批'})).toHaveTextContent('当前批次');
   expect(screen.getByText('数量暂不可用')).toBeVisible();
   expect(screen.queryByText('当前使用')).not.toBeInTheDocument();
 });
@@ -38,7 +38,7 @@ it('keeps explicit current usage visible even when batch recognition remains pen
     usageBatches={[{id:2,usageProducts:[{productId:9,state:'current'}]}] as never}
     counts={null} scope={{kind:'all'}} onSelect={vi.fn()} filters={null} />);
   fireEvent.click(screen.getByRole('button',{name:'展开产品 SKU · T40'}));
-  expect(screen.getByRole('button',{name:'批次 首批'})).toHaveTextContent('当前使用');
+  expect(screen.getByRole('button',{name:'批次 首批'})).not.toHaveTextContent('当前批次');
   expect(screen.getByRole('button',{name:'批次 首批'})).not.toHaveTextContent('待确认');
 });
 
@@ -57,7 +57,7 @@ it('preserves direct orphan batch navigation with truthful unavailable file coun
   render(<PdfProductBatchNavigation products={[]} batches={[{id:7,productId:null,name:'01.首批',recognitionStatus:'pending'}] as never} counts={null} scope={{kind:'all'}} onSelect={select} filters={<input aria-label="手工文件筛选"/>}/>);
   fireEvent.click(screen.getByText('未关联产品批次（1）'));
   const batch=screen.getByRole('button',{name:'批次 首批'});
-  expect(batch).toHaveTextContent('待确认');
+  expect(batch).not.toHaveTextContent('待确认');
   expect(batch).toHaveTextContent('—');
   fireEvent.click(batch);
   expect(select).toHaveBeenCalledWith({kind:'batch',batchId:7});

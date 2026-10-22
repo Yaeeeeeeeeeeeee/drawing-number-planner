@@ -8,7 +8,7 @@ export class DrawingReuseService {
  constructor(private readonly db:PlannerDatabase){}
  preview(input:DrawingReuseInput):DrawingReusePreview {
   const origin=input.signedId>0?'planned':'historical',id=Math.abs(input.signedId);
-  if(!Number.isSafeInteger(input.signedId)||!id||!input.reason.trim())throw new DrawingAssociationError('INVALID_REUSE','请选择图号与目标外观并填写沿用原因');
+  if(!Number.isSafeInteger(input.signedId)||!id||!Number.isSafeInteger(input.appearanceVersionId)||!input.appearanceVersionId||!input.reason.trim())throw new DrawingAssociationError('INVALID_REUSE','请选择图号与目标外观并填写沿用原因');
   const record=this.db.prepare(`select * from ${origin==='planned'?'drawing_numbers':'historical_drawing_numbers'} where id=? and deleted_at is null`).get(id) as {product_id:number|null;full_code:string;status:string}|undefined;
   const binding=this.db.prepare('select * from drawing_appearance_bindings where origin=? and record_id=?').get(origin,id) as {product_id:number;appearance_version_id:number}|undefined;
   const productId=resolveCanonicalProductId(this.db,input.productId);

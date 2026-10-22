@@ -1,3 +1,4 @@
+import { effectiveDrawingProductSql } from '../drawings/drawing-product-evidence.js';
 import {drawingAppearanceRelationsSql} from '../drawings/drawing-appearance-scope.js';
 import { PdfManagementRepository } from './pdf-management.js';
 import { listRawProductIds } from '../products/appearance-identity.js';
@@ -58,8 +59,7 @@ const FILE_SEARCH_JOINS = `from pdf_files file
       left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
       left join drawing_appearance_bindings planned_binding on planned_binding.origin='planned' and planned_binding.record_id=file.drawing_id
       left join drawing_appearance_bindings historical_binding on historical_binding.origin='historical' and historical_binding.record_id=file.historical_drawing_id
-      left join product_identity_members identity on identity.raw_product_id = coalesce(planned_binding.product_id,historical_binding.product_id,drawing.product_id,historical.product_id)
-      left join products product on product.id = coalesce(identity.canonical_product_id,planned_binding.product_id,historical_binding.product_id,drawing.product_id,historical.product_id)
+      left join products product on product.id = coalesce(${effectiveDrawingProductSql("'planned'", 'file.drawing_id')},${effectiveDrawingProductSql("'historical'", 'file.historical_drawing_id')})
       left join dictionary_items brand on brand.id = product.brand_id
       left join dictionary_items project on project.id = drawing.project_item_id
       left join dictionary_items color on color.id = drawing.color_id
@@ -73,7 +73,7 @@ function fileSearchPredicate(filters: FileSearchFilters, db: PlannerDatabase): {
       or drawing.full_code like @keyword escape '\\')`);
     parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
   }
-  if (filters.productId != null) { const ids = listRawProductIds(db, filters.productId); where.push(`coalesce(planned_binding.product_id,historical_binding.product_id,drawing.product_id,historical.product_id) in (${ids.map(Number).join(',') || 'null'})`); }
+  if (filters.productId != null) { const ids = listRawProductIds(db, filters.productId); where.push(`product.id in (${ids.map(Number).join(',') || 'null'})`); }
   if (filters.appearanceVersionId != null) {
     where.push(`exists(select 1 from ${drawingAppearanceRelationsSql} binding where binding.appearance_version_id = @appearanceVersionId and
       ((binding.origin = 'planned' and binding.record_id = file.drawing_id) or (binding.origin = 'historical' and binding.record_id = file.historical_drawing_id)))`);

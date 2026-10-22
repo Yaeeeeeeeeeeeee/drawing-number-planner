@@ -1,5 +1,7 @@
+import {dirname,join} from 'node:path';
+import {createDatabaseBackup} from '../../db/backup.js';
 import type { PlannerDatabase } from '../../db/database.js';
-import { ensureProductAppearance, listRawProductIds, resolveCanonicalProductId } from './appearance-identity.js';
+import { ensureProductIdentity, listRawProductIds, resolveCanonicalProductId } from './appearance-identity.js';
 import { DrawingAssociationService } from '../drawings/drawing-association-service.js';
 import { ProductRepository } from './product-repository.js';
 import type { ConfirmHistoricalProductCandidateInput, HistoricalProductCandidate, Product, ProductFilters, ProductInput, ProductReferenceSummary } from './product-types.js';
@@ -30,8 +32,7 @@ export class ProductService {
     return this.database.transaction(() => {
       try {
         const product = this.repository.create(normalized);
-        ensureProductAppearance(this.database,product.id);
-        new DrawingAssociationService(this.database).diagnoseProduct(product.id,{autoApply:true});
+        ensureProductIdentity(this.database,product.id);
         return product;
       } catch (error) { return this.mapDatabaseError(error); }
     })();
@@ -44,7 +45,7 @@ export class ProductService {
     if (this.repository.hasDrawingReferences(id) && this.changesReferencedMeaning(current, normalized)) {
       throw new ProductError('PRODUCT_REFERENCED', '该产品已有图号记录，不能修改编码含义');
     }
-    try { const product=this.repository.update(id, normalized);new DrawingAssociationService(this.database).diagnoseProduct(id,{autoApply:false});return product; }
+    try { return this.repository.update(id, normalized); }
     catch (error) { return this.mapDatabaseError(error); }
   }
 
@@ -89,6 +90,11 @@ export class ProductService {
     if (![input.productCategory, input.sku, input.model].every((value) => value.trim().length > 0)) {
       throw new ProductError('INVALID_HISTORICAL_CANDIDATE', '历史产品候选信息不完整');
     }
+    // This action repairs retained historical ownership; back up before its outer transaction.
+    if(this.database.name!==':memory:'&&this.database.name!==''){
+      if(this.database.inTransaction)throw new ProductError('INVALID_HISTORICAL_CANDIDATE','历史产品确认必须在独立事务中执行，以便先创建备份');
+      createDatabaseBackup(this.database,this.database.name,join(dirname(this.database.name),'backups'),'restore');
+    }
     return this.database.transaction(() => {
       if (this.repository.hasSku(input.sku)) throw new ProductError('DUPLICATE_SKU', 'SKU 已存在');
       const candidate = this.listHistoricalCandidates().items.find((item) => item.productCategory === input.productCategory
@@ -106,10 +112,15 @@ export class ProductService {
         defaultAppearanceId: input.defaultAppearanceId,
         referenceProductId: null,
       });
+      const confirmedRows = this.database.prepare(`select id from historical_drawing_numbers
+        where product_id is null and detected_product_category=? and detected_sku=? and detected_model=?`).all(input.productCategory,input.sku,input.model) as Array<{id:number}>;
       const linkedHistoricalCount = this.repository.linkHistoricalCandidate(input, product.id);
       if (linkedHistoricalCount !== candidate.historicalDrawingCount) {
         throw new ProductError('STALE_HISTORICAL_CANDIDATE', '历史产品候选已变化，请刷新后重试');
       }
+      // This explicit user action is a durable confirmation, unlike scanner-populated raw IDs.
+      const associations = new DrawingAssociationService(this.database);
+      associations.correctMany(confirmedRows.map(row=>({signedId:-row.id,productId:product.id})),'用户确认历史产品候选，核对完整目录身份后建立产品归属');
       return { product, linkedHistoricalCount };
     })();
   }

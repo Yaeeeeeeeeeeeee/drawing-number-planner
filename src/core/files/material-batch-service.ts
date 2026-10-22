@@ -1,3 +1,4 @@
+import { selectLatestBusinessBatch, codeScopeFromFullCode } from './batch-business-order.js';
 import { listRawProductIds } from '../products/appearance-identity.js';
 import { FileError } from './file-errors.js';
 import type { PlannerDatabase } from '../../db/database.js';
@@ -52,18 +53,18 @@ export class MaterialBatchService {
       duplicatePaths: this.db.prepare('select lower(replace(relative_path, char(47), char(92))) as pathKey, group_concat(id) as ids, count(*) as count from material_batches group by pathKey having count(*) > 1').all() };
   }
 
-  getCurrentBatchSelection(productDirectory: string): CurrentBatchSelection {
-    const rows = this.db.prepare(`select id, sequence_number as sequenceNumber
-      from material_batches
-      where product_directory = ? and is_present = 1 and recognition_status = 'recognized'
-        and sequence_number is not null
-      order by sequence_number desc, id desc`).all(productDirectory) as Array<{ id: number; sequenceNumber: number }>;
-    if (rows.length === 0) return { status: 'none', batchId: null };
-    const highest = rows[0].sequenceNumber;
-    const candidates = rows.filter((row) => row.sequenceNumber === highest);
-    return candidates.length === 1
-      ? { status: 'selected', batchId: candidates[0].id }
-      : { status: 'indeterminate', batchId: null };
+  getCurrentBatchSelection(productDirectory: string, codeScope?:string): CurrentBatchSelection {
+    const rows = this.db.prepare(`select id, sequence_number as sequenceNumber, business_date as businessDate
+      from material_batches where product_directory = ? and is_present = 1 and recognition_status = 'recognized'`).all(productDirectory) as Array<{id:number;sequenceNumber:number|null;businessDate:string|null}>;
+    return selectLatestBusinessBatch(codeScope?rows.filter(row=>{const scopes=this.batchCodeScopes(row.id);return scopes.length===0||scopes.includes(codeScope);}):rows);
+  }
+
+  private batchCodeScopes(batchId:number):string[] {
+    const rows=this.db.prepare(`select distinct coalesce(drawing.full_code,historical.full_code) as code from pdf_files file
+      left join drawing_numbers drawing on drawing.id=file.drawing_id
+      left join historical_drawing_numbers historical on historical.id=file.historical_drawing_id
+      where file.material_batch_id=? and file.management_state='included' and file.match_status='matched'`).all(batchId) as Array<{code:string|null}>;
+    return [...new Set(rows.flatMap(row=>{const scope=row.code?codeScopeFromFullCode(row.code):null;return scope?[scope]:[];}))];
   }
 
   list(filters: { search?: string; productId?: number } = {}): MaterialBatchView[] {
@@ -96,14 +97,14 @@ export class MaterialBatchService {
       group by batch.id`).all(params) as Array<Omit<MaterialBatchView, 'isPresent' | 'currentState'> & { isPresent: number }>;
     const selections = new Map<string, CurrentBatchSelection>();
     const items = rows.map((row): MaterialBatchView => {
-      let selection = selections.get(row.productDirectory);
-      if (!selection) {
-        selection = this.getCurrentBatchSelection(row.productDirectory);
-        selections.set(row.productDirectory, selection);
+      const scopes=this.batchCodeScopes(row.id);
+      const key=`${row.productDirectory}:${scopes.join(',')}`;
+      let selection=selections.get(key);
+      if(!selection){
+        selection=scopes.length===1?this.getCurrentBatchSelection(row.productDirectory,scopes[0]):scopes.length===0?this.getCurrentBatchSelection(row.productDirectory):{status:'indeterminate' as const,batchId:null};
+        selections.set(key,selection);
       }
-      const currentState: BatchUsageState = row.recognitionStatus === 'pending'
-        || selection.status !== 'selected' ? 'indeterminate'
-        : selection.batchId === row.id ? 'current' : 'historical';
+      const currentState:BatchUsageState=!row.isPresent||row.recognitionStatus==='pending'||selection.status!=='selected'?'indeterminate':selection.batchId===row.id?'current':'historical';
       return { ...row, isPresent: row.isPresent === 1, currentState };
     });
     return items.sort((left, right) => {
@@ -251,7 +252,7 @@ export class MaterialBatchService {
     for (const row of rows) {
       let selection = selectionByProduct.get(row.product_directory);
       if (!selection) {
-        selection = this.getCurrentBatchSelection(row.product_directory);
+        selection = this.getCurrentBatchSelection(row.product_directory, codeScopeFromFullCode(fullCode) ?? undefined);
         selectionByProduct.set(row.product_directory, selection);
       }
       const usageState: BatchUsageState = row.recognition_status === 'pending' ? 'indeterminate'

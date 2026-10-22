@@ -28,6 +28,23 @@ function preview(fileName='ZU70SD-User Manual（c2hg2h8）.pdf') {
 }
 function count(table:string){return (db.prepare(`select count(*) as n from ${table}`).get() as {n:number}).n;}
 describe('manual PDF association persistence',()=>{
+ it('links a real lowercase Warranty PDF without changing existing QR metadata or disk bytes',()=>{
+  db.prepare('update products set model=? where id=?').run('B500',productId);
+  const qr=new QrService(db),warranty=qr.listPurposes().items.find(p=>p.englishName==='Warranty')!;
+  const code=qr.create({productId,purposeId:warranty.id,name:'B500售后卡',targetUrl:'https://qrs.ly/hwh0kd9',status:'active'});
+  const path=join(dir,'B500-warranty （hwh0kd9）.pdf');writeFileSync(path,PDF);const before=readFileSync(path);
+  const chosen=manual.selectTrustedFile(path),result=manual.preview({token:chosen.token,qrCodeId:code.id,productId,purposeId:warranty.id,name:code.name,targetUrl:code.targetUrl!});
+  expect(result.issues).toEqual([]);const linked=manual.commit(result.previewId);
+  expect(linked).toMatchObject({id:code.id,name:code.name,targetUrl:code.targetUrl,status:'active'});expect(linked.files[0].fileName).toBe('B500-warranty （hwh0kd9）.pdf');
+  expect(readFileSync(path)).toEqual(before);expect(count('qr_manual_audit')).toBe(1);
+ });
+
+ it('keeps the existing reasoned audit exception for an extra historical filename suffix',()=>{
+  db.prepare('update products set model=? where id=?').run('H10',productId);const qr=new QrService(db),warranty=qr.listPurposes().items.find(p=>p.englishName==='Warranty')!;
+  const code=qr.create({productId,purposeId:warranty.id,name:'H10售后卡',targetUrl:'https://qrs.ly/g8gwcl6',status:'inactive'}),path=join(dir,'H10-warranty-avakyo（g8gwcl6）.pdf');writeFileSync(path,PDF);const before=readFileSync(path);
+  const chosen=manual.selectTrustedFile(path),result=manual.preview({token:chosen.token,qrCodeId:code.id,productId,purposeId:warranty.id,name:code.name,targetUrl:code.targetUrl!});expect(result.issues).toEqual(['文件名须为 型号-英文用途(7位网址尾码).pdf']);
+  expect(()=>manual.commit(result.previewId)).toThrowError(expect.objectContaining({code:'VALIDATION_BLOCKED'}));const linked=manual.commit(result.previewId,{confirmed:true,reason:'已核对历史文件型号用途及网址尾码'});expect(linked).toMatchObject({id:code.id,targetUrl:code.targetUrl,status:'inactive'});expect(readFileSync(path)).toEqual(before);expect(db.prepare('select reason from qr_manual_audit where qr_code_id=?').get(code.id)).toEqual({reason:'已核对历史文件型号用途及网址尾码'});
+ });
  it('selection and preview cancel leave all DB tables untouched',()=>{preview();expect(count('qr_manual_files')).toBe(0);expect(count('qr_manual_links')).toBe(0);expect(count('qr_manual_audit')).toBe(0);expect(count('product_qr_codes')).toBe(1);});
  it('confirms real PDF and keeps name, status, original path/content unchanged',()=>{
  const p=preview();const original=readFileSync(p.path);const code=manual.commit(p.result.previewId);
@@ -82,9 +99,10 @@ describe('manual PDF association persistence',()=>{
  const p=preview();manual.commit(p.result.previewId);const backupPath=join(dir,'persisted.db');db.exec(`vacuum into '${backupPath.replaceAll("'","''")}'`);db.close();db=openDatabase(backupPath);const restarted=new QrManualService(db);const code=new QrService(db).get(codeId);expect(code.files).toHaveLength(1);expect(restarted.resolveFile(code.files[0].externalFileId!)).toEqual({path:p.path,mimeType:'application/pdf'});expect(restarted.history(codeId).items).toHaveLength(1);
  });
  it('keeps shared and each appearance independent and rejects versions of other products',()=>{
- const appearance=(db.prepare('select id from product_appearance_versions where product_id=?').get(productId) as {id:number}).id;
+ const appearance=new AppearanceService(db).createDraft(productId,{label:'Legacy version',appearanceId:new ProductService(db).get(productId).defaultAppearanceId}).id;
  const qr=new QrService(db);const versionQr=qr.create({productId,purposeId,name:'Version QR',targetUrl:'https://qrs.ly/c2hg2h8',status:'inactive',appearanceVersionId:appearance});
  expect(versionQr.id).not.toBe(codeId);expect(versionQr.appearanceVersionId).toBe(appearance);expect(qr.list({productId,appearanceVersionId:appearance}).items).toHaveLength(2);
+ const path=join(dir,'ZU70SD-User Manual(c2hg2h8).pdf');writeFileSync(path,PDF);const chosen=manual.selectTrustedFile(path);const checked=manual.preview({token:chosen.token,qrCodeId:versionQr.id,productId,purposeId,name:versionQr.name,targetUrl:versionQr.targetUrl!,appearanceVersionId:appearance});expect(checked.issues).toEqual([]);expect(manual.commit(checked.previewId)).toMatchObject({id:versionQr.id,appearanceVersionId:appearance,status:'inactive'});expect(new QrService(db).get(codeId).files).toHaveLength(0);
  expect(()=>qr.list({productId,appearanceVersionId:99999})).toThrowError(expect.objectContaining({code:'INVALID_APPEARANCE'}));
  expect(()=>qr.create({productId,purposeId,name:'Invalid',targetUrl:null,status:'inactive',appearanceVersionId:99999})).toThrow();
  });

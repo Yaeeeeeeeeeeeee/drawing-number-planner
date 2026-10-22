@@ -1,3 +1,4 @@
+import { DraftingCompass, ClipboardList, PackageCheck, Boxes, LibraryBig, QrCode, Files, BookOpen, ShieldCheck, Menu, ChevronsLeft } from 'lucide-react';
 import type { ProductVersionTarget } from '../pages/products/ProductAppearancePanel';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -27,17 +28,19 @@ import { isPublicUiMock, PublicUiMock } from '../pages/PublicUiMock';
 type Page = 'drawings' | 'dictionaries' | 'products' | 'import' | 'planning' | 'bom' | 'files' | 'qr' | 'exports';
 const navigation = [
   { label: '日常工作', items: [
-    { key: 'planning', label: '图号规划 / 更新包材', icon: '规', enabled: true },
-    { key: 'bom', label: 'BOM 管理', icon: 'B', enabled: true },
-    { key: 'exports', label: '外发资料', icon: '外', enabled: true },
-    { key: 'qr', label: '二维码管理', icon: '二', enabled: true },
+    { key: 'planning', label: '图号规划 / 更新包材', icon: DraftingCompass, enabled: true },
+    { key: 'bom', label: 'BOM 管理', icon: ClipboardList, enabled: true },
+    { key: 'exports', label: '外发资料', icon: PackageCheck, enabled: true },
   ] },
-  { label: '基础资料', items: [
-    { key: 'drawings', label: '图号库', icon: '图', enabled: true },
-    { key: 'products', label: '产品档案', icon: '品', enabled: true },
-    { key: 'files', label: 'PDF 文件中心', icon: 'P', enabled: true },
-    { key: 'dictionaries', label: '编码字典', icon: '码', enabled: true },
-    { key: 'import', label: '迁移检查', icon: '迁', enabled: true },
+  { label: '产品明细', items: [
+    { key: 'products', label: '产品档案', icon: Boxes, enabled: true },
+    { key: 'drawings', label: '图号库', icon: LibraryBig, enabled: true },
+    { key: 'qr', label: '二维码管理', icon: QrCode, enabled: true },
+  ] },
+  { label: '数据来源', items: [
+    { key: 'files', label: 'PDF 文件中心', icon: Files, enabled: true },
+    { key: 'dictionaries', label: '编码字典', icon: BookOpen, enabled: true },
+    { key: 'import', label: '迁移检查', icon: ShieldCheck, enabled: true },
   ] },
 ] as const;
 
@@ -63,7 +66,7 @@ export function AppShell({ api }: { api: PlannerApi }) {
     if (narrow) closeNavigation();
   };
   const [versionTarget, setVersionTarget] = useState<ProductVersionTarget | null>(null);
-  const [drawingTarget, setDrawingTarget] = useState<{productId:number;appearanceVersionId:number;revision?:number}>();
+  const [drawingTarget, setDrawingTarget] = useState<{productId:number;appearanceVersionId?:number;revision?:number}>();
   const [filesVisited, setFilesVisited] = useState(false);
   useEffect(() => { if (page === 'files') setFilesVisited(true); }, [page]);
   const openVersion = (target:ProductVersionTarget) => {
@@ -125,14 +128,14 @@ export function AppShell({ api }: { api: PlannerApi }) {
   return <div className={`app-shell engineering-workspace ${navigationOpen ? 'navigation-open' : 'navigation-closed'} ${narrow ? 'navigation-overlay' : 'navigation-wide'}`}>
     <button ref={navigationToggle} type="button" className="navigation-toggle" aria-controls="workspace-navigation"
       hidden={navigationOpen} aria-expanded={navigationOpen} aria-label="展开导航" title="展开工作导航"
-      onClick={() => setNavigationOpen(true)}><span aria-hidden="true">☰</span></button>
+      onClick={() => setNavigationOpen(true)}><Menu size={18} strokeWidth={1.8} aria-hidden="true"/></button>
     {narrow && navigationOpen && <button type="button" tabIndex={-1} className="navigation-backdrop" aria-label="关闭导航遮罩" onClick={closeNavigation} />}
     <aside ref={navigationPanel} id="workspace-navigation" className="sidebar" hidden={!navigationOpen} inert={!navigationOpen}
       role={narrow ? 'dialog' : undefined} aria-label="工作导航" aria-modal={narrow && navigationOpen ? true : undefined}>
-      <div className="navigation-heading"><strong>图号规划器</strong><button className="navigation-close" type="button" aria-label="关闭导航" title="收起工作导航" onClick={closeNavigation}>‹</button></div>
+      <div className="navigation-heading"><strong>图号规划器</strong><button className="navigation-close" type="button" aria-label="关闭导航" title="收起工作导航" onClick={closeNavigation}><ChevronsLeft size={18} strokeWidth={1.8} aria-hidden="true"/></button></div>
     <nav aria-label="主导航">{navigation.map((group) => <section className="nav-group" key={group.label} aria-label={group.label}>
       <p className="nav-group-label">{group.label}</p>{group.items.map((item) => <button className={`nav-item ${page === item.key ? 'active' : ''}`} disabled={!item.enabled || (previewPage !== null && item.key !== previewPage)} onClick={() => item.enabled && (!previewPage || item.key === previewPage) && navigatePage(item.key as Page)} key={item.key} type="button">
-        <span className="nav-label"><i aria-hidden="true">{item.icon}</i>{item.label}</span></button>)}</section>)}</nav>
+        <span className="nav-label"><item.icon size={18} strokeWidth={1.8} aria-hidden="true"/>{item.label}</span></button>)}</section>)}</nav>
     <div className="sidebar-footer">{recoveryPreview ? <RecoveryMockPage docked/> : previewPage ? <small>开发 Mock · 未连接业务服务</small> : <SafeRecovery api={api} />}</div></aside>
     <main className="workspace" inert={narrow && navigationOpen}>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage api={api} navigationTarget={drawingTarget} registerLeaveGuard={registerDrawingLeaveGuard} active={page === 'drawings'} onNavigatePdf={target => { if (drawingLeaveGuard.current && !drawingLeaveGuard.current()) return; setDrawingPdfTarget(target); setPage('files'); }} /></div>}{page === 'dictionaries' && <DictionariesPage api={api} />}
       {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} onOpenVersion={openVersion} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{page === 'import' && <ImportPage api={api} />}{page === 'planning' && <PlanningPage api={api} onOpenDrawingLibrary={target => {setDrawingTarget({...target,revision:Date.now()});setPage('drawings');}} />}

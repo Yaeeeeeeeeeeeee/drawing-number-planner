@@ -55,7 +55,7 @@ function sendDrawingError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQueryService): void {
-  const targetSchema = z.object({signedId:z.number().int().refine(id=>id!==0),productId:z.number().int().positive(),appearanceVersionId:z.number().int().positive()}).strict();
+  const targetSchema = z.object({signedId:z.number().int().refine(id=>id!==0),productId:z.number().int().positive(),appearanceVersionId:z.number().int().positive().nullable().optional()}).strict();
   const reuseSchema=targetSchema.extend({reason:z.string().trim().min(1).max(1000)}).strict();
   app.post('/api/drawings/reuse-preview',async(request,reply)=>{const parsed=reuseSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'沿用条件无效'}});try{return service.reuse.preview(parsed.data);}catch(error){return sendDrawingError(reply,error);}});
   app.post('/api/drawings/reuse-confirm',async(request,reply)=>{const parsed=reuseSchema.extend({fingerprint:z.string().min(1),confirmed:z.literal(true)}).strict().safeParse(request.body);if(!parsed.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'沿用确认无效'}});try{return service.reuse.confirm(parsed.data);}catch(error){return sendDrawingError(reply,error);}});
@@ -65,7 +65,7 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
     return service.associations.preview(input.data.productId,input.data.signedIds);
   });
   app.post('/api/drawings/association-confirm', async(request,reply)=>{
-    const input=z.object({targets:z.array(targetSchema).min(1).max(100),fingerprint:z.string().min(1),reason:z.string().trim().min(1),confirmed:z.literal(true)}).strict().safeParse(request.body);
+    const input=z.object({targets:z.array(targetSchema).min(1).max(10000),fingerprint:z.string().min(1),reason:z.string().trim().min(1),confirmed:z.literal(true)}).strict().safeParse(request.body);
     if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'关联确认条件无效'}});
     try{return service.associations.confirm(input.data);}catch(error){return sendDrawingError(reply,error);}
   });

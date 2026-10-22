@@ -1,3 +1,4 @@
+import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
@@ -493,14 +494,14 @@ describe('drawing catalog counts', () => {
     try {
       const counts = drawings.navigationCounts({});
       expect(counts.total).toBe(2);
-      expect(counts.unassociated).toBe(0); // owning a product does not require a batch
+      expect(counts.unassociated).toBe(1); // conflicting business evidence does not confirm original ownership; owning a product does not require a batch
       expect(counts.products).toContainEqual({ productId: f.otherProductId, count: 1 });
       expect(counts.categories).toContainEqual({ name: '空气炸锅', count: 1 });
       expect(counts.batches).toContainEqual({ materialBatchId: f.older, productId: f.otherProductId, count: 1 });
       expect(counts.batches).not.toContainEqual(expect.objectContaining({ materialBatchId: f.storage }));
       expect(drawings.search({ navigationProductCategory: '空气炸锅' }).total).toBe(1);
       expect(drawings.search({ navigationProductCategory: '空气炸锅', productCategory: '不匹配' }).total).toBe(0);
-      expect(drawings.search({ associationState: 'unassociated' }).total).toBe(0);
+      expect(drawings.search({ associationState: 'unassociated' }).total).toBe(counts.unassociated);
       const filtered = drawings.navigationCounts({ keyword: '说明书' });
       expect(filtered.total).toBe(1); expect(filtered.products).not.toContainEqual(expect.objectContaining({ productId: f.otherProductId }));
       expect(db.serialize().equals(before)).toBe(true);
@@ -529,7 +530,7 @@ describe('drawing catalog counts', () => {
 
 it('shows explicit older material reuse in the new appearance without duplicating records or replacing original attribution',()=>{
   const productId=(db.prepare('select product_id as id from drawing_numbers where id=?').get(ids.first) as {id:number}).id;
-  const initial=db.prepare('select id,appearance_id from product_appearance_versions where product_id=?').get(productId) as {id:number;appearance_id:number};
+  ensureProductAppearance(db,productId);const initial=db.prepare('select id,appearance_id from product_appearance_versions where product_id=?').get(productId) as {id:number;appearance_id:number};
   const next=Number(db.prepare(`insert into product_appearance_versions(product_id,version_number,appearance_id,label,status,created_at) values(?,2,?,'New','draft','now')`).run(productId,initial.appearance_id).lastInsertRowid);
   drawings.associations.correct({signedId:ids.first,productId,appearanceVersionId:initial.id},'核验原始版本');
   const original=drawings.get(ids.first).fullCode;

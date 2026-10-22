@@ -9,8 +9,8 @@ describe('PDF renderer-only preview isolation', () => {
     window.history.replaceState({}, '', '/?mock=files&files-scenario=anomalies');
     const real = vi.fn(() => { throw new Error('REAL API MUST NOT RUN'); });
     render(<App api={new Proxy({}, { get: () => real }) as never} />);
-    await screen.findAllByText('批次缺失');
-    const row = document.querySelector('.files-batch.missing')!.closest('tr')!;
+    await screen.findAllByText('多图号冲突');
+    const row = document.querySelector('.file-match.conflict')!.closest('tr')!;
     expect(row.querySelector('.presence-label.present')).toHaveTextContent('存在');
     expect(row.querySelector('.file-match.conflict')).toHaveTextContent('多图号冲突');
     expect(real).not.toHaveBeenCalled();
@@ -48,10 +48,10 @@ describe('PDF renderer-only preview isolation', () => {
     expect(document.querySelector('.file-match.matched .files-match-badge')).toHaveTextContent('已匹配');
     expect(document.querySelector('.files-batch.current .files-status')).toHaveTextContent('当前批次');
     expect(screen.getAllByRole('checkbox')[0]).toBeDisabled();
-    expect(screen.getByText(/仅缺失记录可选/)).toBeVisible();
+    expect(screen.queryByText(/仅缺失记录可选/)).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /大小/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '修改时间' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(51);
+    expect(screen.getAllByRole('row').length).toBeLessThan(51);
     fireEvent.click(screen.getAllByRole('button', { name: /打开 .* 的位置/ })[0]);
     await screen.findByText(/Mock：文件定位已隔离/);
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));

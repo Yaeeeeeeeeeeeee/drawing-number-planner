@@ -16,3 +16,10 @@ it('expires cached results and preserves unrelated namespaces',async()=>{
 it('persists only supported page sizes independently per module',()=>{
  localStorage.clear();expect(readPageSize('pdf')).toBe(50);savePageSize('pdf',25);savePageSize('drawings',100);expect(readPageSize('pdf')).toBe(25);expect(readPageSize('drawings')).toBe(100);savePageSize('pdf',20);expect(readPageSize('pdf')).toBe(25);
 });
+it('bounds retained query results and evicts the least recently used scope',async()=>{
+ const cache=new QueryCache(30000,()=>0,2);
+ await cache.fetch('pdf:one',async()=>1);await cache.fetch('pdf:two',async()=>2);
+ expect(cache.get('pdf:one')).toBe(1);
+ await cache.fetch('pdf:three',async()=>3);
+ expect(cache.get('pdf:two')).toBeUndefined();expect(cache.get('pdf:one')).toBe(1);expect(cache.get('pdf:three')).toBe(3);
+});

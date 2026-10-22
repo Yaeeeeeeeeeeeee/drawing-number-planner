@@ -1,7 +1,7 @@
-name: Comprehensive production Windows delivery
+name: V3 production Windows delivery
 on:
   push:
-    branches: [codex/comprehensive-appearance-20261020]
+    branches: [codex/v3-business-ui-20261022]
     paths:
       - 'src/**'
       - 'tests/**'

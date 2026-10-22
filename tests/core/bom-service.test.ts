@@ -1,3 +1,4 @@
+import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -48,7 +49,7 @@ function insertHistorical(productId: number | null, projectItemCode: string, sta
 }
 describe('product-level BOM service', () => {
   it('explicitly reuses samecanonical alias drawings without rewriting raw historical identities',()=>{
-    const r=setup(); const aliasDrawing=r.draw(r.other.id,r.white.id,r.logo.id);
+    const r=setup();ensureProductAppearance(db,r.product.id); const aliasDrawing=r.draw(r.other.id,r.white.id,r.logo.id);
     db.prepare('update product_identity_members set canonical_product_id=? where raw_product_id=?').run(r.product.id,r.other.id);
     const appearance=(db.prepare("select id from product_appearance_versions where product_id=? and status='current'").get(r.product.id) as {id:number}).id;
     const candidates=service.listCandidates({productId:r.product.id,appearanceVersionId:appearance,includeReusableMaterials:true,projectItemId:r.logo.id,usesWhiteMaterial:false});
@@ -59,7 +60,7 @@ describe('product-level BOM service', () => {
     expect(()=>service.saveVersion({productId:r.product.id,appearanceVersionId:appearance,businessChangeDate:'2026-10-20',expectedCurrentVersionId:saved.id,items:[{projectItemId:r.manual.id,drawingId:aliasDrawing.id,usesWhiteMaterial:false}]})).toThrow(/项目不一致/);
   });
   it('keeps an independent current BOM per appearance and records immutable correction snapshots', () => {
-    const r = setup(); const drawing = r.draw(r.product.id,r.white.id,r.logo.id);
+    const r = setup();ensureProductAppearance(db,r.product.id); const drawing = r.draw(r.product.id,r.white.id,r.logo.id);
     const currentAppearance = db.prepare("select id from product_appearance_versions where product_id=? and status='current'").get(r.product.id) as {id:number};
     const image=insertAsset('appearance-copy.png');
     const item = {projectItemId:r.logo.id,drawingId:drawing.id,usesWhiteMaterial:false,assets:[{role:'image' as const,assetId:image}]};

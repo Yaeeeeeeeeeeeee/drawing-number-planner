@@ -38,7 +38,7 @@ function apiFixture(configured = false) {
     getFileIndexClearPreview: vi.fn().mockResolvedValue({ workspaceRoot: 'X:\\Library',
       counts: { pdfFiles: 4, qrCodeFiles: 2, materialBatches: 1, scanChanges: 4, scanRuns: 2 } }),
     clearFileIndex: vi.fn().mockResolvedValue({ pdfFiles: 4, qrCodeFiles: 2, materialBatches: 1, scanChanges: 4, scanRuns: 2 }),
-    searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 50 }),
+    searchPdfFiles: vi.fn().mockResolvedValue({ items: [file, outlined, unmatched, pending], total: 4, page: 1, pageSize: 100 }),
     listProducts: vi.fn().mockResolvedValue([{ id: 9, sku: 'SKDZC100JP', model: 'ZC100', productCategory: '冰柜', status: 'active' }]),
     listMaterialBatches: vi.fn().mockResolvedValue([{ id: 2, sku: 'SKDZC100JP', model: 'ZC100', productId: 9, name: '06.20260309' }]),
   };
@@ -57,7 +57,7 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '待关联产品' }));
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'manual', matchStatus: 'pending', unassociatedProduct: 'true' })));
     fireEvent.click(screen.getByRole('button', { name: '全部文件' }));
-    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenCalledWith({ keyword: 'manual', matchStatus: 'pending', conversionType: '', presence: 'all', managementState:'included', page: 1, pageSize: 50 }));
+    await waitFor(() => expect(api.searchPdfFiles).toHaveBeenCalledWith({ keyword: 'manual', matchStatus: 'pending', conversionType: '', presence: 'all', managementState:'included', page: 1, pageSize: 100 }));
     expect(screen.getAllByLabelText('文件关键词')).toHaveLength(1);
     expect(screen.getByLabelText('文件关键词').closest('nav')).toHaveAttribute('aria-label', '资料导航');
     expect(screen.queryByRole('button', { name: '待确认文件' })).not.toBeInTheDocument();
@@ -72,6 +72,7 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button',{name:'待关联产品'}));
     await screen.findAllByText('冰柜 · ZC100',{selector:'.file-product strong'});
     release({workspaceRoot:'X:\\Library',configured:true,available:true});
+    fireEvent.click(screen.getByText('详细信息'));
     expect(await screen.findByDisplayValue('X:\\Library')).toBeVisible();
     expect(await screen.findByRole('button',{name:'产品 SKDZC100JP · ZC100'})).toBeVisible();
   });
@@ -113,14 +114,14 @@ describe('FilesPage', () => {
     const current = { ...file, id: 72, relativePath: 'T40\\06.20260309\\same.pdf',
       materialBatchId: 2, materialBatchName: '06.20260309', materialBatchStatus: 'recognized' };
     const api = apiFixture(true);
-    api.searchPdfFiles.mockResolvedValue({ items: [first, current], total: 2, page: 1, pageSize: 50 });
+    api.searchPdfFiles.mockResolvedValue({ items: [first, current], total: 2, page: 1, pageSize: 100 });
 
     render(<FilesPage api={api as never} />);
 
     expect(await screen.findAllByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' })).toHaveLength(2);
     expect(screen.getByText('首批大货', { selector: '.files-batch-code' })).toBeVisible();
     expect(screen.getByText('20260309', { selector: '.files-batch-code' })).toBeVisible();
-    expect(screen.getByText(/同一图号出现在不同资料批次属于正常历史快照/)).toBeVisible();
+    expect(screen.queryByText(/同一图号出现在不同资料批次属于正常历史快照/)).not.toBeInTheDocument();
     expect(screen.queryByText('扫描重复')).not.toBeInTheDocument();
   });
 
@@ -136,7 +137,7 @@ describe('FilesPage', () => {
   });
   it('opens a present file by PDF index ID and disables missing file locations', async () => {
     const showFileInFolder = vi.fn().mockResolvedValue({ ok: true }); window.plannerDesktop = { showFileInFolder };
-    const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [file, missing], total: 2, page: 1, pageSize: 50 });
+    const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [file, missing], total: 2, page: 1, pageSize: 100 });
     render(<FilesPage api={api as never} />); await screen.findByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
 
     fireEvent.click(screen.getByRole('button', { name: `打开 ${file.fileName} 的位置` }));
@@ -181,6 +182,7 @@ describe('FilesPage', () => {
     let release!: (value: Awaited<ReturnType<ReturnType<typeof apiFixture>['scanPdfFiles']>>) => void;
     const api = apiFixture(true); api.scanPdfFiles.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
     render(<FilesPage api={api as never} />); await screen.findByDisplayValue('X:\\Library');
+    fireEvent.click(screen.getByText('详细信息'));
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
     expect(screen.getByRole('button', { name: '扫描中…' })).toBeDisabled();
     release({ total: 4, matched: 2, pending: 1, historicalRegistered: 1, unmatched: 1, conflict: 0,
@@ -220,6 +222,7 @@ describe('FilesPage', () => {
   it('separates current library state from this scan changes and expands grouped details in place', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
     await screen.findByDisplayValue('X:\\Library');
+    fireEvent.click(screen.getByText('详细信息'));
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
 
     expect(await screen.findByText('当前索引统计')).toBeVisible();
@@ -255,6 +258,7 @@ describe('FilesPage', () => {
     render(<FilesPage api={api as never} />);
     await screen.findByDisplayValue('X:\\Library');
 
+    fireEvent.click(screen.getByText('详细信息'));
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
 
     fireEvent.click(screen.getByRole('button',{name:'展开产品 SKDZC100JP · ZC100'}));
@@ -274,7 +278,7 @@ describe('FilesPage', () => {
 
   it('shows directory and filename conversion conflicts for reliably matched files', async () => {
     const api = apiFixture(true);
-    api.searchPdfFiles.mockResolvedValueOnce({ items: [conversionConflict], total: 1, page: 1, pageSize: 50 });
+    api.searchPdfFiles.mockResolvedValueOnce({ items: [conversionConflict], total: 1, page: 1, pageSize: 100 });
     render(<FilesPage api={api as never} />);
 
     expect(await screen.findByText('目录与文件名的转曲标记冲突')).toBeVisible();
@@ -291,27 +295,19 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
 
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith({ keyword: 'unknown', matchStatus: 'unmatched',
-      conversionType: '', presence: 'missing', managementState:'included', page: 1, pageSize: 50 }));
+      conversionType: '', presence: 'missing', managementState:'included', page: 1, pageSize: 100 }));
   });
 
-  it('pages through more than fifty matching PDF records', async () => {
-    const api = apiFixture(true);
-    api.searchPdfFiles.mockImplementation(async (filters?: Record<string, unknown>) => ({
-      items: filters?.page === 2 ? [outlined] : [file], total: 51, page: Number(filters?.page ?? 1), pageSize: 50,
-    }));
-    render(<FilesPage api={api as never} />);
-    await screen.findByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
-
-    expect(screen.getByText('第 1 / 2 页')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
-    expect(await screen.findByText(outlined.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' })).toBeVisible();
-    expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 50 }));
-    expect(screen.getByRole('button', { name: '上一页' })).toBeEnabled();
+  it('shows the PDF list without traditional pagination controls',async()=>{
+    const api=apiFixture(true);render(<FilesPage api={api as never}/>);
+    await screen.findByText(file.fileName.replace(/\.pdf$/i,''),{selector:'.file-primary'});
+    expect(screen.queryByRole('navigation',{name:'PDF 分页'})).not.toBeInTheDocument();
+    expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.objectContaining({page:1,pageSize:100}));
   });
 
   it('confirms a single missing-index cleanup and refreshes the displayed count', async () => {
     const api = apiFixture(true);
-    api.searchPdfFiles.mockResolvedValue({ items: [missing], total: 1, page: 1, pageSize: 50 });
+    api.searchPdfFiles.mockResolvedValue({ items: [missing], total: 1, page: 1, pageSize: 100 });
     render(<FilesPage api={api as never} />);
     await screen.findByText(missing.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
 
@@ -326,12 +322,12 @@ describe('FilesPage', () => {
 
   it('selects only missing rows on the current page for a confirmed batch cleanup', async () => {
     const api = apiFixture(true);
-    api.searchPdfFiles.mockResolvedValue({ items: [file, missing], total: 2, page: 1, pageSize: 50 });
+    api.searchPdfFiles.mockResolvedValue({ items: [file, missing], total: 2, page: 1, pageSize: 100 });
     render(<FilesPage api={api as never} />);
     await screen.findByText(missing.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
 
     expect(screen.getByRole('checkbox', { name: `选择 ${file.fileName}` })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '全选本页缺失记录' }));
+    fireEvent.click(screen.getByRole('button', { name: '全选已加载缺失记录' }));
     expect(screen.getByRole('checkbox', { name: `选择 ${missing.fileName}` })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: '清理已选索引记录 (1)' }));
     fireEvent.click(await screen.findByRole('button', { name: '确认清理索引记录' }));
@@ -365,10 +361,10 @@ describe('FilesPage', () => {
   it('clears a selected deleted batch filter so the next scan shows rebuilt batches and files', async () => {
     const rebuilt = { ...file, id: 12, fileName: 'rebuilt.pdf', relativePath: 'rebuilt.pdf' };
     const api = apiFixture(true);
-    api.searchPdfFiles.mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 50 })
-      .mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 50 })
-      .mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 50 })
-      .mockResolvedValueOnce({ items: [rebuilt], total: 1, page: 1, pageSize: 50 });
+    api.searchPdfFiles.mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 100 })
+      .mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 100 })
+      .mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 100 })
+      .mockResolvedValueOnce({ items: [rebuilt], total: 1, page: 1, pageSize: 100 });
     api.listMaterialBatches.mockResolvedValueOnce([{ id: 2, productId:9, sku: 'SKDZC100JP', model: 'ZC100', name: '旧批次' }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 12, productId:9, sku: 'SKDWT040JP', model: 'T40', name: '重扫批次' }]);
@@ -384,13 +380,14 @@ describe('FilesPage', () => {
 
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenNthCalledWith(3, expect.not.objectContaining({ materialBatchId: 2 })));
     expect(screen.getByRole('button',{name:'全部文件'})).toHaveAttribute('aria-current','page');
+    fireEvent.click(screen.getByText('详细信息'));
     fireEvent.click(screen.getByRole('button', { name: '扫描资料库' }));
     expect(await screen.findByRole('button', { name: '批次 重扫批次' })).toBeVisible();
     expect(screen.getByText('rebuilt', { selector: '.file-primary' })).toBeVisible();
   });
 
   it('closes a pending missing-index cleanup confirmation after a full index clear', async () => {
-    const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [missing], total: 1, page: 1, pageSize: 50 });
+    const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [missing], total: 1, page: 1, pageSize: 100 });
     render(<FilesPage api={api as never} />);
     await screen.findByText(missing.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
     fireEvent.click(screen.getByRole('button', { name: `清理 ${missing.fileName} 的索引记录` }));
@@ -407,7 +404,7 @@ describe('FilesPage', () => {
 
   it('keeps a completed index clear successful when the post-clear refresh fails', async () => {
     const api = apiFixture(true);
-    api.searchPdfFiles.mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 50 })
+    api.searchPdfFiles.mockResolvedValueOnce({ items: [file], total: 1, page: 1, pageSize: 100 })
       .mockRejectedValueOnce(new Error('列表刷新失败'));
     render(<FilesPage api={api as never} />);
     await screen.findByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });

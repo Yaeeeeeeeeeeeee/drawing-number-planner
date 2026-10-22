@@ -49,9 +49,8 @@ export class PlanningRepository {
       throw new PlanningError('DICTIONARY_NOT_ACTIVE', '产品引用的品牌或品类尺寸无效或已停用');
     }
     const versions = this.db.prepare('select id, appearance_id from product_appearance_versions where product_id=? order by version_number').all(canonicalId) as Array<{id:number;appearance_id:number|null}>;
-    const version = input.appearanceVersionId !== undefined ? versions.find(v=>v.id===input.appearanceVersionId) : versions.length===1 && (input.appearanceId===undefined || input.appearanceId===versions[0].appearance_id) ? versions[0] : undefined;
+    const version = input.appearanceVersionId !== undefined ? versions.find(v=>v.id===input.appearanceVersionId) : undefined;
     if (input.appearanceVersionId !== undefined && !version) throw new PlanningError('APPEARANCE_REQUIRED', '外观版本不属于所选产品');
-    if (versions.length>1 && !version) throw new PlanningError('APPEARANCE_REQUIRED', '请明确选择外观版本');
     if (version && input.appearanceId !== undefined && input.appearanceId !== version.appearance_id) throw new PlanningError('APPEARANCE_REQUIRED', '外观编码与版本不一致');
     if (version && !version.appearance_id) throw new PlanningError('APPEARANCE_REQUIRED', '所选外观版本尚未配置有效外观编码');
     const appearanceId = version?.appearance_id ?? input.appearanceId ?? product.default_appearance_id;
@@ -101,7 +100,7 @@ export class PlanningRepository {
         context.brandCode, context.productSizeCode, context.appearanceCode,
         row.colorCode, row.mainCategoryCode, row.projectItemCode, planned.sequence,
         row.notes?.trim() || null, new Date().toISOString());
-    if (context.appearanceVersionId) this.db.prepare(`insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,revision,updated_at) values('planned',?,?,?,'planning',1,?)`).run(Number(result.lastInsertRowid),context.productId,context.appearanceVersionId,new Date().toISOString());
+    this.db.prepare(`insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,revision,updated_at) values('planned',?,?,?,'planning',1,?)`).run(Number(result.lastInsertRowid),context.productId,context.appearanceVersionId ?? null,new Date().toISOString());
     return { id: Number(result.lastInsertRowid), fullCode: planned.fullCode,
       displayName: planned.displayName, status: 'reserved' };
   }

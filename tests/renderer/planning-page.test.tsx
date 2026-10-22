@@ -131,17 +131,29 @@ describe('PlanningPage', () => {
   });
 });
 
-it('carries selected appearance through preview and reservation and opens that exact library scope',async()=>{
-  const api={...apiFixture(),listAppearanceVersions:vi.fn().mockResolvedValue({productId:1,revision:0,items:[{id:41,productId:1,appearanceId:3,versionNumber:1,label:'一代',status:'historical'},{id:42,productId:1,appearanceId:3,versionNumber:2,label:'二代',status:'current'}]})};
+it('uses the original appearance dictionary and reserves a product-only library scope',async()=>{
+  const api={...apiFixture(),listAppearanceVersions:vi.fn().mockResolvedValue({items:[]})};
   const open=vi.fn();render(<PlanningPage api={api as never} onOpenDrawingLibrary={open}/>);
-  fireEvent.change(await screen.findByLabelText('产品型号'),{target:{value:'1'}});
-  await waitFor(()=>expect(screen.getByLabelText('外观版本')).toHaveValue('42'));
-  fireEvent.change(screen.getByLabelText('第 1 行主类别'),{target:{value:'5'}});
-  fireEvent.change(screen.getByLabelText('第 1 行项目明细'),{target:{value:'6'}});
-  fireEvent.change(screen.getByLabelText('第 1 行颜色'),{target:{value:'4'}});
+  await completeFirstRow();
+  expect(screen.getByLabelText('外观')).toHaveValue('3');
+  expect(screen.queryByLabelText('外观版本')).toBeNull();
+  expect(api.listAppearanceVersions).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));
-  await waitFor(()=>expect(api.previewPlan).toHaveBeenCalledWith(expect.objectContaining({productId:1,appearanceVersionId:42})));
+  await waitFor(()=>expect(api.previewPlan).toHaveBeenCalled());
+  expect(api.previewPlan.mock.calls[0][0]).not.toHaveProperty('appearanceVersionId');
   fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));
   fireEvent.click(await screen.findByRole('button',{name:'查看图号库'}));
-  expect(api.reservePlan).toHaveBeenCalledWith(expect.objectContaining({appearanceVersionId:42}));expect(open).toHaveBeenCalledWith({productId:1,appearanceVersionId:42});
+  expect(api.reservePlan.mock.calls[0][0]).not.toHaveProperty('appearanceVersionId');
+  expect(open).toHaveBeenCalledWith({productId:1});
+});
+
+it('allows choosing a different dictionary appearance without editing the product default',async()=>{
+ const api=apiFixture();
+ const original=api.listDictionaries.getMockImplementation()!;
+ api.listDictionaries.mockImplementation(type=>type==='appearance'?Promise.resolve([{id:3,code:'01',name:'一号外观',status:'active'},{id:12,code:'02',name:'二号外观',status:'active'}]):original(type));
+ render(<PlanningPage api={api as never}/>);await completeFirstRow();
+ fireEvent.change(screen.getByLabelText('外观'),{target:{value:'12'}});
+ fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));
+ await waitFor(()=>expect(api.previewPlan).toHaveBeenCalledWith(expect.objectContaining({productId:1,appearanceId:12})));
+ expect(api.previewPlan.mock.calls[0][0]).not.toHaveProperty('appearanceVersionId');
 });

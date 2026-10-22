@@ -35,14 +35,14 @@ if(mode==='prepare'){
  const walBackup=createDatabaseBackup(db,file,path.join(root,'wal-backups'),'migration');const backup=openDatabase(walBackup);try{assert.equal((backup.prepare('select model from products where id=5').get() as {model:string}).model,'WAL已提交型号');assert.equal(backup.pragma('integrity_check',{simple:true}),'ok');}finally{backup.close();}
  }finally{reader.exec('rollback');reader.close();}
  db.prepare("update products set model='M1' where id=5").run();
- db.exec("create trigger fail_final_upgrade before insert on schema_migrations when new.version=17 begin select raise(abort,'native-rollback17');end");
- let backupPath='';assert.throws(()=>migrateDatabase(db,{databaseExists:true,createBackup(){backupPath=createDatabaseBackup(db,file,path.join(root,'rollback-backups'),'migration');}}),/native-rollback17/);
+ db.exec("create trigger fail_final_upgrade before insert on schema_migrations when new.version=18 begin select raise(abort,'native-rollback18');end");
+ let backupPath='';assert.throws(()=>migrateDatabase(db,{databaseExists:true,createBackup(){backupPath=createDatabaseBackup(db,file,path.join(root,'rollback-backups'),'migration');}}),/native-rollback18/);
  assert.ok(backupPath);assert.equal((db.prepare('select max(version) as v from schema_migrations').get() as {v:number}).v,15);verifyLegacy(db,before);
  db.exec('drop trigger fail_final_upgrade');assert.deepEqual(db.prepare('select type,name,sql from sqlite_master order by type,name').all(),schema);
- fs.writeFileSync(path.join(root,'native-rollback-and-wal.json'),JSON.stringify({walCommittedRowInBackup:true,v15To17FailureRollsBackSchemaAndRows:true,backupBeforeMigration:true}));
+ fs.writeFileSync(path.join(root,'native-rollback-and-wal.json'),JSON.stringify({walCommittedRowInBackup:true,v15To18FailureRollsBackSchemaAndRows:true,backupBeforeMigration:true}));
  }finally{db.close();}
 }else if(mode==='audit-upgrade'){
- const db=openDatabase(file);try{assert.equal((db.prepare('select max(version) as v from schema_migrations').get() as {v:number}).v,17);verifyLegacy(db,JSON.parse(fs.readFileSync(path.join(root,'legacy.json'),'utf8')));
+ const db=openDatabase(file);try{assert.equal((db.prepare('select max(version) as v from schema_migrations').get() as {v:number}).v,18);verifyLegacy(db,JSON.parse(fs.readFileSync(path.join(root,'legacy.json'),'utf8')));
  const backups=fs.readdirSync(path.join(root,'backups')).filter(name=>name.startsWith('migration-')&&name.endsWith('.db'));assert.ok(backups.length>0);let preUpgrade=false;
  for(const name of backups){const backup=openDatabase(path.join(root,'backups',name));try{if((backup.prepare('select max(version) as v from schema_migrations').get() as {v:number}).v===15){verifyLegacy(backup,JSON.parse(fs.readFileSync(path.join(root,'legacy.json'),'utf8')));preUpgrade=true;}}finally{backup.close();}}
  assert.ok(preUpgrade,'Real startup must create a readable, row-preserving v15 backup');

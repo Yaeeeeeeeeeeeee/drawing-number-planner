@@ -204,3 +204,44 @@ describe('MaterialBatchService', () => {
     })]);
   });
 });
+
+it('keeps independent appearance-code batch chronology and hides ambiguous multi-code state',()=>{
+ const directory='03.冰柜\\SKU-ZC100';
+ const old=insertBatch(directory,'00.20250101');
+ const newer=insertBatch(directory,'01.20260101');
+ const oldCode=insertHistorical('02.0209.010.0401001');
+ const newCode=insertHistorical('02.0209.020.0401001');
+ insertFile(old,oldCode,'old-code');insertFile(newer,newCode,'new-code');
+ expect(service.list().find(batch=>batch.id===old)?.currentState).toBe('current');
+ expect(service.list().find(batch=>batch.id===newer)?.currentState).toBe('current');
+ insertFile(newer,oldCode,'reuse-old');
+ expect(service.list().find(batch=>batch.id===newer)?.currentState).toBe('indeterminate');
+ expect(service.list().find(batch=>batch.id===old)?.currentState).toBe('historical');
+});
+it('uses reliable business dates when sequence is absent and rejects duplicate latest dates',()=>{
+ const directory='03.冰柜\\SKU-ZC100';const first=insertBatch(directory,'00.首批大货');const next=insertBatch(directory,'01.20260101');
+ db.prepare('update material_batches set sequence_number=null,business_date=? where id=?').run('2025-01-01',first);
+ db.prepare('update material_batches set sequence_number=null,business_date=? where id=?').run('2026-01-01',next);
+ expect(service.getCurrentBatchSelection(directory)).toEqual({status:'selected',batchId:next});
+ db.prepare('update material_batches set business_date=? where id=?').run('2026-01-01',first);
+ expect(service.getCurrentBatchSelection(directory)).toEqual({status:'indeterminate',batchId:null});
+});
+it('preserves distinct real batch paths with the same display name and renames only display metadata',()=>{
+ const directory='03.冰柜\\SKU-ZC100';
+ const first=insertBatch(directory,'00.首批大货');
+ const other=insertBatch(directory,'01.第二批');
+ const drawing=insertHistorical('02.0209.010.0401001');
+ insertFile(first,drawing,'first');insertFile(other,drawing,'second');
+ const beforeFiles=db.prepare('select * from pdf_files order by id').all();
+ const beforePaths=db.prepare('select id,relative_path,name from material_batches order by id').all();
+ service.rename(first,'首批大货',0);service.rename(other,'首批大货',0);
+ const diagnostics=service.diagnostics();
+ expect(diagnostics.duplicatePaths).toEqual([]);
+ expect(diagnostics.batches).toEqual(expect.arrayContaining([
+   expect.objectContaining({id:first,sameDisplayNameIds:[other]}),
+   expect.objectContaining({id:other,sameDisplayNameIds:[first]}),
+ ]));
+ expect(db.prepare('select id,relative_path,name from material_batches order by id').all()).toEqual(beforePaths);
+ expect(db.prepare('select * from pdf_files order by id').all()).toEqual(beforeFiles);
+ expect(()=>service.rename(first,'stale name',0)).toThrow('批次名称已变化');
+});

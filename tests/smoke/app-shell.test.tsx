@@ -10,15 +10,17 @@ describe('application shell', () => {
     expect(screen.getByText('图号规划器')).toBeVisible();
     expect(screen.getByRole('navigation')).toBeVisible();
     expect(screen.getByText('日常工作')).toBeVisible();
-    expect(screen.getByText('基础资料')).toBeVisible();
+    expect(screen.getByText('产品明细')).toBeVisible();
+    expect(screen.getByText('数据来源')).toBeVisible();
     const navGroups = Array.from(screen.getByRole('navigation').querySelectorAll<HTMLElement>('.nav-group'));
-    expect(navGroups.map((group) => group.getAttribute('aria-label'))).toEqual(['日常工作', '基础资料']);
+    expect(navGroups.map((group) => group.getAttribute('aria-label'))).toEqual(['日常工作', '产品明细', '数据来源']);
     expect(Array.from(navGroups[0].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
-      '规图号规划 / 更新包材', 'BBOM 管理', '外外发资料', '二二维码管理',
+      '图号规划 / 更新包材', 'BOM 管理', '外发资料',
     ]);
     expect(Array.from(navGroups[1].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
-      '图图号库', '品产品档案', 'PPDF 文件中心', '码编码字典', '迁迁移检查',
+      '产品档案', '图号库', '二维码管理',
     ]);
+    expect(Array.from(navGroups[2].querySelectorAll('button')).map((button) => button.textContent)).toEqual(['PDF 文件中心','编码字典','迁移检查']);
     expect(screen.getByRole('button', { name: /图号规划 \/ 更新包材/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /BOM 管理/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /二维码管理/ })).toBeEnabled();

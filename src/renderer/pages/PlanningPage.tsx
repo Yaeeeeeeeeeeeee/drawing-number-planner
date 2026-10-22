@@ -1,4 +1,3 @@
-import type { AppearanceVersion } from '../data/appearance-client';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -6,10 +5,10 @@ import type { DictionaryItemView, PlannerApi, PlanningPreviewView, PlanningRowIn
 import { isPlanningMock, PlanningMockPage } from './planning-mock';
 
 interface DraftRow { clientId: string; colorId: string; mainCategoryId: string; projectItemId: string; notes: string }
-interface ApprovedInput { productId: number; appearanceId: number; appearanceVersionId?:number; rows: PlanningRowInputView[] }
+interface ApprovedInput { productId: number; appearanceId: number; rows: PlanningRowInputView[] }
 const blankRow = (id: number): DraftRow => ({ clientId: `row-${id}`, colorId: '', mainCategoryId: '', projectItemId: '', notes: '' });
 
-export interface PlanningDrawingTarget {productId:number;appearanceVersionId:number}
+export interface PlanningDrawingTarget {productId:number;appearanceVersionId?:number}
 export function PlanningPage({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpenDrawingLibrary?(target:PlanningDrawingTarget):void }) {
   return isPlanningMock() ? <PlanningMockPage/> : <PlanningWorkspace api={api} onOpenDrawingLibrary={onOpenDrawingLibrary}/>;
 }
@@ -23,9 +22,6 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
   const [sizes, setSizes] = useState<DictionaryItemView[]>([]);
   const [productId, setProductId] = useState('');
   const [appearanceId, setAppearanceId] = useState('');
-  const [versions,setVersions]=useState<AppearanceVersion[]>([]);
-  const [appearanceVersionId,setAppearanceVersionId]=useState('');
-  const versionRequest=useRef(0);
   const [rows, setRows] = useState<DraftRow[]>([blankRow(1)]);
   const [preview, setPreview] = useState<PlanningPreviewView | null>(null);
   const [approvedInput, setApprovedInput] = useState<ApprovedInput | null>(null);
@@ -62,16 +58,13 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
     setProductId(value); const product = products.find((item) => item.id === Number(value));
     setAppearanceId(product?.defaultAppearanceId ? String(product.defaultAppearanceId) : ''); invalidate();
   };
-  useEffect(()=>{const epoch=++versionRequest.current;setVersions([]);setAppearanceVersionId('');if(!productId||!api.listAppearanceVersions)return;
-    void api.listAppearanceVersions(Number(productId)).then(result=>{if(epoch!==versionRequest.current)return;setVersions(result.items);const current=result.items.find(v=>v.status==='current')??result.items[0];if(current){setAppearanceVersionId(String(current.id));setAppearanceId(current.appearanceId?String(current.appearanceId):'');}}).catch(reason=>{if(epoch===versionRequest.current)setError(reason instanceof Error?reason.message:'外观版本加载失败');});
-  },[productId,api]);
   const updateRow = (clientId: string, field: keyof Omit<DraftRow, 'clientId'>, value: string) => {
     setRows((current) => current.map((row) => row.clientId === clientId
       ? { ...row, [field]: value, ...(field === 'mainCategoryId' ? { projectItemId: '' } : {}) } : row));
     invalidate();
   };
-  const complete = useMemo(() => Boolean(productId && appearanceId && (!api.listAppearanceVersions || appearanceVersionId) && rows.length
-    && rows.every((row) => row.colorId && row.mainCategoryId && row.projectItemId)), [productId, appearanceId, appearanceVersionId, rows]);
+  const complete = useMemo(() => Boolean(productId && appearanceId && rows.length
+    && rows.every((row) => row.colorId && row.mainCategoryId && row.projectItemId)), [productId, appearanceId, rows]);
   const planningRows = () => rows.map((row) => ({
     clientId: row.clientId, colorId: Number(row.colorId), mainCategoryId: Number(row.mainCategoryId),
     projectItemId: Number(row.projectItemId), ...(row.notes.trim() ? { notes: row.notes.trim() } : {}),
@@ -79,7 +72,7 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
   const check = async () => {
     if (!complete) return; setBusy(true); setError(''); setNeedsRefresh(false); setReserved([]);
     const version = draftVersion.current;
-    const input: ApprovedInput = { productId: Number(productId), appearanceId: Number(appearanceId), ...(appearanceVersionId?{appearanceVersionId:Number(appearanceVersionId)}:{}), rows: planningRows() };
+    const input: ApprovedInput = { productId: Number(productId), appearanceId: Number(appearanceId), rows: planningRows() };
     try {
       const result = await api.previewPlan(input);
       if (version === draftVersion.current) { setPreview(result); setApprovedInput(input); }
@@ -92,7 +85,7 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
   const reserve = async () => {
     if (!preview || !approvedInput) return;
     const currentInput: ApprovedInput = {
-      productId: Number(productId), appearanceId: Number(appearanceId), ...(appearanceVersionId?{appearanceVersionId:Number(appearanceVersionId)}:{}), rows: planningRows(),
+      productId: Number(productId), appearanceId: Number(appearanceId), rows: planningRows(),
     };
     if (JSON.stringify(currentInput) !== JSON.stringify(approvedInput)) {
       setPreview(null); setApprovedInput(null); setNeedsRefresh(true); setError('规划条件已变化，请重新查重');
@@ -110,7 +103,7 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
     setBusy(true); setError('');
     try {
       const items = await api.reservePlan({ ...approvedInput, rows: reservationRows });
-      setReserved(items);setReservedContext(approvedInput.appearanceVersionId?{productId:approvedInput.productId,appearanceVersionId:approvedInput.appearanceVersionId}:null); setPreview(null); setApprovedInput(null); setRows([blankRow(nextRow.current++)]);
+      setReserved(items);setReservedContext({productId:approvedInput.productId}); setPreview(null); setApprovedInput(null); setRows([blankRow(nextRow.current++)]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '批量占号失败'); setPreview(null); setApprovedInput(null); setNeedsRefresh(true);
     } finally { setBusy(false); }
@@ -122,9 +115,9 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
     <section className="planning-stage" aria-label="产品与外观"><h2><span>01</span> 产品与外观</h2>
     <div className="pp-context">
       <label><span>产品型号</span><select aria-label="产品型号" disabled={busy} value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.map((item) => <option value={item.id} key={item.id}>{item.sku ?? 'SKU待补录'} · {item.model} · {item.brandName}</option>)}</select></label>
-      {api.listAppearanceVersions ? <label><span>外观版本</span><select aria-label="外观版本" disabled={busy} value={appearanceVersionId} onChange={event=>{const value=event.target.value;setAppearanceVersionId(value);const selected=versions.find(v=>v.id===Number(value));setAppearanceId(selected?.appearanceId?String(selected.appearanceId):'');invalidate();}}><option value="">请选择外观版本</option>{versions.map(v=><option key={v.id} value={v.id}>{v.label} · {v.status==='current'?'当前':v.status==='draft'?'草稿':'历史'}</option>)}</select></label> : <label><span>外观</span><select aria-label="外观" disabled={busy} value={appearanceId} onChange={(event) => { setAppearanceId(event.target.value); invalidate(); }}><option value="">请选择</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>}
+      <label><span>外观</span><select aria-label="外观" disabled={busy} value={appearanceId} onChange={(event) => { setAppearanceId(event.target.value); invalidate(); }}><option value="">请选择</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
     </div>
-    <div className="pp-derived"><div className="pp-context-fact"><span>品牌</span><strong>{selectedProduct ? `${brands.find(item=>item.id===selectedProduct.brandId)?.code ? brands.find(item=>item.id===selectedProduct.brandId)?.code+' · ' : ''}${selectedProduct.brandName}` : '随产品确定'}</strong></div><div className="pp-context-fact"><span>品类尺寸</span><strong>{selectedProduct ? `${sizes.find(item=>item.id===selectedProduct.productSizeId)?.code ? sizes.find(item=>item.id===selectedProduct.productSizeId)?.code+' · ' : ''}${selectedProduct.productSizeName}` : '随产品确定'}</strong></div><small>完整外观编码参与生成；产品身份及字典关系不改变。</small></div>
+    <div className="pp-derived"><div className="pp-context-fact"><span>品牌</span><strong>{selectedProduct ? `${brands.find(item=>item.id===selectedProduct.brandId)?.code ? brands.find(item=>item.id===selectedProduct.brandId)?.code+' · ' : ''}${selectedProduct.brandName}` : '随产品确定'}</strong></div><div className="pp-context-fact"><span>品类尺寸</span><strong>{selectedProduct ? `${sizes.find(item=>item.id===selectedProduct.productSizeId)?.code ? sizes.find(item=>item.id===selectedProduct.productSizeId)?.code+' · ' : ''}${selectedProduct.productSizeName}` : '随产品确定'}</strong></div></div>
     </section>
     <section className="planning-stage planning-items" aria-label="规划项目"><h2><span>02</span> 规划项目</h2>
     <div className="pp-toolbar"><strong>规划项目 · {rows.length} 行</strong><button type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidate(); }}>添加项目</button></div>

@@ -69,7 +69,6 @@ export class PlanningService {
         throw new PlanningError('PLAN_STALE', '推荐图号已变化，请重新查重后再占号');
       }
       const context = this.repository.resolveContext(planningInput);
-      if (!context.appearanceVersionId) throw new PlanningError('APPEARANCE_REQUIRED','批量占号必须明确选择产品外观版本');
       try {
         return preview.rows.map((planned, index) => this.repository.insertReserved(context, context.rows[index], planned));
       } catch (error) {
