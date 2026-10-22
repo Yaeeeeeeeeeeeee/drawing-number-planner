@@ -126,3 +126,10 @@ it('gives drawing navigation the shared 300px default and 260–420px resizing r
   expect(handle).toHaveAttribute('aria-valuenow','300');
   expect(screen.getByLabelText('保留图号筛选')).toHaveValue('SKU');
 });
+
+it('keeps the drawing detail readable instead of shrinking it to fit beside a crowded list',()=>{
+ vi.stubGlobal('innerWidth',1600);
+ render(<ModuleWorkspace drawingWorkspace resizable navigation={<p>产品树</p>} detail={<p>图号明细</p>} detailLabel="图号详情" onCloseDetail={()=>{}}><p>图号列表</p></ModuleWorkspace>);
+ expect(screen.getByRole('dialog',{name:'图号详情窗口'})).toBeVisible();
+ expect(screen.queryByRole('separator',{name:'调整详情宽度'})).not.toBeInTheDocument();
+});

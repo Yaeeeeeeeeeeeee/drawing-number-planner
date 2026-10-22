@@ -24,8 +24,8 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const navigationWidth = clamp(preferredNavigation, minimumNavigation, maxNavigation);
   const navigationDocked = width >= navigationWidth + 820 && !navigationCollapsed;
   const centerWidth = width - (navigation && navigationDocked ? navigationWidth + 10 : 0);
-  const maxDetail = Math.max(300, Math.min(drawingWorkspace ? 680 : 480, centerWidth - 810));
-  const detailWidth = clamp(preferredDetail, 300, maxDetail);
+  const maxDetail = drawingWorkspace ? 680 : Math.max(300, Math.min(480, centerWidth - 810));
+  const detailWidth = clamp(preferredDetail, drawingWorkspace ? 600 : 300, maxDetail);
   const detailDocked = centerWidth >= 800 + detailWidth + 10;
   const detailModal = Boolean(detail) && !detailDocked;
   const navigationModal = Boolean(navigation) && navigationOpen && !navigationDocked && !detailModal;
@@ -100,7 +100,7 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
       {navigation && navigationDocked && resizable && <PanelResizeHandle label="调整产品导航宽度" value={navigationWidth} min={minimumNavigation} max={maxNavigation} onChange={setPreferredNavigation} />}
       <div className={`module-center ${detail && detailDocked ? 'docked-detail' : ''}`} style={{ gridTemplateColumns: detail && detailDocked ? `minmax(0,1fr) 10px ${detailWidth}px` : 'minmax(0,1fr)' }}>
         <div className="module-list">{children}</div>
-        {detail && detailDocked && resizable && <PanelResizeHandle label="调整详情宽度" value={detailWidth} min={300} max={maxDetail} reversed onChange={setPreferredDetail} />}
+        {detail && detailDocked && resizable && <PanelResizeHandle label="调整详情宽度" value={detailWidth} min={drawingWorkspace ? 600 : 300} max={maxDetail} reversed onChange={setPreferredDetail} />}
         {detail && <div ref={detailModal ? panel : undefined} className={`module-detail ${detailModal ? 'module-drawer' : ''}`}
           role={detailModal ? 'dialog' : undefined} aria-modal={detailModal || undefined} aria-label={`${detailLabel}窗口`} tabIndex={-1}>{detail}</div>}
       </div>
