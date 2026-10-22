@@ -2,24 +2,24 @@
 
 面向单人长期使用的 Windows 公司内部工具。当前版本已把真实 Excel 编码规则、SKU、历史资料只读扫描、永久占号、文件完整性、外发资料和桌面安全恢复接入同一套本地工作流，并可用同一套真实数据在 Windows 桌面窗口或浏览器中运行。
 
-## Windows 软件下载（V3 · 2026-10-22）
+## Windows 软件下载（V3.1 · 2026-10-22）
 
 日常使用无需安装 Git、Node 或下载源码：
 
-- **[下载最新版中文安装 EXE](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v2026.10.22-v3/DrawingNumberPlanner-V3-Windows-x64-Setup.exe)**：中文向导，可自定义安装路径。
-- [本版更新说明、安装指南及 SHA256 校验](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v2026.10.22-v3)
+- **[下载最新版中文安装 EXE](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v2026.10.22-v3.1/DrawingNumberPlanner-V3.1-Windows-x64-Setup.exe)**：中文向导，可自定义安装路径。
+- [本版更新说明、安装指南及 SHA256 校验](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v2026.10.22-v3.1)
 - [完整升级、备份与回退步骤](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-installation-20261022.md)
 - [V3 最新源码与修改记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/tree/codex/v3-business-ui-20261022)
 
-应用源码版本 `8a4275b`，157文件1313项测试通过，Windows实际安装和旧库升级验证通过。安装包不捆绑示例业务数据。已有用户先关闭旧版并保留原数据，首次明确选择原 `planner.db`；程序先备份再升级。不要通过新建空库替代旧库升级。
+应用源码版本 `fca9987`，157文件1316项测试通过，Windows实际安装和旧库升级验证通过。安装包不捆绑示例业务数据。已有用户先关闭旧版并保留原数据，首次明确选择原 `planner.db`；程序先备份再升级。不要通过新建空库替代旧库升级。
 
-V3统一产品归属、PDF批次目录与计数、二维码手工文件关联、外发批次选件及列表性能；取消独立外观版本日常管理，保留字典外观编码与全部旧历史兼容。不会在启动时自动归并产品、删除原PDF或释放历史占号。真实本地数据仍需诊断核对。
+V3.1修正PDF产品导航全部显示0，按唯一精确SKU-型号目录归类，保持图号确认独立；无需清库或重建索引。V3统一产品归属、PDF批次目录与计数、二维码手工文件关联、外发批次选件及列表性能；取消独立外观版本日常管理，保留字典外观编码与全部旧历史兼容。不会在启动时自动归并产品、删除原PDF或释放历史占号。真实本地数据仍需诊断核对。
 
 GitHub 的 **Code → Download ZIP** 和 Release 中的 **Source code** 是源码，不能直接运行。旧P4下载仅用于历史追溯，请日常使用V3安装包。
 
 ## 开发启动
 
-请先切换到 `v2026.10.22-v3` 标签或上方 V3 源码分支；本说明对应已发布 V3。
+请先切换到 `v2026.10.22-v3.1` 标签或上方 V3 源码分支；本说明对应已发布 V3。
 
 首次使用先安装依赖：
 
