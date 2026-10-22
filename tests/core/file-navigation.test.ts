@@ -52,15 +52,15 @@ describe('PDF navigation statistics', () => {
     seed();
     const before = db.serialize();
     const stats = repository.navigation({ presence: 'all' });
-    expect(stats).toMatchObject({ total: 6, unassociatedProducts: 3,
-      products: [{ productId, count: 3 }], categories: [{ name: '洗碗机', count: 3 }] });
-    expect(stats.batches).toHaveLength(3);
-    expect(stats.batches.filter((row) => row.productId === productId).map((row) => row.count)).toEqual([1, 1]);
-    expect(stats.batches.find((row) => row.productId === null)?.count).toBe(1);
-    expect(repository.search({ presence: 'all', unassociatedProduct: true }).total).toBe(3);
+    expect(stats).toMatchObject({ total: 6, unassociatedProducts: 2,
+      products: [{ productId, count: 4 }], categories: [{ name: '洗碗机', count: 4 }] });
+    expect(stats.batches).toHaveLength(2);
+    expect(stats.batches.filter((row) => row.productId === productId).map((row) => row.count)).toEqual([1, 2]);
+    expect(stats.batches.find((row) => row.productId === null)).toBeUndefined();
+    expect(repository.search({ presence: 'all', unassociatedProduct: true }).total).toBe(2);
     expect(repository.search({ presence: 'all', unassociatedProduct: true, matchStatus: 'matched' }).total).toBe(1);
-    expect(repository.search({ presence: 'all', unassociatedProduct: false }).total).toBe(3);
-    expect(repository.search({ presence: 'all', productCategory: '洗碗机' }).total).toBe(3);
+    expect(repository.search({ presence: 'all', unassociatedProduct: false }).total).toBe(4);
+    expect(repository.search({ presence: 'all', productCategory: '洗碗机' }).total).toBe(4);
     expect(repository.search({ presence: 'all', productCategory: '冰柜' }).total).toBe(0);
     expect(repository.search({ presence: 'all', productCategory: "洗碗机' or 1=1 --" }).total).toBe(0);
     expect(db.prepare('select distinct product_id from material_batches').all()).toEqual([{ product_id: productId }]);
@@ -81,7 +81,7 @@ describe('PDF navigation statistics', () => {
     }
   });
 
-  it('refreshes counts immediately after explicit historical product confirmation without rescanning or reassigning unknown PDFs', () => {
+  it('refreshes directory classification after product creation while leaving drawing match status independent', () => {
     const fullCode = parseDrawingCode('02.0404.010.0401007')!;
     const context = { productCategory: '冰柜', sku: 'NEW-SKU', model: 'Z40' };
     const root = '03.冰柜\\NEW-SKU-Z40\\03.量产后的变更文件';
@@ -97,10 +97,10 @@ describe('PDF navigation statistics', () => {
       productSizeId: template.productSizeId, defaultAppearanceId: template.defaultAppearanceId! });
     expect(confirmed.linkedHistoricalCount).toBe(1);
     const stats = repository.navigation({ presence: 'all' });
-    expect(stats).toMatchObject({ total: 3, unassociatedProducts: 1,
-      products: [{ productId: confirmed.product.id, count: 2 }], categories: [{ name: '冰柜', count: 2 }] });
-    expect(repository.search({ presence: 'all', unassociatedProduct: true }).items.map(file => file.fileName)).toEqual(['unknown.pdf']);
-    expect(repository.search({ presence: 'all', productId: confirmed.product.id }).total).toBe(2);
+    expect(stats).toMatchObject({ total: 3, unassociatedProducts: 0,
+      products: [{ productId: confirmed.product.id, count: 3 }], categories: [{ name: '冰柜', count: 3 }] });
+    expect(repository.search({ presence: 'all', unassociatedProduct: true }).items.map(file => file.fileName)).toEqual([]);
+    expect(repository.search({ presence: 'all', productId: confirmed.product.id }).total).toBe(3);
     expect(db.prepare('select id, drawing_id, historical_drawing_id, material_batch_id from pdf_files order by id').all()).toEqual(beforeFiles);
     expect(db.prepare('select count(*) as count from file_scan_runs').get()).toEqual({ count: 1 });
   });
@@ -146,8 +146,8 @@ describe('PDF navigation statistics', () => {
       const stats = repository.navigation({ presence: 'present' });
       expect(committed).toBe(true);
       expect(stats.total).toBe(5);
-      expect(stats.products).toEqual([{ productId, count: 3 }]);
-      expect(stats.categories).toEqual([{ name: '洗碗机', count: 3 }]);
+      expect(stats.products).toEqual([{ productId, count: 4 }]);
+      expect(stats.categories).toEqual([{ name: '洗碗机', count: 4 }]);
       expect(stats.batches.reduce((sum, row) => sum + row.count, 0)).toBe(3);
       expect(repository.search().total).toBe(0);
     } finally {
@@ -161,4 +161,37 @@ describe('PDF navigation statistics', () => {
     expect(repository.navigation({ presence: 'all' })).toEqual({ total: 10_001, unassociatedProducts: 10_001,
       categories: [], products: [], batches: [], appearances: [], appearanceBatches: [] });
   });
+});
+
+it('groups PDFs by an exact existing product directory without requiring a confirmed drawing owner',async()=>{
+ const code=parseDrawingCode('02.0404.010.0401011')!;
+ const root='01.洗碗机\\SKU-T40';
+ repository.replaceScan([record(`${root}\\03.量产后的变更文件\\00.首批大货\\matched.pdf`,code.fullCode),record(`${root}\\03.量产后的变更文件\\00.首批大货\\unknown.pdf`),record(`${root}\\02.未转曲源文件\\source.pdf`,code.fullCode),record('loose.pdf')],[{...code,directoryContext:{sku:'SKU',model:'T40',productCategory:'洗碗机'}}],timestamp);
+ const before=db.serialize();
+ const stats=repository.navigation({presence:'all'});
+ expect(stats.products).toEqual([{productId,count:3}]);expect(stats.unassociatedProducts).toBe(1);
+ expect(repository.search({productId,presence:'all'}).total).toBe(3);
+ expect(repository.search({productId,matchStatus:'unmatched',presence:'all'}).items.map(file=>file.fileName)).toEqual(['unknown.pdf']);
+ const batch=stats.batches.find(row=>row.productId===productId)!;expect(batch.count).toBe(2);expect(repository.search({productId,materialBatchId:batch.materialBatchId!,presence:'all'}).total).toBe(2);
+ const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');
+ expect(new DrawingQueryService(db).search({associationState:'unassociated'}).total).toBe(1);
+ expect(db.prepare('select * from drawing_appearance_bindings').all()).toEqual([]);expect(db.serialize().equals(before)).toBe(true);
+});
+
+it('keeps separate PDF directory usage for a shared historical code across two SKUs',async()=>{
+ const template=new ProductService(db).get(productId);const other=new ProductService(db).create({sku:'OTHER',model:'T50',productCategory:'洗碗机',brandId:template.brandId,productSizeId:template.productSizeId,defaultAppearanceId:template.defaultAppearanceId});
+ const code=parseDrawingCode('02.0404.010.0401012')!;
+ repository.replaceScan([record('01.洗碗机\\SKU-T40\\03.量产后的变更文件\\00.首批大货\\a.pdf',code.fullCode),record('01.洗碗机\\OTHER-T50\\03.量产后的变更文件\\00.首批大货\\b.pdf',code.fullCode)],[{...code,directoryContext:null}],timestamp);
+ const before=db.serialize();
+ expect(repository.navigation({presence:'all'}).products).toEqual([{productId,count:1},{productId:other.id,count:1}]);
+ expect(repository.search({productId,presence:'all'}).items.map(file=>file.fileName)).toEqual(['a.pdf']);expect(repository.search({productId:other.id,presence:'all'}).items.map(file=>file.fileName)).toEqual(['b.pdf']);
+ expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({count:1});
+ const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');expect(new DrawingQueryService(db).search({associationState:'unassociated'}).total).toBe(1);expect(db.serialize().equals(before)).toBe(true);
+});
+
+it('does not choose between ambiguous SKU-model directory combinations or guess from model only',()=>{
+ const service=new ProductService(db),template=service.get(productId);
+ for(const [sku,model] of [['A-B','C'],['A','B-C']])service.create({sku,model,productCategory:'洗碗机',brandId:template.brandId,productSizeId:template.productSizeId,defaultAppearanceId:template.defaultAppearanceId});
+ repository.replaceScan([record('洗碗机\\A-B-C\\ambiguous.pdf'),record('洗碗机\\T40\\model-only.pdf'),record('洗碗机\\SKUX-T40\\unknown.pdf')],[],timestamp);
+ expect(repository.navigation({presence:'all'})).toMatchObject({total:3,unassociatedProducts:3,products:[]});expect(repository.search({productId,presence:'all'}).total).toBe(0);
 });

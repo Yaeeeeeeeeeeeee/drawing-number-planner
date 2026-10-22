@@ -1,4 +1,4 @@
-import { effectiveDrawingProductSql } from '../drawings/drawing-product-evidence.js';
+import { canonicalProductSql, effectiveDrawingProductSql } from '../drawings/drawing-product-evidence.js';
 import {drawingAppearanceRelationsSql} from '../drawings/drawing-appearance-scope.js';
 import { PdfManagementRepository } from './pdf-management.js';
 import { listRawProductIds } from '../products/appearance-identity.js';
@@ -54,12 +54,24 @@ function toView(row: FileRow): PdfFileView {
     materialBatchStatus: row.material_batch_status };
 }
 
+// A PDF's directory usage is independent of the global drawing's confirmed owner.
+// Resolve only a unique exact SKU-model directory against existing product IDs;
+// this read-only projection never confirms or rewrites a historical drawing.
+const normalizedPdfPath = "replace(file.relative_path, '/', char(92))";
+const afterCategory = `substr(${normalizedPdfPath}, instr(${normalizedPdfPath}, char(92)) + 1)`;
+const productDirectorySegment = `substr(${afterCategory}, 1, instr(${afterCategory}, char(92)) - 1)`;
+const pdfDirectoryProductSql = `(select min(${canonicalProductSql('directory_product.id')}) from products directory_product
+  where directory_product.deleted_at is null and instr(${normalizedPdfPath}, char(92)) > 0
+    and instr(${afterCategory}, char(92)) > 0 and directory_product.sku is not null
+    and ${productDirectorySegment} = directory_product.sku || '-' || directory_product.model collate nocase
+  having count(distinct ${canonicalProductSql('directory_product.id')}) = 1)`;
+
 const FILE_SEARCH_JOINS = `from pdf_files file
       left join drawing_numbers drawing on drawing.id = file.drawing_id
       left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
       left join drawing_appearance_bindings planned_binding on planned_binding.origin='planned' and planned_binding.record_id=file.drawing_id
       left join drawing_appearance_bindings historical_binding on historical_binding.origin='historical' and historical_binding.record_id=file.historical_drawing_id
-      left join products product on product.id = coalesce(${effectiveDrawingProductSql("'planned'", 'file.drawing_id')},${effectiveDrawingProductSql("'historical'", 'file.historical_drawing_id')})
+      left join products product on product.id = coalesce(${pdfDirectoryProductSql},${effectiveDrawingProductSql("'planned'", 'file.drawing_id')},${effectiveDrawingProductSql("'historical'", 'file.historical_drawing_id')})
       left join dictionary_items brand on brand.id = product.brand_id
       left join dictionary_items project on project.id = drawing.project_item_id
       left join dictionary_items color on color.id = drawing.color_id

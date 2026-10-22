@@ -345,7 +345,7 @@ describe('FileRepository', () => {
     expect(repository.search({ productId }).items).toEqual(expect.arrayContaining([
       expect.objectContaining({ fileName: 'planned.pdf', productId, sku: 'TEST-FILE-REPOSITORY', model: 'ZC100', productCategory: '冰柜' }),
     ]));
-    expect(repository.search({unassociatedProduct:true}).items).toContainEqual(expect.objectContaining({fileName:'historical.pdf',productId:null}));
+    expect(repository.search({productId}).items).toContainEqual(expect.objectContaining({fileName:'historical.pdf',productId}));
     expect(repository.search({ productId: productId + 1000 }).items).toHaveLength(0);
   });
 

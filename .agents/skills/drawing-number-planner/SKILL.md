@@ -115,3 +115,8 @@ Latest explicit request: see docs/p4-products-list-20261016.md. The real product
 ### V3.0 全局业务修正授权（2026-10-22，当前）
 
 用户以 docs/v3-business-ui-requirements-20261022.md 明确替代独立外观版本日常管理、旧产品/QR/PDF分页和部分外发选择流程。按同名计划连续实施，无须逐阶段批准：保留原外观编码与旧版本表/FK兼容，不再要求创建/选择/维护独立外观对象；可靠产品证据共享图号/PDF查询与既有绑定审计，目录或前缀不能冒充确认。仅产品/QR/PDF取消传统分页并采用有界DOM加载；外发按明确批次、自动同编码可靠前序、BOM仅辅助；QR仍纯手工并兼容合理用途大小写/括号空格。保留原始PDF、占号、历史BOM和外发快照，禁止启动时不可逆修复真实数据。旧2026-10-20～21独立外观UI授权为历史，不能反向覆盖本次简化。用户本地758历史图号数据未提供，不得伪报实际修复数量。
+
+
+## Current PDF directory-context correction (2026-10-22)
+
+A PDF index instance's directory usage and the global drawing's confirmed product ownership are separate. For PDF navigation only, a unique exact existing SKU-model directory may be projected read-only to the canonical product; preserve drawing match status and all stored identities. Never promote this directory context into a formal/historical drawing binding or occupation change. Ambiguous directory combinations remain unresolved, and counts/filter/list must use the same predicate. See docs/pdf-directory-zero-correction-20261022.md.

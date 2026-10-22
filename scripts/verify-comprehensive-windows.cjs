@@ -92,6 +92,23 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.deepEqual(errors,[]);report.rendererErrors=errors;
  }finally{dialog.child.kill();if(app)await app.close();}
  database('audit-upgrade',legacy);report.oldV15Upgrade={originalDirectoryRetained:true,settingsBytesPreserved:true,oldRowsAndSnapshotsPreserved:true,realMigrationBackupValidated:true,walAndRollback:JSON.parse(fs.readFileSync(path.join(legacy,'native-rollback-and-wal.json'),'utf8'))};
+ // Exercise the reported zero-count failure through a real installed scan and navigation.
+ const directoryRoot=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更文件','00.首批大货');
+ const directoryPdf=path.join(directoryRoot,'02.0209.010.0401002-M1（转曲）.pdf'),unmatchedPdf=path.join(directoryRoot,'M1-补充资料（转曲）.pdf');
+ const directoryHashes=[writePdf(directoryPdf,'Directory context matched drawing'),writePdf(unmatchedPdf,'Directory context unmatched drawing')];
+ const bindingsBeforeScan=snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings;
+ app=await launch();try{
+  const page=await ready(app);await go(page,'PDF 文件中心');await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});
+  const counts=await page.evaluate(async()=>await(await fetch('/api/files/navigation?presence=present')).json());
+  const list=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());
+  assert.equal(counts.products.find(item=>item.productId===5)?.count,2);assert.equal(list.total,2);assert.deepEqual(list.items.map(item=>item.matchStatus).sort(),['matched','unmatched']);
+  const product=page.getByRole('button',{name:'产品 SKU · M1',exact:true});if(!await product.isVisible())await page.getByRole('button',{name:'产品／批次导航',exact:true}).click();await product.click();
+  await page.getByText(path.basename(directoryPdf),{exact:true}).waitFor();await page.getByText(path.basename(unmatchedPdf),{exact:true}).waitFor();
+  const unassociated=await page.evaluate(async()=>await(await fetch('/api/drawings?associationState=unassociated')).json());assert.ok(unassociated.items.some(item=>item.fullCode==='02.0209.010.0401002'));
+  assert.deepEqual(snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings,bindingsBeforeScan);
+  assert.equal(createHash('sha256').update(fs.readFileSync(directoryPdf)).digest('hex'),directoryHashes[0]);assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
+  await page.screenshot({path:path.join(evidence,'Windows-PDF-目录归类-无图号确认.png')});report.pdfDirectoryClassification={actualScan:true,productCount:2,listCount:2,matchedAndUnmatchedPreserved:true,unconfirmedDrawingStillUnassociated:true,noBindingWrites:true,originalFileHashesPreserved:true};
+ }catch(error){await captureFailure(app,'pdf-directory',error);throw error;}finally{await app.close();}
  const beforeQr=snapshot(path.join(legacy,'planner.db'));const qrName='Windows原生手动售后卡';
  const firstPdf=path.join(temporary,'原生QR首次','M1-warranty (qagp85g).pdf'),replacementPdf=path.join(temporary,'原生QR替换','M1-warranty (qagp85g).pdf');
  const firstHash=writePdf(firstPdf,'Native QR first PDF'),replacementHash=writePdf(replacementPdf,'Native QR replacement PDF');assert.notEqual(firstHash,replacementHash);
