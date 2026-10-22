@@ -17,7 +17,7 @@ permissions:
   actions: read
 concurrency:
   group: comprehensive-windows-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 env:
   PLANNER_ACCEPTANCE_REVISION: ${{ github.sha }}
 jobs:
