@@ -103,7 +103,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   const list=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());
   assert.equal(counts.products.find(item=>item.productId===5)?.count,2);assert.equal(list.total,2);assert.deepEqual(list.items.map(item=>item.matchStatus).sort(),['matched','unmatched']);
   const product=page.getByRole('button',{name:'产品 SKU · M1',exact:true});if(!await product.isVisible())await page.getByRole('button',{name:'产品／批次导航',exact:true}).click();await product.click();
-  await page.getByText(path.basename(directoryPdf),{exact:true}).waitFor();await page.getByText(path.basename(unmatchedPdf),{exact:true}).waitFor();
+  await page.getByRole('button',{name:`文件详情 ${path.basename(directoryPdf)}`,exact:true}).waitFor();await page.getByRole('button',{name:`文件详情 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
   const unassociated=await page.evaluate(async()=>await(await fetch('/api/drawings?associationState=unassociated')).json());assert.ok(unassociated.items.some(item=>item.fullCode==='02.0209.010.0401002'));
   assert.deepEqual(snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings,bindingsBeforeScan);
   assert.equal(createHash('sha256').update(fs.readFileSync(directoryPdf)).digest('hex'),directoryHashes[0]);assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
