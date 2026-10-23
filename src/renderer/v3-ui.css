@@ -5,10 +5,32 @@
  .engineering-workspace .nav-group + .nav-group { margin-top: 20px; }
  .engineering-workspace .nav-group-label { margin-bottom: 8px; }
  .engineering-workspace .nav-item { min-height: 40px; }
- .engineering-workspace .navigation-close, .engineering-workspace .navigation-toggle { display: inline-flex; align-items: center; justify-content: center; }
+ .engineering-workspace .navigation-close:not([hidden]), .engineering-workspace .navigation-toggle:not([hidden]) { display: inline-flex; align-items: center; justify-content: center; }
  .engineering-workspace :is(th,td) { padding-inline: 12px; vertical-align: middle; }
  .engineering-workspace th, .engineering-workspace :is(button,.badge,.status-badge) { white-space: nowrap; }
  .engineering-workspace :is(.row-actions,.actions-cell,.action-buttons) { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: nowrap; }
  .engineering-workspace :is(.code-cell,.sku-cell,.model-cell,.date-cell,.batch-name) { white-space: nowrap; }
  .engineering-workspace .virtual-table-spacer > td { padding: 0; border: 0; }
 }
+
+/* Shared control contract. Unlayered module styles can vary layout, not basic sizing.
+   Icon, text, checkbox and radio controls deliberately retain their own compact targets. */
+:root {--ws-control-height:36px;--ws-control-compact:30px;--ws-control-radius:6px;--ws-control-font:13px;}
+:root .engineering-workspace .page-surface :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=hidden]),select),
+:root .qr-manual-modal-root :is(input:not([type=checkbox]):not([type=radio]),select) {
+  box-sizing:border-box;height:var(--ws-control-height);min-height:var(--ws-control-height);padding:0 10px;
+  font-size:var(--ws-control-font);line-height:1.4;border:1px solid var(--ws-line);border-radius:var(--ws-control-radius);background:#fff;color:var(--ws-text);
+}
+:root .engineering-workspace .page-surface :is(.primary-button,.secondary-button),
+:root .qr-manual-modal-root :is(.primary-button,.secondary-button) {
+  box-sizing:border-box;height:var(--ws-control-height);min-height:var(--ws-control-height);padding:0 12px;
+  font-size:var(--ws-control-font);line-height:1.4;border-radius:var(--ws-control-radius);white-space:nowrap;
+}
+:root .engineering-workspace .page-surface :is(.primary-button,.secondary-button):disabled,
+:root .qr-manual-modal-root :is(.primary-button,.secondary-button):disabled {cursor:not-allowed;}
+:root .engineering-workspace :is(.text-button,.link-button):disabled {color:var(--ws-muted);opacity:.55;text-decoration:none;cursor:not-allowed;}
+:root .engineering-workspace [hidden], :root .qr-manual-modal-root [hidden] {display:none;}
+:root .engineering-workspace :focus-visible, :root .qr-manual-modal-root :focus-visible {outline:2px solid #4f5b66;outline-offset:3px;}
+:root .engineering-workspace .page-surface :is(input,textarea)::placeholder {color:#6b6b6b;opacity:1;}
+:root .engineering-workspace .page-surface .file-cleanup-toolbar {--ws-control-height:var(--ws-control-compact);}
+:root .engineering-workspace .page-surface .drawing-detail-group .drawing-file-row {--ws-control-height:var(--ws-control-compact);}

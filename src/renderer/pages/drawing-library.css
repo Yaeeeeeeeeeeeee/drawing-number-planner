@@ -23,21 +23,6 @@
 .product-batch-navigation small {display:block;color:var(--text-muted,#677487);}
 .drawing-workspace .module-detail.module-drawer {width:min(520px,calc(100vw - 24px));max-width:600px;}
 @media(min-width:2200px) {.drawing-workspace .module-detail.module-drawer {width:560px;}}
-/* Compact V1 wins over the earlier stacked file-row baseline. */
-.drawing-library-page .workspace-drawing-detail .drawing-code-inline h2 {font-size:22px;line-height:1.3;min-width:0;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes {gap:8px 16px;margin:12px 0;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes div {padding:0;min-width:0;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes dt {margin:0 0 3px;font-size:12px;color:#737373;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-attributes dd {margin:0;font-size:13px;overflow-wrap:anywhere;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-section {margin:0;padding:10px 0;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-section h3 {margin:0 0 6px;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-section ul {padding:0;gap:4px;}
-.drawing-library-page .workspace-drawing-detail .drawing-file-row {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px;background:#f7f7f7;}
-.drawing-library-page .workspace-drawing-detail .drawing-file-identity {display:grid;gap:2px;width:auto;}
-.drawing-library-page .workspace-drawing-detail .drawing-file-name {font-size:13px;line-height:1.4;}
-.drawing-library-page .workspace-drawing-detail .drawing-file-row small {line-height:1.4;}
-.drawing-library-page .workspace-drawing-detail .drawing-file-row button {align-self:center;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-toolbar {margin:8px 0;flex-wrap:wrap;}
 .drawing-library-page .module-list .table-wrap {overflow-x:auto;}
 .drawing-library-page .module-list table {min-width:940px;}
 .drawing-library-page .module-list th:last-child,.drawing-library-page .module-list td:last-child {position:sticky;right:0;background:#fff;white-space:nowrap;}
@@ -109,63 +94,63 @@
 .drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(8){width:110px;}
 .drawing-library-page .module-list > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td){padding:12px;}
 .drawing-library-page .module-list > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(2){text-align:left;}
-/* V3: one responsive drawer, five compact information groups. */
+/* The drawer owns its layout; no legacy file/card or toolbar geometry applies here. */
+.drawing-library-tools {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;}
+.drawing-library-tools:empty {display:none;}
 .drawing-library-page .drawing-workspace .module-detail.module-drawer {width:min(640px,calc(100vw - 24px));max-width:680px;}
-.drawing-library-page .workspace-drawing-detail {padding:20px;min-width:0;}
-.drawing-library-page .drawing-detail-header {position:relative;padding:0 34px 14px 0;border-bottom:1px solid #e5e5e5;margin-bottom:14px;}
-.drawing-library-page .drawing-detail-header .drawing-code-inline {justify-content:flex-start;gap:6px;min-width:0;}
-.drawing-library-page .drawing-detail-header h2 {font-size:22px;line-height:1.4;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.drawing-library-page .drawing-close-icon {position:absolute;right:0;top:0;display:grid;place-items:center;width:28px;height:28px;min-height:28px;padding:4px;border:0;background:transparent;}
-.drawing-library-page .drawing-detail-badges {display:flex;align-items:center;gap:8px;margin-top:8px;}
-.drawing-library-page .drawing-origin-label {font-size:12px;background:#eee;color:#555;border-radius:4px;padding:2px 6px;}
-.drawing-library-page .drawing-detail-header .detail-name {font-size:13px;margin:8px 0 0;color:#666;}
-.drawing-library-page .workspace-drawing-detail .drawing-detail-group {--drawing-group-gap:20px;--drawing-group-padding:16px;margin:0 0 var(--drawing-group-gap);padding:var(--drawing-group-padding);background:#f7f8fa;border:1px solid #ededed;border-radius:8px;min-width:0;}
-.drawing-library-page .drawing-detail-group > h3 {font-size:14px;margin:0 0 12px;color:#333;}
-.drawing-library-page .drawing-detail-group .drawing-detail-attributes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;margin:0;}
+.drawing-library-page .workspace-drawing-detail {padding:24px;min-width:0;}
+.drawing-library-page .drawing-detail-header {position:relative;padding:0 34px 20px 0;border-bottom:1px solid var(--ws-line);margin-bottom:24px;}
+.drawing-library-page .drawing-detail-header .drawing-code-inline {justify-content:flex-start;gap:8px;min-width:0;}
+.drawing-library-page .drawing-detail-header h2 {font-size:24px;line-height:1.4;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.4px;}
+.drawing-library-page .drawing-close-icon {position:absolute;right:0;top:0;display:grid;place-items:center;width:28px;height:28px;min-height:28px;padding:4px;border:0;border-radius:4px;background:transparent;}
+.drawing-library-page .drawing-close-icon:hover {background:var(--ws-hover);}
+.drawing-library-page .drawing-detail-badges {display:flex;align-items:center;gap:8px;margin-top:10px;}
+.drawing-library-page .drawing-detail-badges > span {display:inline-flex;align-items:center;min-height:24px;padding:2px 8px;border-radius:4px;font-size:12px;line-height:1.4;}
+.drawing-library-page .drawing-origin-label {background:#eee;color:#555;}
+.drawing-library-page .drawing-detail-header .detail-name {font-size:13px;font-weight:400;margin:10px 0 0;color:var(--ws-muted);}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-group {margin:0 0 20px;padding:20px;border:0;border-radius:10px;min-width:0;}
+.drawing-library-page .drawing-detail-group:nth-of-type(1) {background:#f5f6f8;}
+.drawing-library-page .drawing-detail-group:nth-of-type(2) {background:#f0f5fa;}
+.drawing-library-page .drawing-detail-group:nth-of-type(3) {background:#f0f7f4;}
+.drawing-library-page .drawing-detail-group:nth-of-type(4) {background:#f7f5f9;}
+.drawing-library-page .drawing-detail-group > h3 {font-size:14px;font-weight:600;line-height:1.5;margin:0 0 16px;color:#292929;}
+.drawing-library-page .drawing-detail-group .drawing-detail-attributes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px;margin:0;}
 .drawing-library-page .drawing-detail-attributes :is(dt,dd) {font-size:13px;line-height:1.5;overflow-wrap:anywhere;}
-.drawing-library-page .drawing-detail-attributes dt {color:#777;}
-.drawing-library-page .drawing-detail-attributes dd {margin:2px 0 0;color:#292929;}
-.drawing-library-page .drawing-detail-group .drawing-detail-section {margin:10px 0 0;padding:10px 0 0;border-top:1px solid #e3e3e3;}
-.drawing-library-page .drawing-detail-group .drawing-detail-section h3 {font-size:13px;margin:0 0 8px;}
+.drawing-library-page .drawing-detail-attributes dt {color:#626870;}
+.drawing-library-page .drawing-detail-attributes dd {margin:4px 0 0;color:#292929;font-weight:600;}
+.drawing-library-page .drawing-detail-group .drawing-detail-section {margin:16px 0 0;padding:16px 0 0;border:0;border-top:1px solid #dce3e9;border-radius:0;background:transparent;}
+.drawing-library-page .drawing-detail-group .drawing-file-section:first-of-type {margin-top:0;padding-top:0;border:0;}
+.drawing-library-page .drawing-detail-group .drawing-detail-section h3 {font-size:13px;font-weight:600;margin:0 0 10px;}
 .drawing-library-page .drawing-detail-group :is(p,li,summary,label) {font-size:13px;line-height:1.5;}
 .drawing-library-page .drawing-detail-group p {margin:6px 0;}
-.drawing-library-page .drawing-detail-group ul {margin:6px 0;padding-left:18px;}
-.drawing-library-page .drawing-detail-group .drawing-file-row {position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px;background:#fff;border:1px solid #e5e5e5;border-radius:5px;margin:6px 0;}
-.drawing-library-page .drawing-file-identity {min-width:0;padding-right:66px;}
-.drawing-library-page .drawing-file-name {display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;}
-.drawing-library-page .drawing-file-presence {position:absolute;right:10px;top:10px;font-size:11px;}
-.drawing-library-page .drawing-file-presence.present {color:#547263;}
-.drawing-library-page .drawing-file-presence.missing {color:#b4493f;}
-.drawing-library-page .drawing-file-row > button {grid-column:2;grid-row:1;margin-top:24px;align-self:end;font-size:12px;}
-.drawing-library-page .drawing-file-row details {margin-top:6px;}
-.drawing-library-page .drawing-file-row details small {overflow-wrap:anywhere;font-size:11px;}
-.drawing-library-page .drawing-detail-group .drawing-detail-toolbar {position:static;display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:0 0 10px;border:0;background:transparent;}
-.drawing-library-page .drawing-detail-group .danger-zone {margin-top:14px;border-top:1px solid #e5cccc;}
-.drawing-library-page .drawing-product-relation {font-weight:600;}
-.drawing-library-page .drawing-association-editor {padding:10px;background:#fff;border-color:#e2e2e2;}
-.drawing-library-page .drawing-association-editor :is(input,select) {min-width:0;flex:1 1 150px;}
+.drawing-library-page .drawing-detail-group ul {margin:8px 0 0;padding:0;list-style:none;}
+.drawing-library-page .drawing-file-section > h3 {display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.drawing-library-page .drawing-file-presence {position:static;font-size:12px;white-space:nowrap;}
+.drawing-library-page .drawing-file-presence.present {color:#306747;}
+.drawing-library-page .drawing-file-presence.missing {color:#aa3a31;}
+.drawing-library-page .drawing-detail-group .drawing-file-row {--ws-control-height:30px;display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px;height:52px;min-height:48px;padding:8px 12px;box-sizing:border-box;background:#fff;border:1px solid #d9e3ed;border-radius:6px;margin:8px 0 0;}
+.drawing-library-page .drawing-file-identity {flex:1;min-width:0;width:auto;padding:0;}
+.drawing-library-page .drawing-file-name {display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;line-height:1.5;font-weight:500;}
+.drawing-library-page .drawing-file-row > button {flex-shrink:0;white-space:nowrap;margin:0;align-self:center;color:#425f7c;}
+.drawing-library-page .drawing-detail-group .drawing-detail-toolbar {display:flex;position:static;align-items:center;flex-wrap:wrap;gap:12px;padding:0;margin:0;border:0;background:transparent;}
+.drawing-library-page .drawing-detail-group .danger-zone {display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin-top:20px;padding:16px 0 0;border:0;border-top:1px solid #ded9e3;background:transparent;}
+.drawing-library-page .drawing-detail-group .danger-zone > :is(p,div) {flex-basis:100%;}
+.drawing-library-page .drawing-detail-group .text-button {min-height:28px;padding:4px 0;border:0;border-radius:0;background:transparent;font-size:13px;}
+.drawing-library-page .drawing-detail-group .danger-zone > .text-button.danger {padding:4px 0;border:0;background:transparent;}
+.drawing-library-page .drawing-detail-group .text-button:hover:not(:disabled) {text-decoration:underline;text-underline-offset:3px;background:transparent;}
+.drawing-library-page .drawing-business-summary {margin:0;}
+.drawing-library-page .drawing-business-summary > div {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;}
+.drawing-library-page .drawing-business-summary > div:first-child {padding-top:0;}
+.drawing-library-page .drawing-business-summary > div:last-child {padding-bottom:0;}
+.drawing-library-page .drawing-business-summary > div+div {border-top:1px solid #dce7e0;margin-top:12px;padding-top:16px;}
+.drawing-library-page .drawing-business-summary dt {color:#5f6b65;flex-shrink:0;}
+.drawing-library-page .drawing-business-summary dd {margin:0;text-align:right;font-size:13px;font-weight:500;}
+.drawing-library-page .drawing-business-status {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;}
+.drawing-library-page .drawing-business-status select {width:150px;min-width:0;}
+.drawing-association-editor {padding:12px;background:transparent;}
+.drawing-association-editor :is(input,select) {min-width:0;flex:1 1 150px;}
+.drawing-association-records {max-height:min(40vh,360px);overflow:auto;border-block:1px solid var(--ws-line);margin-block:8px;}
+.drawing-association-preview {min-height:0;flex-shrink:0;}
+.drawing-association-result {flex-shrink:0;}
 @media(min-width:2200px) {.drawing-library-page .drawing-workspace .module-detail.module-drawer {width:680px;}}
-@media(max-width:520px) {.drawing-library-page .workspace-drawing-detail {padding:12px;}.drawing-library-page .drawing-detail-header h2{font-size:17px;}.drawing-library-page .drawing-detail-group .drawing-detail-attributes{gap:10px;}}
-
-.drawing-association-records {max-height: min(40vh, 360px); overflow: auto; border-block: 1px solid #e5e7eb; margin-block: 8px;}
-.drawing-association-preview {min-height: 0; flex-shrink: 0;}
-.drawing-association-result {flex-shrink: 0;}
-
-/* Four compact detail groups; file actions never wrap below names. */
-.drawing-library-page .drawing-detail-group:nth-of-type(1){background:#f5f6f8;}
-.drawing-library-page .drawing-detail-group:nth-of-type(2){background:#f0f5fa;}
-.drawing-library-page .drawing-detail-group:nth-of-type(3){background:#f0f7f4;}
-.drawing-library-page .drawing-detail-group:nth-of-type(4){background:#f7f5f9;}
-.drawing-library-page .drawing-file-section > h3{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.drawing-library-page .drawing-file-section .drawing-file-presence{position:static;font-size:12px;white-space:nowrap;}
-.drawing-library-page .drawing-file-section > ul{list-style:none;padding:0;margin:6px 0;}
-.drawing-library-page .drawing-detail-group .drawing-file-row{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px;min-height:48px;height:52px;padding:8px 12px;box-sizing:border-box;}
-.drawing-library-page .drawing-file-identity{flex:1;min-width:0;padding:0;}
-.drawing-library-page .drawing-file-row > button{flex-shrink:0;white-space:nowrap;margin:0;align-self:center;font-size:12px;}
-.drawing-library-page .drawing-business-summary{margin:0;}
-.drawing-library-page .drawing-business-summary > div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;}
-.drawing-library-page .drawing-business-summary > div+div{border-top:1px solid #dce7e0;}
-.drawing-library-page .drawing-business-summary dt{color:#6c726f;flex-shrink:0;}
-.drawing-library-page .drawing-business-summary dd{margin:0;text-align:right;font-size:13px;}
-.drawing-library-page .drawing-business-status{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;}
-.drawing-library-page .drawing-business-status select{width:130px;min-width:0;}
+@media(max-width:640px) {.drawing-library-page .workspace-drawing-detail {padding:16px;}.drawing-library-page .drawing-detail-header h2 {font-size:20px;}.drawing-library-page .workspace-drawing-detail .drawing-detail-group {padding:16px;}.drawing-library-page .drawing-detail-group .drawing-detail-attributes {gap:14px;}}

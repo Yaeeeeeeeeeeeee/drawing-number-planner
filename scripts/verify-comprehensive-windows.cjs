@@ -79,6 +79,9 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
     await page.getByRole('heading',{name:label,exact:true}).waitFor();
     await page.waitForTimeout(150);if(label==='二维码管理')await assertQrListLayout(page,`${width}x${height}`);
     if(['产品档案','PDF 文件中心'].includes(label))assert.equal(await page.locator('.table-pagination').count(),0,`${label} must use scrolling rather than traditional paging`);
+    const uiControls=await page.evaluate(()=>({hiddenToggleVisible:[...document.querySelectorAll('.navigation-toggle[hidden]')].some(e=>getComputedStyle(e).display!=='none'),selectHeights:[...document.querySelectorAll('.page-surface select')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect().height)}));
+    assert.equal(uiControls.hiddenToggleVisible,false);assert.ok(uiControls.selectHeights.every(height=>Math.abs(height-36)<1),`${label} controls must share 36px height`);
+    (report.uiControlConsistency??=[]).push({label,width,...uiControls});
     if(width===1920&&label==='图号库'){
      await page.getByRole('button',{name:'查看 / 管理',exact:true}).first().click();
      const drawer=page.locator('.drawing-maintenance');await drawer.waitFor();assert.equal(await drawer.locator(':scope > .drawing-detail-group').count(),4);
@@ -94,7 +97,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  database('audit-upgrade',legacy);report.oldV15Upgrade={originalDirectoryRetained:true,settingsBytesPreserved:true,oldRowsAndSnapshotsPreserved:true,realMigrationBackupValidated:true,walAndRollback:JSON.parse(fs.readFileSync(path.join(legacy,'native-rollback-and-wal.json'),'utf8'))};
  // Exercise the reported zero-count failure through a real installed scan and navigation.
  const directoryRoot=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更明细（已量产的产品看最新日期）','00.首批大货');
- const directoryPdf=path.join(directoryRoot,'02.0209.010.0401002-M1（转曲）.pdf'),unmatchedPdf=path.join(directoryRoot,'M1-补充资料（转曲）.pdf');
+ const directoryPdf=path.join(directoryRoot,'02.0209.010.0401002-M1-铭牌及安装注意事项多语言生产定稿（转曲）.pdf'),unmatchedPdf=path.join(directoryRoot,'M1-补充资料（转曲）.pdf');
  const directoryHashes=[writePdf(directoryPdf,'Directory context matched drawing'),writePdf(unmatchedPdf,'Directory context unmatched drawing')];
  const bindingsBeforeScan=snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings;
  app=await launch();try{
@@ -121,10 +124,12 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   const compactDrawer=page.locator('.drawing-maintenance');await compactDrawer.waitFor();
   assert.equal(await compactDrawer.locator(':scope > .drawing-detail-group').count(),4);
   const fileGeometry=await compactDrawer.locator('.drawing-file-row').evaluateAll(rows=>rows.map(row=>{const name=row.querySelector('.drawing-file-name').getBoundingClientRect(),button=row.querySelector('button').getBoundingClientRect(),card=row.getBoundingClientRect();const style=getComputedStyle(row);return {display:style.display,height:card.height,nameY:name.y+name.height/2,buttonY:button.y+button.height/2,overlap:name.right>button.left};}));
+  const innerBackgrounds=await compactDrawer.locator('.drawing-detail-group .drawing-detail-section').evaluateAll(items=>items.map(e=>getComputedStyle(e).backgroundColor));assert.ok(innerBackgrounds.every(color=>color==='rgba(0, 0, 0, 0)'));
+  await page.screenshot({path:path.join(evidence,'Windows-UI修正-四板块文件行.png')});
   assert.ok(fileGeometry.length>0);for(const row of fileGeometry){assert.equal(row.display,'flex');assert.ok(row.height>=48&&row.height<=56);assert.ok(Math.abs(row.nameY-row.buttonY)<3);assert.equal(row.overlap,false);}
   await compactDrawer.getByRole('button',{name:'取消占号并删除',exact:true}).click();
   await compactDrawer.getByText(/该图号存在历史扫描占用记录/).waitFor();
-  report.compactDrawingDrawer={fourGroups:true,fileGeometry,historicalReleaseQualificationReachable:true,protectedHistoryReleaseBlocked:true};
+  report.compactDrawingDrawer={fourGroups:true,fileGeometry,innerBackgrounds,historicalReleaseQualificationReachable:true,protectedHistoryReleaseBlocked:true};
   report.oneClickDrawingClassification={actualRendererClick:true,realDatabaseSaved:true,productFilteredListContainsDrawing:true,navigationCountsNonzero:true,auditRecorded:true};
 
  }catch(error){await captureFailure(app,'pdf-directory',error);throw error;}finally{await app.close();}
@@ -136,6 +141,9 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   const page=await ready(app);assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeQr);report.restartPreservesDatabase=true;
   await go(page,'二维码管理');await assertQrListLayout(page,'before-native-association');await page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).locator('xpath=ancestor::tr').getByRole('button',{name:'新增用途',exact:true}).click();
   const modal=page.getByRole('dialog',{name:'手动关联二维码PDF'});await modal.waitFor();
+  assert.equal(await modal.evaluate(element=>element.contains(document.activeElement)),true);
+  const modalCancel=modal.getByRole('button',{name:'取消',exact:true});await modalCancel.focus();await page.keyboard.press('Tab');assert.equal(await modal.evaluate(element=>element.contains(document.activeElement)),true);assert.equal(await modalCancel.evaluate(element=>element===document.activeElement),false);await page.keyboard.press('Shift+Tab');assert.equal(await modalCancel.evaluate(element=>element===document.activeElement),true);
+  report.qrModalKeyboardFocus={initialFocus:true,tabLoop:true};
   const purpose=await page.evaluate(async()=>{const result=await(await fetch('/api/qr-purposes')).json();return result.items.find(p=>p.key==='warranty'&&p.englishName==='Warranty');});assert.ok(purpose);
   assert.equal(await modal.getByLabel('手动二维码外观版本',{exact:true}).count(),0);assert.ok(!beforeQr.product_qr_codes.some(row=>row.product_id===5&&row.purpose_id===purpose.id&&row.deleted_at==null&&row.appearance_version_id==null),'Native test must not replace an existing shared Warranty QR');
   await modal.getByLabel('手动二维码用途',{exact:true}).selectOption(String(purpose.id));await modal.getByLabel('手动二维码名称',{exact:true}).fill(qrName);await modal.getByLabel('手动二维码网址',{exact:true}).fill('https://qrs.ly/qagp85g');

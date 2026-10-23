@@ -314,7 +314,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
 
-    {!mockMode && api.classifyDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>{
+    <div className="drawing-library-tools">{!mockMode && api.classifyDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>{
       if(maintainingRef.current)return;
       setMaintaining(true);setError('');setAssociationResult(null);
       void api.classifyDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})})
@@ -322,7 +322,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
         .catch(reason=>setError(reason instanceof Error?reason.message:'自动归类失败，未保存，请重试'))
         .finally(()=>setMaintaining(false));
     }}>{maintaining?'正在归类…':'自动归类'}</button>}
-    {!mockMode && api.previewDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>void api.previewDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})}).then(setRepairPreview).catch(reason=>setError(reason.message))}>诊断图号关联</button>}
+    {!mockMode && api.previewDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>void api.previewDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})}).then(setRepairPreview).catch(reason=>setError(reason.message))}>诊断图号关联</button>}</div>
     {repairPreview && <section className="drawing-association-preview" aria-label="关联诊断预览"><h3>关联诊断预览</h3>{repairPreview.summary && <p>历史图号已关联 {repairPreview.summary.historicalAssociated} / {repairPreview.summary.historicalTotal} · 正式图号已关联 {repairPreview.summary.plannedAssociated} / {repairPreview.summary.plannedTotal} · 待确认 {repairPreview.summary.ready} · 歧义 {repairPreview.summary.ambiguous} · 冲突 {repairPreview.summary.conflicts}</p>}<div className="drawing-association-records">{repairPreview.records.map(row=><p key={row.signedId}>{row.fullCode} · {{associated:'已确认',ready:'唯一候选，可直接归类','missing-product':'缺少产品依据','missing-version':'缺少关联依据',ambiguous:'候选有歧义',conflict:'依据冲突'}[row.state]} · {row.evidence.join('；')} · {row.targets.map(target=>products.find(product=>product.id===target.productId)?.model??`产品 #${target.productId}`).join('；')}</p>)}</div>
       <button type="button" disabled={maintaining||!repairPreview.records.some(row=>row.state==='ready')} onClick={()=>{if(maintainingRef.current)return;setMaintaining(true);const targets=repairPreview.records.filter(row=>row.state==='ready').flatMap(row=>row.targets);void api.confirmDrawingAssociations?.({targets,fingerprint:repairPreview.fingerprint,reason:'核验诊断证据后批量确认',confirmed:true}).then(async(result)=>{setAssociationResult(result);setRepairPreview(null);await refreshCurrentQuery();}).catch(reason=>setError(reason.message)).finally(()=>setMaintaining(false));}}>人工确认候选关联</button><button type="button" onClick={()=>setRepairPreview(null)}>关闭预览</button></section>}
     {associationResult && <p role="status" className="drawing-association-result">已更新 {associationResult.updated} 条关联{associationResult.before && associationResult.after && <> · 历史已关联 {associationResult.before.historicalAssociated} → {associationResult.after.historicalAssociated} / {associationResult.after.historicalTotal} · 正式已关联 {associationResult.before.plannedAssociated} → {associationResult.after.plannedAssociated} / {associationResult.after.plannedTotal}</>}<button className="text-button" type="button" aria-label="关闭关联结果" onClick={()=>setAssociationResult(null)}>关闭</button></p>}
@@ -410,7 +410,7 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
       <div className="drawing-code-inline"><h2 title={selected.fullCode}>{selected.fullCode}</h2><CopyDrawingCode key={selected.fullCode} code={selected.fullCode} /></div>
       <button className="panel-close drawing-close-icon" aria-label="关闭图号详情" disabled={maintaining} onClick={onClose} type="button"><X size={18} strokeWidth={1.8}/></button>
       <div className="drawing-detail-badges"><span className="drawing-origin-label">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</span><span className={`status-text ${selected.status}`}>{selected.status==='reserved'?'已占号':selected.status==='active'?'使用中':'历史版本'}</span></div>
-      <p className="detail-name">{selected.displayName}</p>
+      {selected.displayName?.trim() && selected.displayName.trim() !== selected.fullCode && <p className="detail-name">{selected.displayName}</p>}
     </header>
     {errorMessage && <p className="error-banner" role="alert">{errorMessage}</p>}
     <section className="drawing-detail-group"><h3>01 基础信息</h3><dl className="drawing-detail-attributes">

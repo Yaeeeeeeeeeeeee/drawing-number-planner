@@ -27,22 +27,7 @@
   .product-qr-direct > button { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; line-height: 1.6; min-height: 24px; }
   .products-integrated > .table-wrap tr:not(.expanded-table-row) > :is(th,td):nth-child(6) { width: 170px; }
   .products-integrated > .table-wrap > table { min-width: 820px; }
-  .workspace-drawing-detail > .drawing-detail-attributes { margin: 20px 0; gap: 16px; }
-  .workspace-drawing-detail > h2 { font-family: Consolas,monospace; font-size: 16px; line-height: 1.5; margin: 0 0 12px; }
-  .workspace-drawing-detail .detail-name { font-size: 14px; font-weight: 600; margin: 12px 0 20px; }
-  .workspace-drawing-detail :is(.drawing-detail-section,.drawing-state-maintenance) { border: 0; border-top: 1px solid var(--ws-line); border-radius: 0; background: white; margin: 20px 0 0; padding: 18px 0 0; }
-  .workspace-drawing-detail h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
-  .workspace-drawing-detail :is(.status-text,.presence-label,.usage-badge) { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 6px; font-size: 12px; border-radius: 4px; }
-  .workspace-drawing-detail ul { padding-left: 0; list-style: none; margin: 0; }
-  .workspace-drawing-detail .drawing-file-row { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--ws-line); }
-  .workspace-drawing-detail .drawing-file-identity { display: grid; gap: 6px; width: 100%; }
-  .workspace-drawing-detail .drawing-file-name { font-size: 13px; line-height: 1.65; font-weight: 600; overflow-wrap: anywhere; }
-  .workspace-drawing-detail small { font-size: 12px; color: var(--ws-muted); line-height: 1.65; overflow-wrap: anywhere; }
-  .workspace-drawing-detail :is(.text-button,.secondary-button) { min-height: 30px; padding: 5px 9px; border: 1px solid var(--ws-line); border-radius: 6px; }
-  .workspace-drawing-detail .drawing-actions { margin-top: 12px; gap: 10px; }
-  .workspace-drawing-detail .batch-occurrence { padding: 12px 0; display: flex; flex-wrap: wrap; gap: 8px; }
-  .workspace-drawing-detail .batch-occurrence > small { flex-basis: 100%; }
-  .workspace-drawing-detail .danger-zone { border-top-color: #e6c8c4; }
+  /* Drawing detail presentation is owned by pages/drawing-library.css. */
   .planning-stage { max-width: 1560px; margin-bottom: 24px; padding: 0 0 24px; border-bottom: 1px solid var(--ws-line); }
   .planning-stage > h2, .approved-outbound .ob-step > h2 { display: flex; align-items: center; gap: 12px; font-size: 17px; margin: 0 0 20px; }
   .planning-stage > h2 > span, .approved-outbound .ob-step > h2 > span { color: var(--ws-muted); font: 12px Consolas,monospace; }

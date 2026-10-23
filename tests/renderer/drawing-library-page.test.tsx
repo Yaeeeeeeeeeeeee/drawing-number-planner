@@ -13,6 +13,12 @@ it('requests enough initial drawing records for a tall workspace without truncat
 });
 
 describe('DrawingLibraryPage', () => {
+  it('shows the full drawing number once in the detail header when the display name is identical', async () => {
+    const item={id:1,fullCode:'02.0209.010.0501001',displayName:'02.0209.010.0501001',origin:'planned',status:'reserved',readOnly:false,sourceFiles:[],outlinedFiles:[],currentBomUsage:[]};
+    const api={searchDrawings:vi.fn().mockResolvedValue({items:[item],total:1}),listDictionaries:vi.fn().mockResolvedValue([]),getDrawing:vi.fn().mockResolvedValue(item)};
+    render(<DrawingLibraryPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:item.fullCode}));
+    const detail=await screen.findByRole('complementary',{name:'图号详情'});expect(within(detail).getAllByText(item.fullCode)).toHaveLength(1);
+  });
   it('does not replace a new drawings PDF candidates with an old manual search response', async () => {
     const first = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active', model: 'T40', displayName: '第一记录', readOnly: false, sourceFiles: [], outlinedFiles: [], currentBomUsage: [] };
     const second = { ...first, id: 2, fullCode: '02.0209.010.0501002', displayName: '第二记录' };

@@ -1,3 +1,4 @@
+import { useModalFocus } from './useModalFocus';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronsLeft } from 'lucide-react';
 import { PanelResizeHandle } from './PanelResizeHandle';
@@ -47,40 +48,10 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
     if (navigationFocus.current === 'panel' && navigationDocked) root.current?.querySelector<HTMLButtonElement>('.navigation-fold')?.focus();
     navigationFocus.current = null;
   }, [navigationDocked]);
-  useEffect(() => {
-    if (!modal || !panel.current) return;
-    const current = panel.current, previousFocus = document.activeElement as HTMLElement | null;
-    // Make every background sibling inert, including the shell header/navigation.
-    const background: Array<[HTMLElement, boolean]> = [];
-    for (let node: HTMLElement | null = current; node?.parentElement && node.parentElement !== document.body; node = node.parentElement) {
-      for (const sibling of node.parentElement.children) if (sibling !== node && sibling instanceof HTMLElement && !sibling.classList.contains('module-backdrop')) {
-        background.push([sibling, sibling.hasAttribute('inert')]); sibling.setAttribute('inert', '');
-      }
-    }
-    const controls = () => [...current.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],summary,[tabindex="0"]')]
-      .filter(el => !el.closest('[hidden],[inert]') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')
-      .filter(el => ![...current.querySelectorAll('details:not([open])')].some(details => details.contains(el) && details.querySelector(':scope > summary') !== el));
-    if (!current.contains(document.activeElement)) (controls()[0] ?? current).focus();
-    const keydown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      if (event.key === 'Escape') { event.preventDefault(); modal === 'detail' ? closeRef.current() : setNavigationOpen(false); }
-      if (event.key === 'Tab') {
-        const all = controls(), first = all[0], last = all.at(-1);
-        if (!first || !last) { event.preventDefault(); current.focus(); return; }
-        if (!current.contains(document.activeElement) || event.shiftKey && document.activeElement === first) {
-          event.preventDefault(); (event.shiftKey ? last : first).focus();
-        } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-      }
-    };
-    document.addEventListener('keydown', keydown);
-    return () => {
-      document.removeEventListener('keydown', keydown);
-      for (const [element, wasInert] of background) if (!wasInert) element.removeAttribute('inert');
-      const stillEditing = current.isConnected && !current.hidden && current.contains(document.activeElement);
-      const origin = modal === 'detail' ? detailOrigin.current ?? previousFocus : previousFocus;
-      if (!stillEditing && origin?.isConnected) origin.focus();
-    };
-  }, [modal, detailIdentity]);
+  useModalFocus({ panel, open: Boolean(modal), identity: `${modal}-${detailIdentity ?? ''}`,
+    onClose: () => modal === 'detail' ? closeRef.current() : setNavigationOpen(false),
+    returnFocus: () => modal === 'detail' ? detailOrigin.current : null,
+  });
 
   const navVisible = navigationDocked || navigationModal;
   const closeNavigation = () => { if(navigationDocked) { navigationFocus.current = 'toggle'; setNavigationCollapsed(true); } setNavigationOpen(false); };

@@ -435,7 +435,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     <p className="files-loading-status" role="status" aria-live="polite">{loading ? '正在加载 PDF 文件索引…' : '\u00a0'}</p>
     {!loading && !error && files.length === 0 && <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
       description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} />}
-    {
+    {(files.length > 0 || loading) &&
       <DataTable virtualize virtualKey={queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope})} onEndReached={() => void loadMore()} items={files} renderExpandedRow={item => expandedPathId === item.id
         ? <div id={`file-path-${item.id}`}><FilePath path={item.relativePath} name={item.fileName} onClose={() => {
           setExpandedPathId(null);

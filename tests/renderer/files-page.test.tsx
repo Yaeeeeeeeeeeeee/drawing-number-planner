@@ -421,3 +421,9 @@ describe('FilesPage', () => {
     expect(screen.queryByRole('option', { name: 'SKDZC100JP · ZC100 · 06.20260309' })).not.toBeInTheDocument();
   });
 });
+
+it('renders one empty PDF list region without a second empty table',async()=>{
+ const api=apiFixture();api.searchPdfFiles.mockResolvedValue({items:[],total:0,page:1,pageSize:100});
+ render(<FilesPage api={api as never}/>);await screen.findByRole('heading',{name:'请先设置资料根目录'});
+ expect(screen.queryByRole('table')).not.toBeInTheDocument();
+});

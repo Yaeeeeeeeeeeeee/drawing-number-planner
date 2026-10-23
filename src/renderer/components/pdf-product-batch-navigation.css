@@ -19,7 +19,7 @@
 .pdf-nav-expand {display:flex;align-items:center;justify-content:center;flex:none;width:22px;height:36px;padding:0;color:var(--text-muted,#677487);}
 .pdf-nav-product {padding-left:12px;}
 .pdf-nav-batch {padding-left:23px;}
-.pdf-nav-state {flex:none;font-size:10px;white-space:nowrap;color:#737b85;}
+.pdf-nav-state {flex:none;font-size:10px;white-space:nowrap;color:#606972;}
 .pdf-nav-state.current {color:#36694d;background:#edf5ef;border:1px solid #d0e3d5;border-radius:3px;padding:1px 3px;}.pdf-nav-state.pending {color:#87671d;background:#faf4e5;border:1px solid #eadbb5;border-radius:3px;padding:1px 3px;}
 .pdf-nav-note {display:block;margin:4px 8px 10px;color:var(--text-muted,#677487);font-size:11px;}
 .catalog-nav-special {border-top:1px solid var(--border,#e1e5e9);padding-top:7px;}

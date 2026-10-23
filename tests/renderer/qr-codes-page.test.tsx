@@ -10,6 +10,20 @@ function desktop(){const result={token:'picker-token',fileName:manual.files[0].f
 async function expand(){fireEvent.click(await screen.findByRole('button',{name:'展开 ZU70SD 的二维码用途'}));return document.querySelector('.qr-manual-subtable') as HTMLElement;}
 afterEach(()=>{Object.defineProperty(window,'plannerDesktop',{configurable:true,value:undefined});localStorage.clear();});
 describe('manual QR page',()=>{
+ it('traps keyboard focus in the manual dialog and Escape cancels without saving, restoring the opener',async()=>{
+  const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();const opener=within(sub).getByRole('button',{name:'更换文件'});opener.focus();fireEvent.click(opener);
+  const dialog=screen.getByRole('dialog');await waitFor(()=>expect(dialog.contains(document.activeElement)).toBe(true));
+  expect(document.querySelector('.qr-page:not(.qr-manual-modal-root)')?.closest('[inert]')).not.toBeNull();
+  const cancel=within(dialog).getByRole('button',{name:'取消'});cancel.focus();fireEvent.keyDown(cancel,{key:'Tab'});expect(dialog.contains(document.activeElement)).toBe(true);expect(document.activeElement).not.toBe(cancel);
+  fireEvent.keyDown(document.activeElement!,{key:'Tab',shiftKey:true});expect(cancel).toHaveFocus();
+  fireEvent.keyDown(cancel,{key:'Escape'});await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());expect(opener).toHaveFocus();expect(opener.closest('[inert]')).toBeNull();expect(api.qrManualCommit).not.toHaveBeenCalled();
+ });
+ it('does not dismiss or restore background focus while a native file selection is pending',async()=>{
+  const bridge=desktop();let finish!:(value:null)=>void;bridge.qrManualSelectFile.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+  const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));fireEvent.keyDown(dialog,{key:'Escape'});expect(dialog).toBeInTheDocument();finish(null);await waitFor(()=>expect(within(dialog).getByRole('button',{name:'取消'})).not.toBeDisabled());
+  fireEvent.keyDown(dialog,{key:'Escape'});await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());expect(api.qrManualCommit).not.toHaveBeenCalled();
+ });
  it('removes independent appearance selection but preserves the legacy record scope during replacement',async()=>{
   desktop();const code={...manual,appearanceVersionId:47},api=apiFor([code]);render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');
   expect(within(dialog).queryByLabelText('手动二维码外观版本')).not.toBeInTheDocument();
