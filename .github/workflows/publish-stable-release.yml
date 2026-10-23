@@ -1,0 +1,127 @@
+name: Publish verified stable Windows release
+on:
+  push:
+    branches: [codex/v3-business-ui-20261022]
+    paths: ['.github/workflows/publish-stable-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-stable-1.0.0
+  cancel-in-progress: false
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  SOURCE_SHA: ec915e70706d6780198350cc320befdf3db1a056
+  VERIFIED_RUN: '40005024004'
+  SETUP_DIGEST: 'sha256:19ec85375470079d592ffa32d09ed336280f8b5cc4aa5cf66525a7f2bc6cb313'
+  REPORT_DIGEST: 'sha256:e86c4c6367d1c1685aec820d98ab47c7fe6057fbf2812d49e50a1a02448a03bb'
+  RELEASE_TAG: v1.0.0
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require the exact successful installed build and pinned artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/actions/runs/$VERIFIED_RUN" > /tmp/verified-run.json
+          gh api "repos/$GH_REPO/actions/runs/$VERIFIED_RUN/artifacts" > /tmp/verified-artifacts.json
+          python3 - <<'PY'
+          import json,os,subprocess
+          run=json.load(open('/tmp/verified-run.json'))
+          assert run['head_sha']==os.environ['SOURCE_SHA'] and run['conclusion']=='success'
+          assert run['path']=='.github/workflows/comprehensive-windows-delivery.yml'
+          artifacts=json.load(open('/tmp/verified-artifacts.json'))['artifacts']
+          for kind,digest in [('Chinese-Setup',os.environ['SETUP_DIGEST']),('Verification',os.environ['REPORT_DIGEST'])]:
+              selected=[a for a in artifacts if a['name']==f"Comprehensive-Windows-{kind}-{os.environ['SOURCE_SHA']}"]
+              assert len(selected)==1 and not selected[0]['expired'] and selected[0]['digest']==digest
+              assert selected[0]['workflow_run']['head_sha']==os.environ['SOURCE_SHA']
+          package=json.loads(subprocess.check_output(['git','show',os.environ['SOURCE_SHA']+':package.json']))
+          assert package['version']=='1.0.0'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: Comprehensive-Windows-Chinese-Setup-${{ env.SOURCE_SHA }}
+          run-id: ${{ env.VERIFIED_RUN }}
+          github-token: ${{ github.token }}
+          path: verified-installer
+      - uses: actions/download-artifact@v4
+        with:
+          name: Comprehensive-Windows-Verification-${{ env.SOURCE_SHA }}
+          run-id: ${{ env.VERIFIED_RUN }}
+          github-token: ${{ github.token }}
+          path: verified-report
+      - name: Verify native results and prepare unchanged EXE and evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          python3 - <<'PY'
+          import pathlib,hashlib,shutil,json,os,zipfile,re
+          report=pathlib.Path('verified-report')
+          native=json.loads((report/'windows-comprehensive-verification.json').read_text(encoding='utf-8-sig'))
+          assert native['revision']==os.environ['SOURCE_SHA']
+          assert native['oldV15Upgrade']['realMigrationBackupValidated']
+          assert native['freshBusinessTablesEmpty'] and native['freshRestartPreservesDatabase']
+          assert native['rendererErrors']==[]
+          assert native['v4']['manualPdfFiles']==12
+          assert native['v41v42']['actualInstalledHttpAndDom'] and native['v41v42']['uniqueUnbatchedFilesShown']
+          assert native['v41v42']['competingUnbatchedFilesRequireConfirmation']
+          assert native['v41v42']['batchContextMenu']['emptyBatchDeletionAndScanRediscovery']
+          desktop=json.loads((report/'windows-desktop-install.json').read_text(encoding='utf-8-sig'))
+          assert desktop['desktopFilePreserved'] and desktop['personalDataPreserved']
+          assert desktop['chineseChild']['verifiedFiles']>0 and desktop['desktopRoot']['verifiedFiles']>0
+          wizard=json.loads((report/'windows-chinese-installer.json').read_text(encoding='utf-8-sig'))
+          assert wizard['shellFolderPicker'] and wizard['advancedToReady'] and wizard['typedDesktopRootRedirected']
+          installed=json.loads((report/'installed-version.json').read_text(encoding='utf-8-sig'))
+          assert installed['installedVersion']=='1.0.0' and installed['revision']==os.environ['SOURCE_SHA']
+          source=pathlib.Path('verified-installer/图号规划器-Windows-x64-安装包.exe')
+          assert source.is_file() and source.read_bytes()[:2]==b'MZ'
+          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.0.0-Windows-x64-Setup.exe')
+          shutil.copyfile(source,target)
+          assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest()
+          shutil.copyfile('docs/install-and-upgrade.md','release-assets/INSTALL-UPGRADE.md')
+          notes=pathlib.Path('docs/release-1.0.0.md').read_text()
+          prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/docs/"
+          notes=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',notes)
+          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.0.0`。\n\n清理后完整自动化 **169 文件、1445 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
+          pathlib.Path('release-assets/README-Windows-1.0.0.md').write_text(notes)
+          with zipfile.ZipFile('release-assets/Verification-Windows-1.0.0.zip','w',zipfile.ZIP_DEFLATED) as archive:
+              for file in sorted(report.rglob('*')):
+                  if file.is_file(): archive.write(file,file.relative_to(report))
+          files=sorted(pathlib.Path('release-assets').iterdir())
+          pathlib.Path('release-assets/SHA256SUMS.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files))
+          PY
+      - name: Publish stable tag and permanent download
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
+            existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
+            test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace another source tag'; exit 1; }
+          else
+            gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" --title '图号规划器 v1.0.0 · Windows 正式版' --notes-file release-assets/README-Windows-1.0.0.md --draft
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.0.0.md --draft=false --prerelease=false --latest
+      - name: Update repository homepage without merging application history
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/contents/README.md?ref=master" > /tmp/homepage.json
+          python3 - <<'PY'
+          import json,base64,pathlib,os,re
+          old=json.load(open('/tmp/homepage.json'))
+          text=pathlib.Path('README.md').read_text()
+          prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['RELEASE_TAG']}/"
+          text=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',text)
+          body={'branch':'master','sha':old['sha'],'message':'docs: point homepage to verified v1.0.0 release and source tag','content':base64.b64encode(text.encode()).decode()}
+          pathlib.Path('/tmp/update-homepage.json').write_text(json.dumps(body))
+          PY
+          gh api --method PUT "repos/$GH_REPO/contents/README.md" --input /tmp/update-homepage.json > /tmp/homepage-updated.json
