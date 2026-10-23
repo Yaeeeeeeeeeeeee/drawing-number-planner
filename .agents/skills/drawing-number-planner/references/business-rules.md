@@ -25,7 +25,7 @@ The classifications in `SKILL.md` are authoritative for this reference. Current 
 ## Confirmed Backlog
 
 - QR content decoding and automatic URL discovery.
-- Batch renaming, richer old-model copying, server synchronization, and server-side difference comparison.
+- Richer old-model copying, server synchronization, and server-side difference comparison. Batch display renaming is Current.
 - Any future QR editing UI, including whether it should be restored to BOM editing.
 - Further outbound automation beyond the currently implemented workflow.
 
@@ -53,7 +53,7 @@ The latest explicit user request makes an existing BOM record's ID, business dat
 
 用户明确纠正整产品删除须逐个输入图号的不合理要求。仅整产品向导改为一次输入型号、明确选择占号和历史策略、核对数量后确认；完整图号/ID列表从已显示可展开的预检快照自动形成载荷，服务端逐项精确校验和指纹/引用重查不变。历史清除的额外手输短语同样由明确选择和最终确认代替。独立单图号释放不因本交互改动而减省规则。见docs/p4-pdf-navigation-20261019.md。
 
-## Current：综合产品外观与手工二维码、外发V2（2026-10-20～21）
+## Historical appearance UI; retained QR/outbound and data protection（2026-10-20～21）
 
 用户已确认并授权完整实施：同一规范产品SKU/型号允许多个独立外观版本，一个当前，其余历史或草稿；归并保留原身份与历史外键，实际归并由用户本地确认。正式占号与产品/外观绑定在同一事务内；明确沿用关系不改原始归属、不自动加入BOM。扫描派生产品信息只作候选，不冒充确认事实。PDF索引清除与忽略不删除磁盘文件；批次改显示名，不按同名合并。二维码为纯手工PDF关联，原有扫描字段保留兼容而不继续自动确认流程。外发V2以用户选择批次为来源、BOM仅辅助，禁止隐式拼接历史批次；具体规则、确认条件和数据安全见当前综合计划及 `docs/outbound-v2-requirements-20261020.md`。本轮确认的批次命名、QR操作与身份归并不再属于上述对应的历史Backlog/Pending条目；未确认的其他跨产品行为仍不可推断授权。
 
@@ -63,8 +63,12 @@ The latest explicit user request makes an existing BOM record's ID, business dat
 
 ## Current：图号详情四板块及历史释放资格（2026-10-22最新）
 
-详情只保留基础、文件、业务关联、状态操作，隐藏历史明细不等于删除历史。使用中/历史版本都可发起释放核查；历史扫描、正式启用、旧作废无法证明未使用、受保护历史引用均不放行。仅无引用且可证明未启用的正式reserved允许释放；事务重查包含PDF脱链检测码、软删BOM、外发快照、已删图号关系与删除前引用汇总。旧测试中直接释放历史扫描的行为被本次要求取代。reserved用占位状态保留明确启用操作，不因UI仅两种业务选项就自动启用或允许历史占号复用。详见docs/drawing-detail-four-groups-20261022.md。
+详情只保留基础、文件、业务关联、状态操作，隐藏历史明细不等于删除历史。使用中/已停用都可发起释放核查；历史扫描、正式启用、旧作废无法证明未使用、受保护历史引用均不放行。仅无引用且可证明未启用的正式reserved允许释放；事务重查包含PDF脱链检测码、软删BOM、外发快照、已删图号关系与删除前引用汇总。旧测试中直接释放历史扫描的行为被本次要求取代。reserved用占位状态保留明确启用操作，不因UI仅两种业务选项就自动启用或允许历史占号复用。详见docs/drawing-detail-four-groups-20261022.md。
 
 ## Current: V4 identity and manual PDF classification (2026-10-23)
 
 SKU and model are not unique identities; actual product IDs distinguish all records, with no automatic merging. Default appearance is only a planning default, so changing it must not erase confirmed other-appearance references. Explicit per-PDF product/batch assignments survive rescans and feed trustworthy drawing queries; conflicts cannot overwrite original drawing bindings or independent BOM/outbound facts. Same-name batches remain separate by ID/path and each PDF instance retains its own audit. Historical occupation and immutable snapshots remain protected. V4 supersedes the older uniqueness and independent appearance UI rules; see docs/v4-data-interaction-requirements-20261023.md.
+
+## Current: V4.1 / V4.2 and stable delivery
+
+Use the current SKILL.md rules for drawing colors, single-line category/project, reversible 使用中/已停用, concrete PDF-instance availability, PDF batch context menus and empty-only protected deletion, toolbar labels and shared layout controls. Earlier 历史版本 drawing labels and version-column presentation are Deprecated; reserved remains an internal unactivated placeholder. Product merge history protects table-tagged material batch IDs even without live PDF rows. Desktop child installation preserves the chosen path; Desktop root installs in a dedicated application subfolder. No file/occupation/history cleanup follows from these presentation changes.

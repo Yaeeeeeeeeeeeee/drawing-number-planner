@@ -24,3 +24,7 @@ This is a routing reference, not a replacement for the live schema. Always inspe
 - Keep compatibility columns and historical rows when the current implementation uses them to preserve old references.
 
 Schema versions and migration names are observations of the current implementation, not permanent business rules. Update conclusions by rereading the files at task time.
+
+## Current migration observation
+
+This checkout includes Schema20, replacing only the planned-drawing usage update trigger's prohibition on normal stop transitions. Complete code, ownership and deletion guards remain. Schema19 identity/PDF-assignment migration and all earlier compatibility migrations remain. See docs/v41-backend-verification-20261024.md and current tests for backup/rollback/preservation evidence; future schema registry entries supersede this observation.

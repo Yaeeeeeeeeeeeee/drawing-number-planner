@@ -189,3 +189,7 @@ Current：用户要求交付无示例、中文、自选路径。本候选不携�
 ## Current: V4 compact lists and shared column interactions (2026-10-23)
 
 PDF has no right file detail panel; per-row path/open only and top bulk management/manual classification, nav-only batch rename. Drawing nav third level is actual coding main categories, not batches/appearance versions. Products, QR, PDF and drawings have no traditional paging UI; bounded DOM/chunks preserve selections/query scope. Shared tables provide resize/minima/6px snap/double-click fit, header reorder, local persistence and reset. Text stays within its column, filenames/batches at most two lines each, composite file lists keep all independent actions. Old no-wrap and drawing pagination constraints are superseded by V4; history APIs and protected actions remain. Browser/CI fixture acceptance does not establish local user data or physical DPI acceptance.
+
+## Current: V4.1 / V4.2
+
+The current Skill defines exact status names, category/color layout, batch context-menu actions, one-row toolbar and visible shared-table reset/handles. It supersedes old uniform category badge colors, two-line project layout, historical-version drawing label and persistent batch pencils. Verify native installation folder browsing, Desktop child/root paths, installed app version, source revision and actual API/DOM mutations; a Linux unit result does not establish Windows interaction success. Preserve earlier safety evidence without treating dated UI acceptance as current approval.

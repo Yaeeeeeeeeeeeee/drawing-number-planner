@@ -6,3 +6,10 @@ playwright-report/
 test-results/
 *.log
 work/
+
+# Disposable Windows delivery/build outputs
+installer/
+Comprehensive-Windows/
+existing-p4/
+*.tsbuildinfo
+.DS_Store

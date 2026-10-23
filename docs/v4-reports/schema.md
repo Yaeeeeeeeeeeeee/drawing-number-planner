@@ -1,3 +1,5 @@
+> 历史阶段记录：本文描述当时Schema19任务；当前Schema20见 docs/v41-backend-verification-20261024.md。旧测试数量不是当前交付结果。
+
 # V4 Task 1: product identity and migration
 
 Root causes: schema1 embedded `UNIQUE(brand_id, model)` and schema5 `products_sku_unique` blocked separate products with equal display strings. ProductService also translated these constraints into permanent business promises. Its referenced-meaning protection included `defaultAppearanceId`, incorrectly treating a planning default as historical identity. The explicit historical-candidate path independently rejected existing SKU strings and hid them from its candidate list.
