@@ -1,7 +1,7 @@
 import {selectDrawingFiles} from './drawing-file-selection';
 import {drawingCategoryStyle,drawingBusinessState,drawingBusinessLabel,upgradeDrawingColumnLayout} from './drawing-library-presentation';
-import './v41-drawings.css';
 import './drawing-library.css';
+import './v41-drawings.css';
 import {plannerQueryCache,queryKey} from '../data/query-cache';
 import type {DrawingAssociationPreviewView,DrawingAssociationResult} from '../data/drawing-appearance-client';
 import { ProductCatalogNavigation, type CatalogNavigationScope, type CatalogNavigationCounts } from '../components/ProductCatalogNavigation';

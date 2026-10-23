@@ -89,8 +89,8 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   const initialCatalog = await showCatalog();
   const fileFilters = initialCatalog.locator('.pdf-nav-filters');
   if (await fileFilters.getAttribute('open') === null) await fileFilters.locator('summary').click();
-  await page.getByLabel('文件关键词', { exact: true }).fill('');
-  for (const [label, value] of [['匹配状态', ''], ['转曲类型', ''], ['存在状态', 'all'], ['纳入范围', 'included']]) await page.getByLabel(label, { exact: true }).selectOption(value);
+  await initialCatalog.getByRole('textbox', { name: '文件关键词', exact: true }).fill('');
+  for (const [label, value] of [['匹配状态', ''], ['转曲类型', ''], ['存在状态', 'all'], ['纳入范围', 'included']]) await initialCatalog.getByRole('combobox', { name: label, exact: true }).selectOption(value);
   await page.getByRole('button', { name: '筛选 PDF', exact: true }).click();
   await initialCatalog.getByRole('button', { name: '全部文件', exact: true }).click();
   let batches = items(await get('/api/material-batches'));
@@ -112,6 +112,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
       const buttons = [...element.querySelectorAll('button')].map(button => { const rect = button.getBoundingClientRect(); return { y: rect.y, height: rect.height, nowrap: getComputedStyle(button).whiteSpace }; });
       return { width: innerWidth, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, overflowX: getComputedStyle(element).overflowX, pageOverflow: document.documentElement.scrollWidth - innerWidth, buttons };
     });
+    console.log('V42 toolbar geometry', JSON.stringify(geometry));
     assert.ok(geometry.buttons.every(button => button.height >= 32 && button.height <= 36 && button.nowrap === 'nowrap'));
     assert.ok(Math.max(...geometry.buttons.map(button => button.y)) - Math.min(...geometry.buttons.map(button => button.y)) < 2, 'All six buttons must remain on one row');
     assert.ok(geometry.pageOverflow <= 1, 'Narrow toolbar must not overflow the page');
@@ -186,7 +187,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   if (!await drawingCatalog.isVisible()) await page.getByRole('button', { name: '产品／批次导航', exact: true }).click();
   await page.getByRole('button', { name: '清除筛选', exact: true }).click();
   await drawingCatalog.getByRole('button', { name: `产品 ${product.model}`, exact: true }).click();
-  await page.getByLabel('关键词', { exact: true }).fill(''); await page.getByRole('button', { name: '查询', exact: true }).click();
+  await page.getByRole('textbox', { name: '关键词', exact: true }).fill(''); await page.getByRole('button', { name: '查询', exact: true }).click();
   const table = page.locator('.drawing-library-page table.layout-table');
   await page.getByRole('button', { name: formal[0].fullCode, exact: true }).waitFor();
   assert.equal(await table.getByRole('columnheader', { name: '颜色', exact: true }).count(), 1);
@@ -206,7 +207,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   const stateEvidence = [];
   for (const drawing of [formal[0], historical]) {
     await drawingCatalog.getByRole('button', { name: '全部图号', exact: true }).click();
-    await page.getByLabel('关键词', { exact: true }).fill(drawing.fullCode);
+    await page.getByRole('textbox', { name: '关键词', exact: true }).fill(drawing.fullCode);
     await page.getByRole('button', { name: '查询', exact: true }).click();
     await page.getByRole('button', { name: drawing.fullCode, exact: true }).click();
     const panel = page.getByRole('complementary', { name: '图号详情', exact: true }); await panel.waitFor();
@@ -249,7 +250,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   // Introduce a second real unbatched outlined instance; the drawer must expose uncertainty, not choose a file.
   const ambiguousPdf = recordPdf([...productPath, '另一独立目录', `${formal[0].fullCode}-V41第二成品（转曲）.pdf`], 'Native V41 competing outlined content');
   await go(page, 'PDF 文件中心'); await scan(); await go(page, '图号库');
-  await page.getByLabel('关键词', { exact: true }).fill(formal[0].fullCode);
+  await page.getByRole('textbox', { name: '关键词', exact: true }).fill(formal[0].fullCode);
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await page.getByRole('button', { name: formal[0].fullCode, exact: true }).click();
   const panel = page.getByRole('complementary', { name: '图号详情', exact: true }); await panel.waitFor();

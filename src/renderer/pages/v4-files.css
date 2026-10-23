@@ -5,8 +5,9 @@
 
 .files-page .module-list{position:relative;}.files-page .files-loading-status{position:absolute;right:8px;top:0;z-index:5;margin:0;padding:6px 10px;height:auto;min-height:0;background:#fff;font-size:12px;pointer-events:none;}
 
-.files-page .files-management-toolbar {flex:none;min-width:0;max-width:100%;justify-content:space-between;flex-wrap:nowrap;gap:24px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
-.files-page .files-management-toolbar > div {display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:8px;flex-shrink:0;}
+:root .engineering-workspace .page-surface .file-cleanup-toolbar.files-management-toolbar {--ws-control-height:34px;}
+.files-page .file-cleanup-toolbar.files-management-toolbar {flex:none;min-width:0;max-width:100%;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:24px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
+.files-page .file-cleanup-toolbar.files-management-toolbar > div {display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:8px;flex-shrink:0;}
 .files-page .files-management-toolbar button {height:34px;min-height:34px;flex:none;padding:6px 12px;white-space:nowrap;}
 .files-page .files-management-toolbar button:disabled {color:var(--ws-muted,#69727d);opacity:1;background:#edf0f2;border-color:#dce0e4;cursor:default;}
 .files-page .files-management-toolbar .files-selection-count {white-space:nowrap;margin-left:4px;}
