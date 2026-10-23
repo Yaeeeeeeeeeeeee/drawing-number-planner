@@ -104,20 +104,19 @@ function Select-ShellFolder($path,$expected) {
   $script:pickerCount++
   $dialogHandle=[IntPtr]$dialog.Current.NativeWindowHandle
   # Inno 6.7.1 uses IFileDialog/FOS_PICKFOLDERS, not SHBrowseForFolder.
-  # The native common-dialog filename field accepts a physical folder path.
-  $folderEdit=$null
+  # Saved runner evidence identifies the genuine filename HWND as id 1152,
+  # native class Edit, while UIA incorrectly reports ControlType.Pane.
+  $folderEditHandle=[IntPtr]::Zero
   for ($attempt=0;$attempt -lt 40;$attempt++) {
-    $elements=$dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
-    $folderEdit=$elements | Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit -and $_.Current.AutomationId -in @('1148','1152','1001') -and !$_.Current.IsOffscreen } | Select-Object -First 1
-    if ($folderEdit) { break }
+    $folderEditHandle=[InstallerNative]::GetDlgItem($dialogHandle,1152)
+    if ($folderEditHandle -ne [IntPtr]::Zero) { break }
     Start-Sleep -Milliseconds 250
   }
-  if (!$folderEdit) { throw 'Modern Shell folder-name edit missing; see captured picker controls' }
-  $value=$null
-  if (!$folderEdit.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$value)) { throw 'Shell folder-name edit has no ValuePattern' }
-  $value.SetValue($path)
+  if ($folderEditHandle -eq [IntPtr]::Zero -or [InstallerNative]::Describe($folderEditHandle).nativeClass -ne 'Edit') { throw 'Verified Shell folder-name Edit HWND (id 1152) missing; see captured picker controls' }
+  [void][InstallerNative]::SendMessage($folderEditHandle,0x000C,[IntPtr]::Zero,$path)
+  if ((Read-Directory $folderEditHandle) -ne $path) { throw 'Shell folder-name Edit did not retain the requested physical directory' }
   $okHandle=[InstallerNative]::GetDlgItem($dialogHandle,1)
-  if ($okHandle -eq [IntPtr]::Zero) { throw 'Shell folder picker Select Folder button missing' }
+  if ($okHandle -eq [IntPtr]::Zero -or [InstallerNative]::Describe($okHandle).nativeClass -ne 'Button') { throw 'Verified Shell Select Folder Button HWND (id 1) missing' }
   $ok=[System.Windows.Automation.AutomationElement]::FromHandle($okHandle)
   Click-NativeButton $ok
   # A common dialog may first navigate into the typed folder. If it remains

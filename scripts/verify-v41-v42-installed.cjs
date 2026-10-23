@@ -205,6 +205,9 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   assert.notEqual(categoryGeometry[0].background, categoryGeometry[1].background, 'Different main categories need distinct stable colors');
   const stateEvidence = [];
   for (const drawing of [formal[0], historical]) {
+    await drawingCatalog.getByRole('button', { name: '全部图号', exact: true }).click();
+    await page.getByLabel('关键词', { exact: true }).fill(drawing.fullCode);
+    await page.getByRole('button', { name: '查询', exact: true }).click();
     await page.getByRole('button', { name: drawing.fullCode, exact: true }).click();
     const panel = page.getByRole('complementary', { name: '图号详情', exact: true }); await panel.waitFor();
     const selector = panel.getByRole('combobox', { name: '图号业务状态', exact: true });
@@ -246,6 +249,8 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   // Introduce a second real unbatched outlined instance; the drawer must expose uncertainty, not choose a file.
   const ambiguousPdf = recordPdf([...productPath, '另一独立目录', `${formal[0].fullCode}-V41第二成品（转曲）.pdf`], 'Native V41 competing outlined content');
   await go(page, 'PDF 文件中心'); await scan(); await go(page, '图号库');
+  await page.getByLabel('关键词', { exact: true }).fill(formal[0].fullCode);
+  await page.getByRole('button', { name: '查询', exact: true }).click();
   await page.getByRole('button', { name: formal[0].fullCode, exact: true }).click();
   const panel = page.getByRole('complementary', { name: '图号详情', exact: true }); await panel.waitFor();
   const outlined = panel.locator('.drawing-file-section').filter({ has: page.getByRole('heading', { name: /转曲后文件/ }) });
