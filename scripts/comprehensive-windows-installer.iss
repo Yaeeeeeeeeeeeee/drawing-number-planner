@@ -56,8 +56,14 @@ begin
   Directory := WizardDirValue;
   { The shell picker exposes Desktop and redirected known folders. Preserve
     selected subfolders exactly; keep application files out of Desktop itself. }
+  Log('Opening Windows Shell installation-folder picker');
   if BrowseForFolder('选择安装文件夹（可以选择桌面上的文件夹）', Directory, True) then
+  begin
     WizardForm.DirEdit.Text := NormalizeInstallDirectory(Directory);
+    Log('Selected installation folder: ' + WizardDirValue);
+  end
+  else
+    Log('Windows Shell installation-folder picker cancelled');
 end;
 
 procedure InitializeWizard();
