@@ -137,9 +137,11 @@ function Assert-ReadyDirectory($expected) {
     # confirmation belonging to this isolated wizard.
     $dialogs=[InstallerNative]::Windows([IntPtr]::Zero) | Where-Object { $_.visible -and $_.title -eq '文件夹已存在' -and ($_.owner -eq $window.Current.NativeWindowHandle -or $_.pid -eq $edit.Current.ProcessId) }
     foreach ($nativeDialog in $dialogs) {
-      $dialog=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$nativeDialog.handle)
-      $yes=$dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition) | Where-Object { $_.Current.Name -match '^是' -and (NativeClass $_) -match 'Button' } | Select-Object -First 1
-      if ($yes) { Click-NativeButton $yes }
+      # Runner evidence shows the system MessageBox uses English Yes/No even
+      # when its prompt is Chinese. IDYES (6) identifies the actual button.
+      $yesHandle=[InstallerNative]::GetDlgItem([IntPtr]$nativeDialog.handle,6)
+      if ($yesHandle -eq [IntPtr]::Zero -or [InstallerNative]::Describe($yesHandle).nativeClass -ne 'Button') { throw 'Verified existing-folder confirmation IDYES Button HWND missing' }
+      Click-NativeButton ([System.Windows.Automation.AutomationElement]::FromHandle($yesHandle))
     }
     $elements=$window.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
     $install=$elements | Where-Object { $_.Current.Name -match '^安装' -and (NativeClass $_) -match 'Button' -and !$_.Current.IsOffscreen } | Select-Object -First 1
