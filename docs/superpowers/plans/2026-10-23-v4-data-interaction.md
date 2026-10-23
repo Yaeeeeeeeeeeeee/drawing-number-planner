@@ -68,13 +68,15 @@
 - [x] Independent domain and final review; correct important findings.
 
 ### Task 8: Verification and delivery
-- [ ] Full automated suite, typecheck/build, old Schema18 and15 upgrade/rollback/FK/history checks.
-- [ ] Actual Windows installed app: new/old DB, scan/classify/manual12-file/column interactions and restart persistence.
-- [ ] Commit/push dev branch, Chinese custom-path installer, exact source/hash, GitHub download说明 and final direct download.
-- [ ] Report root causes, isolated before/after counts/unresolved reasons, migration/backups and local verification steps; no fabricated production stats.
+- [x] Full automated suite, typecheck/build, old Schema18 and15 upgrade/rollback/FK/history checks.
+- [x] Actual Windows installed app: new/old DB, scan/classify/manual12-file/column interactions and restart persistence.
+- [x] Commit/push dev branch, Chinese custom-path installer, exact source/hash, GitHub download说明 and final direct download.
+- [x] Report root causes, isolated before/after counts/unresolved reasons, migration/backups and local verification steps; no fabricated production stats.
 
 ## Execution rulings
 
 - Existing branch b9ea45f is the clean authorized development checkout; no master code merge.
 - User's repeated opt-out of new phase approvals remains applicable. V4 is the approved scope, not a request to pause for another design approval.
 - Independent-domain dispatch separates Schema/product, PDF backend, table component and page work by file ownership; parent integrates shared contracts and association rules.
+
+Final: ceaf7ac source, 164 files/1392 tests, types/Vite/Main and Windows39958384708 installed native checks passed. Artifact12502884698. Real production data and physical DPI remain local acceptance.

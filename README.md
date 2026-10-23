@@ -2,27 +2,26 @@
 
 面向单人长期使用的 Windows 公司内部工具。当前版本已把真实 Excel 编码规则、SKU、历史资料只读扫描、永久占号、文件完整性、外发资料和桌面安全恢复接入同一套本地工作流，并可用同一套真实数据在 Windows 桌面窗口或浏览器中运行。
 
-## Windows 软件下载（2026-10-23 PDF管理与目录修正版 · 923932f）
+## Windows 软件下载（2026-10-23 V4 数据关联与表格交互版 · ceaf7ac）
 
-下载已验证安装ZIP，解压运行中文EXE，可自定义安装路径。GitHub网页下载工件需登录，工件保留至2026-11-06。
+下载 ZIP，解压运行中文安装 EXE，可自定义安装路径。GitHub 网页下载工件需登录，工件保留至 2026-11-06。
 
-- **[下载最新中文安装包 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39917811999/artifacts/12485179458)**
-- [本轮修正、测试与安装说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/pdf-catalog-correction-20261023.md)
-- [完整升级、备份与回退步骤](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-installation-20261022.md)
+- **[下载最新中文安装包 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39958384708/artifacts/12502884698)**
+- [本轮功能、提交、测试及升级说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v4-delivery-20261023.md)
 - [最新源码与提交记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/tree/codex/v3-business-ui-20261022)
-- [Windows实际运行报告与截图工件](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39917811999/artifacts/12486730532)
+- [Windows 实际运行报告与截图](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39958384708/artifacts/12502854802)
 
-应用源码 `923932ffa48f6bd0ae9acf4421e086fe3634c429`；158文件1354项自动化测试通过，类型及前端/Main构建通过。Windows实际中文安装、自选路径、旧库升级/备份/WAL/回滚/重启、PDF三个管理按钮、目录归类与筛选、图号详情、二维码原生文件选择均通过。
+应用源码 `ceaf7acdbcee74671150ed79ce55d032108d38c8`；最终 164 文件、1392 项测试全通过，类型及前端/Main构建通过。Windows 39958384708 实际中文安装、自选路径、旧 v15→19 升级、备份/WAL/回滚、原生二维码选择、12个PDF归纳/重扫、列拖动/重排/重启保留及空库检查全部通过。
 
-本轮修复PDF管理预览参数无效及批次改名的JSON请求；图号产品目录在归类和返回页面后正确刷新，字典失败不再阻断目录；PDF和图号筛选只更新数量，不再用0计数推断未归属。切页保留已提交查询和未提交输入。
+本版允许重复 SKU/型号，以内部产品 ID 区分；默认外观只用于新规划。同产品可关联多个外观编码。PDF 新增单条/批量人工归纳，预览冲突、备份及审计，重扫保留；图号树按产品类别→型号→编码主类别。共享表格支持列宽、顺序、吸附、适应和布局保存，图号库改用滚动加载。
 
-安装前关闭旧版并备份完整数据目录，启动后继续选择原planner.db，无需清库或重复关联。无新增Schema迁移，不自动归并ZC100，不删除原始PDF，不释放历史占号。安装包不带测试业务数据。
+安装前关闭旧版并备份完整数据目录，启动继续选择原 planner.db。本版有 Schema19 安全迁移，不清库、不自动归并产品、不删除原始PDF、不释放历史占号。安装包不含示例业务数据；存在歧义的产品及归属冲突需在本地核对纠正。
 
-安装ZIP SHA256：`aed9fd95612858729881245fcdd459042a633f1db1585923b36fc16caca6e86b`。用户真实业务库、物理DPI及跨显示器仍需本地核对。Releases此前权限403未发布新版本；旧Release和Source code不是本安装包。
+安装 ZIP SHA256：`5b7cfc74c17174ec5ef412424defb7adc24e4b1fedf77c915358707562e4dbc8`。用户正式库和物理 Windows DPI/跨屏仍需本地核对；旧 Release 和 Source code 不是本安装包。
 
 ## 开发启动
 
-请切换到 `codex/v3-business-ui-20261022` 分支；已验证应用源码提交为 `923932f`。
+请切换到 `codex/v3-business-ui-20261022` 分支；已验证应用源码提交为 `ceaf7ac`。
 
 首次使用先安装依赖：
 
@@ -163,7 +162,7 @@ pnpm test:e2e
 - 可靠历史图号永久登记、异常候选待确认和统一占号查询
 - 正式/历史图号统一展示及源文件、转曲后文件完整性筛选
 - PDF 相对路径索引、缺失标记和组合筛选
-- 图号库完整分页、资料批次视角、受保护删除和长路径展示
+- 图号库虚拟滚动、产品/编码主类别导航、受保护删除和长路径展示
 - 二维码用途与业务记录 CRUD、手动 PDF 校验关联、更换、解除及历史审计
 - 选定批次完整包材、本次变更对比预览和安全 ZIP 生成
 - 外发联系人、邮件模板、可选段落、签名、草稿和历史快照
