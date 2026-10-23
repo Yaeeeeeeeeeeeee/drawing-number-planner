@@ -51,7 +51,7 @@ describe('FilesPage', () => {
     await screen.findByRole('button', { name: '全部文件' });
     fireEvent.click(screen.getByText('文件筛选'));
     fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'manual' } });
-    fireEvent.change(screen.getByLabelText('匹配状态'), { target: { value: 'pending' } });
+    fireEvent.change(screen.getByRole('combobox',{name:'匹配状态'}), { target: { value: 'pending' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'manual',matchStatus:'pending'})));
     fireEvent.click(screen.getByRole('button', { name: '待关联产品' }));
@@ -86,24 +86,21 @@ describe('FilesPage', () => {
     expect(api.updateWorkspaceSettings).not.toHaveBeenCalled();
   });
 
-  it('keeps a file-location failure visible inside the file detail drawer', async () => {
+  it('keeps a file-location failure visible without a file detail panel', async () => {
     delete window.plannerDesktop;
     render(<FilesPage api={apiFixture(true) as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: `文件详情 ${file.fileName}` }));
-    const detail = await screen.findByRole('complementary', { name: '文件详情' });
-    fireEvent.click(within(detail).getByRole('button', { name: '打开文件位置' }));
-    expect(await within(detail).findByRole('alert')).toHaveTextContent('请在 Windows 桌面版打开文件位置');
+    fireEvent.click(await screen.findByRole('button', { name: `打开 ${file.fileName} 的位置` }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('请在 Windows 桌面版打开文件位置');
+    expect(screen.queryByRole('complementary',{name:'文件详情'})).not.toBeInTheDocument();
   });
-  it('navigates with real product IDs and shows indexed file details separately from cleanup selection', async () => {
+  it('navigates with real product IDs and expands indexed paths separately from cleanup selection', async () => {
     const api = apiFixture(true);
     render(<FilesPage api={api as never} />);
     fireEvent.click(await screen.findByRole('button', { name: '产品 SKDZC100JP · ZC100' }));
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ productId: 9, page: 1 })));
-    fireEvent.click(screen.getByRole('button', { name: `文件详情 ${file.fileName}` }));
-    const detail = await screen.findByRole('complementary', { name: '文件详情' });
-    expect(detail.closest('table')).toBeNull();
-    expect(detail.textContent).toContain(file.relativePath);
-    expect(detail.textContent).toContain('1024 B');
+    fireEvent.click(screen.getByRole('button',{name:`查看 ${file.fileName} 的完整相对路径`}));
+    expect(screen.getByText(file.relativePath)).toBeVisible();
+    expect(screen.queryByRole('button',{name:/文件详情/})).not.toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: `选择 ${file.fileName}` })).not.toBeChecked();
     expect(api.scanPdfFiles).not.toHaveBeenCalled();
     expect(api.cleanupPdfFiles).not.toHaveBeenCalled();
@@ -143,7 +140,7 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: `打开 ${file.fileName} 的位置` }));
     await waitFor(() => expect(showFileInFolder).toHaveBeenCalledWith(file.id));
     expect(screen.getByRole('button', { name: `打开 ${missing.fileName} 的位置` })).toBeDisabled();
-    expect(screen.getByText('文件缺失')).toBeVisible();
+    expect(screen.getByText('缺失',{selector:'.presence-label'})).toBeVisible();
   });
 
   it('shows the desktop-only browser message without calling the API', async () => {
@@ -290,7 +287,7 @@ describe('FilesPage', () => {
     await screen.findByText(unmatched.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
     fireEvent.click(screen.getByText('文件筛选'));
     fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'unknown' } });
-    fireEvent.change(screen.getByLabelText('匹配状态'), { target: { value: 'unmatched' } });
+    fireEvent.change(screen.getByRole('combobox',{name:'匹配状态'}), { target: { value: 'unmatched' } });
     fireEvent.change(screen.getByLabelText('存在状态'), { target: { value: 'missing' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
 
@@ -311,7 +308,8 @@ describe('FilesPage', () => {
     render(<FilesPage api={api as never} />);
     await screen.findByText(missing.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
 
-    fireEvent.click(screen.getByRole('button', { name: `清理 ${missing.fileName} 的索引记录` }));
+    fireEvent.click(screen.getByRole('checkbox',{name:`选择 ${missing.fileName}`}));
+    fireEvent.click(screen.getByRole('button',{name:'清理已选索引记录 (1)'}));
     expect(await screen.findByText('此操作只清理数据库索引记录，不会删除磁盘文件，也不会释放历史图号。')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '确认清理索引记录' }));
 
@@ -390,7 +388,8 @@ describe('FilesPage', () => {
     const api = apiFixture(true); api.searchPdfFiles.mockResolvedValue({ items: [missing], total: 1, page: 1, pageSize: 100 });
     render(<FilesPage api={api as never} />);
     await screen.findByText(missing.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
-    fireEvent.click(screen.getByRole('button', { name: `清理 ${missing.fileName} 的索引记录` }));
+    fireEvent.click(screen.getByRole('checkbox',{name:`选择 ${missing.fileName}`}));
+    fireEvent.click(screen.getByRole('button',{name:'清理已选索引记录 (1)'}));
     expect(await screen.findByRole('dialog', { name: '确认清理 PDF 索引记录' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: '清空资料库索引' }));

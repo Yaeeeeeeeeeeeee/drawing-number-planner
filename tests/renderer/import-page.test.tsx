@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ImportPage } from '../../src/renderer/pages/ImportPage';
@@ -24,6 +24,12 @@ describe('ImportPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
 
     expect(await screen.findByText('发现 1 个问题')).toBeVisible();
+    const issues=screen.getByRole('table',{name:'迁移问题工作表'});
+    fireEvent.keyDown(within(issues).getByRole('columnheader',{name:'数据摘要'}),{altKey:true,key:'ArrowLeft'});
+    expect(issues.querySelectorAll('thead th')[1]).toHaveAttribute('data-column-key','summary');
+    expect(issues.querySelectorAll('tbody td')[1]).toHaveTextContent('0209');
+    fireEvent.click(within(issues).getByRole('button',{name:'查看原因'}));
+    expect(within(issues).getByText('同一字典范围内存在重复编码')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
     expect(screen.getAllByText('0209')).toHaveLength(1);
     expect(screen.getByText('SAMKYO')).toBeVisible();

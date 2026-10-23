@@ -14,7 +14,7 @@ it('restores an archived identity, edits its name and keeps draft input if savin
  await waitFor(()=>expect(screen.queryByRole('button',{name:'恢复 验收样例'})).toBeNull());
  fireEvent.click(screen.getByRole('button',{name:'修改 验收样例'}));
  const input=screen.getByLabelText('修改名称');expect(input).toBeEnabled();expect(input).not.toHaveAttribute('readonly');
- expect(screen.getByLabelText('编码')).toBeDisabled();
+ expect(screen.getByRole('textbox',{name:'编码'})).toBeDisabled();
  input.focus();fireEvent.change(input,{target:{value:'恢复后修改名称'}});expect(input).toHaveFocus();
  fireEvent.click(screen.getByRole('button',{name:'保存'}));await screen.findByText('暂时无法保存');
  expect(screen.getByLabelText('修改名称')).toBe(input);expect(input).toHaveValue('恢复后修改名称');

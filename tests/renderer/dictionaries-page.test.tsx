@@ -125,7 +125,7 @@ describe('DictionariesPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '新增' }));
     expect(screen.queryByLabelText('项目明细编码')).toBeNull();
-    fireEvent.change(screen.getByLabelText('编码'), { target: { value: '02' } });
+    fireEvent.change(screen.getByRole('textbox',{name:'编码'}), { target: { value: '02' } });
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '延迟品牌' } });
     fireEvent.click(screen.getByRole('button', { name: '新增编码' }));
     fireEvent.click(screen.getByRole('tab', { name: '颜色' }));
@@ -242,8 +242,8 @@ describe('DictionariesPage', () => {
     await screen.findByText('SAMKYO');
 
     fireEvent.click(screen.getByRole('button', { name: '修改 SAMKYO' }));
-    expect(screen.getByLabelText('编码')).toHaveValue('02');
-    expect(screen.getByLabelText('编码')).toBeDisabled();
+    expect(screen.getByRole('textbox',{name:'编码'})).toHaveValue('02');
+    expect(screen.getByRole('textbox',{name:'编码'})).toBeDisabled();
     fireEvent.change(screen.getByLabelText('修改名称'), { target: { value: 'SAMKYO 新名称' } });
     fireEvent.click(screen.getByRole('button', { name: /^保存$/ }));
 

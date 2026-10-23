@@ -64,3 +64,7 @@ The latest explicit user request makes an existing BOM record's ID, business dat
 ## Current：图号详情四板块及历史释放资格（2026-10-22最新）
 
 详情只保留基础、文件、业务关联、状态操作，隐藏历史明细不等于删除历史。使用中/历史版本都可发起释放核查；历史扫描、正式启用、旧作废无法证明未使用、受保护历史引用均不放行。仅无引用且可证明未启用的正式reserved允许释放；事务重查包含PDF脱链检测码、软删BOM、外发快照、已删图号关系与删除前引用汇总。旧测试中直接释放历史扫描的行为被本次要求取代。reserved用占位状态保留明确启用操作，不因UI仅两种业务选项就自动启用或允许历史占号复用。详见docs/drawing-detail-four-groups-20261022.md。
+
+## Current: V4 identity and manual PDF classification (2026-10-23)
+
+SKU and model are not unique identities; actual product IDs distinguish all records, with no automatic merging. Default appearance is only a planning default, so changing it must not erase confirmed other-appearance references. Explicit per-PDF product/batch assignments survive rescans and feed trustworthy drawing queries; conflicts cannot overwrite original drawing bindings or independent BOM/outbound facts. Same-name batches remain separate by ID/path and each PDF instance retains its own audit. Historical occupation and immutable snapshots remain protected. V4 supersedes the older uniqueness and independent appearance UI rules; see docs/v4-data-interaction-requirements-20261023.md.

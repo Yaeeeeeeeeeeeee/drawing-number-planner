@@ -1296,3 +1296,21 @@ export const schemaVersionSeventeen = `
        CREATE TRIGGER outbound_batch_scope_audit_immutable_update BEFORE UPDATE ON outbound_batch_scope_audit BEGIN SELECT RAISE(ABORT,'外发批次确认审计不可修改'); END;
  CREATE TRIGGER outbound_batch_scope_audit_immutable_delete BEFORE DELETE ON outbound_batch_scope_audit BEGIN SELECT RAISE(ABORT,'外发批次确认审计不可删除'); END;
 `;
+
+export const schemaVersionNineteen = `
+ CREATE TABLE pdf_product_assignments (
+  pdf_file_id INTEGER PRIMARY KEY REFERENCES pdf_files(id),
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  material_batch_id INTEGER NOT NULL REFERENCES material_batches(id),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK(revision > 0),
+  updated_at TEXT NOT NULL
+ );
+ CREATE TABLE pdf_product_assignment_audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pdf_file_id INTEGER NOT NULL REFERENCES pdf_files(id),
+  previous_json TEXT NOT NULL CHECK(json_valid(previous_json)),
+  target_json TEXT NOT NULL CHECK(json_valid(target_json)),
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL
+ );
+`;

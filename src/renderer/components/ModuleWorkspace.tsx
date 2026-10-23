@@ -6,9 +6,9 @@ import { useWorkspaceExtent } from './useWorkspaceExtent';
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
 
 /** Layout only; panel movement never changes record selection or business state. */
-export function ModuleWorkspace({ children, navigation, detail, detailLabel, detailIdentity, onCloseDetail, fileWorkspace = false, resizable = false, drawingWorkspace = false }: {
+export function ModuleWorkspace({ children, navigation, detail, detailLabel, detailIdentity, onCloseDetail, fileWorkspace = false, resizable = false, drawingWorkspace = false, hideLayoutReset = false }: {
   children: ReactNode; navigation?: ReactNode | ((controls: {collapseControl: ReactNode}) => ReactNode); detail?: ReactNode; detailLabel: string;
-  detailIdentity?: number | string; onCloseDetail(): void; fileWorkspace?: boolean; resizable?: boolean; drawingWorkspace?: boolean;
+  detailIdentity?: number | string; onCloseDetail(): void; fileWorkspace?: boolean; resizable?: boolean; drawingWorkspace?: boolean; hideLayoutReset?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null), panel = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -21,6 +21,7 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const minimumNavigation = catalogWorkspace ? 260 : 180;
   const [preferredNavigation, setPreferredNavigation] = useState(defaultNavigation), [preferredDetail, setPreferredDetail] = useState(drawingWorkspace ? 640 : 380);
   const closeRef = useRef(onCloseDetail); closeRef.current = onCloseDetail;
+  useEffect(()=>{const reset=()=>{setPreferredNavigation(defaultNavigation);setPreferredDetail(drawingWorkspace?640:380);};window.addEventListener('module-workspace:reset-layout',reset);return()=>window.removeEventListener('module-workspace:reset-layout',reset);},[defaultNavigation,drawingWorkspace]);
   const maxNavigation = Math.max(minimumNavigation, Math.min(catalogWorkspace ? 420 : 280, width - 820));
   const navigationWidth = clamp(preferredNavigation, minimumNavigation, maxNavigation);
   const navigationDocked = width >= navigationWidth + 820 && !navigationCollapsed;
@@ -58,9 +59,9 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const collapseControl = <button type="button" className="text-button navigation-fold" aria-label={navigationDocked ? '收起产品导航' : '关闭产品导航'} title={navigationDocked ? '收起产品导航' : '关闭产品导航'} onClick={closeNavigation}><ChevronsLeft size={18} strokeWidth={1.8} aria-hidden="true"/></button>;
   const integratedNavigation = typeof navigation === 'function';
   return <div ref={root} className={`module-workspace-viewport p4-workspace adaptive-data-workspace ${fileWorkspace ? 'file-workspace' : ''} ${drawingWorkspace ? 'drawing-workspace' : ''}`} style={{ '--workspace-available-height': `${height}px` } as CSSProperties}>
-    {(navigation && !navigationDocked || resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 640 : 380))) && <div className="module-workspace-tools">
+    {(navigation && !navigationDocked || !hideLayoutReset && resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 640 : 380))) && <div className="module-workspace-tools">
       {navigation && !navigationDocked && <button ref={toggle} className="secondary-button module-navigation-toggle" type="button" aria-expanded={navigationModal} onClick={() => { const canDock = width >= navigationWidth + 820; if (canDock) navigationFocus.current = 'panel'; setNavigationCollapsed(false); setNavigationOpen(!canDock); }}>产品／批次导航</button>}
-      {resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 640 : 380)) && <button className="text-button" type="button" onClick={() => { setPreferredNavigation(defaultNavigation); setPreferredDetail(drawingWorkspace ? 640 : 380); }}>恢复默认宽度</button>}
+      {!hideLayoutReset && resizable && (preferredNavigation !== defaultNavigation || preferredDetail !== (drawingWorkspace ? 640 : 380)) && <button className="text-button" type="button" onClick={() => { setPreferredNavigation(defaultNavigation); setPreferredDetail(drawingWorkspace ? 640 : 380); }}>恢复默认宽度</button>}
     </div>}
     <div className={`p4-workspace-grid ${navigation && navigationDocked ? 'has-navigation' : ''}`} style={{ gridTemplateColumns: navigation && navigationDocked ? `${navigationWidth}px 10px minmax(0,1fr)` : 'minmax(0,1fr)' }}>
       {navigation && <div ref={navigationModal ? panel : undefined} className={`module-navigation ${navigationModal ? 'module-drawer' : ''}`} hidden={!navVisible}

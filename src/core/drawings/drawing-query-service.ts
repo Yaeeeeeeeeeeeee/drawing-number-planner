@@ -44,9 +44,9 @@ export class DrawingQueryService {
 
   navigationCounts(filters: DrawingSearchFilters = {}) { return this.repository.navigationCounts(filters); }
 
-  navigation(): { batches: DrawingNavigationBatch[] } {
+  navigation(): { batches: DrawingNavigationBatch[]; mainCategories: NonNullable<import('./drawing-types.js').DrawingNavigationCounts['mainCategories']> } {
     const usage = this.repository.businessUsage();
-    return { batches: this.batches.list().map((batch) => {
+    return { mainCategories:this.repository.navigationCounts({}).mainCategories??[],batches: this.batches.list().map((batch) => {
       const evidence = usage.filter((item) => item.batchId === batch.id);
       const identities = (items: typeof evidence) => new Set(items.map((item) => `${item.origin}:${item.recordId}`)).size;
       const productIds = [...new Set(evidence.map((item) => item.productId))];

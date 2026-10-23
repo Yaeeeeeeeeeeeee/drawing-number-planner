@@ -56,20 +56,18 @@ describe('ProductService', () => {
       .toThrowError(expect.objectContaining({ code: 'INVALID_SKU' }));
   });
 
-  it('enforces case-insensitive sku uniqueness', () => {
+  it('allows case-insensitive duplicate sku', () => {
     const first = validReferences();
     products.create({ ...first, sku: 'SKDZU070JP', model: 'ZU70SD', productCategory: '03.冰柜' } as never);
     const second = validReferences('B');
-    expect(() => products.create({ ...second, sku: 'skdzu070jp', model: 'ZU71', productCategory: '03.冰柜' } as never))
-      .toThrowError(expect.objectContaining({ code: 'DUPLICATE_SKU' }));
+    expect(products.create({ ...second, sku: 'skdzu070jp', model: 'ZU71', productCategory: '03.冰柜' }).sku).toBe('skdzu070jp');
   });
 
-  it('enforces model uniqueness within a brand', () => {
+  it('allows duplicate model within a brand', () => {
     const first = validReferences();
     products.create({ ...first, sku: 'SKU-1', model: 'ZC220', productCategory: '冰柜' });
 
-    expect(() => products.create({ ...first, sku: 'SKU-2', model: 'ZC220', productCategory: '卧式冰柜' }))
-      .toThrowError(expect.objectContaining({ code: 'DUPLICATE_MODEL' }));
+    expect(products.create({ ...first, sku: 'SKU-1', model: 'ZC220', productCategory: '冰柜' }).model).toBe('ZC220');
 
     const second = validReferences('B');
     expect(products.create({ ...second, sku: 'SKU-3', model: 'ZC220', productCategory: '冰柜' }).model).toBe('ZC220');
@@ -247,7 +245,7 @@ describe('ProductService', () => {
       .toThrowError(expect.objectContaining({ code: 'PRODUCT_REFERENCED' }));
   });
 
-  it('derives deterministic historical product candidates, groups exact tuples and excludes formal SKUs', () => {
+  it('derives deterministic historical product candidates, groups exact tuples without excluding duplicate SKUs', () => {
     const refs = validReferences();
     products.create({ ...refs, sku: 'FORMAL-SKU', model: 'FORMAL', productCategory: '03.冰柜' });
     insertHistorical({ fullCode: '02.0209.010.0401001', sku: 'HISTORY-SKU', model: 'ZC220', productCategory: '03.冰柜' });
@@ -260,6 +258,7 @@ describe('ProductService', () => {
     expect(products.listHistoricalCandidates()).toEqual({ items: [
       { productCategory: '03.冰柜', sku: 'HISTORY-SKU', model: 'ZC220', historicalDrawingCount: 2, ambiguous: true },
       { productCategory: '03.冰柜', sku: 'HISTORY-SKU', model: 'ZC221', historicalDrawingCount: 1, ambiguous: true },
+      { productCategory: '03.冰柜', sku: 'formal-sku', model: 'OTHER', historicalDrawingCount: 1, ambiguous: false },
     ] });
     expect(db.prepare(`select full_code, product_id from historical_drawing_numbers order by full_code`).all()).toEqual(before);
   });
@@ -298,13 +297,13 @@ describe('ProductService', () => {
     expect(db.prepare(`select count(*) as count from products`).get()).toEqual({ count: 0 });
   });
 
-  it('rolls back duplicate-SKU and inactive-dictionary confirmation while preserving permanent occupancy', () => {
+  it('allows explicit duplicate-SKU confirmation and rolls back inactive-dictionary confirmation while preserving permanent occupancy', () => {
     const refs = validReferences();
     insertHistorical({ fullCode: '02.0209.010.0401001', sku: 'HISTORY-SKU', model: 'ZC220', productCategory: '03.冰柜' });
     products.create({ ...refs, sku: 'HISTORY-SKU', model: 'OTHER', productCategory: '03.冰柜' });
-    expect(() => products.confirmHistoricalCandidate({
-      productCategory: '03.冰柜', sku: 'HISTORY-SKU', model: 'ZC220', ...refs,
-    })).toThrowError(expect.objectContaining({ code: 'DUPLICATE_SKU' }));
+    const candidate={productCategory:'03.冰柜',sku:'HISTORY-SKU',model:'ZC220',...refs};
+    expect(products.confirmHistoricalCandidate(candidate).linkedHistoricalCount).toBe(1);
+    expect(()=>products.confirmHistoricalCandidate(candidate)).toThrowError(expect.objectContaining({code:'STALE_HISTORICAL_CANDIDATE'}));
 
     insertHistorical({ fullCode: '02.0209.010.0401002', sku: 'INACTIVE-SKU', model: 'ZC221', productCategory: '03.冰柜' });
     dictionaries.deactivate(refs.defaultAppearanceId);
@@ -317,4 +316,14 @@ describe('ProductService', () => {
       .toEqual({ product_id: null });
     expect(new OccupiedNumberRepository(db).hasFullCode('02.0209.010.0401002')).toBe(true);
   });
+});
+
+it('changes a referenced product default without rewriting historical drawings or appearance versions', () => {
+ const refs=validReferences(), input={...refs,sku:'V4',model:'ZC100',productCategory:'冰柜'};
+ const product=products.create(input);insertHistorical({fullCode:'02.0209.010.0401001',productId:product.id});
+ const before=db.prepare('select * from historical_drawing_numbers').all(), versions=db.prepare('select * from product_appearance_versions').all();
+ const appearance=dictionaries.create({type:'appearance',code:'02',name:'Second'});
+ expect(products.update(product.id,{...input,defaultAppearanceId:appearance.id}).defaultAppearanceId).toBe(appearance.id);
+ expect(db.prepare('select * from historical_drawing_numbers').all()).toEqual(before);
+ expect(db.prepare('select * from product_appearance_versions').all()).toEqual(versions);
 });

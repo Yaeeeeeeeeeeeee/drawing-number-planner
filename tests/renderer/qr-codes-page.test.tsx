@@ -10,6 +10,22 @@ function desktop(){const result={token:'picker-token',fileName:manual.files[0].f
 async function expand(){fireEvent.click(await screen.findByRole('button',{name:'展开 ZU70SD 的二维码用途'}));return document.querySelector('.qr-manual-subtable') as HTMLElement;}
 afterEach(()=>{Object.defineProperty(window,'plannerDesktop',{configurable:true,value:undefined});localStorage.clear();});
 describe('manual QR page',()=>{
+ it('keeps every independent legacy file action outside a shared two-line clamp',async()=>{
+  const files=[1,2,3].map((id)=>({...manual.files[0],id,externalFileId:`file-${id}`,fileName:`ZU70SD-User Manual-very-long-${id}（c2hg2h8）.pdf`}));
+  render(<QrCodesPage api={apiFor([{...manual,files}]) as never}/>);const sub=await expand();
+  const buttons=within(sub).getAllByRole('button',{name:/ZU70SD-User Manual-very-long/});
+  expect(buttons).toHaveLength(3);for(const button of buttons){expect(button.closest('.table-cell-two-lines')).toBeNull();expect(button).toBeEnabled();}
+ });
+ it('moves nested purpose headers with their cells while preserving independent outer columns',async()=>{
+  render(<QrCodesPage api={apiFor() as never}/>);const sub=await expand();
+  const table=within(sub).getByRole('table');const outer=document.querySelector('.qr-main-table table')!;
+  const before=Array.from(outer.querySelectorAll(':scope > thead > tr > th')).map(c=>c.getAttribute('data-column-key'));
+  fireEvent.keyDown(within(table).getByRole('columnheader',{name:'关联文件'}),{altKey:true,key:'ArrowLeft'});
+  expect(table.querySelector('thead th')).toHaveAttribute('data-column-key','fileName');
+  const first=table.querySelector('tbody tr td')!;expect(first).toHaveAttribute('data-column-key','fileName');
+  expect(within(first as HTMLElement).getByRole('button',{name:/ZU70SD/})).toBeInTheDocument();
+  expect(Array.from(outer.querySelectorAll(':scope > thead > tr > th')).map(c=>c.getAttribute('data-column-key'))).toEqual(before);
+ });
  it('traps keyboard focus in the manual dialog and Escape cancels without saving, restoring the opener',async()=>{
   const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();const opener=within(sub).getByRole('button',{name:'更换文件'});opener.focus();fireEvent.click(opener);
   const dialog=screen.getByRole('dialog');await waitFor(()=>expect(dialog.contains(document.activeElement)).toBe(true));

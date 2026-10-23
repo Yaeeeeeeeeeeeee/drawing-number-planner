@@ -84,6 +84,18 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService, t
     try { return service.applyManagement(input.data); } catch (error) { return sendFileError(reply, error); }
   });
 
+  const classificationSchema = cleanupSchema.extend({productId:z.number().int().positive(),materialBatchId:z.number().int().positive()}).strict();
+  app.post('/api/files/classification/preview',async(request,reply)=>{
+    const input=classificationSchema.safeParse(request.body);
+    if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'人工归纳参数无效'}});
+    try{return service.previewClassification(input.data);}catch(error){return sendFileError(reply,error);}
+  });
+  app.post('/api/files/classification/apply',async(request,reply)=>{
+    const input=classificationSchema.extend({fingerprint:z.string().length(64),confirmed:z.literal(true),reason:z.string().trim().min(1).max(2000)}).strict().safeParse(request.body);
+    if(!input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'人工归纳确认参数无效'}});
+    try{return service.applyClassification(input.data);}catch(error){return sendFileError(reply,error);}
+  });
+
   app.post('/api/files/cleanup', async (request, reply) => {
     const input = cleanupSchema.safeParse(request.body);
     if (!input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 索引清理请求无效' } });

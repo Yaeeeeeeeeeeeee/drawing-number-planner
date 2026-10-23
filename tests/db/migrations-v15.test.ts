@@ -14,10 +14,10 @@ it.each([false, true])('v14 recycle-bin upgrade backs up and rolls back on failu
     const backup = vi.fn(() => { expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:14}); });
     const run = () => migrateDatabase(db, { databaseExists: true, createBackup: backup });
     if (fail) expect(run).toThrow('v15-failed');
-    else expect(run()).toEqual({ from: 14, to: 18 });
+    else expect(run()).toEqual({ from: 14, to: 19 });
     expect(backup).toHaveBeenCalledOnce();
     expect(db.prepare('select code,name from dictionary_items').all()).toEqual([{code:'02',name:'历史品牌'}]);
-    expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v: fail ? 14 : 18});
+    expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v: fail ? 14 : 19});
     expect((db.pragma('table_info(dictionary_items)') as {name:string}[]).some(c=>c.name==='deleted_at')).toBe(!fail);
     expect(db.pragma('foreign_key_check')).toEqual([]);
   } finally { db.close(); }

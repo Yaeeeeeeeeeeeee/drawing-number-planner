@@ -10,7 +10,7 @@ describe('dictionary real-page density', () => {
     ]);
     render(<DictionariesPage api={{listDictionaries} as never}/>);
     await screen.findByText('品牌甲');
-    expect(screen.queryByLabelText('编码')).toBeNull();
+    expect(screen.queryByRole('textbox',{name:'编码'})).toBeNull();
     fireEvent.change(screen.getByLabelText('字典状态'),{target:{value:'inactive'}});
     expect(screen.queryByText('品牌甲')).toBeNull();
     expect(screen.getByText('品牌乙')).toBeVisible();

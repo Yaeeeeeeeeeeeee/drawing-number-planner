@@ -9,7 +9,7 @@ it('keeps dictionary editing on the approved branch with a locked code and equal
   const {container}=render(<DictionariesPage api={api as never}/>);
   fireEvent.click(await screen.findByRole('button',{name:'修改 品牌甲'}));
   expect(container.querySelector('.dm-edit-branch .dm-editor')).not.toBeNull();
-  expect(screen.getByLabelText('编码')).toBeDisabled();
+  expect(screen.getByRole('textbox',{name:'编码'})).toBeDisabled();
   expect(screen.getByRole('button',{name:/^保存$/})).toBeVisible();
 });
 

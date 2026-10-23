@@ -45,6 +45,13 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('DrawingQueryService', () => {
+  it('groups real coding main categories under actual product IDs and applies the same intersection',()=>{
+    const record=drawings.get(ids.first);
+    expect(drawings.navigation().mainCategories).toContainEqual({productId:record.productId!,mainCategoryId:record.mainCategoryId,name:'印刷件类',code:'04',count:2});
+    expect(drawings.search({productId:record.productId!,mainCategoryId:record.mainCategoryId!}).total).toBe(2);
+    expect(drawings.navigationCounts({keyword:'no-such-drawing'}).mainCategories).toEqual([]);
+    expect(drawings.navigation().mainCategories).toHaveLength(1);
+  });
   it('supports partial and exact drawing-number searches', () => {
     expect(drawings.search({ drawingNumber: '0401' }).items.map((item) => item.id)).toEqual([ids.first]);
     expect(drawings.search({ drawingNumber: '02.0209.010.0401001', exactDrawingNumber: true }).items)

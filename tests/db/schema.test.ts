@@ -53,7 +53,7 @@ describe('schema migrations', () => {
     const seeded = seedProduct(database);
     const backup = vi.fn();
 
-    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 18 });
+    expect(migrateDatabase(database, { databaseExists: true, createBackup: backup })).toEqual({ from: 4, to: 19 });
 
     expect(backup).toHaveBeenCalledOnce();
     expect(database.prepare('select id, sku from products').get()).toEqual({ id: seeded.product, sku: null });
@@ -92,14 +92,14 @@ describe('schema migrations', () => {
     expect(database.pragma('foreign_key_check')).toEqual([]);
   });
 
-  it('enforces unique non-empty sku without guessing legacy values', () => {
+  it('allows duplicate SKU without guessing legacy values', () => {
     const database = v4Database(); seedProduct(database);
     migrateDatabase(database, { databaseExists: true, createBackup: vi.fn() });
     database.prepare("update products set sku = 'SKDZU070JP'").run();
     expect(() => database.prepare(`insert into products
       (brand_id, product_size_id, default_appearance_id, model, product_category, sku, created_at)
       select brand_id, product_size_id, default_appearance_id, 'ZC201', product_category, 'skdzu070jp', created_at from products limit 1`).run())
-      .toThrow(/UNIQUE constraint/);
+      .not.toThrow();
   });
 
   it('stores parsed historical codes and links a matched pdf to exactly one code source', () => {

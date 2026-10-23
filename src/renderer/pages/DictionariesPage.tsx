@@ -160,7 +160,7 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
       <div className="form-actions"><button className="text-button" type="button" onClick={() => setConfirmDeleteId(null)}>取消</button><button className="primary-button danger" disabled={pendingId === item.id} type="button" onClick={() => void deleteItem(item)}>{pendingId === item.id ? '删除中…' : '确认删除'}</button></div></div>}
     {rowFeedback?.id === item.id && <p className={rowFeedback.kind === 'error' ? 'error-banner' : 'success-banner'}>{rowFeedback.message}</p>}
   </div> : null;
-  const dictionaryTable = (source: DictionaryItemView[], options?: { selectMain?: boolean }) => <DataTable fillViewport items={source} columns={[
+  const dictionaryTable = (source: DictionaryItemView[], options?: { selectMain?: boolean }) => <DataTable tableId={`dictionaries.${type === 'main_category' ? 'project-items' : type}`} fillViewport items={source} columns={[
     { key: 'code', label: '编码', render: (item) => <strong className="mono">{item.code}</strong> },
     { key: 'name', label: '名称', render: (item) => item.name }, { key: 'status', label: '状态', render: statusCell },
     ...(options?.selectMain ? [{ key: 'detail', label: '项目明细', render: (item: DictionaryItemView) => <button className="text-button" aria-label={`查看 ${item.name} 的项目明细`} aria-pressed={selectedMainId === item.id} onClick={() => { setSelectedMainId(item.id); setCreatingProject(false); }} type="button">查看</button> }] : []),

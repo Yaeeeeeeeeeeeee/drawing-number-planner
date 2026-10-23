@@ -1,3 +1,4 @@
+import './v4-page-tables.css';
 import type { ProductVersionTarget } from './products/ProductAppearancePanel';
 import type { AppearanceApi } from '../data/appearance-client';
 import './products/product-appearance.css';
@@ -264,13 +265,13 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
     {error && <p className="error-banner">{error}</p>}
     {queryState !== 'ready' && <QueryFeedback state={queryState} error={queryError} onRetry={() => initialLoaded ? void load(queriedFilters) : loadInitial()}/>}
     {items.length === 0 ? queryState !== 'ready' ? null : <EmptyState title={Object.entries(queriedFilters).some(([key,value]) => key === 'status' ? value !== 'all' : Boolean(value)) ? '没有符合筛选条件的产品' : '还没有产品档案'} description="先完成编码字典，再创建首个产品型号。" symbol="品" /> :
-      <><DataTable fillViewport virtualize virtualKey={JSON.stringify(queriedFilters)} items={items} columns={[
-        { key: 'sku', label: 'SKU', render: item => <strong title={item.sku ?? undefined}>{item.sku ?? '待补录'}</strong> },
-        { key: 'model', label: '型号', render: item => item.model },
-        { key: 'brand', label: '品牌', render: item => item.brandName },
-        { key: 'category', label: '产品类别', render: item => item.productCategory },
-        { key: 'status', label: '状态', render: item => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span> },
-        ...productQrPurposes.map(purpose => ({ key: purpose.key, label: purpose.label, render: (item: ProductView) => {
+      <><DataTable tableId="products.archive" fillViewport virtualize virtualKey={JSON.stringify(queriedFilters)} items={items} columns={[
+        { key: 'sku', label: 'SKU', width:210, minWidth:130, align:'left', render: item => <strong title={item.sku ?? undefined}>{item.sku ?? '待补录'}</strong> },
+        { key: 'model', label: '型号', width:170, minWidth:130, align:'left', render: item => <span title={item.model}>{item.model}</span> },
+        { key: 'brand', label: '品牌', width:130, minWidth:130, align:'left', render: item => item.brandName },
+        { key: 'category', label: '产品类别', width:150, minWidth:130, align:'left', render: item => item.productCategory },
+        { key: 'status', label: '状态', width:120, minWidth:120, align:'center', render: item => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span> },
+        ...productQrPurposes.map(purpose => ({ key: purpose.key, label: purpose.label, width:130, minWidth:112, align:'center' as const, render: (item: ProductView) => {
           const records = qrCodes.filter(code => {
             const linked = code as ProductQrCodeView & { canonicalProductId?: number };
             return (linked.canonicalProductId ?? code.productId) === item.id && code.key === purpose.key;
@@ -279,7 +280,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
           const label = state === 'unconfigured' ? '未配置' : state === 'active' ? '已启用' : '已停用';
           return <button className={`text-button product-purpose-link product-purpose-${state}`} type="button" aria-label={`${purpose.label} · ${label}`} title={records.length > 1 ? `${records.length} 条记录，点击查看全部；${records.filter(code => code.status === 'active').length} 条已启用` : `管理 ${item.model} 的${purpose.label}`} onClick={() => openQr(item, purpose)} disabled={!onOpenQr}>{label}{records.length > 1 && <small> · {records.length} 条</small>}</button>;
         }})),
-        { key: 'actions', label: '操作', render: item => <button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button> },
+        { key: 'actions', label: '操作', width:100, minWidth:100, align:'center', locked:'end', render: item => <button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button> },
       ]} /></>}
   </section>;
 }

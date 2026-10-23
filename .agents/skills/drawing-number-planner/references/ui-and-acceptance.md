@@ -185,3 +185,7 @@ Drawing origin is an independent 来源 column. User selected a low-saturation g
 Current：图号/PDF共用目录树与Lucide18px/1.8图标；标题行图标收起，默认300px、可调260–420px。待关联入口位于树后同一滚动区，不固定底部。单套兼容文件筛选折叠，待关联只清导航冲突条件，保留手动条件。计数按唯一索引/实际图号身份、明确关联查询；修改后刷新列表与统计。图号七列不含默认文件完整性列，详情仍保留。
 
 Current：用户要求交付无示例、中文、自选路径。本候选不携带acceptance-seed；首次新库移除预设示例模板和个人签名，保留系统用途定义；已存在用户数据不重置。旧样例安装目标拒绝并要求新目录，禁止靠清理AppData或原始PDF实现空数据。仅隔离交付，不自动合并或覆盖已发布版本。见docs/p4-unified-navigation-empty-installer-20261020.md。
+
+## Current: V4 compact lists and shared column interactions (2026-10-23)
+
+PDF has no right file detail panel; per-row path/open only and top bulk management/manual classification, nav-only batch rename. Drawing nav third level is actual coding main categories, not batches/appearance versions. Products, QR, PDF and drawings have no traditional paging UI; bounded DOM/chunks preserve selections/query scope. Shared tables provide resize/minima/6px snap/double-click fit, header reorder, local persistence and reset. Text stays within its column, filenames/batches at most two lines each, composite file lists keep all independent actions. Old no-wrap and drawing pagination constraints are superseded by V4; history APIs and protected actions remain. Browser/CI fixture acceptance does not establish local user data or physical DPI acceptance.

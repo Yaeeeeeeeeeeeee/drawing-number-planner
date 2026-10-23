@@ -246,7 +246,7 @@ it('serves navigation before signed detail IDs and validates actual usage filter
   const before = db.serialize(); db.pragma('query_only = ON');
   try {
     const navigation = await app.inject({ method: 'GET', url: '/api/drawings/navigation' });
-    expect(navigation.statusCode).toBe(200); expect(navigation.json()).toEqual({ batches: [] });
+    expect(navigation.statusCode).toBe(200); expect(navigation.json()).toEqual({ batches: [],mainCategories:[expect.objectContaining({productId,code:'04',name:'Main',count:1})] });
     const filtered = await app.inject({ method: 'GET', url: `/api/drawings?productId=${productId}&associationState=pending` });
     expect(filtered.statusCode).toBe(200); expect(filtered.json().items.map((item: { id: number }) => item.id)).toEqual([planned.id]);
     expect((await app.inject({ method: 'GET', url: '/api/drawings?usageBatchId=1' })).json().total).toBe(0);

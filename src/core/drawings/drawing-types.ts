@@ -145,6 +145,7 @@ export interface PagedDrawingResult {
 
 /** Counts use the same read-only record identity and predicates as the list. */
 export interface DrawingNavigationCounts {
+  mainCategories?: Array<{productId:number;mainCategoryId:number;name:string;code:string;count:number}>;
   appearances: Array<{appearanceVersionId:number;count:number}>;
   total: number;
   categories: Array<{ name: string; count: number }>;

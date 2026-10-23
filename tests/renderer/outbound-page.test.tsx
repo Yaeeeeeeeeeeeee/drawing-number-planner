@@ -323,6 +323,12 @@ describe('OutboundPage', () => {
     expect(screen.getByRole('button', { name: '生成压缩包' })).toBeEnabled();
     expect(screen.getByText(/未选中的异常文件不会阻止其他有效文件外发/)).toBeVisible();
     expect(screen.getByRole('table',{name:'外发文件预览'}).querySelectorAll('th')).toHaveLength(6);
+    const table=screen.getByRole('table',{name:'外发文件预览'});
+    fireEvent.keyDown(within(table).getByRole('columnheader',{name:'完整图号'}),{altKey:true,key:'ArrowLeft'});
+    expect(table.querySelectorAll('thead th')[1]).toHaveAttribute('data-column-key','fullCode');
+    expect(table.querySelectorAll('tbody tr')[0].querySelectorAll('td')[1]).toHaveTextContent(preview.items[0].fullCode!);
+    expect(within(table).getByRole('checkbox',{name:'选择 铭牌'})).toBeChecked();
+
   });
 
   it('explains desktop-only packaging without calling the API in browser preview', async () => {
@@ -399,14 +405,14 @@ describe('OutboundPage', () => {
     await selectLoadedProduct();
     await waitFor(()=>expect(screen.getByRole('option',{name:'20260910'})).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
-    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '预览文件' })); });
     await screen.findByText('A铭牌.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
     fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
     await screen.findByText('压缩包已生成');
 
     fireEvent.change(screen.getByLabelText('打包模式'),{target:{value:'current_complete'}});
-    fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '预览文件' })); });
     await screen.findByText('B说明书.pdf');
     expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
     expect(await screen.findByLabelText('主题')).toHaveValue('A包');
@@ -735,14 +741,15 @@ describe('OutboundPage', () => {
     render(<OutboundPage api={api as never}/>);
     await selectLoadedProduct();
     await waitFor(()=>expect(screen.getByRole('option',{name:'20260910'})).toBeInTheDocument());fireEvent.change(screen.getByLabelText('资料批次'),{target:{value:'8'}});
-    fireEvent.click(screen.getByRole('button',{name:'预览文件'}));await screen.findByText('铭牌（转曲）.pdf');
+    // Settle the preview's selected-file effects before opening a new preflight.
+    await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'预览文件'}));});await screen.findByText('铭牌（转曲）.pdf');
     // Settle each preceding step explicitly, so the test switches scope only after
     // the intended desktop operation is pending, independently of DOM polling timers.
     await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'生成压缩包'}));});
     expect(api.preflightOutboundPackage).toHaveBeenCalledOnce();
     expect(api.preflightOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({selectedPdfFileIds:[41]}));
     await act(async()=>{finishPreflight({previewToken:'preview-1',packageName:preview.packageName,selectedCount:1,normalCount:1,warningCount:0,blockingErrors:[],warnings:[],context:{}});});
-    await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'确认生成'}));});
+    const confirm=await screen.findByRole('button',{name:'确认生成'});await act(async()=>{fireEvent.click(confirm);});
     expect(phase==='directory'?picked:api.createOutboundPackage).toHaveBeenCalledOnce();
     if(phase==='create')expect(api.createOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({productId:3,selectedPdfFileIds:[41]}));
     const changedScope=screen.getByLabelText(scope==='product'?'产品':'打包模式');

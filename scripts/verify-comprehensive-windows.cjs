@@ -61,7 +61,7 @@ async function launch(){
 async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow(app,dialog);await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});return page;}catch(error){await captureFailure(app,app.__verificationLabel,error);throw error;}}
 (async()=>{
  fs.mkdirSync(evidence,{recursive:true});assert.equal(fs.existsSync(profileHome),false,'Refuse to touch any pre-existing runner/user production profile');
- const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,18);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
+ const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,19);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
  const legacy=path.join(temporary,'旧版原始数据目录');database('prepare',legacy);database('rollback-and-wal',legacy);const settingsBefore=fs.readFileSync(path.join(legacy,'settings.json'));
  const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));let app;
  try{app=await launch();const page=await ready(app,dialog);
@@ -78,7 +78,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
     const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();
     await page.getByRole('heading',{name:label,exact:true}).waitFor();
     await page.waitForTimeout(150);if(label==='二维码管理')await assertQrListLayout(page,`${width}x${height}`);
-    if(['产品档案','PDF 文件中心'].includes(label))assert.equal(await page.locator('.table-pagination').count(),0,`${label} must use scrolling rather than traditional paging`);
+    if(['产品档案','PDF 文件中心','图号库','二维码管理'].includes(label))assert.equal(await page.locator('.table-pagination').count(),0,`${label} must use scrolling rather than traditional paging`);
     const uiControls=await page.evaluate(()=>({hiddenToggleVisible:[...document.querySelectorAll('.navigation-toggle[hidden]')].some(e=>getComputedStyle(e).display!=='none'),selectHeights:[...document.querySelectorAll('.page-surface select')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect().height)}));
     assert.equal(uiControls.hiddenToggleVisible,false);assert.ok(uiControls.selectHeights.every(height=>Math.abs(height-36)<1),`${label} controls must share 36px height`);
     (report.uiControlConsistency??=[]).push({label,width,...uiControls});
@@ -107,7 +107,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.equal(counts.products.find(item=>item.productId===5)?.count,2);assert.equal(list.total,2);assert.deepEqual(list.items.map(item=>item.matchStatus).sort(),['matched','unmatched']);
   assert.ok(list.items.every(item=>item.materialBatchId&&item.conversionType==='outlined'));assert.ok(list.items.every(item=>item.materialBatchName.includes('首批大货')));
   const product=page.getByRole('button',{name:'产品 SKU · M1',exact:true});if(!await product.isVisible())await page.getByRole('button',{name:'产品／批次导航',exact:true}).click();await product.click();
-  await page.getByRole('button',{name:`文件详情 ${path.basename(directoryPdf)}`,exact:true}).waitFor();await page.getByRole('button',{name:`文件详情 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
+  await page.getByRole('checkbox',{name:`选择 ${path.basename(directoryPdf)}`,exact:true}).waitFor();await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
   const unassociated=await page.evaluate(async()=>await(await fetch('/api/drawings?associationState=unassociated')).json());assert.ok(unassociated.items.some(item=>item.fullCode==='02.0209.010.0401002'));
   assert.deepEqual(snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings,bindingsBeforeScan);
   assert.equal(createHash('sha256').update(fs.readFileSync(directoryPdf)).digest('hex'),directoryHashes[0]);assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
@@ -136,7 +136,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
     assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
   }
   await range.selectOption('included');await filterButton.click();await page.getByRole('button',{name:'扫描资料库',exact:true}).click();
-  await page.getByRole('button',{name:`文件详情 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor({timeout:45000});
+  await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor({timeout:45000});
   report.pdfManagementButtons={actualRenderer:true,previewApplyIgnoreRestoreClear:true,originalFileHashPreserved:true,clearedIndexRediscovered:true,zeroCountDoesNotReparentBatch:true};
   await go(page,'图号库');await page.getByRole('button',{name:'自动归类',exact:true}).click();
   await page.locator('.drawing-association-result').waitFor({timeout:45000});
@@ -198,7 +198,8 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.equal(createHash('sha256').update(fs.readFileSync(firstPdf)).digest('hex'),firstHash);assert.equal(createHash('sha256').update(fs.readFileSync(replacementPdf)).digest('hex'),replacementHash);
   report.nativeQrPdfPicker={actualNativeDialog:true,rendererSelectionPreviewCommit:true,fullWidthFilename:false,asciiParentheses:true,sevenColumnProductList:true,noIndependentAppearancePicker:true,newRecordProductScoped:true,lowercasePurposeAndParenthesisSpaceValidated:true,firstFileHash:firstHash,replacementFileHash:replacementHash,restartPreservesLinkAndMetadata:true,replacementPreservesMetadataAndHistory:true,unlinkPreservesFilesAndAudit:true,oldV15RowsPreserved:true,qrCodeId:linkedState.code.id};
  }finally{await app.close();}
- const beforeRestart=snapshot(path.join(legacy,'planner.db'));app=await launch();try{await ready(app);assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeRestart);}finally{await app.close();}report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
+ app=await launch();try{const page=await ready(app);report.v4=await require('./verify-v4-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});}catch(error){await captureFailure(app,'v4',error);throw error;}finally{await app.close();}
+ const beforeRestart=snapshot(path.join(legacy,'planner.db'));app=await launch();try{const page=await ready(app);assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeRestart);assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('table-layout:v1:pdf-files'))),report.v4.tableLayout);report.v4.layoutSurvivesRestart=true;}finally{await app.close();}report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
  // New-user path uses the real native first-start choice; the old selected DB remains intact.
  fs.unlinkSync(config);fs.rmdirSync(profileHome);const freshDialog=nativeDialog('fresh');app=undefined;
  try{app=await launch();await ready(app,freshDialog);const data=await app.evaluate(({app})=>app.getPath('userData'));assert.equal(data,path.join(profileHome,'data'));const all=snapshot(path.join(data,'planner.db'));for(const [name,rows]of Object.entries(all))if(!['schema_migrations','qr_purposes','qr_purpose_product_categories'].includes(name))assert.equal(rows.length,0,name);assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeRestart);report.freshBusinessTablesEmpty=true;report.freshDatabaseBeforeRestart=all;}finally{freshDialog.child.kill();if(app)await app.close();}

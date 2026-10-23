@@ -304,7 +304,7 @@ export interface LocalTaskView {
 
 export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<DrawingAppearanceApi>, PdfManagementApi, QrManualApi {
   getDrawingNavigationCounts?(filters?: Record<string, string | number | boolean | undefined>): Promise<DrawingNavigationCounts>;
-  getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[] }>;
+  getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[];mainCategories?: DrawingNavigationCounts['mainCategories'] }>;
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingDetailView>;
   activateDrawing(id: number): Promise<DrawingDetailView>;
@@ -698,3 +698,5 @@ export const apiClient: PlannerApi = {
   listLocalTasks: async () => (await request<{ tasks: LocalTaskView[] }>('/api/tasks')).tasks,
   cancelLocalTask: (id) => request(`/api/tasks/${id}/cancel`, json('POST')),
 };
+
+export type {PdfClassificationInput, PdfClassificationApplyInput, PdfClassificationPreview, PdfClassificationEntry, PdfClassificationResult} from './pdf-management-client';

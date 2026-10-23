@@ -1,0 +1,18 @@
+/* Semantic keys keep these rules attached to the data after column moves. */
+:is(.products-integrated,.qr-page,.bom-page,.outbound-page,.outbound-mock-page) [data-column-key] { min-width: 0; vertical-align: middle; overflow: hidden; }
+:is(.products-integrated,.qr-page,.bom-page,.outbound-page,.outbound-mock-page) :is(td,th)[data-column-key]:is([data-column-key='sku'],[data-column-key='model'],[data-column-key='fullCode']) { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+:is(.products-integrated,.qr-page,.bom-page,.outbound-page,.outbound-mock-page) [data-column-key='actions'] { white-space: nowrap; }
+:is(.products-integrated,.qr-page,.bom-page,.outbound-page,.outbound-mock-page) [data-column-key='actions'] :is(.row-actions,.ob-config-row-actions,.ob-part-actions) { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.qr-page .qr-subtable [data-column-key] { width: auto; }
+.qr-page .qr-subtable [data-column-key='fileName'] .qr-filename,
+.outbound-full-file-list [data-column-key='fileName'] .outbound-file-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; white-space: normal; max-width: 100%; text-align: left; }
+.qr-page .qr-subtable [data-column-key='url'] { overflow-wrap: anywhere; white-space: normal; }
+.bom-history-table-scroll { max-width: 100%; overflow-x: auto; }
+.bom-history-fields [data-column-key] { overflow-wrap: anywhere; }
+.qr-page .qr-subtable th[data-column-key] { width: auto !important; }
+:is(.products-integrated,.qr-page,.bom-page,.outbound-page) [data-column-key='actions'] .row-actions { flex-wrap: nowrap; }
+.qr-page .qr-subtable { overflow-x: auto; max-width: calc(100% - 28px); }
+.products-integrated [data-column-key='sku'] > strong,
+.products-integrated [data-column-key='model'] > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.qr-manual-page .qr-subtable .qr-filename {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;overflow-wrap:anywhere;max-height:3em;line-height:1.5;margin-bottom:4px;}

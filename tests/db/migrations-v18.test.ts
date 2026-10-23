@@ -1,3 +1,4 @@
+import {createV18Fixture} from './v18-fixture';
 import {afterEach,expect,it,vi} from 'vitest';
 import {openDatabase,type PlannerDatabase} from '../../src/db/database';
 import {migrateDatabase} from '../../src/db/migrations';
@@ -6,7 +7,7 @@ import {ProductService} from '../../src/core/products/product-service';
 import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 let db:PlannerDatabase;afterEach(()=>db?.close());
 function v17(){
- db=openDatabase(':memory:');migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});
+ db=createV18Fixture();
  const dictionary=new DictionaryService(db),brand=dictionary.create({type:'brand',code:'02',name:'Brand'}),size=dictionary.create({type:'product_size',code:'0404',name:'Size'}),appearance=dictionary.create({type:'appearance',code:'01',name:'First'});
  const product=new ProductService(db).create({sku:'LEGACY',model:'ZC100',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id,productCategory:'Test'});ensureProductAppearance(db,product.id);
  const version=(db.prepare('select id from product_appearance_versions where product_id=?').get(product.id) as {id:number}).id;
@@ -19,10 +20,10 @@ function v17(){
 }
 it('upgrades v17 product-only compatibility after backup without changing any old binding, audit or schema guards',()=>{
  const {product}=v17();const before=db.prepare('select * from drawing_appearance_bindings').all(),backup=vi.fn();
- expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:17,to:18});expect(backup).toHaveBeenCalledTimes(1);expect(db.prepare('select * from drawing_appearance_bindings').all()).toEqual(before);
+ expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:17,to:19});expect(backup).toHaveBeenCalledTimes(1);expect(db.prepare('select * from drawing_appearance_bindings').all()).toEqual(before);
  expect(db.prepare("select name from sqlite_master where name in ('legacy_binding_product','legacy_binding_update','drawing_usage_primary_binding_update') order by name").all()).toHaveLength(3);
  db.prepare("insert into drawing_appearance_bindings values('historical',83,?,null,'confirmed',1,'now')").run(product.id);
- expect(db.pragma('foreign_key_check')).toEqual([]);expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:18,to:18});expect(backup).toHaveBeenCalledTimes(1);
+ expect(db.pragma('foreign_key_check')).toEqual([]);expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:19,to:19});expect(backup).toHaveBeenCalledTimes(1);
 });
 it('rolls back the entire constraint change if migration history cannot be recorded',()=>{
  v17();const before=db.prepare('select * from drawing_appearance_bindings').all();db.exec("create trigger reject_v18 before insert on schema_migrations when new.version=18 begin select raise(abort,'test rollback'); end");

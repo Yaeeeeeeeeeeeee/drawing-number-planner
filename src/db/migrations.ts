@@ -1,6 +1,7 @@
 import type { PlannerDatabase } from './database.js';
 import { toWorkspacePathKey } from '../core/files/workspace-paths.js';
 import {
+  schemaVersionNineteen,
   schemaVersionSeventeen,
   schemaVersionSixteen,
   schemaVersionFive,
@@ -774,8 +775,8 @@ export function applyAppearanceVersionSchema(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 18) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 18`);
-  if (from >= 18) {
+  if (from > 19) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 19`);
+  if (from >= 19) {
     const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
@@ -789,6 +790,9 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
   }
   if (safety.databaseExists) safety.createBackup();
   if (database.inTransaction) throw new Error('Schema升级必须在独立事务中执行');
+  const foreignKeys = database.pragma('foreign_keys', { simple: true });
+  database.pragma('foreign_keys = OFF');
+  try {
   database.transaction(() => {
     if (from < 1) database.exec(schemaVersionOne);
     if (from < 2) {
@@ -866,7 +870,9 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
     }
     if (from < 10) {
       const before = v9MaintenanceSnapshot(database);
-      preserveBomItemTriggersDuringRebuild(database, () => database.exec(schemaVersionTen));
+      // Reproduce v10's intentional parent-drop cascade while FK enforcement is suspended.
+      preserveBomItemTriggersDuringRebuild(database, () => database.exec(schemaVersionTen.replace(
+        'DROP TABLE bom_items;', 'DROP TABLE bom_items; DELETE FROM bom_item_assets; DELETE FROM bom_item_qr_codes;')));
       restoreAutoincrementHighWater(database, 'bom_items', before.bomItemsSequence);
       database.prepare('insert into schema_migrations (version, applied_at) values (10, ?)').run(new Date().toISOString());
       validateMaintenanceMigration(database, before);
@@ -966,6 +972,28 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       database.prepare('insert into schema_migrations(version,applied_at) values(18,?)').run(new Date().toISOString());
       for(const table of protectedTables)if(JSON.stringify(database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all())!==JSON.stringify(protectedRows[table]))throw new Error('产品关联兼容迁移历史内容校验失败');
     }
+    if (from < 19) {
+      const tables = (database.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' and name<>'schema_migrations' order by name").all() as {name:string}[]).map(row=>row.name);
+      const before = Object.fromEntries(tables.map(table=>[table,database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all()]));
+      const originalSql=(database.prepare("select sql from sqlite_master where type='table' and name='products'").get() as {sql:string}).sql;
+      const sql=originalSql.replace(/,\s*UNIQUE\s*\(\s*brand_id\s*,\s*model\s*\)/i,'');
+      if(sql===originalSql)throw new Error('产品身份迁移未找到预期型号约束');
+      const objects=database.prepare("select sql from sqlite_master where tbl_name='products' and type in ('index','trigger') and sql is not null and name<>'products_sku_unique' order by type,name").all() as {sql:string}[];
+      const sequence=(database.prepare("select seq from sqlite_sequence where name='products'").get() as {seq:number}|undefined)?.seq;
+      database.exec('drop table products');
+      database.exec(sql);
+      for(const row of before.products as Record<string,string|number|null>[]) {
+        const columns=Object.keys(row);
+        database.prepare(`insert into products(${columns.map(quoteIdentifier).join(',')}) values(${columns.map(()=>'?').join(',')})`).run(...Object.values(row));
+      }
+      for(const object of objects)database.exec(object.sql);
+      if(sequence!==undefined)restoreAutoincrementHighWater(database,'products',sequence);
+      database.exec(schemaVersionNineteen);
+      database.prepare('insert into schema_migrations(version,applied_at) values(19,?)').run(new Date().toISOString());
+      for(const table of tables)if(JSON.stringify(database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all())!==JSON.stringify(before[table]))throw new Error('产品身份迁移历史内容校验失败');
+      if((database.pragma('foreign_key_check') as unknown[]).length)throw new Error('产品身份迁移引用校验失败');
+    }
   })();
-  return { from, to: 18 };
+  } finally { database.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`); }
+  return { from, to: 19 };
 }

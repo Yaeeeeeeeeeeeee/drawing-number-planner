@@ -147,7 +147,7 @@ describe('DrawingLibraryPage', () => {
     expect(await screen.findByRole('button', { name: '改变产品所属' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^删除图号$/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /打开转曲前文件.*的位置/ })).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox', { name: '全选当前页' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '全选已加载' }));
     expect(screen.getByRole('button', { name: /批量删除/ })).toBeDisabled();
     expect(realCall).not.toHaveBeenCalled();
     window.history.replaceState({}, '', '/');
@@ -545,13 +545,13 @@ describe('DrawingLibraryPage', () => {
     expect(screen.queryByLabelText('搜索现有 PDF')).not.toBeInTheDocument();
   });
 
-  it('passes explicit pagination and resets it when selectable drawing filters or views change', async () => {
+  it('uses bounded chunks without pagination and resets scope on submitted filters', async () => {
     const drawing = { id: 1, fullCode: '02.0209.010.0401001', displayName: '长路径图号', sku: 'SKU-220', productId: 5,
       model: 'ZC220', productCategory: '冰柜', brandName: 'SAMKYO', colorName: '白色', mainCategoryName: '印刷件类',
       projectItemName: 'LOGO', status: 'active', origin: 'planned', hasSourceFile: true, hasOutlinedFile: true,
       dictionaryMappingStatus: 'mapped' } as const;
     const api = {
-      searchDrawings: vi.fn().mockResolvedValue({ items: [drawing], total: 128, page: 1, pageSize: 25 }),
+      searchDrawings: vi.fn().mockResolvedValue({ items: [drawing], total: 1, page: 1, pageSize: 50 }),
       listProducts: vi.fn().mockResolvedValue([{ id:5, model:'T40', productCategory: '冰柜' }]),
       listMaterialBatches: vi.fn().mockResolvedValue([{ id: 44, name: '01.20260827', sku: 'SKU-220', model: 'ZC220' }]),
       listDictionaries: vi.fn((type: string) => Promise.resolve(type === 'main_category'
@@ -564,10 +564,7 @@ describe('DrawingLibraryPage', () => {
 
     render(<DrawingLibraryPage api={api as never} />);
     await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 50 })));
-    fireEvent.change(screen.getByRole('combobox', { name: '每页条数' }), { target: { value: '25' } });
-    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 25 })));
-    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
-    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 25 })));
+    expect(screen.queryByLabelText('每页条数')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '更多筛选' }));
     fireEvent.change(await screen.findByRole('combobox', { name: '产品类别' }), { target: { value: '冰柜' } });
     fireEvent.change(screen.getByLabelText('主类别'), { target: { value: '12' } });
@@ -579,10 +576,10 @@ describe('DrawingLibraryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({
       productCategory: '冰柜', mainCategoryId: 12, projectItemId: 21, appearanceId: 31, materialBatchId: '',
-      page: 1, pageSize: 25,
+      page: 1, pageSize: 50,
     })));
     fireEvent.click(screen.getByRole('button', { name: '全部图号' }));
-    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 25 })));
+    await waitFor(() => expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 50 })));
   });
 });
 
@@ -734,26 +731,23 @@ it('does not use the current page total as navigation counts when server counts 
 });
 
 
-it.each(['planned','historical'] as const)('refreshes filtered records and navigation counts after %s status changes while preserving scope and page', async origin => {
+it.each(['planned','historical'] as const)('refreshes filtered records and navigation counts after %s status changes while preserving scope and scroll', async origin => {
   let changed=false;
   const row={id:1,fullCode:'STATUS-CODE',origin,status:'active',sourceFiles:[],outlinedFiles:[],currentBomUsage:[],readOnly:origin==='historical'};
-  const api={listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValue([{id:5,sku:'SKU',model:'T40',productCategory:'冰柜'}]),searchDrawings:vi.fn().mockImplementation(()=>Promise.resolve({items:changed?[{...row,id:2,fullCode:'REMAINING-CODE'}]:[row],total:changed?100:101})),getDrawingNavigationCounts:vi.fn().mockImplementation(()=>Promise.resolve({total:changed?100:101,categories:[],products:[],batches:[],unassociated:0})),getDrawing:vi.fn().mockImplementation(()=>Promise.resolve({...row,status:changed?(origin==='historical'?'inactive':'voided'):'active'})),voidDrawing:vi.fn().mockImplementation(()=>{changed=true;return Promise.resolve();}),deactivateHistoricalDrawing:vi.fn().mockImplementation(()=>{changed=true;return Promise.resolve();})};
+  const api={listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValue([{id:5,sku:'SKU',model:'T40',productCategory:'冰柜'}]),searchDrawings:vi.fn().mockImplementation(()=>Promise.resolve({items:changed?[{...row,id:2,fullCode:'REMAINING-CODE'}]:[row],total:changed?1:2})),getDrawingNavigationCounts:vi.fn().mockImplementation(()=>Promise.resolve({total:changed?1:2,categories:[],products:[],batches:[],unassociated:0})),getDrawing:vi.fn().mockImplementation(()=>Promise.resolve({...row,status:changed?(origin==='historical'?'inactive':'voided'):'active'})),voidDrawing:vi.fn().mockImplementation(()=>{changed=true;return Promise.resolve();}),deactivateHistoricalDrawing:vi.fn().mockImplementation(()=>{changed=true;return Promise.resolve();})};
   vi.spyOn(window,'confirm').mockReturnValue(true);
   render(<DrawingLibraryPage api={api as never}/>);
   fireEvent.click(await screen.findByRole('button',{name:'分类 冰柜'}));
   await waitFor(()=>expect(screen.getByRole('button',{name:'查询'})).toBeEnabled());
   fireEvent.change(screen.getByLabelText('状态'),{target:{value:'active'}});
   fireEvent.click(screen.getByRole('button',{name:'查询'}));
-  await waitFor(()=>expect(screen.getByRole('button',{name:'下一页'})).toBeEnabled());
-  fireEvent.click(screen.getByRole('button',{name:'下一页'}));
-  await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({page:2,status:'active',navigationProductCategory:'冰柜'})));
   fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'UNAPPLIED-DRAFT'}});
   const scrollRegion=screen.getByRole('table').parentElement!; scrollRegion.scrollTop=120;
   fireEvent.click(await screen.findByRole('button',{name:'STATUS-CODE'}));
   fireEvent.click(await screen.findByRole('button',{name:'改变产品所属'}));
   fireEvent.change(await screen.findByRole('combobox',{name:'图号业务状态'}),{target:{value:'historical'}});
-  await waitFor(()=>expect(within(screen.getByRole('button',{name:'全部图号'})).getByLabelText('100 个图号')).toBeVisible());
-  expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({page:2,status:'active',navigationProductCategory:'冰柜',keyword:''}));
+  await waitFor(()=>expect(within(screen.getByRole('button',{name:'全部图号'})).getByLabelText('1 个图号')).toBeVisible());
+  expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({page:1,status:'active',navigationProductCategory:'冰柜',keyword:''}));
   expect(within(screen.getByRole('table')).queryByRole('button',{name:'STATUS-CODE'})).not.toBeInTheDocument();
   expect(screen.getByRole('table').parentElement).toBe(scrollRegion);
   expect(scrollRegion.scrollTop).toBe(120);
@@ -794,22 +788,19 @@ it('refreshes counts after a successful status mutation even when the detail rel
   expect(screen.getByRole('alert')).toHaveTextContent('详情刷新失败');
 });
 
-it('retains the table during navigation and pages only the applied conditions with a remembered size',async()=>{
-  const row={id:90,fullCode:'STABLE-CODE',origin:'planned',status:'active',model:'T40',productId:5};
-  const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[row],total:150})};
-  const rendered=render(<DrawingLibraryPage api={api as never}/>);
-  await screen.findByRole('button',{name:'STABLE-CODE'});
-  const table=screen.getByRole('table');
-  expect(within(table).getAllByRole('columnheader')).toHaveLength(8);
-  fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'未提交'}});
-  fireEvent.change(screen.getByLabelText('每页条数'),{target:{value:'25'}});
-  await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({pageSize:25,keyword:''})));
-  expect(screen.getByRole('table')).toBe(table);
-  expect(localStorage.getItem('planner:page-size:drawings')).toBe('25');
-  fireEvent.click(screen.getByRole('button',{name:'下一页'}));
-  await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({page:2,pageSize:25,keyword:''})));
-  rendered.unmount();render(<DrawingLibraryPage api={{...api,searchDrawings:vi.fn().mockResolvedValue({items:[],total:0})} as never}/>);
-  await waitFor(()=>expect(screen.queryByRole('button',{name:'查询中…'})).not.toBeInTheDocument());
+it('retains the table and draft while reactivating the applied query without page controls',async()=>{
+ const row={id:90,fullCode:'STABLE-CODE',origin:'planned',status:'active',model:'T40',productId:5};
+ const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1})};
+ const rendered=render(<DrawingLibraryPage api={api as never}/>);
+ await screen.findByRole('button',{name:'STABLE-CODE'});const table=screen.getByRole('table');
+ expect(within(table).getAllByRole('columnheader')).toHaveLength(8);
+ fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'未提交'}});
+ rendered.rerender(<DrawingLibraryPage api={api as never} active={false}/>);rendered.rerender(<DrawingLibraryPage api={api as never} active/>);
+ await waitFor(()=>expect(screen.getByRole('table')).toBe(table));
+ expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({page:1,pageSize:50,keyword:''}));
+ expect(screen.getByLabelText('关键词')).toHaveValue('未提交');
+ expect(screen.queryByLabelText('每页条数')).not.toBeInTheDocument();
+ expect(screen.queryByLabelText('图号分页')).not.toBeInTheDocument();
 });
 
 it('keeps the last rapidly selected product result when the earlier request resolves later',async()=>{

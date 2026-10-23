@@ -67,7 +67,7 @@ describe('BomPage product-level BOM', () => {
     finishOld({...record,id:19,appearanceVersionId:102});
     await waitFor(() => expect(screen.getByRole('button',{name:'查看 BOM 20'})).toBeVisible());
     expect(screen.queryByRole('button',{name:'查看 BOM 19'})).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('业务变更日期')).not.toBeInTheDocument();
+    expect(document.querySelector('input[aria-label="业务变更日期"]')).not.toBeInTheDocument();
     expect(api.getCurrentBom).not.toHaveBeenCalled();
     expect(api.saveBomVersion).not.toHaveBeenCalled();
   });
@@ -267,6 +267,12 @@ describe('BomPage product-level BOM', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '查询' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     expect(await screen.findByText('业务日期未补录')).toBeVisible();
+    const table=screen.getByText('业务日期未补录').closest('table')!;
+    fireEvent.keyDown(within(table).getByRole('columnheader',{name:'型号'}),{altKey:true,key:'ArrowLeft'});
+    expect(table.querySelectorAll('thead th')[1]).toHaveAttribute('data-column-key','model');
+    expect(table.querySelectorAll('tbody tr')[0].querySelectorAll('td')[1]).toHaveTextContent('ZC100');
+    expect(within(table).getByRole('button',{name:'查看 BOM 20'})).toBeEnabled();
+
     await waitFor(() => expect(api.queryBomVersions).toHaveBeenLastCalledWith({ model: 'ZC100', businessChangeDate: '2026-09-02',
       effectiveBatchRelativePath: 'legacy/removed-snapshot', projectItemId: 7, fullCode: '0401001' }));
   });

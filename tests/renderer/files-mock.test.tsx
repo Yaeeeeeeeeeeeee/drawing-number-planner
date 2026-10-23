@@ -94,7 +94,8 @@ describe('PDF renderer-only preview isolation', () => {
     await screen.findByText('说明书-001-源文件');
     expect(document.querySelector('.file-match.pending .files-match-badge')?.textContent).toBe('待确认');
     expect(document.querySelector('.file-match.conflict .files-match-badge')?.textContent).toBe('多图号冲突');
-    fireEvent.click(screen.getAllByRole('button', { name: /清理 .* 的索引记录/ })[0]);
+    fireEvent.click(screen.getByRole('checkbox',{name:'选择 说明书-001-源文件.pdf'}));
+    fireEvent.click(screen.getByRole('button',{name:'清理已选索引记录 (1)'}));
     fireEvent.click(screen.getByRole('button', { name: '确认清理索引记录' }));
     await screen.findByText('已清理 1 条缺失 PDF 索引记录');
     expect(screen.queryByText('说明书-001-源文件')).not.toBeInTheDocument();

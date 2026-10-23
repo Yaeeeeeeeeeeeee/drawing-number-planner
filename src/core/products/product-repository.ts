@@ -175,9 +175,6 @@ export class ProductRepository {
         and historical.detected_product_category is not null and length(trim(historical.detected_product_category)) > 0
         and historical.detected_sku is not null and length(trim(historical.detected_sku)) > 0
         and historical.detected_model is not null and length(trim(historical.detected_model)) > 0
-        and not exists (
-          select 1 from products product where product.sku = historical.detected_sku collate nocase
-        )
       group by historical.detected_product_category, historical.detected_sku, historical.detected_model
       order by historical.detected_product_category, historical.detected_sku, historical.detected_model`).all() as HistoricalCandidateRow[])
       .map((row) => ({

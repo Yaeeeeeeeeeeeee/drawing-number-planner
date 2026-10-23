@@ -3,6 +3,17 @@ import { expect, it, vi } from 'vitest';
 import { ProductCatalogNavigation } from '../../src/renderer/components/ProductCatalogNavigation';
 import { PdfProductBatchNavigation } from '../../src/renderer/components/PdfProductBatchNavigation';
 
+it('expands actual drawing main categories and selects the product-category intersection',()=>{
+ const onSelect=vi.fn();
+ render(<ProductCatalogNavigation mode="drawings" products={[{id:9,sku:'SKU',model:'ZC100',productCategory:'冰柜'}] as never} batches={[]}
+   mainCategories={[{productId:9,mainCategoryId:3,name:'铭牌类',code:'02',count:2}]} counts={{total:2,categories:[],products:[{productId:9,count:2}],batches:[],unassociated:0,mainCategories:[{productId:9,mainCategoryId:3,name:'铭牌类',code:'02',count:2}]}}
+   scope={{kind:'all'}} onSelect={onSelect}/>);
+ fireEvent.click(screen.getByRole('button',{name:'展开产品 ZC100'}));
+ fireEvent.click(screen.getByRole('button',{name:'主类别 铭牌类'}));
+ expect(onSelect).toHaveBeenCalledWith({kind:'main-category',productId:9,mainCategoryId:3});
+ expect(screen.queryByRole('button',{name:/外观/})).not.toBeInTheDocument();
+});
+
 it('uses reliable code-scoped batch chronology and expands search ancestors', () => {
   const select = vi.fn();
   render(<PdfProductBatchNavigation products={[{id:9,sku:'SKU-LONG',model:'T40',productCategory:'洗碗机'}] as never}
@@ -82,15 +93,14 @@ it('keeps a zero-result batch under its real product when file filters remove it
  expect(screen.queryByText(/未关联产品批次/)).not.toBeInTheDocument();
 });
 
-it('keeps drawing usage batches in their products across filtered zero counts and clearing filters',()=>{
+it('keeps drawing main categories under their product across filtered zero counts and clearing filters',()=>{
  const products=[{id:3,sku:'SKU',model:'T40',productCategory:'洗碗机'}];
- const batches=[{id:10,name:'首批大货',relativePath:'old/首批大货',productDirectory:'old',productId:null}];
- const usageBatches=[{id:10,usageProducts:[{productId:3,state:'historical',drawingCount:8}]}];
- const full={total:8,unassociated:0,categories:[{name:'洗碗机',count:8}],products:[{productId:3,count:8}],batches:[{materialBatchId:10,productId:3,count:8}]};
- const zero={...full,total:0,categories:[],products:[],batches:[]};
- const props={products:products as never,batches:batches as never,usageBatches:usageBatches as never,scope:{kind:'all'} as const,onSelect:vi.fn(),mode:'drawings' as const};
+ const mainCategories=[{productId:3,mainCategoryId:8,name:'包装类',code:'05',count:8}];
+ const full={total:8,unassociated:0,categories:[{name:'洗碗机',count:8}],products:[{productId:3,count:8}],batches:[],mainCategories};
+ const zero={...full,total:0,categories:[],products:[],mainCategories:[]};
+ const props={products:products as never,batches:[],mainCategories,scope:{kind:'all'} as const,onSelect:vi.fn(),mode:'drawings' as const};
  const view=render(<ProductCatalogNavigation {...props} counts={full}/>);fireEvent.click(screen.getByRole('button',{name:'展开产品 T40'}));
- expect(screen.getByRole('button',{name:'批次 首批大货'})).toHaveTextContent('8');
- view.rerender(<ProductCatalogNavigation {...props} counts={zero}/>);expect(screen.getByRole('button',{name:'批次 首批大货'})).toHaveTextContent('0');
- view.rerender(<ProductCatalogNavigation {...props} counts={full}/>);expect(screen.getByRole('button',{name:'批次 首批大货'})).toHaveTextContent('8');
+ expect(screen.getByRole('button',{name:'主类别 包装类'})).toHaveTextContent('8');
+ view.rerender(<ProductCatalogNavigation {...props} counts={zero}/>);expect(screen.getByRole('button',{name:'主类别 包装类'})).toHaveTextContent('0');
+ view.rerender(<ProductCatalogNavigation {...props} counts={full}/>);expect(screen.getByRole('button',{name:'主类别 包装类'})).toHaveTextContent('8');
 });

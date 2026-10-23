@@ -105,3 +105,5 @@ export interface FileNavigationResult {
   products: Array<{ productId: number; count: number }>;
   batches: Array<{ materialBatchId: number; productId: number | null; count: number }>;
 }
+
+export type {PdfClassificationInput, PdfClassificationApplyInput, PdfClassificationPreview, PdfClassificationEntry, PdfClassificationResult} from './pdf-classification.js';

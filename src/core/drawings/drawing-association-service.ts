@@ -1,4 +1,3 @@
-import { pdfDirectoryProductSql } from '../files/pdf-product-context.js';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type { PlannerDatabase } from '../../db/database.js';
@@ -23,20 +22,34 @@ export class DrawingAssociationService {
       const facts=getDrawingProductEvidence(this.db,origin,Math.abs(row.signedId));
       const trustworthyProducts=[...new Set(facts.map(fact=>fact.productId))];
       const evidence:string[]=facts.map(fact=>`${fact.source}: 产品 ID ${fact.productId}${fact.appearanceVersionId===null?'':`，原外观版本 ID ${fact.appearanceVersionId}`}`);
-      let candidates=trustworthyProducts;
-      if(!candidates.length&&row.productId!==null){candidates=[resolveCanonicalProductId(this.db,row.productId)];evidence.push(`原扫描产品 ID ${row.productId} 仅为候选`);}
-      if(!candidates.length&&row.detectedSku&&row.detectedModel){
-        candidates=[...new Set((this.db.prepare('select id from products where lower(sku)=lower(?) and model=? and deleted_at is null').all(row.detectedSku,row.detectedModel) as Array<{id:number}>).map(product=>resolveCanonicalProductId(this.db,product.id)))];
-        if(candidates.length)evidence.push(`目录 SKU ${row.detectedSku} / 型号 ${row.detectedModel} 精确候选，尚未归类`);
-      }
+      let candidates=[...trustworthyProducts];
       if(!trustworthyProducts.length&&!binding){
-        const directoryProducts=this.db.prepare(`select distinct ${pdfDirectoryProductSql} as productId from pdf_files file
-          where ${origin==='planned'?'file.drawing_id':'file.historical_drawing_id'}=? and file.management_state='included'`).all(Math.abs(row.signedId)) as Array<{productId:number|null}>;
-        const directoryIds=directoryProducts.flatMap(product=>product.productId===null?[]:[product.productId]);
-        if(directoryIds.length){
-          candidates=[...new Set([...candidates,...directoryIds])];
-          evidence.push('关联 PDF 的完整 SKU-型号目录精确对应产品档案');
+        // Legacy scan IDs are suggestions: enumerate every actual SKU/model peer,
+        // including when the old scan did not retain its detected strings.
+        if(row.productId!==null){
+          const raw=this.db.prepare('select sku,model from products where id=?').get(row.productId) as {sku:string|null;model:string}|undefined;
+          candidates=[resolveCanonicalProductId(this.db,row.productId)];
+          if(raw?.sku)candidates.push(...(this.db.prepare('select id from products where lower(sku)=lower(?) and model=? collate nocase and deleted_at is null').all(raw.sku,raw.model) as Array<{id:number}>).map(product=>resolveCanonicalProductId(this.db,product.id)));
+          evidence.push(`原扫描产品 ID ${row.productId} 及相同 SKU / 型号档案仅为候选`);
         }
+        if(row.detectedSku&&row.detectedModel){
+          candidates.push(...(this.db.prepare('select id from products where lower(sku)=lower(?) and model=? collate nocase and deleted_at is null').all(row.detectedSku,row.detectedModel) as Array<{id:number}>).map(product=>resolveCanonicalProductId(this.db,product.id)));
+          if(candidates.length)evidence.push(`目录 SKU ${row.detectedSku} / 型号 ${row.detectedModel} 精确候选，尚未归类`);
+        }
+        // The PDF projection deliberately yields NULL for ambiguous directories.
+        // Diagnosis must retain ALL candidates so that an old scan ID cannot win.
+        const normalizedPath="replace(file.relative_path, '/', char(92))";
+        const afterCategory=`substr(${normalizedPath}, instr(${normalizedPath}, char(92)) + 1)`;
+        const productSegment=`substr(${afterCategory}, 1, instr(${afterCategory}, char(92)) - 1)`;
+        const directoryProducts=this.db.prepare(`select distinct product.id as productId from pdf_files file join products product
+          on ${productSegment}=product.sku || '-' || product.model collate nocase
+          where ${origin==='planned'?'file.drawing_id':'file.historical_drawing_id'}=? and file.management_state='included'
+          and product.deleted_at is null and instr(${normalizedPath},char(92))>0 and instr(${afterCategory},char(92))>0`).all(Math.abs(row.signedId)) as Array<{productId:number}>;
+        if(directoryProducts.length){
+          candidates.push(...directoryProducts.map(product=>resolveCanonicalProductId(this.db,product.productId)));
+          evidence.push('关联 PDF 的完整 SKU-型号目录对应全部产品档案候选');
+        }
+        candidates=[...new Set(candidates)];
       }
       candidates=candidates.filter(id=>Boolean(this.db.prepare('select id from products where id=? and deleted_at is null').get(id)));
       if(origin==='historical'&&!binding)evidence.push('扫描信息为归类候选；唯一产品可直接归类，多产品歧义保留待处理');

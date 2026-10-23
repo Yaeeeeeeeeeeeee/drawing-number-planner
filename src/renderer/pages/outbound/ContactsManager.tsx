@@ -1,3 +1,5 @@
+import { LayoutTable } from '../../components/LayoutTable';
+import '../v4-page-tables.css';
 import { useEffect, useState } from 'react';
 import { useConfigurationEditor, type RegisterLeaveGuard } from './useConfigurationEditor';
 import type { OutboundContactInputView, OutboundContactView, PlannerApi } from '../../data/client';
@@ -94,7 +96,7 @@ export function ContactsManager({ api, hideDefaultType = false, registerLeaveGua
       {error && <p role="alert" className="error-banner">{error}</p>}
       {editing !== null && <div className="ob-config-editor">{editor}</div>}
       <fieldset disabled={guard.busy} className="ob-config-list-fieldset">
-      <div className="ob-contacts-table-scroll"><table aria-label="联系人列表" className="ob-contacts-table">
+      <div className="ob-contacts-table-scroll"><LayoutTable tableId="outbound.contacts" columns={[{key:'company',label:'公司',width:210,align:'left'},{key:'contact',label:'称呼',width:130,align:'left'},{key:'email',label:'邮箱',width:280,minWidth:180,align:'left'},{key:'type',label:'默认类型',width:130,align:'center'},{key:'status',label:'状态',width:120,align:'center'},{key:'actions',label:'操作',width:230,minWidth:210,align:'center',locked:'end'}]} aria-label="联系人列表" className="ob-contacts-table">
         <thead><tr><th>公司</th><th>称呼</th><th>邮箱</th><th>默认类型</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>{items.map(item => <tr key={item.id}>
           <td>{item.company}</td><td>{item.contactName}</td><td>{item.email}</td>
@@ -105,7 +107,7 @@ export function ContactsManager({ api, hideDefaultType = false, registerLeaveGua
             <button className="text-button danger" type="button" onClick={() => void remove(item)}>删除</button>
           </div></td>
         </tr>)}</tbody>
-      </table>{items.length === 0 && <p className="muted-text">暂无联系人</p>}</div>
+      </LayoutTable>{items.length === 0 && <p className="muted-text">暂无联系人</p>}</div>
       </fieldset>
     </section>
   );

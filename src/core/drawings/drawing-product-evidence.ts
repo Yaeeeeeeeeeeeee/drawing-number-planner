@@ -4,6 +4,10 @@ import type { PlannerDatabase } from '../../db/database.js';
  * a shared code prefix, detected SKU/model, or historical_drawing_numbers.product_id. */
 export const drawingProductEvidenceSql = `(
  select 'planned' as origin,id as record_id,product_id,null as appearance_version_id,'planning' as source from drawing_numbers
+ union all select case when file.drawing_id is not null then 'planned' else 'historical' end,
+ coalesce(file.drawing_id,file.historical_drawing_id),assignment.product_id,null,'confirmed-pdf'
+ from pdf_product_assignments assignment join pdf_files file on file.id=assignment.pdf_file_id
+ where file.drawing_id is not null or file.historical_drawing_id is not null
  union all select origin,record_id,product_id,appearance_version_id,'confirmed' from drawing_appearance_bindings
  union all select case when item.drawing_id is not null then 'planned' else 'historical' end,
  coalesce(item.drawing_id,item.historical_drawing_id),version.product_id,version.appearance_version_id,'bom'
@@ -19,6 +23,9 @@ export const drawingProductEvidenceSql = `(
  join product_appearance_versions version on version.id=scope.appearance_version_id
  join material_batches batch on batch.id=file.material_batch_id
  where (file.drawing_id is not null or file.historical_drawing_id is not null)
+ -- An explicit per-file correction supersedes this same file's legacy batch inference.
+ -- Other physical PDFs and business evidence retain their independent attribution.
+ and not exists(select 1 from pdf_product_assignments assignment where assignment.pdf_file_id=file.id)
  and coalesce((select canonical_product_id from product_identity_members where raw_product_id=batch.product_id),batch.product_id)=version.product_id
 )`;
 

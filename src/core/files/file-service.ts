@@ -1,3 +1,4 @@
+import type {PdfClassificationInput,PdfClassificationApplyInput} from './pdf-classification.js';
 import { createHash } from 'node:crypto';
 import { openSync, closeSync, readSync, statSync, existsSync } from 'node:fs';
 import { FileError } from './file-errors.js';
@@ -81,6 +82,13 @@ export class FileService {
   applyManagement(input: PdfManagementApplyInput) {
     if (this.scanning) throw new FileError('SCAN_IN_PROGRESS', '扫描期间不能修改 PDF 管理决定');
     return this.repository.management().apply(input, pdfWorkspaceKey(this.settings.get().workspaceRoot), this.diskEvidence(input.ids));
+  }
+
+  previewClassification(input:PdfClassificationInput) { return this.repository.classification().preview(input); }
+
+  applyClassification(input:PdfClassificationApplyInput) {
+    if(this.scanning) throw new FileError('SCAN_IN_PROGRESS','扫描期间不能修改 PDF 归属');
+    return this.repository.classification().apply(input);
   }
 
   cleanup(ids: unknown): { cleaned: number } {

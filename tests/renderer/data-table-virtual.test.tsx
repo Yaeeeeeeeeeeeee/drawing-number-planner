@@ -23,6 +23,13 @@ describe('bounded scrolling data table',()=>{
   expect(container.querySelector('table')).toBe(table);
   fireEvent.scroll(scroll,{target:{scrollTop:8800}});await waitFor(()=>expect(end).toHaveBeenCalledTimes(2));
  });
+ it('retries an end notification rejected during loading without requiring different row identities',async()=>{
+  const waiting=vi.fn(()=>false),ready=vi.fn(()=>true);const columns=[{key:'name',label:'产品',render:(item:typeof items[number])=>item.name}];
+  const view=render(<DataTable virtualize onEndReached={waiting} items={items.slice(0,2)} columns={columns}/>);
+  await waitFor(()=>expect(waiting).toHaveBeenCalled());
+  view.rerender(<DataTable virtualize onEndReached={ready} items={items.slice(0,2)} columns={columns}/>);
+  await waitFor(()=>expect(ready).toHaveBeenCalledOnce());
+ });
  it('returns to the top for a new query without remounting the table',async()=>{
   const columns=[{key:'name',label:'产品',render:(item:typeof items[number])=>item.name}];
   const {container,rerender}=render(<DataTable virtualize virtualKey="all" items={items} columns={columns}/>);

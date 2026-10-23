@@ -271,7 +271,13 @@ export class DrawingRepository {
         group by usage.product_id, usage.batch_id order by usage.product_id, usage.batch_id`)
         .all(...manualCondition.values) as DrawingNavigationCounts['batches'];
       const appearances=this.db.prepare(`${catalogCte} select relation.appearance_version_id as appearanceVersionId,count(distinct record.id) as count from filtered_records record join ${drawingAppearanceRelationsSql} relation on relation.origin=record.origin and relation.record_id=abs(record.id) group by relation.appearance_version_id`).all(...manualCondition.values) as DrawingNavigationCounts['appearances'];
-      return { total: count(), categories, products, batches, appearances,
+      const mainCategories=this.db.prepare(`${catalogCte} select association.product_id as productId,
+        category.id as mainCategoryId,category.name,category.code,count(distinct record.id) as count
+        from product_associations association join filtered_records record on record.id=association.drawing_id
+        join dictionary_items category on category.id=record.main_category_id and category.type='main_category'
+        group by association.product_id,category.id order by association.product_id,category.code,category.id`)
+        .all(...manualCondition.values) as NonNullable<DrawingNavigationCounts['mainCategories']>;
+      return { total: count(), categories, products, batches, appearances,mainCategories,
         unassociated: count({ associationState: 'unassociated' }),
         recycle: count({ deletionState: _deletion === 'deleted-retained' || _deletion === 'deleted-released' ? _deletion : 'deleted' }) };
     }).deferred();

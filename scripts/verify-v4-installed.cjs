@@ -1,0 +1,48 @@
+// V4 installed-app acceptance. Called only with the ephemeral native verifier fixture.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{createHash}=require('node:crypto');
+module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapshot,go}){
+ const dbFile=path.join(legacy,'planner.db');const before=snapshot(dbFile);
+ await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1920,1080));
+ const request=async(route,body,method='POST')=>page.evaluate(async({route,body,method})=>{const token=(await(await fetch('/api/session',{method:'POST'})).json()).token;const response=await fetch(route,{method,headers:{'content-type':'application/json','x-planner-token':token},body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw Error(JSON.stringify(result));return result;},{route,body,method});
+ const get=route=>page.evaluate(async route=>await(await fetch(route)).json(),route);
+ const original=await get('/api/products/5');
+ const appearance=await request('/api/dictionaries/appearance',{code:'02',name:'2号外观'});
+ const main=await request('/api/dictionaries/main_category',{code:'04',name:'印刷件类'});
+ await request('/api/dictionaries/project_item',{code:'01',name:'LOGO',parentId:main.id});
+ const input={sku:original.sku,model:original.model,productCategory:original.productCategory,brandId:original.brandId,productSizeId:original.productSizeId,defaultAppearanceId:appearance.id};
+ const duplicate=await request('/api/products',input);assert.notEqual(duplicate.id,original.id);
+ await request('/api/products/5',input,'PUT');
+ assert.deepEqual(snapshot(dbFile).historical_drawing_numbers,before.historical_drawing_numbers,'Default appearance must not rewrite historical codes');
+ const files=Array.from({length:12},(_,i)=>{const code=`02.0209.${i<6?'010':'020'}.0401${String(i+40).padStart(3,'0')}`;const file=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更明细','00.首批大货',`${code}-V4原生-第${i+1}个很长文件名验证人工归纳不覆盖相邻资料批次（转曲）.pdf`);return{code,file,hash:writePdf(file,`Native V4 manual assignment ${i}`)};});
+ await go(page,'PDF 文件中心');await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});
+ const pending=(await get('/api/files?presence=present&pageSize=100')).items.filter(file=>file.fileName.includes('V4原生-'));assert.equal(pending.length,12);assert.ok(pending.every(file=>file.productId===null));
+ const batchList=await get('/api/material-batches');const target=(batchList.items??batchList).find(batch=>batch.relativePath.includes('00.首批大货'));assert.ok(target);
+ for(const file of files)await page.getByRole('checkbox',{name:`选择 ${path.basename(file.file)}`,exact:true}).check();
+ await page.getByRole('button',{name:'人工归纳',exact:true}).click();const dialog=page.getByRole('dialog',{name:'PDF 人工归纳',exact:true});await dialog.waitFor();
+ assert.ok((await dialog.getByLabel('目标产品',{exact:true}).locator('option').allTextContents()).filter(label=>label.includes('内部ID')).length>=2);
+ await dialog.getByLabel('目标产品',{exact:true}).selectOption('5');await dialog.getByLabel('目标资料批次',{exact:true}).selectOption(String(target.id));await dialog.getByRole('button',{name:'预览归属',exact:true}).click();await dialog.getByText('原归属 → 目标归属',{exact:true}).waitFor();
+ await page.screenshot({path:path.join(evidence,'Windows-V4-人工归纳12文件预览.png')});
+ await dialog.getByLabel('归纳原因',{exact:true}).fill('隔离Windows验收：核对12个实际PDF实例');await dialog.getByLabel('已核对原归属与目标归属',{exact:true}).check();await dialog.getByRole('button',{name:'确认归纳',exact:true}).click();await page.getByText('已归纳 12 条 PDF',{exact:true}).waitFor({timeout:45000});
+ const after=(await get('/api/files?presence=present&pageSize=100')).items.filter(file=>file.fileName.includes('V4原生-'));assert.ok(after.every(file=>file.productId===5&&file.materialBatchId===target.id));
+ assert.equal(await page.getByRole('complementary',{name:'文件详情',exact:true}).count(),0);
+ const geometry=[];
+ for(const width of [1920,2560,3840]){
+  await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setContentSize(width,1080),width);
+  await page.getByRole('button',{name:'恢复默认表格布局',exact:true}).click();const table=page.locator('.files-page table.layout-table');await table.waitFor();
+  const header=table.locator('thead [data-column-key=name]'),grip=header.getByRole('separator'),r=await grip.boundingBox(),old=await header.boundingBox();
+  await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+40,r.y+r.height/2,{steps:6});await page.mouse.up();const next=await header.boundingBox();assert.ok(Math.abs(next.width-old.width-40)<2,`V4 pointer boundary ${width}: ${next.width-old.width}`);
+  await table.getByRole('columnheader',{name:'资料批次',exact:true}).press('Alt+ArrowLeft');const order=await table.locator('thead th').evaluateAll(cells=>cells.map(cell=>cell.dataset.columnKey));assert.equal(order[1],'batch');
+  const row=await table.locator('tbody tr:not(.virtual-table-spacer)').first().locator('td').evaluateAll(cells=>cells.map(cell=>cell.dataset.columnKey));assert.deepEqual(row,order);
+  geometry.push({width,before:old.width,after:next.width,order});await page.screenshot({path:path.join(evidence,`Windows-V4-列拖动-${width}.png`)});
+ }
+ const tableLayout=await page.evaluate(()=>JSON.parse(localStorage.getItem('table-layout:v1:pdf-files')));
+ await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});const rescanned=(await get('/api/files?presence=present&pageSize=100')).items.filter(file=>file.fileName.includes('V4原生-'));
+ assert.deepEqual(rescanned.map(file=>[file.id,file.productId,file.materialBatchId]).sort(),after.map(file=>[file.id,file.productId,file.materialBatchId]).sort());
+ await go(page,'图号库');const nav=page.getByRole('navigation',{name:'图号导航',exact:true});if(!await nav.isVisible())await page.getByRole('button',{name:'产品／批次导航',exact:true}).click();
+ const product=nav.locator('.pdf-nav-product[data-product-id="5"]');const expand=product.locator('.pdf-nav-expand').first();if(await expand.getAttribute('aria-expanded')==='false')await expand.click();await product.getByRole('button',{name:'主类别 印刷件类',exact:true}).click();
+ await page.getByRole('button',{name:files[0].code,exact:true}).waitFor();assert.equal(await page.getByLabel('图号分页',{exact:true}).count(),0);assert.equal(await page.getByLabel('每页条数',{exact:true}).count(),0);
+ const drawingList=await get('/api/drawings?productId=5&pageSize=100');assert.equal(drawingList.items.filter(item=>files.some(file=>file.code===item.fullCode)).length,12);
+ for(const file of files)assert.equal(createHash('sha256').update(fs.readFileSync(file.file)).digest('hex'),file.hash);
+ const current=snapshot(dbFile);for(const table of ['drawing_numbers','historical_drawing_numbers','bom_versions','bom_items','outbound_packages','outbound_package_items','product_qr_codes','qr_manual_files','qr_manual_links','drawing_association_audit'])for(const row of before[table]??[])assert.ok(current[table].some(candidate=>Object.keys(row).filter(key=>table!=='historical_drawing_numbers'||key!=='last_seen_at').every(key=>candidate[key]===row[key])),`V4 must preserve prior ${table}`);
+ return {isolatedFixture:true,duplicateProductIds:[5,duplicate.id],defaultEditPreservesHistory:true,manualPdfFiles:12,perAppearance:{'01':6,'02':6},rescanStable:true,originalFilesUnchanged:true,drawingsUnderProduct:12,mainCategoryNavigation:true,noPdfDetailPanel:true,noDrawingPaging:true,geometry,tableLayout};
+};

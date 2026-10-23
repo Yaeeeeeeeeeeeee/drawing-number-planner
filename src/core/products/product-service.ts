@@ -96,7 +96,6 @@ export class ProductService {
       createDatabaseBackup(this.database,this.database.name,join(dirname(this.database.name),'backups'),'restore');
     }
     return this.database.transaction(() => {
-      if (this.repository.hasSku(input.sku)) throw new ProductError('DUPLICATE_SKU', 'SKU 已存在');
       const candidate = this.listHistoricalCandidates().items.find((item) => item.productCategory === input.productCategory
         && item.sku === input.sku && item.model === input.model);
       if (!candidate) throw new ProductError('STALE_HISTORICAL_CANDIDATE', '历史产品候选已变化，请刷新后重试');
@@ -153,19 +152,12 @@ export class ProductService {
   }
 
   private mapDatabaseError(error: unknown): never {
-    if (error instanceof Error && error.message.includes('UNIQUE constraint failed: products.sku')) {
-      throw new ProductError('DUPLICATE_SKU', 'SKU 已存在');
-    }
-    if (error instanceof Error && error.message.includes('UNIQUE constraint failed: products.brand_id, products.model')) {
-      throw new ProductError('DUPLICATE_MODEL', '同一品牌下型号已存在');
-    }
     throw error;
   }
 
   private changesReferencedMeaning(current: Product, next: ProductInput): boolean {
     return current.brandId !== next.brandId
       || current.productSizeId !== next.productSizeId
-      || current.defaultAppearanceId !== next.defaultAppearanceId
       || current.model !== next.model
       || current.productCategory !== next.productCategory
       || current.referenceProductId !== next.referenceProductId;

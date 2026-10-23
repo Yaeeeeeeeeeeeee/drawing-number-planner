@@ -18,7 +18,7 @@
 .bom-page .bom-history-comparison .bom-history-fields :is(th,td) { padding:9px 12px; vertical-align:top; text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; word-break:normal; border-bottom:1px solid #eee; }
 .bom-history-comparison .bom-history-fields thead th { background:#fafafa; }
 .bom-history-comparison .bom-history-fields tr[data-changed=true] { background:#f3f3f3; }
-.bom-history-comparison .bom-history-fields tr[data-changed=true] td:last-child { font-weight:600; }
+.bom-history-comparison .bom-history-fields tr[data-changed=true] td[data-column-key=selected] { font-weight:600; }
 .bom-history-comparison .bom-history-fields .code-cell { white-space:normal; overflow-wrap:anywhere; }
 .bom-history-comparison .bom-history-asset { display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; margin-bottom:12px; }
 .bom-history-comparison .bom-history-asset>strong,.bom-history-comparison details { max-width:100%; overflow-wrap:anywhere; }
