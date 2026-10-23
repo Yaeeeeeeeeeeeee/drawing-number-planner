@@ -11,8 +11,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: Comprehensive-Windows-Verification-fd85b89c0a0982121f175209cb3164a041907fe9
-          run-id: 39998891146
+          name: Comprehensive-Windows-Verification-c2d5b7c8222d83e732356c921b218f3de6291d57
+          run-id: 39999819508
           github-token: ${{ github.token }}
           path: saved-evidence
       - name: Print actual Shell picker controls and failure windows
@@ -22,7 +22,7 @@ jobs:
           import json
           from pathlib import Path
           root = Path('saved-evidence')
-          for name in ('folder-picker-0-windows.json', 'installer-failure-windows.json'):
+          for name in ('installer-failure-windows.json',):
               files = list(root.rglob(name))
               if not files:
                   raise SystemExit(f'Missing saved evidence: {name}')
@@ -32,9 +32,9 @@ jobs:
                   print('TOP WINDOWS', json.dumps(data.get('topWindows'), ensure_ascii=False))
                   for entry in data.get('windows', []):
                       window = entry.get('window', {})
-                      if '选择安装文件夹' not in window.get('title', ''):
+                      if window.get('title') != '文件夹已存在':
                           continue
-                      print('SHELL WINDOW', json.dumps(window, ensure_ascii=False))
+                      print('EXISTING FOLDER DIALOG', json.dumps(window, ensure_ascii=False))
                       if 'error' in entry:
                           print('UIA ERROR', entry['error'])
                       for element in entry.get('elements', []):
