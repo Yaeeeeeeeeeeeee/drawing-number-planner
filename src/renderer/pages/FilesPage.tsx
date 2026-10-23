@@ -1,6 +1,6 @@
 import type { AppearanceApi } from '../data/appearance-client';
 import { plannerQueryCache, queryKey } from '../data/query-cache';
-import type { PdfManagementApi, PdfManagementPreview } from '../data/pdf-management-client';
+import type { MaterialBatchDeletionPreview, PdfManagementApi, PdfManagementPreview } from '../data/pdf-management-client';
 import './files-management.css';
 import './v4-files.css';
 import { PdfClassificationDialog } from '../components/PdfClassificationDialog';
@@ -85,6 +85,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const [managementPreview, setManagementPreview] = useState<PdfManagementPreview | null>(null);
   const [managementPhrase, setManagementPhrase] = useState('');
   const [managementBusy, setManagementBusy] = useState(false);
+  const [batchDeletion, setBatchDeletion] = useState<MaterialBatchDeletionPreview | null>(null);
   const [renameBatch, setRenameBatch] = useState<MaterialBatchView | null>(null);
   const [batchName, setBatchName] = useState('');
   const [classifying, setClassifying] = useState(false);
@@ -142,7 +143,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     try {
       const result = await loadChunks(values,scope,requestedPage);
       if (request !== searchRequest.current) return;
-      setFiles(result.items); setTotal(result.total); latestSearch.current.page=result.page;
+      setFiles(result.items); setSelectedIds(current=>current.filter(id=>result.items.some(file=>file.id===id))); setTotal(result.total); latestSearch.current.page=result.page;
       void refreshNavigation(values);
     } catch (reason) {if(request===searchRequest.current)setError(reason instanceof Error?reason.message:'PDF 文件加载失败');}
     finally {if(request===searchRequest.current)setLoading(false);}
@@ -208,9 +209,33 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     try { const result = await locally(() => api.applyPdfManagement!({ids:managementPreview.ids, action:managementPreview.action, fingerprint:managementPreview.fingerprint, confirmation:managementPhrase}));
       plannerQueryCache.invalidate('pdf:'); setManagementPreview(null); setSelectedIds([]);
       setMessage(`已处理 ${result.changed} 条 PDF，保留 ${result.blocked.length} 条受保护记录`);
-      await search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope);
+      await Promise.all([search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope),api.listMaterialBatches({}).then(setBatches)]);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '操作失败'); }
     finally { setManagementBusy(false); }
+  };
+  const previewBatchDeletion = async (batch:MaterialBatchView) => {
+    if (!api.previewMaterialBatchDeletion) return;
+    setManagementBusy(true);setError('');setMessage('');
+    try {setBatchDeletion(await api.previewMaterialBatchDeletion(batch.id));}
+    catch(reason){setError(reason instanceof Error?reason.message:'批次预检失败');}
+    finally{setManagementBusy(false);}
+  };
+  const confirmBatchDeletion = async () => {
+    if (!batchDeletion?.allowed || !api.deleteMaterialBatch) return;
+    setManagementBusy(true);setError('');
+    try {
+      await locally(()=>api.deleteMaterialBatch!(batchDeletion.id,{fingerprint:batchDeletion.fingerprint,confirmation:'删除批次'}));
+      plannerQueryCache.invalidate('pdf:');
+      const current=latestSearch.current;
+      const nextScope:PdfNavigationScope=current.scope.kind==='batch'&&current.scope.batchId===batchDeletion.id
+        ? current.scope.productId?{kind:'product',productId:current.scope.productId}:{kind:'all'}:current.scope;
+      setBatchDeletion(null);setNavigationScope(nextScope);
+      if(nextScope!==current.scope)setSelectedIds([]);
+      setMessage('已删除批次记录');
+      setBatches(await api.listMaterialBatches({}));
+      await search(current.values,nextScope===current.scope?current.page:1,nextScope);await refreshNavigation(current.values);
+    } catch(reason){setError(reason instanceof Error?reason.message:'删除批次失败');}
+    finally{setManagementBusy(false);}
   };
   const saveBatchName = async () => {
     if (!renameBatch || !api.renameMaterialBatch) return;
@@ -315,7 +340,10 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     if (!result.ok) setError(result.error?.message ?? '打开文件位置失败');
   };
 
-  const navigation = ({collapseControl}: {collapseControl: ReactNode}) => <PdfProductBatchNavigation collapseControl={collapseControl} products={products} onRenameBatch={api.renameMaterialBatch ? batch => {setRenameBatch(batch);setBatchName(batch.name);} : undefined} batches={batches} counts={navigationCounts} usageBatches={usageBatches} scope={navigationScope}
+  const selectedFiles=files.filter(file=>selectedIds.includes(file.id));
+  const excludableIds=selectedFiles.filter(file=>!file.managementState||file.managementState==='included').map(file=>file.id);
+  const restorableIds=selectedFiles.filter(file=>file.managementState==='ignored'||file.managementState==='needs_review').map(file=>file.id);
+  const navigation = ({collapseControl}: {collapseControl: ReactNode}) => <PdfProductBatchNavigation collapseControl={collapseControl} products={products} onDeleteBatch={api.previewMaterialBatchDeletion && api.deleteMaterialBatch ? batch=>void previewBatchDeletion(batch):undefined} onRenameBatch={api.renameMaterialBatch ? batch => {setRenameBatch(batch);setBatchName(batch.name);} : undefined} batches={batches} counts={navigationCounts} usageBatches={usageBatches} scope={navigationScope}
     onSelect={scope => { setNavigationScope(scope); setSelectedIds([]); setError(''); setMessage(''); void search(latestSearch.current.values, 1, scope); }}
     filters={<form className="filter-bar files-filter" onSubmit={submit}>
       <label><span>文件关键词</span><input aria-label="文件关键词" value={filters.keyword} onChange={(event) => setFilter('keyword', event.target.value)} /></label>
@@ -363,12 +391,18 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     {mock && scanning && <section className="scan-comparison" role="status"><span>正在模拟扫描 · 仅处理内存样例，不读取文件</span><button type="button" className="secondary-button" onClick={() => void api.listLocalTasks().then(tasks => { const task = tasks.find(item => item.status === 'running'); if (task) return api.cancelLocalTask(task.id); }).catch(reason => setError(String(reason)))}>取消模拟扫描</button></section>}
 
     <ModuleWorkspace fileWorkspace resizable hideLayoutReset navigation={navigation} detailLabel="" onCloseDetail={() => {}}>
-    {(api.previewPdfManagement || classificationAvailable) && <section className="file-cleanup-toolbar" aria-label="PDF 索引管理">
-      <span>已选 {selectedIds.length} 条</span><div>
-      <button className="secondary-button" disabled={managementBusy || !files.length} onClick={() => setSelectedIds(files.map(file => file.id))}>全选已加载</button>
-      <button className="secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => setSelectedIds([])}>取消选择</button>
-      {classificationAvailable && <button className="secondary-button" disabled={managementBusy || !selectedIds.length} onClick={()=>setClassifying(true)}>人工归纳</button>}
-      {api.previewPdfManagement && (['clear','ignore','restore'] as const).map(action => <button key={action} className="secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => void previewManagement(selectedIds, action)}>{{clear:'清除已选索引',ignore:'暂不纳入已选',restore:'恢复纳入已选'}[action]}</button>)}</div>
+    {(api.previewPdfManagement || classificationAvailable) && <section className="file-cleanup-toolbar files-management-toolbar" aria-label="PDF 索引管理">
+      <div className="files-selection-actions" role="group" aria-label="文件选择与归纳">
+        <button className="secondary-button" disabled={managementBusy || !files.length} onClick={() => setSelectedIds(files.map(file => file.id))}>全选</button>
+        <button className="secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => setSelectedIds([])}>取消选择</button>
+        <button className="secondary-button" disabled={!classificationAvailable || managementBusy || !selectedIds.length} onClick={()=>setClassifying(true)}>人工归纳</button>
+        <span className="files-selection-count">已选 {selectedIds.length} 条</span>
+      </div>
+      <div className="files-record-actions" role="group" aria-label="文件纳入与记录">
+        <button className="secondary-button" disabled={!api.previewPdfManagement || managementBusy || !excludableIds.length} onClick={()=>void previewManagement(excludableIds,'ignore')}>排除所选文件</button>
+        <button className="secondary-button" disabled={!api.previewPdfManagement || managementBusy || !restorableIds.length} onClick={()=>void previewManagement(restorableIds,'restore')}>恢复所选文件</button>
+        <button className="secondary-button files-remove-record" disabled={!api.previewPdfManagement || managementBusy || !selectedIds.length} onClick={()=>void previewManagement(selectedIds,'clear')}>移除文件记录</button>
+      </div>
     </section>}
     {classifying && <PdfClassificationDialog api={{previewPdfClassification:input=>api.previewPdfClassification!(input),applyPdfClassification:input=>locally(()=>api.applyPdfClassification!(input))}} ids={selectedIds} products={products} batches={batches} onClose={()=>setClassifying(false)} onSaved={async (updated,conflictCount=0)=>{
       plannerQueryCache.invalidate(); setClassifying(false); setSelectedIds([]); setMessage(`已归纳 ${updated} 条 PDF${conflictCount?`；${conflictCount} 条图号关联冲突保留原归属`:``}`);
@@ -388,6 +422,13 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       <label>输入“{managementPreview.confirmation}”<input aria-label="PDF 管理确认短语" value={managementPhrase} onChange={event => setManagementPhrase(event.target.value)} /></label>
       <button className="secondary-button" disabled={managementBusy} onClick={() => setManagementPreview(null)}>取消</button>
       <button className="primary-button" disabled={managementBusy || managementPhrase !== managementPreview.confirmation || !managementPreview.allowed} onClick={() => void applyManagement()}>确认处理</button>
+    </section>}
+    {batchDeletion && <section className="file-cleanup-confirmation" role="dialog" aria-label="删除批次">
+      <strong>删除批次“{batchDeletion.name}”</strong>
+      <p>仅删除内部批次记录。磁盘文件和文件夹保持保留；目录内 PDF 再次被扫描时，会重新建立批次记录。</p>
+      {batchDeletion.reason && <p role="alert">{batchDeletion.reason}</p>}
+      <button className="secondary-button" disabled={managementBusy} onClick={()=>setBatchDeletion(null)}>取消</button>
+      <button className="secondary-button danger" disabled={managementBusy||!batchDeletion.allowed} onClick={()=>void confirmBatchDeletion()}>确认删除批次</button>
     </section>}
     {renameBatch && <section className="file-cleanup-confirmation" role="dialog" aria-label="批次显示名称">
       <strong>修改批次显示名称</strong><p title={renameBatch.relativePath}>{renameBatch.relativePath}</p>
@@ -434,7 +475,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     {!loading && !error && files.length === 0 && <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
       description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} />}
     {(files.length > 0 || loading) &&
-      <DataTable tableId="pdf-files" virtualize virtualKey={queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope})} onEndReached={() => {if(loading)return false;void loadMore();return true;}} items={files} renderExpandedRow={item => expandedPathId === item.id
+      <DataTable tableId="pdf-files" showLayoutTools={false} virtualize virtualKey={queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope})} onEndReached={() => {if(loading)return false;void loadMore();return true;}} items={files} renderExpandedRow={item => expandedPathId === item.id
         ? <div id={`file-path-${item.id}`}><FilePath path={item.relativePath} name={item.fileName} onClose={() => {
           setExpandedPathId(null);
           document.getElementById(`file-path-toggle-${item.id}`)?.focus();

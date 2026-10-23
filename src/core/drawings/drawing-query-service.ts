@@ -98,7 +98,6 @@ export class DrawingQueryService {
       const labels: Record<string, string> = { reserved: '已占号', active: '正式使用', voided: '作废' };
       throw new DrawingQueryError('INVALID_TRANSITION', `不支持从${labels[drawing.status] ?? drawing.status}变更为${labels[target] ?? target}`);
     }
-    if(target==='voided'&&this.database.prepare("select 1 from drawing_appearance_usages where origin='planned' and record_id=?").get(id))throw new DrawingQueryError('INVALID_TRANSITION','该图号已有明确外观沿用关系，须保留有效占号与追溯');
     this.repository.updateStatus(id, target);
     return this.get(id);
   }

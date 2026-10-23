@@ -163,7 +163,13 @@ it('explicitly reuses a reserved drawing in a new version without changing attri
  expect(db.prepare('select * from drawing_appearance_bindings where record_id=?').get(reserved.id)).toEqual(primary);
  expect(db.prepare('select * from bom_versions').all()).toEqual([]);expect(service.preview({...request,appearanceVersionId:(primary as {appearance_version_id:number}).appearance_version_id}).rows[0].sequence).toBe(2);
  expect(db.prepare('select count(*) as n from drawing_appearance_usage_audit').get()).toEqual({n:1});
- expect(()=>library.transition(reserved.id,'voided')).toThrow('已有明确外观沿用关系');
+ const usagesBefore=db.prepare('select * from drawing_appearance_usages').all();
+ const auditBefore=db.prepare('select * from drawing_appearance_usage_audit').all();
+ expect(library.transition(reserved.id,'voided')).toMatchObject({status:'voided',fullCode:reserved.fullCode,occupied:true});
+ expect(library.transition(reserved.id,'active')).toMatchObject({status:'active',fullCode:reserved.fullCode,occupied:true});
+ expect(db.prepare('select * from drawing_appearance_usages').all()).toEqual(usagesBefore);
+ expect(db.prepare('select * from drawing_appearance_usage_audit').all()).toEqual(auditBefore);
+ expect(db.prepare('select * from drawing_appearance_bindings where record_id=?').get(reserved.id)).toEqual(primary);
  expect(()=>library.associations.correct(target,'不允许改写沿用图号的原始归属')).toThrow('不能改写原始归属');
  expect(library.previewDeletion(reserved.id)).toMatchObject({deletable:false,blockers:[expect.objectContaining({kind:'appearance_usage'})]});
  expect(library.reuse.confirm({...target,fingerprint:library.reuse.preview(target).fingerprint,confirmed:true})).toEqual({updated:0});

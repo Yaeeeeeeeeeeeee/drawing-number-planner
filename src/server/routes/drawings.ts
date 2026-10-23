@@ -163,7 +163,7 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   });
 
   const historicalTransition = (target: 'active' | 'inactive', invalidMessage: string) => async (request: any, reply: FastifyReply) => {
-    const params = paramsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
+    const params = historicalParamsSchema.safeParse(request.params); const input = confirmedSchema.safeParse(request.body);
     if (!params.success || !input.success) {
       return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: invalidMessage } });
     }

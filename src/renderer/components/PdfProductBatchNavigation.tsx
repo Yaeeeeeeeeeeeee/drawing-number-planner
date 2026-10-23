@@ -4,7 +4,7 @@ import { ProductCatalogNavigation, type CatalogNavigationScope } from './Product
 export type PdfNavigationScope = Omit<CatalogNavigationScope, 'kind'> & {kind: Exclude<CatalogNavigationScope['kind'], 'recycle'>};
 export type { PdfNavigationCounts } from '../data/client';
 export function PdfProductBatchNavigation({counts, onSelect, ...props}: {
-  appearances?: AppearanceVersionView[]; onRenameBatch?(batch:MaterialBatchView):void;
+  appearances?: AppearanceVersionView[]; onRenameBatch?(batch:MaterialBatchView):void; onDeleteBatch?(batch:MaterialBatchView):void;
   products: ProductView[]; batches: MaterialBatchView[]; counts: PdfNavigationCounts | null;
   usageBatches?: DrawingNavigationBatchView[]; scope: PdfNavigationScope; onSelect(scope: PdfNavigationScope): void;
   filters: ReactNode; collapseControl?: ReactNode;

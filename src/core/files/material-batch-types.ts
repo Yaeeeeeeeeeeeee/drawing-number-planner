@@ -79,3 +79,10 @@ export interface MaterialBatchLogicalMaterialView {
   outlinedFiles: MaterialBatchFileView[];
   sourceFiles: MaterialBatchFileView[];
 }
+
+export interface MaterialBatchDeletionReference { source: string; label: string; count: number }
+export interface MaterialBatchDeletionPreview {
+  id: number; name: string; relativePath: string; allowed: boolean;
+  reason: string | null; references: MaterialBatchDeletionReference[]; fingerprint: string;
+}
+export interface MaterialBatchDeletionInput { fingerprint: string; confirmation: string }

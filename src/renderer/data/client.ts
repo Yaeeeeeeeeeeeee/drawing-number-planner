@@ -48,7 +48,7 @@ export interface DrawingView {
   deletedPreviousStatus: string | null; deletedReason: string | null; occupied: boolean;
 }
 export interface DrawingFileView {
-  pdfIndexId: number; fileName: string; relativePath: string; isPresent: boolean; conversionType: 'source' | 'outlined';
+  pdfIndexId: number; fileName: string; relativePath: string; isPresent: boolean; conversionType: 'source' | 'outlined'; materialBatchId?: number | null;
 }
 export interface DrawingBomUsageView {
   bomVersionId: number; productId: number; model: string; colorId: number; colorName: string; versionNumber: number;

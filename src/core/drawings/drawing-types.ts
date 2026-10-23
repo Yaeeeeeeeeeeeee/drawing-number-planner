@@ -59,6 +59,7 @@ export interface DrawingRecord {
 
 export interface DrawingFileRecord {
   pdfIndexId: number;
+  materialBatchId?: number | null;
   fileName: string;
   relativePath: string;
   isPresent: boolean;

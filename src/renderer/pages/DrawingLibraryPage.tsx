@@ -1,3 +1,6 @@
+import {selectDrawingFiles} from './drawing-file-selection';
+import {drawingCategoryStyle,drawingBusinessState,drawingBusinessLabel,upgradeDrawingColumnLayout} from './drawing-library-presentation';
+import './v41-drawings.css';
 import './drawing-library.css';
 import {plannerQueryCache,queryKey} from '../data/query-cache';
 import type {DrawingAssociationPreviewView,DrawingAssociationResult} from '../data/drawing-appearance-client';
@@ -34,6 +37,7 @@ const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', produ
 
 export interface DrawingPdfNavigationTarget { productId?: number; materialBatchId?: number; fullCode: string; }
 export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf, registerLeaveGuard,navigationTarget }: { navigationTarget?:{productId:number;appearanceVersionId?:number;revision?:number}; api: PlannerApi; active?: boolean; registerLeaveGuard?(guard:(() => boolean) | null): void; onNavigatePdf?(target: DrawingPdfNavigationTarget): void }) {
+  useEffect(upgradeDrawingColumnLayout,[]);
   const mockMode = isDrawingLibraryMockEnabled();
   const api = useMemo(() => mockMode ? createDrawingLibraryMockApi() : realApi, [mockMode, realApi]);
   const cacheApiId=useMemo(()=>{let id=cacheApiIds.get(api);if(!id){id=nextCacheApiId++;cacheApiIds.set(api,id);}return id;},[api]);
@@ -211,7 +215,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     if (!selected || maintainingRef.current) return;
     const confirmed = window.confirm(target === 'active'
       ? '确认将该图号变更为正式使用？此操作会记录业务状态。'
-      : '确认作废该图号？之后可以恢复使用，作废期间号码继续占用。');
+      : '确认停用该图号？停用期间号码继续占用，可恢复使用。');
     if (!confirmed) return;
     const request = detailRequest.current;
     setMaintaining(true); setError('');
@@ -366,7 +370,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     <form className="filter-bar filter-grid drawing-search-bar" onSubmit={submit}>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('主类别', 'mainCategoryId', 'main_category')}
-      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={event => set('status',event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
+      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={event => set('status',event.target.value)}><option value="">全部</option><option value="active">使用中</option><option value="inactive">已停用</option></select></label>
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '查询中…' : '查询'}</button>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
       <button className="text-button" type="button" onClick={clearFilters} disabled={loading}>清除筛选</button>
@@ -389,16 +393,16 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     {loading && items.length>0 && <p className="muted-text" role="status">正在加载所选范围，表格保留上次结果…</p>}
     {queryError && items.length>0 && <p className="error-banner" role="alert">{queryError} · 当前显示上次成功结果</p>}
     {queryState !== 'ready' && items.length===0 ? <QueryFeedback state={queryState} error={queryError} onRetry={() => void search(queriedValues, page, pageSize)}/> : items.length === 0 ? <EmptyState title={Object.entries(queriedValues).some(([key,value]) => value !== emptyFilters[key as keyof typeof emptyFilters]) ? '没有符合查询条件的图号' : '图号库尚无记录'} description="可调整查询条件后重新检索；新增图号请使用图号规划。" /> :
-      <DataTable tableId="drawing-library" virtualize virtualKey={queryKey('drawing:scope',{values:queriedValues,scope})} onEndReached={()=>{if(loading)return false;void loadMore();return true;}} items={items} onRowClick={(item) => void openDetail(item)} columns={[
+      <DataTable showLayoutTools={false} tableId="drawing-library" virtualize virtualKey={queryKey('drawing:scope',{values:queriedValues,scope})} onEndReached={()=>{if(loading)return false;void loadMore();return true;}} items={items} onRowClick={(item) => void openDetail(item)} columns={[
         { key: 'select', label: '选择',width:48,minWidth:48,locked:'start',align:'center', render: (item) => <input type="checkbox" aria-label={`选择图号 ${item.fullCode}`} disabled={Boolean(item.deletedAt)} checked={checkedIds.includes(item.id)}
           onClick={(event) => event.stopPropagation()} onChange={(event) => setCheckedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /> },
         { key: 'code', label: '完整图号',width:240,minWidth:190,align:'left', render: (item) => <span className="drawing-code-inline"><button className="link-button" type="button"
           ref={(node) => { if (node) disclosureButtons.current.set(item.id, node); else disclosureButtons.current.delete(item.id); }}
           aria-expanded={selected?.id === item.id} aria-controls={`drawing-detail-${item.id}`}>{item.fullCode}</button><CopyDrawingCode code={item.fullCode} /></span> },
-        { key: 'category', label: '主类别 / 项目',width:165,minWidth:120,align:'center', render: (item) => <span className="drawing-category-project"><span className="drawing-category-badge">{item.mainCategoryName}</span><span className="drawing-project-name">{item.projectItemName}</span></span> },
+        { key: 'category', label: '主类别 / 项目',width:210,minWidth:140,align:'center', render: (item) => <span className="drawing-category-project" title={`${item.mainCategoryName} / ${item.projectItemName}`}><span className="drawing-category-badge" style={drawingCategoryStyle(item)}>{item.mainCategoryName}</span><span className="drawing-category-divider" aria-hidden="true">/</span><span className="drawing-project-name">{item.projectItemName}</span></span> },
         { key: 'origin', label: '来源',width:100,minWidth:90,align:'center', render: (item) => <span className="drawing-origin-cell">{item.origin === 'planned' ? '正式规划' : '历史扫描'}{item.dictionaryMappingStatus === 'unmapped' && <small className="mapping-warning">字典待映射</small>}</span> },
-        {key:'product',label:'关联产品',width:120,minWidth:100,align:'center',render:item=>item.productId?item.model:'待关联'}, {key:'version',label:'版本',width:100,minWidth:85,align:'center',render:item=>typeof item.version==='string'&&item.version.trim()?item.version:'未记录'},
-        { key: 'status', label: '图号状态',width:130,minWidth:100,align:'center', render: (item) => <span className="drawing-status-summary"><span className={`status-text ${item.status}`}>{statusLabel(item.origin, item.status)}</span>{item.deletedAt && <span className="mapping-warning">{item.deletionMode === 'retain_occupied' ? '删除·保留占号' : '删除·已释放'}</span>}</span> },
+        {key:'product',label:'关联产品',width:120,minWidth:100,align:'center',render:item=>item.productId?item.model:'待关联'}, {key:'color',label:'颜色',width:100,minWidth:85,align:'center',render:item=>item.colorName?.trim()||'未识别'},
+        { key: 'status', label: '图号状态',width:130,minWidth:100,align:'center', render: (item) => <span className="drawing-status-summary"><span className="status-text drawing-business-badge" data-state={drawingBusinessState(item.status)} title={item.status==='reserved'?'仅占号，未正式使用':undefined}>{drawingBusinessLabel(item.status)}</span>{item.deletedAt && <span className="mapping-warning">{item.deletionMode === 'retain_occupied' ? '删除·保留占号' : '删除·已释放'}</span>}</span> },
         {key:'actions',label:'操作',width:125,minWidth:110,align:'center',locked:'end',render:item => <button className="text-button" type="button" onClick={event => {event.stopPropagation(); void openDetail(item);}}>查看 / 管理</button>},
 
       ]} />}
@@ -407,10 +411,6 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   </section>;
 }
 
-const statusLabel = (origin: DrawingView['origin'], status: DrawingView['status']) => {
-  if (origin === 'historical') return status === 'inactive' ? '已停用' : '使用中';
-  return status === 'active' ? '正式使用' : status === 'reserved' ? '已占号' : '作废';
-};
 
 function DrawingDetailPanel({associationEditor, selected, contextBatchId, contextProductId, editing, onManage, onCancelManage, onSave, staged, onNavigatePdf, errorMessage, previewOnly = false, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
   setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus,
@@ -435,7 +435,7 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
     <header className="drawing-detail-header">
       <div className="drawing-code-inline"><h2 title={selected.fullCode}>{selected.fullCode}</h2><CopyDrawingCode key={selected.fullCode} code={selected.fullCode} /></div>
       <button className="panel-close drawing-close-icon" aria-label="关闭图号详情" disabled={maintaining} onClick={onClose} type="button"><X size={18} strokeWidth={1.8}/></button>
-      <div className="drawing-detail-badges"><span className="drawing-origin-label">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</span><span className={`status-text ${selected.status}`}>{selected.status==='reserved'?'已占号':selected.status==='active'?'使用中':'历史版本'}</span></div>
+      <div className="drawing-detail-badges"><span className="drawing-origin-label">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</span><span className="status-text drawing-business-badge" data-state={drawingBusinessState(selected.status)} title={selected.status==='reserved'?'仅占号，未正式使用':undefined}>{drawingBusinessLabel(selected.status)}</span></div>
       {selected.displayName?.trim() && selected.displayName.trim() !== selected.fullCode && <p className="detail-name">{selected.displayName}</p>}
     </header>
     {errorMessage && <p className="error-banner" role="alert">{errorMessage}</p>}
@@ -458,10 +458,10 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
       <div><dt>首次 BOM</dt><dd>{selected.firstBom ? `${selected.firstBom.model} · BOM ${selected.firstBom.versionNumber}${selected.firstBom.businessDate ? ' · '+selected.firstBom.businessDate : ''}` : '未进入 BOM'}</dd></div>
     </dl></section>
     <section className="drawing-detail-group"><h3>04 状态与操作</h3>
-      <label className="drawing-business-status"><span>业务状态</span><select aria-label="图号业务状态" disabled={maintaining||Boolean(selected.deletedAt)} value={selected.status==='reserved'?'reserved':selected.status==='active'?'active':'historical'} onChange={event=>{
+      <label className="drawing-business-status"><span>业务状态</span><select aria-label="图号业务状态" disabled={maintaining||Boolean(selected.deletedAt)} value={drawingBusinessState(selected.status)} onChange={event=>{
         if(selected.origin==='historical')void onHistoricalStatus(event.target.value==='active'?'active':'inactive');
         else void onStatus(event.target.value==='active'?'active':'voided');
-      }}>{selected.status==='reserved'&&<option value="reserved" disabled hidden>仅占号，未正式使用</option>}<option value="active">使用中</option><option value="historical">历史版本</option></select></label>{associationEditor}
+      }}><option value="active">使用中</option><option value="inactive">已停用</option></select></label>{associationEditor}
     <div className="drawing-detail-toolbar">{editing ? <><button className="primary-button" disabled={maintaining} onClick={onSave} type="button">保存并返回详情</button><button className="secondary-button" disabled={maintaining} onClick={onCancelManage} type="button">取消编辑</button></> : <button className="secondary-button" disabled={previewOnly} onClick={onManage} type="button">改变产品所属</button>}{onNavigatePdf && <button className="text-button" type="button" onClick={onNavigatePdf}>查看 PDF 文件</button>}</div>    {<section className={`drawing-detail-section danger-zone${!selected.deletedAt && !deletionPreview ? ' danger-compact' : ''}`}>
       {selected.deletedAt ? <><p>删除方式：{selected.deletionMode === 'release' ? '彻底删除并释放图号' : '删除记录并保留占号'}</p>
         {selected.deletedReason && <p className="muted-text">原因：{selected.deletedReason}</p>}
@@ -499,47 +499,22 @@ function DeletionReferenceSummary({ preview }: { preview: DrawingDeletionPreview
 }
 
 function CurrentOutlinedFiles({ selected, contextBatchId, contextProductId, onOpen, previewOnly = false }: { selected: DrawingDetailView; contextBatchId?: number; contextProductId?: number; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
-  const [directory, setDirectory] = useState('');
-  const [inspectedBatch,setInspectedBatch]=useState('');
-  const effectiveBatchId=contextBatchId??(inspectedBatch?Number(inspectedBatch):undefined);
-  const occurrences = (selected.batchUsage?.occurrences ?? []).filter((occurrence) =>
-    effectiveBatchId != null ? occurrence.batchId === effectiveBatchId : (contextProductId ?? selected.productId) == null || occurrence.productId === (contextProductId ?? selected.productId));
-  const directories = [...new Set(occurrences.map((occurrence) => occurrence.productDirectory))];
-  const effectiveDirectory = directories.length === 1 ? directories[0] : directory;
-  const scopedOccurrences = occurrences.filter(occurrence => effectiveBatchId != null ? occurrence.batchId === effectiveBatchId :
-    directories.length === 1 || (directory !== '' && occurrence.productDirectory === effectiveDirectory));
-  const currentIds = new Set(scopedOccurrences.flatMap(occurrence => occurrence.files.filter(file => effectiveBatchId != null ||
-    (selected.batchUsage?.effectiveCurrentFileIds !== undefined ? selected.batchUsage.effectiveCurrentFileIds.includes(file.pdfIndexId) : occurrence.usageState === 'current')).map(file => file.pdfIndexId)));
-  const current = (selected.outlinedFiles ?? []).filter(file => currentIds.has(file.pdfIndexId));
-  const history = (selected.outlinedFiles ?? []).filter(file => !currentIds.has(file.pdfIndexId));
-  const allOccurrences = selected.batchUsage?.occurrences ?? [];
-  const knownBatchedFileIds = new Set(allOccurrences.flatMap(occurrence => occurrence.files.map(file => file.pdfIndexId)));
-  const allowUnbatchedSource = effectiveBatchId == null && (contextProductId == null || contextProductId === selected.productId);
-  const source = (selected.sourceFiles ?? []).filter(file => currentIds.has(file.pdfIndexId)
-    || allowUnbatchedSource && !knownBatchedFileIds.has(file.pdfIndexId));
-  const sourceHistory = (selected.sourceFiles ?? []).filter(file => !source.some(instance => instance.pdfIndexId === file.pdfIndexId));
+  const [batch,setBatch]=useState('');const [directory,setDirectory]=useState('');
+  const usage=selected.batchUsage,occurrences=usage?.occurrences??[];
+  const directories=[...new Set(occurrences.map(o=>o.productDirectory))];
+  const context={batchId:contextBatchId??(batch?Number(batch):undefined),productId:contextProductId??selected.productId??undefined,directory:directory||undefined};
+  const source=selectDrawingFiles(selected.sourceFiles??[],usage,context),outlined=selectDrawingFiles(selected.outlinedFiles??[],usage,context);
   return <>
-    {(selected.batchUsage?.occurrences.length??0)>1 && <label>查看资料批次<select aria-label="查看资料批次" value={inspectedBatch} onChange={event=>setInspectedBatch(event.target.value)}><option value="">当前有效资料</option>{(selected.batchUsage?.occurrences??[]).filter(occurrence=>(contextProductId??selected.productId)==null||occurrence.productId===(contextProductId??selected.productId)).map(occurrence=><option key={occurrence.batchId} value={occurrence.batchId}>{materialBatchLabel(occurrence.batchName)} · {occurrence.productDirectory}</option>)}</select></label>}
-    {effectiveBatchId == null && directories.length > 1 && <label>当前文件所属资料目录<select aria-label="当前文件所属资料目录" value={directory} onChange={(event) => setDirectory(event.target.value)}>
-      <option value="">存在多个资料目录，请选择</option>{directories.map((path) => <option key={path} value={path}>{path}</option>)}
-    </select></label>}
-    <FileSection title="转曲前文件" present={source.some(file => file.isPresent)} files={source} onOpen={onOpen} previewOnly={previewOnly} />
-    <FileSection title="转曲后文件" present={current.some((file) => file.isPresent)} files={current} onOpen={onOpen} previewOnly={previewOnly} />
-    {(history.length > 0 || sourceHistory.length > 0) && <details key={selected.id} className="drawing-detail-section">
-      <summary>查看历史文件</summary>
-      <FileSection title="转曲前文件" present={sourceHistory.some(file => file.isPresent)} files={sourceHistory} onOpen={onOpen} previewOnly={previewOnly} />
-      <FileSection title="转曲后文件" present={history.some((file) => file.isPresent)} files={history} onOpen={onOpen} previewOnly={previewOnly} />
-    </details>}
+    {occurrences.length>1&&<label>查看资料批次<select aria-label="查看资料批次" value={batch} onChange={event=>setBatch(event.target.value)}><option value="">自动判断文件</option>{occurrences.map(o=><option key={o.batchId} value={o.batchId}>{materialBatchLabel(o.batchName)} · {o.productDirectory}</option>)}</select></label>}
+    {context.batchId==null&&directories.length>1&&<label>当前文件所属资料目录<select aria-label="当前文件所属资料目录" value={directory} onChange={event=>setDirectory(event.target.value)}><option value="">存在多个资料目录，请选择</option>{directories.map(path=><option key={path} value={path}>{path}</option>)}</select></label>}
+    <FileSection title="转曲前文件" selection={source} onOpen={onOpen} previewOnly={previewOnly}/>
+    <FileSection title="转曲后文件" selection={outlined} onOpen={onOpen} previewOnly={previewOnly}/>
   </>;
 }
-
-function FileSection({ title, present, files, onOpen, previewOnly = false }: { title: string; present: boolean; files: DrawingFileView[]; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
-  return <section className="drawing-detail-section drawing-file-section"><h3>{title}<span className={`drawing-file-presence ${present?'present':'missing'}`}>{present?'存在':'缺失'}</span></h3>
-    {files.length === 0 ? <p className="muted-text">暂无{title}</p> : <ul>{files.map((file) => <li key={file.pdfIndexId} className="drawing-file-row">
-      <span className="drawing-file-identity"><strong className="drawing-file-name" title={file.fileName}>{file.fileName}</strong></span>
-      <button className="text-button" type="button" disabled={previewOnly || !file.isPresent} title={previewOnly ? 'Mock 不支持磁盘操作' : undefined}
-        aria-label={`打开${title} ${file.fileName} 的位置`} onClick={() => void onOpen(file.pdfIndexId)}>打开位置</button>
-    </li>)}</ul>}</section>;
+function FileSection({ title, selection, onOpen, previewOnly = false }: { title: string; selection:ReturnType<typeof selectDrawingFiles>; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
+  return <section className="drawing-detail-section drawing-file-section"><h3>{title}<span className={`drawing-file-presence ${selection.state}`}>{selection.state==='present'?'存在':selection.state==='ambiguous'?'待确认':'缺失'}</span></h3>
+    {selection.files.length===0?<p className="muted-text">{selection.message??`暂无${title}`}</p>:<ul>{selection.files.map(file=><li key={file.pdfIndexId} className="drawing-file-row"><span className="drawing-file-identity"><strong className="drawing-file-name" title={file.fileName}>{file.fileName}</strong></span><button className="text-button" type="button" disabled={previewOnly||!file.isPresent} title={previewOnly?'Mock 不支持磁盘操作':undefined} aria-label={`打开${title} ${file.fileName} 的位置`} onClick={()=>void onOpen(file.pdfIndexId)}>打开位置</button></li>)}</ul>}
+  </section>;
 }
 
 function CopyDrawingCode({ code }: { code: string }) {

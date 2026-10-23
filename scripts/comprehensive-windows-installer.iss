@@ -9,7 +9,7 @@
 [Setup]
 AppId={{69BB0C19-7394-4ADC-92D1-54A7D56B32EF}
 AppName=图号规划器
-AppVersion=2026.10.22
+AppVersion=1.0.0
 AppPublisher=Drawing Number Planner
 DefaultDirName={localappdata}\Programs\DrawingNumberPlanner
 UsePreviousAppDir=no
@@ -40,6 +40,33 @@ Name: "{group}\图号规划器"; Filename: "{app}\图号规划器.exe"; WorkingD
 Name: "{autodesktop}\图号规划器"; Filename: "{app}\图号规划器.exe"; WorkingDir: "{app}"
 
 [Code]
+function NormalizeInstallDirectory(const Directory: String): String;
+begin
+  Result := Directory;
+  if (Directory <> '') and
+     (CompareText(RemoveBackslashUnlessRoot(ExpandFileName(Directory)),
+       RemoveBackslashUnlessRoot(ExpandConstant('{userdesktop}'))) = 0) then
+    Result := AddBackslash(ExpandConstant('{userdesktop}')) + 'DrawingNumberPlanner';
+end;
+
+procedure BrowseInstallDirectory(Sender: TObject);
+var
+  Directory: String;
+begin
+  Directory := WizardDirValue;
+  { The shell picker exposes Desktop and redirected known folders. Preserve
+    selected subfolders exactly; keep application files out of Desktop itself. }
+  if BrowseForFolder('选择安装文件夹（可以选择桌面上的文件夹）', Directory, True) then
+    WizardForm.DirEdit.Text := NormalizeInstallDirectory(Directory);
+end;
+
+procedure InitializeWizard();
+begin
+  { Also normalize /DIR before silent Setup processes the directory page. }
+  WizardForm.DirEdit.Text := NormalizeInstallDirectory(WizardDirValue);
+  WizardForm.DirBrowseButton.OnClick := @BrowseInstallDirectory;
+end;
+
 function HasOldAcceptanceSeed(const Directory: String): Boolean;
 begin
   Result := DirExists(AddBackslash(Directory) + 'resources\app\acceptance-seed');
@@ -56,6 +83,7 @@ var
 begin
   { Refuse an explicitly supplied old target before a silent wizard is created. }
   RequestedDirectory := ExpandConstant('{param:DIR|}');
+  RequestedDirectory := NormalizeInstallDirectory(RequestedDirectory);
   Result := not ((RequestedDirectory <> '') and HasOldAcceptanceSeed(RequestedDirectory));
   if not Result then
     Log(ExistingSampleMessage());
@@ -64,6 +92,8 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
+  if CurPageID = wpSelectDir then
+    WizardForm.DirEdit.Text := NormalizeInstallDirectory(WizardDirValue);
   if (CurPageID = wpSelectDir) and HasOldAcceptanceSeed(WizardDirValue) then
   begin
     MsgBox(ExistingSampleMessage(), mbError, MB_OK);

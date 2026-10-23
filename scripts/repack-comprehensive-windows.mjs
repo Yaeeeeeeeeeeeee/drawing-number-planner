@@ -40,6 +40,10 @@ if(!inside(oldSeed,workspace)||!fs.statSync(workspace).isDirectory())throw Error
 files(base);
 fs.cpSync(base,output,{recursive:true,filter:entry=>{const relative=path.relative(base,entry).split(path.sep).join('/');return relative!=='resources/app/acceptance-seed'&&!relative.startsWith('resources/app/acceptance-seed/');}});
 const app=path.join(output,'resources/app');
+const applicationVersion=JSON.parse(fs.readFileSync(path.join(source,'package.json'),'utf8')).version;
+const packagedManifest=JSON.parse(fs.readFileSync(path.join(app,'package.json'),'utf8'));
+packagedManifest.version=applicationVersion;
+fs.writeFileSync(path.join(app,'package.json'),JSON.stringify(packagedManifest,null,2)+'\n');
 for(const name of ['Windows-smoke-outcome.txt','windows-verification.json','Windows启动烟测.png','Windows-P4文件详情.png','Windows-P4图号详情.png','delivery-manifest.json','sample-reuse-verification.json'])fs.rmSync(path.join(output,name),{force:true});
 const dep=createRequire(path.join(source,'package.json'));
 const {build}=dep('esbuild');
@@ -51,13 +55,13 @@ fs.cpSync(path.join(source,'dist/renderer'),path.join(app,'dist/renderer'),{recu
 fs.copyFileSync(path.join(source,'dist/main/preload.cjs'),path.join(app,'dist/main/preload.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-entry.cjs'),path.join(app,'acceptance-entry.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-profile.cjs'),path.join(app,'production-profile.cjs'));
-fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,schemaVersion:19,profile:'stable-user-selected',bundledSample:false},null,2));
+fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,applicationVersion,schemaVersion:20,profile:'stable-user-selected',bundledSample:false},null,2));
 fs.renameSync(path.join(output,'图号规划器验收版.exe'),path.join(output,'图号规划器.exe'));
 if(fs.existsSync(path.join(app,'acceptance-seed')))throw Error('Example data must not be included');
 for(const entry of files(output))if(/\.(db|sqlite|sqlite3|pdf)(-wal|-shm)?$/i.test(entry.path))throw Error('Database/PDF data must not be bundled: '+entry.path);
 if(JSON.stringify(beforeSeed)!==JSON.stringify(files(oldSeed)))throw Error('Original package sample must remain untouched');
 const instructions=`图号规划器 Windows x64
-版本：${revision}
+版本：${applicationVersion}\n源码：${revision}
 
 安装版为中文向导，允许自定义安装目录。首次启动时：
 1. 升级用户先关闭旧版程序，选择旧数据目录中的 planner.db（可在旧版AppData数据目录找到）。
@@ -72,7 +76,7 @@ const instructions=`图号规划器 Windows x64
 `;
 fs.writeFileSync(path.join(output,'先看这里-验收说明.txt'),instructions);
 fs.writeFileSync(path.join(output,'验收说明.txt'),instructions);
-fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:19,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
+fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:20,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
 fs.writeFileSync(path.join(output,'delivery-manifest.json'),JSON.stringify({revision,platform:'win32-x64',baseRevision,files:files(output)},null,2));
 verifyManifest(output,JSON.parse(fs.readFileSync(path.join(output,'delivery-manifest.json'),'utf8')));
-console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:19,bundledSample:false}));
+console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:20,bundledSample:false}));

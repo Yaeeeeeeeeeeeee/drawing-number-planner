@@ -315,3 +315,48 @@ it('persists one-click classification through the real HTTP route and exposes it
     expect(id).toBeDefined();
   }finally{await app.close();}
 });
+
+
+it('round-trips formal and historical business status through strict APIs without changing protected facts', async () => {
+  const planned = seedPlannedDrawing(db, 'active');
+  const history = seedHistoricalDrawing(db);
+  const insert = db.prepare(`insert into pdf_files(relative_path,file_name,drawing_id,historical_drawing_id,
+    match_status,detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present)
+    values(?,?,?,?,'matched','[]','outlined',12,'old','old',1)`);
+  insert.run('formal.pdf','formal.pdf',planned.id,null);
+  insert.run('historical.pdf','historical.pdf',null,history);
+  const facts = () => ({
+    files:db.prepare('select * from pdf_files order by id').all(),
+    planned:db.prepare('select full_code,product_id,appearance_id,color_id,created_at,deleted_at,deletion_mode from drawing_numbers').all(),
+    historical:db.prepare('select full_code,product_id,first_seen_at,deleted_at,deletion_mode from historical_drawing_numbers').all(),
+  });
+  const before = facts();
+  const app = Fastify(); registerDrawingRoutes(app,new DrawingQueryService(db));
+  try {
+    for (const [url, status] of [[`/api/drawings/${planned.id}/void`,'voided'],
+      [`/api/historical-drawings/${history}/deactivate`,'inactive']] as const) {
+      const response = await app.inject({method:'POST',url,payload:{confirmed:true}});
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({status,occupied:true,hasOutlinedFile:true});
+    }
+    const inactive = await app.inject({method:'GET',url:'/api/drawings?status=inactive'});
+    expect(new Set(inactive.json().items.map((row:{id:number})=>row.id))).toEqual(new Set([planned.id,-history]));
+    for (const signedId of [planned.id,-history]) {
+      const qualification = await app.inject({method:'GET',url:`/api/drawings/${signedId}/deletion-preview`});
+      expect(qualification.json().releaseEligible).toBe(false);
+    }
+    for (const url of [`/api/drawings/${planned.id}/activate`,`/api/historical-drawings/${history}/activate`]) {
+      const response = await app.inject({method:'POST',url,payload:{confirmed:true}});
+      expect(response.statusCode).toBe(200); expect(response.json()).toMatchObject({status:'active',occupied:true});
+    }
+    for (const id of [0,-history]) {
+      for (const action of ['activate','deactivate']) {
+        expect((await app.inject({method:'POST',url:`/api/historical-drawings/${id}/${action}`,payload:{confirmed:true}})).statusCode).toBe(400);
+      }
+    }
+    expect((await app.inject({method:'POST',url:`/api/drawings/${-history}/associate-pdf`,
+      payload:{pdfIndexId:1,conversionType:'source'}})).json().error.code).toBe('HISTORICAL_READ_ONLY');
+    expect(facts()).toEqual(before);
+    expect((await app.inject({method:'GET',url:'/api/drawings?status=inactive'})).json().total).toBe(0);
+  } finally { await app.close(); }
+});

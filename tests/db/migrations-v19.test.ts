@@ -17,7 +17,7 @@ it.each([false,true])('preserves every old row, custom objects, IDs and high wat
  const schema=db.prepare('select type,name,sql from sqlite_master order by type,name').all();
  const backup=vi.fn(()=>expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:18}));
  if(fail){expect(()=>migrateDatabase(db,{databaseExists:true,createBackup:backup})).toThrow('rollback19');expect(db.prepare('select type,name,sql from sqlite_master order by type,name').all()).toEqual(schema);}
- else{expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:18,to:19});
+ else{expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:18,to:20});
  expect(db.prepare("select name from sqlite_master where name in ('custom_product_index','custom_product_trigger')").all()).toHaveLength(2);
  const result=db.prepare("insert into products(sku,brand_id,product_size_id,model,product_category,created_at) values('SKU',1,2,'ZC100','Freezer','new')").run();expect(Number(result.lastInsertRowid)).toBe(100);db.prepare('delete from products where id=100').run();}
  for(const table of tables)if(table!=='schema_migrations'||fail)expect(db.prepare(`select * from "${table}" order by rowid`).all()).toEqual(before[table]);

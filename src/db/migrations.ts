@@ -1,6 +1,7 @@
 import type { PlannerDatabase } from './database.js';
 import { toWorkspacePathKey } from '../core/files/workspace-paths.js';
 import {
+  schemaVersionTwenty,
   schemaVersionNineteen,
   schemaVersionSeventeen,
   schemaVersionSixteen,
@@ -775,8 +776,8 @@ export function applyAppearanceVersionSchema(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 19) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 19`);
-  if (from >= 19) {
+  if (from > 20) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 20`);
+  if (from >= 20) {
     const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
@@ -993,7 +994,17 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       for(const table of tables)if(JSON.stringify(database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all())!==JSON.stringify(before[table]))throw new Error('产品身份迁移历史内容校验失败');
       if((database.pragma('foreign_key_check') as unknown[]).length)throw new Error('产品身份迁移引用校验失败');
     }
+    if (from < 20) {
+      const tables = (database.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' and name<>'schema_migrations' order by name").all() as {name:string}[]).map(row=>row.name);
+      const before = tables.map(table=>database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all());
+      database.exec(schemaVersionTwenty);
+      database.prepare('insert into schema_migrations(version,applied_at) values(20,?)').run(new Date().toISOString());
+      if (tables.some((table,index)=>JSON.stringify(database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all())!==JSON.stringify(before[index]))) {
+        throw new Error('图号状态迁移历史内容校验失败');
+      }
+      if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('图号状态迁移引用校验失败');
+    }
   })();
   } finally { database.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`); }
-  return { from, to: 19 };
+  return { from, to: 20 };
 }

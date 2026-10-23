@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { MaterialBatchRepository } from './material-batch-repository.js';
 import { selectLatestBusinessBatch, codeScopeFromFullCode } from './batch-business-order.js';
 import { listRawProductIds } from '../products/appearance-identity.js';
 import { FileError } from './file-errors.js';
@@ -6,6 +8,8 @@ import { resolveCurrentMaterialSet, MaterialBatchOrderAmbiguousError } from '../
 import type { DrawingStatus } from '../drawings/drawing-types.js';
 import type { MaterialSetBatchInput } from '../outbound/outbound-types.js';
 import type {
+  MaterialBatchDeletionPreview,
+  MaterialBatchDeletionInput,
   BatchFileInstance,
   BatchUsageState,
   CurrentBatchSelection,
@@ -43,6 +47,27 @@ export class MaterialBatchService {
       if (revision !== undefined && revision !== row.revision) throw new FileError('PDF_PREVIEW_STALE', '批次名称已变化，请刷新后再修改');
       this.db.prepare('update material_batches set display_name = ?, display_revision = display_revision + 1 where id = ?').run(name, id);
       return this.list().find(batch => batch.id === id) ?? null;
+    }).immediate();
+  }
+
+  previewDeletion(id: number): MaterialBatchDeletionPreview | null {
+    const row = this.db.prepare('select * from material_batches where id=?').get(id) as Record<string,unknown> | undefined;
+    if (!row) return null;
+    const references = new MaterialBatchRepository(this.db).deletionReferences(id,String(row.relative_path));
+    const reason = references.length ? `批次仍被引用：${references.map(ref=>`${ref.label} ${ref.count} 条`).join('；')}` : null;
+    return {id, name:String(row.display_name ?? row.name), relativePath:String(row.relative_path), allowed:!references.length, reason, references,
+      fingerprint:createHash('sha256').update(JSON.stringify({row,references})).digest('hex')};
+  }
+
+  delete(id: number, input: MaterialBatchDeletionInput): {deleted:number} | null {
+    return this.db.transaction(() => {
+      const preview = this.previewDeletion(id);
+      if (!preview) return null;
+      if (input.fingerprint !== preview.fingerprint) throw new FileError('PDF_PREVIEW_STALE','批次或引用已变化，请重新预检');
+      if (!preview.allowed) throw new FileError('PDF_CLEANUP_NOT_ALLOWED',preview.reason!);
+      if (input.confirmation !== '删除批次') throw new FileError('INVALID_CLEAR_INDEX_CONFIRMATION','请确认删除批次');
+      this.db.prepare('delete from material_batches where id=?').run(id);
+      return {deleted:id};
     }).immediate();
   }
 

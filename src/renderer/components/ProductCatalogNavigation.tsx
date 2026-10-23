@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { MaterialBatchView, ProductView, DrawingNavigationBatchView, AppearanceVersionView } from '../data/client';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
 import { FileText, Folder, Package, Link2, Link2Off, Trash2, ChevronDown, ChevronRight, Search, Pencil } from 'lucide-react';
@@ -15,7 +16,7 @@ export interface CatalogNavigationCounts {
 }
 export interface ProductCatalogNavigationProps {
   mainCategories?: NonNullable<CatalogNavigationCounts['mainCategories']>;
-  appearances?: AppearanceVersionView[]; onRenameBatch?(batch: MaterialBatchView): void;
+  appearances?: AppearanceVersionView[]; onRenameBatch?(batch: MaterialBatchView): void; onDeleteBatch?(batch: MaterialBatchView): void;
   products: ProductView[]; batches: MaterialBatchView[]; counts: CatalogNavigationCounts | null;
   usageBatches?: DrawingNavigationBatchView[]; scope: CatalogNavigationScope; onSelect(scope: CatalogNavigationScope): void;
   mode: 'files' | 'drawings'; filters?: ReactNode; collapseControl?: ReactNode;
@@ -24,7 +25,26 @@ function NavigationIcon({kind, mode}:{kind:CatalogNavigationScope['kind']; mode:
   const Icon = kind === 'category' ? Folder : kind === 'product' ? Package : kind === 'unassociated' ? (mode === 'files' ? Link2 : Link2Off) : kind === 'recycle' ? Trash2 : FileText;
   return <Icon className="pdf-nav-icon" size={18} strokeWidth={1.8} aria-hidden="true"/>;
 }
-export function ProductCatalogNavigation({ products, batches, counts, scope, onSelect, filters, usageBatches = [], mode, collapseControl, onRenameBatch,mainCategories=[] }: ProductCatalogNavigationProps) {
+export function ProductCatalogNavigation({ products, batches, counts, scope, onSelect, filters, usageBatches = [], mode, collapseControl, onRenameBatch, onDeleteBatch,mainCategories=[] }: ProductCatalogNavigationProps) {
+  const [batchMenu,setBatchMenu] = useState<{batch:MaterialBatchView;x:number;y:number;trigger:HTMLElement}|null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!batchMenu || !menuRef.current) return;
+    const rect=menuRef.current.getBoundingClientRect();
+    const x=Math.max(8,Math.min(batchMenu.x,window.innerWidth-rect.width-8));
+    const y=Math.max(8,Math.min(batchMenu.y,window.innerHeight-rect.height-8));
+    if (x!==batchMenu.x || y!==batchMenu.y) setBatchMenu(current=>current?{...current,x,y}:null);
+    menuRef.current.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  },[batchMenu]);
+  useEffect(() => {
+    if (!batchMenu) return;
+    const outside=(event:PointerEvent|MouseEvent)=>{if(!menuRef.current?.contains(event.target as Node))setBatchMenu(null);};
+    const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();batchMenu.trigger.focus();setBatchMenu(null);}};
+    const close=()=>setBatchMenu(null);
+    document.addEventListener('pointerdown',outside);document.addEventListener('click',outside);document.addEventListener('keydown',key);
+    window.addEventListener('resize',close);
+    return ()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('click',outside);document.removeEventListener('keydown',key);window.removeEventListener('resize',close);};
+  },[batchMenu]);
   const [keyword, setKeyword] = useState('');
   const [closedCategories, setClosedCategories] = useState<string[]>([]);
   const [openProducts, setOpenProducts] = useState<number[]>([]);
@@ -43,12 +63,15 @@ export function ProductCatalogNavigation({ products, batches, counts, scope, onS
 
   const count = (value?: number) => <span className="pdf-nav-count" aria-label={value == null && !counts ? '数量暂不可用' : `${value ?? 0} 个${mode === 'files' ? '文件' : '图号'}`}>{value ?? (counts ? 0 : '—')}</span>;
   const select = (label: string, selected: boolean, next: CatalogNavigationScope, value?: number, title = label, extra?: ReactNode) => <button type="button" data-navigation-select aria-label={label} title={title} aria-current={selected ? 'page' : undefined} onClick={() => onSelect(next)}><NavigationIcon kind={next.kind} mode={mode}/><span className="pdf-nav-label">{title}</span>{extra}{count(value)}</button>;
-  const renderBatch = (batch:MaterialBatchView, productId:number) => {
+  const renderBatch = (batch:MaterialBatchView, productId?:number) => {
     const state=batch.currentState;
     const title=batch.displayName||materialBatchLabel(batch.name);
-    const amount=counts?.batches.find(item=>item.materialBatchId===batch.id&&item.productId===productId)?.count;
+    const amount=counts?.batches.find(item=>item.materialBatchId===batch.id&&(item.productId??undefined)===productId)?.count;
     const badge=state==='current'||state==='historical'?<small className={`pdf-nav-state ${state}`}>{state==='current'?'当前批次':'历史批次'}</small>:undefined;
-    return <div className="pdf-nav-batch" key={batch.id}>{select(`批次 ${title}`,scope.kind==='batch'&&scope.batchId===batch.id&&scope.productId===productId,{kind:'batch',productId,batchId:batch.id},amount,title,badge)}{onRenameBatch&&<button type="button" className="pdf-nav-expand" title={`重命名资料批次 · ${batch.relativePath}`} aria-label={`重命名批次 ${title}`} onClick={()=>onRenameBatch(batch)}><Pencil size={14} strokeWidth={1.8}/></button>}</div>;
+    return <div className="pdf-nav-batch" key={batch.id} onContextMenu={mode==='files'&&(onRenameBatch||onDeleteBatch)?event=>{
+      event.preventDefault();event.stopPropagation();
+      setBatchMenu({batch,x:event.clientX,y:event.clientY,trigger:event.currentTarget.querySelector('button')!});
+    }:undefined}>{select(`批次 ${title}`,scope.kind==='batch'&&scope.batchId===batch.id&&scope.productId===productId,{kind:'batch',...(productId?{productId}:{}),batchId:batch.id},amount,title,badge)}</div>;
   };
   return <nav className="pdf-product-navigation product-catalog-navigation" aria-label={mode === 'files' ? '资料导航' : '图号导航'}>
     <header className="pdf-nav-header"><div className="catalog-nav-heading"><h2>产品与批次</h2>{collapseControl}</div><label className="catalog-nav-search"><Search size={18} strokeWidth={1.8} aria-hidden="true"/><input aria-label="搜索产品 SKU 或型号" placeholder="搜索 SKU / 型号 / 产品名称" value={keyword} onChange={event => setKeyword(event.target.value)} /></label></header>
@@ -68,7 +91,7 @@ export function ProductCatalogNavigation({ products, batches, counts, scope, onS
       })}
       {query && visible.length === 0 && <p className="pdf-nav-note">没有匹配的产品</p>}
       {mode === 'files' && orphanBatches.length > 0 && <details className="catalog-nav-orphans"><summary>未关联产品批次（{orphanBatches.length}）</summary>
-        {orphanBatches.map(batch => <div className="pdf-nav-batch" key={batch.id}>{onRenameBatch && <button type="button" className="pdf-nav-expand" title="重命名资料批次" aria-label={`重命名批次 ${batch.displayName || batch.name}`} onClick={() => onRenameBatch(batch)}><Pencil size={14} strokeWidth={1.8}/></button>}{select(`批次 ${(batch.displayName || materialBatchLabel(batch.name))}`, scope.kind === 'batch' && scope.batchId === batch.id && scope.productId == null, {kind:'batch',batchId:batch.id}, counts?.batches.find(item => item.materialBatchId === batch.id && item.productId == null)?.count, (batch.displayName || materialBatchLabel(batch.name)), batch.currentState==='current'||batch.currentState==='historical'?<small className={`pdf-nav-state ${batch.currentState}`}>{batch.currentState==='current'?'当前批次':'历史批次'}</small>:undefined)}</div>)}
+        {orphanBatches.map(batch=>renderBatch(batch))}
       </details>}
       <div className="catalog-nav-special">{select(mode === 'files' ? '待关联产品' : '未关联图号', scope.kind === 'unassociated', { kind: 'unassociated' }, counts?.unassociated)}
         {mode === 'drawings' && select('回收站', scope.kind === 'recycle', {kind:'recycle'}, counts?.recycle)}
@@ -76,5 +99,15 @@ export function ProductCatalogNavigation({ products, batches, counts, scope, onS
       </div>
       {filters && <details className="pdf-nav-filters"><summary>{mode === 'files' ? '文件筛选' : '图号筛选'}</summary>{filters}</details>}
     </div>
+    {batchMenu && createPortal(<div ref={menuRef} role="menu" aria-label="批次操作" className="pdf-batch-context-menu" style={{left:batchMenu.x,top:batchMenu.y}}
+      onContextMenu={event=>event.preventDefault()} onKeyDown={event=>{
+        if(event.key!=='ArrowDown'&&event.key!=='ArrowUp')return;
+        event.preventDefault();const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+        const index=buttons.indexOf(document.activeElement as HTMLButtonElement);buttons[(index+(event.key==='ArrowDown'?1:buttons.length-1))%buttons.length]?.focus();
+      }}>
+      <button type="button" role="menuitem" disabled={!onRenameBatch} onClick={()=>{const batch=batchMenu.batch;setBatchMenu(null);onRenameBatch?.(batch);}}><Pencil size={15} aria-hidden="true"/>重命名批次</button>
+      <div role="separator"/>
+      <button type="button" role="menuitem" className="pdf-batch-delete" disabled={!onDeleteBatch} onClick={()=>{const batch=batchMenu.batch;setBatchMenu(null);onDeleteBatch?.(batch);}}>删除批次</button>
+    </div>,document.body)}
   </nav>;
 }

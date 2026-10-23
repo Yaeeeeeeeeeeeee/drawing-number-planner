@@ -14,6 +14,10 @@ it('accepts exactly the pinned renderer icon dependency and rejects unrelated pa
   const candidateLock = readFileSync('pnpm-lock.yaml','utf8');
   const check = (pkg = candidatePackage, lock = candidateLock) => assertRendererIconDependencyOnly(old('package.json'), pkg, old('pnpm-lock.yaml'), lock);
   expect(() => check()).not.toThrow();
+  const releasePackage=JSON.parse(candidatePackage);releasePackage.version='1.0.0';
+  expect(() => check(JSON.stringify(releasePackage))).not.toThrow();
+  releasePackage.version='2.0.0';
+  expect(() => check(JSON.stringify(releasePackage))).toThrow();
   expect(() => check(candidatePackage.replace('1.59.0','1.60.0'))).toThrow();
   expect(() => check(candidatePackage.replace('^13.0.3','^14.0.0'))).toThrow();
   expect(() => check(candidatePackage, candidateLock.replace('sha512-5qgMyy','sha512-wrong'))).toThrow();

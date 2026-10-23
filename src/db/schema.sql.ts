@@ -1314,3 +1314,13 @@ export const schemaVersionNineteen = `
   created_at TEXT NOT NULL
  );
 `;
+
+/** Stopping a reused drawing retains every identity, usage relation and occupied number. */
+export const schemaVersionTwenty = `
+ DROP TRIGGER drawing_usage_planned_update;
+ CREATE TRIGGER drawing_usage_planned_update BEFORE UPDATE OF id,product_id,full_code,status,deleted_at,deletion_mode ON drawing_numbers
+  WHEN EXISTS(SELECT 1 FROM drawing_appearance_usages WHERE origin='planned' AND record_id=OLD.id)
+   AND (NEW.id IS NOT OLD.id OR NEW.product_id IS NOT OLD.product_id OR NEW.full_code IS NOT OLD.full_code
+    OR NEW.deleted_at IS NOT NULL OR NEW.deletion_mode='release')
+  BEGIN SELECT RAISE(ABORT,'图号被外观复用引用'); END;
+`;

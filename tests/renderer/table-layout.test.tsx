@@ -6,6 +6,21 @@ import {normalizeLayout} from '../../src/renderer/components/useTableLayout';
 const columns=[{key:'select',label:'选择',locked:'start' as const,width:48,minWidth:48,render:()=> 'check'},{key:'name',label:'名称',width:160,render:(x:{id:number})=>`Name ${x.id}`},{key:'batch',label:'批次',render:()=> 'Batch'},{key:'actions',label:'操作',locked:'end' as const,render:()=> 'Open'}];
 beforeEach(()=>localStorage.clear());
 describe('shared table layouts',()=>{
+ it('restores width and order through a visible button without resetting another table or its records',()=>{
+  const view=render(<><DataTable tableId="first-reset" columns={columns} items={[{id:1}]}/><DataTable tableId="second-reset" columns={columns} items={[{id:2}]}/></>);
+  const [first,second]=Array.from(view.container.querySelectorAll('table'));
+  fireEvent.keyDown(within(first).getByRole('columnheader',{name:'名称'}),{key:'ArrowRight',altKey:true});
+  fireEvent.keyDown(within(first).getByRole('separator',{name:'调整名称列宽'}),{key:'ArrowRight'});
+  fireEvent.keyDown(within(second).getByRole('separator',{name:'调整名称列宽'}),{key:'ArrowRight'});
+  const preserved=localStorage.getItem('table-layout:v1:second-reset');
+  fireEvent.click(within(first).getByRole('button',{name:'恢复默认表格布局'}));
+  expect(within(first).getByRole('separator',{name:'调整名称列宽'})).toHaveAttribute('aria-valuenow','160');
+  expect(Array.from(first.querySelectorAll('thead th')).map(h=>h.getAttribute('data-column-key'))).toEqual(columns.map(c=>c.key));
+  expect(first).toHaveTextContent('Name 1');expect(second).toHaveTextContent('Name 2');
+  expect(localStorage.getItem('table-layout:v1:second-reset')).toBe(preserved);
+  expect(within(second).getByRole('separator',{name:'调整名称列宽'})).toHaveAttribute('aria-valuenow','170');
+ });
+
  it('materializes real wide-container columns before resizing and persists their actual widths',()=>{
   render(<DataTable tableId="wide" columns={columns} items={[{id:1}]}/>);
   const header=screen.getByRole('columnheader',{name:'名称'});Object.defineProperty(header,'getBoundingClientRect',{value:()=>({width:460})});

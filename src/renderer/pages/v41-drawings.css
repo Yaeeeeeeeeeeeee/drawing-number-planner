@@ -1,0 +1,8 @@
+.drawing-library-page .drawing-category-project{display:inline-flex;align-items:center;justify-content:center;gap:6px;max-width:100%;min-width:0;white-space:nowrap;overflow:hidden;vertical-align:middle;}
+.drawing-library-page .drawing-category-badge{flex:0 0 auto;max-width:64%;padding:2px 7px;border:0;border-radius:5px;line-height:18px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+.drawing-library-page .drawing-category-divider{flex:none;color:#858b93;}
+.drawing-library-page .drawing-project-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
+.drawing-library-page .status-text.drawing-business-badge{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:2px 8px;border:1px solid;border-radius:5px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap;}
+.drawing-library-page .status-text.drawing-business-badge[data-state=active]{background:#C8F1D9;color:#17643A;border-color:#86D9AB;}
+.drawing-library-page .status-text.drawing-business-badge[data-state=inactive]{background:#FFDCD8;color:#AD342F;border-color:#ECA8A3;}
+.drawing-library-page .drawing-file-presence.ambiguous{color:#8a5b16;background:#fff0d7;}

@@ -92,7 +92,7 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
     coalesce(product.product_category, historical.detected_product_category, '待识别') as product_category,
     coalesce(product.brand_id, brand.id) as brand_id, coalesce(brand.name, historical.brand_code) as brand_name,
     appearance.id as appearance_id, coalesce(appearance.name, historical.appearance_code) as appearance_name,
-    color.id as color_id, coalesce(color.name, historical.color_code) as color_name,
+    color.id as color_id, coalesce(color.name, '未识别') as color_name,
     main_category.id as main_category_id, coalesce(main_category.name, historical.main_category_code) as main_category_name,
     project_item.id as project_item_id, coalesce(project_item.name, historical.project_item_code) as project_item_name,
     historical.brand_code, historical.product_size_code, historical.appearance_code, historical.color_code,
@@ -101,9 +101,11 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
     null as source_product_id, null as source_product_model, null as source_drawing_id,
     null as source_drawing_full_code, null as notes, historical.first_seen_at as created_at,
     historical.deleted_at, historical.deletion_mode, historical.deleted_previous_status, historical.deleted_reason,
-    exists(select 1 from pdf_files file where file.historical_drawing_id = historical.id
+    exists(select 1 from pdf_files file left join drawing_numbers file_drawing on file_drawing.id = file.drawing_id
+      where (file.historical_drawing_id = historical.id or file_drawing.full_code = historical.full_code)
       and file.is_present = 1 and file.conversion_type = 'source') as has_source_file,
-    exists(select 1 from pdf_files file where file.historical_drawing_id = historical.id
+    exists(select 1 from pdf_files file left join drawing_numbers file_drawing on file_drawing.id = file.drawing_id
+      where (file.historical_drawing_id = historical.id or file_drawing.full_code = historical.full_code)
       and file.is_present = 1 and file.conversion_type = 'outlined') as has_outlined_file,
     case when brand.id is not null and product_size.id is not null and appearance.id is not null
       and color.id is not null and main_category.id is not null and project_item.id is not null
@@ -178,7 +180,8 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
       (record.origin = 'planned' and file.drawing_id = record.id)
       or (record.origin = 'planned' and exists(select 1 from historical_drawing_numbers historical
         where historical.id = file.historical_drawing_id and historical.full_code = record.full_code))
-      or (record.origin = 'historical' and file.historical_drawing_id = -record.id)
+      or (record.origin = 'historical' and (file.historical_drawing_id = -record.id
+        or exists(select 1 from drawing_numbers formal where formal.id=file.drawing_id and formal.full_code=record.full_code)))
     ))`);
     values.push(filters.materialBatchId);
   }
@@ -197,7 +200,8 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
     conditions.push(`(record.product_id is null or not exists(select 1 from business_usage usage
       where ${exactUsageIdentity} and usage.batch_id is not null))`);
   }
-  if (filters.status !== undefined) { conditions.push('record.status = ?'); values.push(filters.status); }
+  if (filters.status === 'inactive') conditions.push("record.status in ('reserved', 'voided', 'inactive')");
+  else if (filters.status !== undefined) { conditions.push('record.status = ?'); values.push(filters.status); }
   if (filters.sourcePresence && filters.sourcePresence !== 'all') {
     conditions.push('record.has_source_file = ?'); values.push(filters.sourcePresence === 'present' ? 1 : 0);
   }
@@ -292,14 +296,15 @@ export class DrawingRepository {
     const drawing = this.get(id);
     if (!drawing) return undefined;
     const historicalId = drawing.origin === 'historical' ? -drawing.id : null;
-    const fileRows = this.db.prepare(`select file.id as pdfIndexId, file.file_name as fileName,
+    const fileRows = this.db.prepare(`select file.id as pdfIndexId, file.material_batch_id as materialBatchId, file.file_name as fileName,
       file.relative_path as relativePath, file.is_present as isPresent, file.conversion_type as conversionType
       from pdf_files file left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
-      where (? is not null and file.historical_drawing_id = ?)
+      left join drawing_numbers formal on formal.id = file.drawing_id
+      where (? is not null and (file.historical_drawing_id = ? or formal.full_code = ?))
         or (? is null and (file.drawing_id = ? or historical.full_code = ?))
       order by file.file_name collate nocase, file.id`)
-      .all(historicalId, historicalId, historicalId, drawing.id, drawing.fullCode) as Array<{
-        pdfIndexId: number; fileName: string; relativePath: string; isPresent: number;
+      .all(historicalId, historicalId, drawing.fullCode, historicalId, drawing.id, drawing.fullCode) as Array<{
+        pdfIndexId: number; materialBatchId: number | null; fileName: string; relativePath: string; isPresent: number;
         conversionType: DrawingFileRecord['conversionType'];
       }>;
     const files = fileRows.map((file): DrawingFileRecord => ({ ...file, isPresent: file.isPresent === 1 }));

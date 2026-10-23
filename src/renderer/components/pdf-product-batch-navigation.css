@@ -41,3 +41,9 @@
 .pdf-nav-appearance {padding-left:23px;}
 .catalog-appearance-batches {padding-left:18px;}
 .catalog-appearance-node {min-width:0;}
+
+.pdf-batch-context-menu {position:fixed;z-index:200;min-width:158px;max-width:calc(100vw - 16px);padding:4px;background:var(--ws-panel,#fff);border:1px solid var(--ws-line,#d7dce1);border-radius:6px;box-shadow:0 6px 24px #16233326;}
+.pdf-batch-context-menu button {display:flex;align-items:center;gap:8px;width:100%;height:34px;min-height:34px;padding:6px 10px;border:0;border-radius:3px;background:transparent;text-align:left;white-space:nowrap;color:var(--ws-text,#28313b);}
+.pdf-batch-context-menu button:hover,.pdf-batch-context-menu button:focus-visible {background:#edf0f3;outline:2px solid transparent;}
+.pdf-batch-context-menu [role=separator] {height:1px;margin:4px;background:var(--ws-line,#d7dce1);}
+.pdf-batch-context-menu .pdf-batch-delete {color:#a53d3d;}

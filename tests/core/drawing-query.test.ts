@@ -1,3 +1,7 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -206,9 +210,9 @@ describe('DrawingQueryService', () => {
 
     expect(drawings.get(ids.first)).toEqual(expect.objectContaining({
       productId: expect.any(Number), sku: 'TEST-DRAWING-QUERY', model: 'ZC220', brandName: 'SAMKYO', status: 'active',
-      sourceFiles: [{ pdfIndexId: sourceId, fileName: 'current.pdf', relativePath: 'source/current.pdf',
+      sourceFiles: [{ pdfIndexId: sourceId, materialBatchId: null, fileName: 'current.pdf', relativePath: 'source/current.pdf',
         isPresent: true, conversionType: 'source' }],
-      outlinedFiles: [{ pdfIndexId: outlinedId, fileName: 'missing.pdf', relativePath: 'outlined/missing.pdf',
+      outlinedFiles: [{ pdfIndexId: outlinedId, materialBatchId: null, fileName: 'missing.pdf', relativePath: 'outlined/missing.pdf',
         isPresent: false, conversionType: 'outlined' }],
       currentBomUsage: [expect.objectContaining({ bomVersionId: versionId, colorName: '白色', quantity: 2,
         projectItemName: 'LOGO', usesWhiteMaterial: false })],
@@ -548,4 +552,120 @@ it('shows explicit older material reuse in the new appearance without duplicatin
   expect(drawings.search({productId,appearanceVersionId:next}).items).toEqual([expect.objectContaining({id:ids.first,fullCode:original,appearanceVersionId:initial.id})]);
   expect(drawings.navigationCounts().appearances).toContainEqual({appearanceVersionId:next,count:1});
   expect(db.prepare('select appearance_version_id from drawing_appearance_bindings where origin=\'planned\' and record_id=?').get(ids.first)).toEqual({appearance_version_id:initial.id});
+});
+
+
+describe('V4.1 drawing business state and legacy index compatibility', () => {
+  const insertHistory = (fullCode = '02.0209.010.0401007', colorCode = '0') => Number(db.prepare(`insert into historical_drawing_numbers
+    (full_code, brand_code, product_size_code, appearance_code, color_code, main_category_code,
+     project_item_code, sequence, first_seen_at, last_seen_at)
+    values (?, '02', '0209', '01', ?, '04', '01', 7, 'now', 'now')`).run(fullCode, colorCode).lastInsertRowid);
+
+  it('groups inactive business filters across reserved, stopped formal and stopped historical records without rewriting statuses', () => {
+    const history = insertHistory();
+    drawings.updateHistoricalStatus(history, 'inactive');
+    drawings.transition(ids.first, 'voided');
+    const result = drawings.search({ status: 'inactive' });
+    expect(new Set(result.items.map(record => record.id))).toEqual(new Set([ids.first, ids.second, -history]));
+    expect(result.items.find(record => record.id === ids.second)?.status).toBe('reserved');
+    expect(result.items.find(record => record.id === ids.first)?.status).toBe('voided');
+    expect(drawings.navigationCounts({ status: 'inactive' }).total).toBe(result.total);
+    expect(drawings.search({ status: 'voided' }).items.map(record => record.id)).toEqual([ids.first]);
+    expect(drawings.search({ status: 'reserved' }).items.map(record => record.id)).toEqual([ids.second]);
+    drawings.transition(ids.first, 'active');
+    drawings.updateHistoricalStatus(history, 'active');
+    expect(drawings.search({ status: 'inactive' }).items.map(record => record.id)).toEqual([ids.second]);
+  });
+
+  it('uses the exact color dictionary for historical codes and identifies unmapped colors without guessing', () => {
+    const history = insertHistory();
+    const unmapped = insertHistory('02.0209.019.0401008', '9');
+    expect(drawings.get(-history)).toMatchObject({ colorCode: '0', colorName: '白色' });
+    expect(drawings.get(-unmapped)).toMatchObject({ colorCode: '9', colorName: '未识别', colorId: null });
+    db.prepare("update dictionary_items set name='米白色' where id=?").run(ids.white);
+    expect(drawings.get(-history)).toMatchObject({ colorCode: '0', colorName: '米白色' });
+    expect(drawings.get(-unmapped).colorName).toBe('未识别');
+  });
+
+  it('returns real unbatched same-code legacy indices for either origin while preserving every instance and missing flag', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'drawing-v41-files-'));
+    try {
+      const code = drawings.get(ids.first).fullCode;
+      const history = insertHistory(code);
+      const insertFile = db.prepare(`insert into pdf_files
+        (relative_path,file_name,drawing_id,historical_drawing_id,match_status,detected_codes_json,
+         conversion_type,size_bytes,modified_at,scanned_at,is_present)
+        values (?,?,?,?,'matched',?, ?, 12,'now','now',?)`);
+      const add = (name: string, type: 'source' | 'outlined', historical: boolean, present: boolean) => {
+        if (present) writeFileSync(join(directory, name), '%PDF-1.4 unchanged fixture');
+        return Number(insertFile.run(name, name, historical ? null : ids.first, historical ? history : null,
+          JSON.stringify([code]), type, Number(present)).lastInsertRowid);
+      };
+      const source = add('legacy-source.pdf', 'source', false, true);
+      const outlined = add('legacy-outlined.pdf', 'outlined', false, true);
+      const duplicate = add('historical-copy.pdf', 'outlined', true, true);
+      const missing = add('missing-copy.pdf', 'outlined', true, false);
+      const indicesBefore = db.prepare('select * from pdf_files order by id').all();
+      const bytesBefore = readFileSync(join(directory, 'legacy-outlined.pdf'));
+      const detail = drawings.get(-history);
+      expect(detail).toMatchObject({ hasSourceFile: true, hasOutlinedFile: true });
+      expect(detail.sourceFiles.map(file => file.pdfIndexId)).toEqual([source]);
+      expect(detail.sourceFiles[0].materialBatchId).toBeNull();
+      expect(detail.batchUsage.effectiveCurrentFileIds).toEqual([]);
+      // Empty batch resolution describes unbatched usage, not missing physical PDF indices.
+      expect(new Set(detail.outlinedFiles.map(file => file.pdfIndexId))).toEqual(new Set([outlined, duplicate, missing]));
+      expect(detail.outlinedFiles.find(file => file.pdfIndexId === missing)?.isPresent).toBe(false);
+      expect(drawings.search({ productId: drawings.get(ids.first).productId!, sourcePresence: 'present' }).items
+        .some(record => record.id === ids.first)).toBe(true);
+      expect(db.prepare('select * from pdf_files order by id').all()).toEqual(indicesBefore);
+      expect(readFileSync(join(directory, 'legacy-outlined.pdf')).equals(bytesBefore)).toBe(true);
+      const batchId = Number(db.prepare(`insert into material_batches(relative_path,product_directory,name,
+        recognition_status,is_present,first_seen_at,last_seen_at) values('batch','directory','Batch','recognized',1,'now','now')`).run().lastInsertRowid);
+      db.prepare('update pdf_files set material_batch_id=? where id=?').run(batchId,source);
+      const productId = drawings.get(ids.first).productId!;
+      db.prepare(`insert into drawing_appearance_bindings(origin,record_id,product_id,source,revision,updated_at)
+        values('historical',?,?,'confirmed',1,'now')`).run(history,productId);
+      expect(drawings.get(-history).sourceFiles[0].materialBatchId).toBe(batchId);
+      expect(new Set(drawings.search({productId,materialBatchId:batchId,sourcePresence:'present'}).items.map(record=>record.id)))
+        .toEqual(new Set([ids.first,-history]));
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('persists both state directions across reopen while keeping original identity, PDF indices, BOM and occupied numbers', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'drawing-v41-db-'));
+    try {
+      const history = insertHistory();
+      const productId = drawings.get(ids.first).productId!;
+      const version = Number(db.prepare(`insert into bom_versions (product_id,version_number,created_at)
+        values (?,1,'original')`).run(productId).lastInsertRowid);
+      db.prepare(`insert into bom_items (bom_version_id,project_item_id,drawing_id,quantity)
+        values (?,?,?,1)`).run(version,ids.logo,ids.first);
+      db.prepare(`insert into bom_items (bom_version_id,project_item_id,historical_drawing_id,quantity)
+        values (?,?,?,2)`).run(version,ids.manual,history);
+      db.prepare(`insert into pdf_files (relative_path,file_name,historical_drawing_id,match_status,
+        detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present)
+        values ('unchanged.pdf','unchanged.pdf',?,'matched','[]','outlined',1,'original','original',1)`).run(history);
+      const before = [ids.first,-history].map(id => drawings.get(id));
+      const protectedTables = ['pdf_files','bom_items','bom_versions','drawing_appearance_bindings','drawing_appearance_usages'];
+      const protectedBefore = protectedTables.map(table => db.prepare(`select * from ${table}`).all());
+      drawings.transition(ids.first,'voided');
+      drawings.updateHistoricalStatus(history,'inactive');
+      const path = join(directory,'planner.db');
+      writeFileSync(path,db.serialize()); db.close(); db=openDatabase(path); drawings=new DrawingQueryService(db);
+      expect(drawings.get(ids.first).status).toBe('voided');
+      expect(drawings.get(-history).status).toBe('inactive');
+      for (const original of before) {
+        expect(new OccupiedNumberRepository(db).hasFullCode(original.fullCode)).toBe(true);
+        expect(drawings.previewDeletion(original.id).releaseBlockers.length).toBeGreaterThan(0);
+      }
+      drawings.transition(ids.first,'active'); drawings.updateHistoricalStatus(history,'active');
+      db.close(); db=openDatabase(path); drawings=new DrawingQueryService(db);
+      for (const original of before) expect(drawings.get(original.id)).toMatchObject({
+        id:original.id,status:'active',fullCode:original.fullCode,productId:original.productId,occupied:true,
+        sourceFiles:original.sourceFiles,outlinedFiles:original.outlinedFiles,
+      });
+      expect(protectedTables.map(table => db.prepare(`select * from ${table}`).all())).toEqual(protectedBefore);
+      expect(() => drawings.associatePdf(-history,1,'source')).toThrowError(expect.objectContaining({code:'HISTORICAL_READ_ONLY'}));
+    } finally { db.close(); db = openDatabase(':memory:'); rmSync(directory, { recursive: true, force: true }); }
+  });
 });

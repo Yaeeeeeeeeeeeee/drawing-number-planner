@@ -11,6 +11,22 @@ const querySchema = z.object({
 const paramsSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
 
 export function registerMaterialBatchRoutes(app: FastifyInstance, service: MaterialBatchService): void {
+  app.get('/api/material-batches/:id/deletion-preview', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'资料批次编号无效'}});
+    return service.previewDeletion(params.data.id) ?? reply.code(404).send({error:{code:'NOT_FOUND',message:'资料批次不存在'}});
+  });
+  app.delete('/api/material-batches/:id', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    const input = z.object({fingerprint:z.string().regex(/^[a-f0-9]{64}$/),confirmation:z.literal('删除批次')}).strict().safeParse(request.body);
+    if (!params.success || !input.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'请先预检并确认删除批次'}});
+    try {
+      return service.delete(params.data.id,input.data) ?? reply.code(404).send({error:{code:'NOT_FOUND',message:'资料批次不存在'}});
+    } catch (error) {
+      if (!(error instanceof FileError)) throw error;
+      return reply.code(error.code === 'PDF_PREVIEW_STALE' ? 409 : 422).send({error:{code:error.code,message:error.message}});
+    }
+  });
   app.get('/api/material-batches/diagnostics', async () => service.diagnostics());
   app.patch('/api/material-batches/:id', async (request, reply) => {
     const params = paramsSchema.safeParse(request.params);

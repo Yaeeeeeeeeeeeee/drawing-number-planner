@@ -29,7 +29,7 @@ describe('drawing library origin column', () => {
     }
     const table = await screen.findByRole('table');
     const headers = within(table).getAllByRole('columnheader').map(header => header.textContent);
-    expect(headers).toEqual(['选择', '完整图号', '主类别 / 项目', '来源', '关联产品', '版本', '图号状态', '操作']);
+    expect(headers).toEqual(['选择', '完整图号', '主类别 / 项目', '来源', '关联产品', '颜色', '图号状态', '操作']);
     for (const [index, record] of rows.entries()) {
       const cells = within(within(table).getAllByRole('row')[index + 1]).getAllByRole('cell');
       expect(cells).toHaveLength(headers.length);
@@ -41,10 +41,10 @@ describe('drawing library origin column', () => {
   });
 });
 
-it('shows an available recorded version without making up a default version', async () => {
-  const rows = [{id:1,fullCode:'02.0209.010.0501002',origin:'planned',status:'active',appearanceVersionLabel:'旧外观',version:'R2'}, {id:2,fullCode:'UNVERSIONED',origin:'historical',status:'active'}];
+it('shows dictionary color independently of recorded version and keeps unknown color explicit', async () => {
+  const rows = [{id:1,fullCode:'02.0209.010.0501002',origin:'planned',status:'active',appearanceVersionLabel:'旧外观',version:'R2',colorName:'白色'}, {id:2,fullCode:'UNVERSIONED',origin:'historical',status:'active'}];
   render(<DrawingLibraryPage api={{searchDrawings:vi.fn().mockResolvedValue({items:rows,total:2}),listDictionaries:vi.fn().mockResolvedValue([])} as never} />);
   const table=await screen.findByRole('table');
-  expect(within(within(table).getAllByRole('row')[1]).getAllByRole('cell')[5]).toHaveTextContent('R2');
-  expect(within(within(table).getAllByRole('row')[2]).getAllByRole('cell')[5]).toHaveTextContent('未记录');
+  expect(within(within(table).getAllByRole('row')[1]).getAllByRole('cell')[5]).toHaveTextContent('白色');
+  expect(within(within(table).getAllByRole('row')[2]).getAllByRole('cell')[5]).toHaveTextContent('未识别');
 });

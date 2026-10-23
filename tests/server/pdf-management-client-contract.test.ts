@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../../src/db/database';
@@ -45,4 +45,26 @@ it('sends batch display-name edits as JSON over real HTTP without changing batch
   await expect(apiClient.renameMaterialBatch!(31,{displayName:'首批生产'})).resolves.toMatchObject({id:31,displayName:'首批生产',relativePath:'old/batch'});
   expect(db.prepare('select id,relative_path,name from material_batches where id=31').get()).toEqual({id:31,relative_path:'old/batch',name:'首批大货'});
  }finally{vi.unstubAllGlobals();await app.close();db.close();}
+});
+
+
+it('preflights and confirms empty batch deletion over real HTTP, keeps physical PDFs and rediscovers the batch on rescan',async()=>{
+ const db=openDatabase(':memory:');const app=Fastify();const root=mkdtempSync(join(tmpdir(),'batch-delete-http-'));const nativeFetch=globalThis.fetch;
+ try{
+  migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});
+  const directory=join(root,'01.洗碗机','SKU-T40','03.量产后的变更文件','01.20260101');mkdirSync(directory,{recursive:true});const original=join(directory,'plain.pdf');writeFileSync(original,'%PDF-1.4 retained');
+  const service=new FileService(new FileRepository(db),new WorkspaceSettingsStore(join(root,'settings.json')));service.updateSettings({workspaceRoot:root});await service.scan();
+  const batches=new MaterialBatchService(db);const batch=batches.list()[0];expect(batch).toBeTruthy();
+  app.post('/api/session',async()=>({token:'isolated-batch-delete-test'}));registerFileRoutes(app,service);registerMaterialBatchRoutes(app,batches);
+  const origin=await app.listen({host:'127.0.0.1',port:0});vi.stubGlobal('fetch',(path:string,init?:RequestInit)=>nativeFetch(new URL(path,origin),init));resetApiSession();
+  const blocked=await apiClient.previewMaterialBatchDeletion!(batch.id);expect(blocked.allowed).toBe(false);expect(blocked.reason).toContain('PDF 索引');
+  await expect(apiClient.deleteMaterialBatch!(batch.id,{fingerprint:blocked.fingerprint,confirmation:'删除批次'})).rejects.toThrow('仍被引用');
+  const ids=service.search().items.map(file=>file.id);const pdfPreview=await apiClient.previewPdfManagement!({ids,action:'clear'});
+  await apiClient.applyPdfManagement!({ids:pdfPreview.ids,action:'clear',fingerprint:pdfPreview.fingerprint,confirmation:pdfPreview.confirmation});
+  const preview=await apiClient.previewMaterialBatchDeletion!(batch.id);expect(preview.allowed).toBe(true);
+  const history=db.prepare('select * from file_scan_runs').all();
+  await expect(apiClient.deleteMaterialBatch!(batch.id,{fingerprint:preview.fingerprint,confirmation:'删除批次'})).resolves.toEqual({deleted:batch.id});
+  expect(batches.list()).toEqual([]);expect(db.prepare('select * from file_scan_runs').all()).toEqual(history);expect(readFileSync(original,'utf8')).toBe('%PDF-1.4 retained');
+  await service.scan();expect(batches.list()).toHaveLength(1);expect(service.search().total).toBe(1);expect(readFileSync(original,'utf8')).toBe('%PDF-1.4 retained');
+ }finally{vi.unstubAllGlobals();await app.close();db.close();rmSync(root,{recursive:true,force:true});}
 });

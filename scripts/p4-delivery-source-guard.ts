@@ -7,10 +7,12 @@ export function assertDesktopLayoutOnly(base: string, candidate: string): void {
   if (reverted !== normalize(base)) throw new Error('Unexpected desktop source change; only native menu visibility is permitted');
 }
 
-/** Permit the requested, renderer-bundled icon dependency without runtime upgrades. */
+/** Permit renderer icons and the approved stable app version without runtime upgrades. */
 export function assertRendererIconDependencyOnly(basePackage: string, candidatePackage: string, baseLock: string, candidateLock: string): void {
   const normalize = (value: string) => value.replaceAll('\r\n', '\n');
   const base = JSON.parse(basePackage), candidate = JSON.parse(candidatePackage);
+  if (candidate.version !== base.version && candidate.version !== '1.0.0') throw new Error('Unexpected application release version');
+  candidate.version = base.version;
   if (candidate.dependencies?.['lucide-react'] !== '1.59.0') throw new Error('Unexpected icon dependency version');
   delete candidate.dependencies['lucide-react'];
   if (JSON.stringify(base) !== JSON.stringify(candidate)) throw new Error('Unexpected package change beyond renderer icons');
