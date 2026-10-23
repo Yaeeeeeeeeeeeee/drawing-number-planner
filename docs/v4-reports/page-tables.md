@@ -4,7 +4,7 @@
 
 | 页面 | 稳定布局 ID | 覆盖 |
 | --- | --- | --- |
-| 产品档案 | products.archive | 真实虚拟列表；SKU/型号左对齐、状态居中、操作锁定末列 |
+| 产品档案 | products.archive | 真实虚拟列表；SKU左对齐、型号/品牌/类别/状态居中、操作锁定末列 |
 | 二维码 | qr.products / qr.purposes | 外层虚拟产品表及展开的真实用途/文件/网址/状态/操作表，分别保存布局 |
 | 编码字典 | dictionaries.<type> / dictionaries.project-items | 仅补稳定 ID，项目表不依赖当前主类别 ID |
 | BOM 查询 | bom.history | 日期/时间居中，型号左对齐，操作锁定末列 |
@@ -36,3 +36,5 @@
 - 产品退出关联检查表 `products.exit-assessment` 接入，数量居中，规则与查看按钮保持原预检信息，新增表格局部滚动容器。
 - 新增真实迁移异常摘要列与单元格同步移动后仍可展开原原因、产品退出数量列移动后仍可查看原 BOM 规则的验证。
 - `import-page` 与 `product-exit-worksheet`：2 文件 7 测试通过。
+
+Windows原生对齐回归已修正：二维码主表仅SKU左对齐，子表仅关联文件左对齐，其他居中；产品主表仅SKU左对齐。共享拖动/顺序仍保持字段与数据同步。

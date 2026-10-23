@@ -267,9 +267,9 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
     {items.length === 0 ? queryState !== 'ready' ? null : <EmptyState title={Object.entries(queriedFilters).some(([key,value]) => key === 'status' ? value !== 'all' : Boolean(value)) ? '没有符合筛选条件的产品' : '还没有产品档案'} description="先完成编码字典，再创建首个产品型号。" symbol="品" /> :
       <><DataTable tableId="products.archive" fillViewport virtualize virtualKey={JSON.stringify(queriedFilters)} items={items} columns={[
         { key: 'sku', label: 'SKU', width:210, minWidth:130, align:'left', render: item => <strong title={item.sku ?? undefined}>{item.sku ?? '待补录'}</strong> },
-        { key: 'model', label: '型号', width:170, minWidth:130, align:'left', render: item => <span title={item.model}>{item.model}</span> },
-        { key: 'brand', label: '品牌', width:130, minWidth:130, align:'left', render: item => item.brandName },
-        { key: 'category', label: '产品类别', width:150, minWidth:130, align:'left', render: item => item.productCategory },
+        { key: 'model', label: '型号', width:170, minWidth:130, align:'center', render: item => <span title={item.model}>{item.model}</span> },
+        { key: 'brand', label: '品牌', width:130, minWidth:130, align:'center', render: item => item.brandName },
+        { key: 'category', label: '产品类别', width:150, minWidth:130, align:'center', render: item => item.productCategory },
         { key: 'status', label: '状态', width:120, minWidth:120, align:'center', render: item => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span> },
         ...productQrPurposes.map(purpose => ({ key: purpose.key, label: purpose.label, width:130, minWidth:112, align:'center' as const, render: (item: ProductView) => {
           const records = qrCodes.filter(code => {
