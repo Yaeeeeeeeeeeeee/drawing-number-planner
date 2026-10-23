@@ -6,6 +6,7 @@ import './pdf-product-batch-navigation.css';
 
 export type CatalogNavigationScope = { kind: 'all' | 'category' | 'product' | 'appearance' | 'batch' | 'unassociated' | 'recycle'; category?: string; productId?: number; batchId?: number; appearanceVersionId?: number };
 export interface CatalogNavigationCounts {
+  batchProducts?: Array<{materialBatchId:number;productId:number|null}>;
   appearances?: Array<{appearanceVersionId:number;count:number}>;
   appearanceBatches?: Array<{appearanceVersionId:number;materialBatchId:number;productId:number|null;count:number}>;
   total: number; categories: Array<{name: string; count: number}>; products: Array<{productId: number; count: number}>;
@@ -29,7 +30,13 @@ export function ProductCatalogNavigation({ products, batches, counts, scope, onS
   const query = keyword.trim().toLocaleLowerCase();
   const visible = products.filter(product => `${product.productCategory} ${product.sku ?? ''} ${product.model}`.toLocaleLowerCase().includes(query));
   const categories = [...new Set(visible.map(product => product.productCategory || '未分类'))];
-  const belongsToProduct=(batch:MaterialBatchView,productId:number)=>counts?counts.batches.some(item=>item.materialBatchId===batch.id&&item.productId===productId&&item.count>0):usageBatches.find(item=>item.id===batch.id)?.usageProducts.some(item=>item.productId===productId)??batch.productId===productId;
+  const belongsToProduct=(batch:MaterialBatchView,productId:number)=>{
+    // Filtering changes counts, never membership. PDF provides a separate unfiltered map.
+    if(counts?.batchProducts)return counts.batchProducts.some(item=>item.materialBatchId===batch.id&&item.productId===productId);
+    const usage=usageBatches.find(item=>item.id===batch.id);
+    if(mode==='drawings'&&usage)return usage.usageProducts.some(item=>item.productId===productId);
+    return batch.productId===productId || Boolean(counts?.batches.some(item=>item.materialBatchId===batch.id&&item.productId===productId&&item.count>0));
+  };
   const orphanBatches=batches.filter(batch=>!products.some(product=>belongsToProduct(batch,product.id)));
 
   const count = (value?: number) => <span className="pdf-nav-count" aria-label={value == null && !counts ? '数量暂不可用' : `${value ?? 0} 个${mode === 'files' ? '文件' : '图号'}`}>{value ?? (counts ? 0 : '—')}</span>;

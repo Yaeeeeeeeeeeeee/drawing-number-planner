@@ -47,6 +47,14 @@ function seed() {
   db.prepare("insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,revision,updated_at) values('historical',?,?,null,'manual',1,?)").run(historical.id,productId,timestamp);
 }
 
+it('keeps batch-product membership independent from keyword, match, presence and management counts',()=>{
+ seed();const before=repository.navigation();expect(before.batches.some(batch=>batch.productId===productId)).toBe(true);
+ const filtered=repository.navigation({keyword:'no-matching-file',matchStatus:'unmatched',presence:'missing',managementState:'ignored'});
+ expect(filtered.total).toBe(0);expect(filtered.batches).toEqual([]);
+ expect(filtered.batchProducts).toEqual(before.batchProducts);
+ expect(filtered.batchProducts?.some(batch=>batch.productId===productId)).toBe(true);
+});
+
 describe('PDF navigation statistics', () => {
   it('counts indexed instances across batches, unbatched and missing files without equating match status with product association', () => {
     seed();
@@ -159,7 +167,7 @@ describe('PDF navigation statistics', () => {
     repository.replaceScan(Array.from({ length: 10_001 }, (_, i) => record(`indexed-${i}.pdf`)), [], timestamp);
     expect(repository.search({ pageSize: 200 }).items).toHaveLength(200);
     expect(repository.navigation({ presence: 'all' })).toEqual({ total: 10_001, unassociatedProducts: 10_001,
-      categories: [], products: [], batches: [], appearances: [], appearanceBatches: [] });
+      categories: [], products: [], batches: [], batchProducts: [], appearances: [], appearanceBatches: [] });
   });
 });
 

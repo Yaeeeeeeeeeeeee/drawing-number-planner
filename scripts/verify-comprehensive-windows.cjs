@@ -112,6 +112,32 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.deepEqual(snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings,bindingsBeforeScan);
   assert.equal(createHash('sha256').update(fs.readFileSync(directoryPdf)).digest('hex'),directoryHashes[0]);assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
   await page.screenshot({path:path.join(evidence,'Windows-PDF-目录归类-无图号确认.png')});report.pdfDirectoryClassification={actualScan:true,productCount:2,listCount:2,matchedAndUnmatchedPreserved:true,unconfirmedDrawingStillUnassociated:true,noBindingWrites:true,originalFileHashesPreserved:true};
+  // Regressions: real renderer JSON requests and filtered counts must not change catalog membership.
+  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1920,1080));
+  const catalog=page.getByRole('navigation',{name:'资料导航'});await catalog.waitFor();
+  const productBranch=catalog.locator('.pdf-nav-product').filter({has:page.getByRole('button',{name:'产品 SKU · M1',exact:true})});
+  const expandProduct=productBranch.locator('.pdf-nav-expand').first();if(await expandProduct.getAttribute('aria-expanded')==='false')await expandProduct.click();
+  const fileFilters=catalog.locator('.pdf-nav-filters');if(await fileFilters.getAttribute('open')===null)await fileFilters.locator('summary').click();
+  const keyword=page.getByLabel('文件关键词',{exact:true}),range=page.getByLabel('纳入范围',{exact:true}),filterButton=page.getByRole('button',{name:'筛选 PDF',exact:true});
+  await keyword.fill('no-file-matches-this-filter');await filterButton.click();await page.getByRole('heading',{name:'没有符合条件的 PDF',exact:true}).waitFor();
+  assert.ok(await productBranch.getByRole('button',{name:'批次 首批大货',exact:true}).count(),'A zero count must not move the real batch out of its product');
+  await keyword.fill('');await filterButton.click();await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
+  const managementActions=[['ignore','暂不纳入已选'],['restore','恢复纳入已选'],['clear','清除已选索引']];
+  for(const [action,button]of managementActions){
+    await range.selectOption(action==='restore'?'ignored':'included');await filterButton.click();
+    await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).check();
+    await page.getByRole('button',{name:button,exact:true}).click();const preview=page.getByRole('dialog',{name:'PDF 管理预览',exact:true});await preview.waitFor();
+    // Use the actual preview phrase so the check also covers renderer/server contract changes.
+    const text=await preview.locator('strong').first().textContent();const confirmation=text.split(' · ')[0];assert.ok(confirmation.length>0);
+    await preview.getByLabel('PDF 管理确认短语',{exact:true}).fill(confirmation);
+    await page.screenshot({path:path.join(evidence,`Windows-PDF管理-${action}-真实预览.png`)});
+    await preview.getByRole('button',{name:'确认处理',exact:true}).click();await preview.waitFor({state:'detached'});
+    await page.waitForFunction(async({name,action})=>{const result=await(await fetch('/api/files?managementState=all&presence=all')).json();const file=result.items.find(item=>item.fileName===name);return action==='clear'?!file:file?.managementState===(action==='ignore'?'ignored':'included');},{name:path.basename(unmatchedPdf),action});
+    assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
+  }
+  await range.selectOption('included');await filterButton.click();await page.getByRole('button',{name:'扫描资料库',exact:true}).click();
+  await page.getByRole('button',{name:`文件详情 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor({timeout:45000});
+  report.pdfManagementButtons={actualRenderer:true,previewApplyIgnoreRestoreClear:true,originalFileHashPreserved:true,clearedIndexRediscovered:true,zeroCountDoesNotReparentBatch:true};
   await go(page,'图号库');await page.getByRole('button',{name:'自动归类',exact:true}).click();
   await page.locator('.drawing-association-result').waitFor({timeout:45000});
   const drawingList=await page.evaluate(async()=>await(await fetch('/api/drawings?productId=5')).json());
@@ -120,6 +146,16 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.ok(drawingCounts.products.some(item=>item.productId===5&&item.count>0));
   assert.ok(snapshot(path.join(legacy,'planner.db')).drawing_association_audit.length>0);
   await page.screenshot({path:path.join(evidence,'Windows-图号一键归类-真实保存.png')});
+  const drawingCatalog=page.getByRole('navigation',{name:'图号导航'});
+  const drawingBranch=drawingCatalog.locator('.pdf-nav-product').filter({has:page.getByRole('button',{name:'产品 M1',exact:true})});
+  await drawingBranch.waitFor();const drawingExpand=drawingBranch.locator('.pdf-nav-expand').first();if(await drawingExpand.getAttribute('aria-expanded')==='false')await drawingExpand.click();
+  await drawingBranch.getByRole('button',{name:'批次 首批大货',exact:true}).waitFor();
+  await page.getByLabel('关键词',{exact:true}).fill('no-drawing-matches-this-filter');await page.getByRole('button',{name:'查询',exact:true}).click();
+  await page.getByRole('heading',{name:'没有符合查询条件的图号',exact:true}).waitFor();
+  assert.equal(await drawingBranch.getByRole('button',{name:'批次 首批大货',exact:true}).count(),1);
+  await page.screenshot({path:path.join(evidence,'Windows-图号筛选零结果-保留产品批次.png')});
+  await page.getByLabel('关键词',{exact:true}).fill('');await page.getByRole('button',{name:'查询',exact:true}).click();
+  report.drawingCatalogRefresh={productVisibleAfterClassification:true,zeroCountDoesNotReparentBatch:true};
   await page.getByRole('button',{name:'02.0209.010.0401002',exact:true}).click();
   const compactDrawer=page.locator('.drawing-maintenance');await compactDrawer.waitFor();
   assert.equal(await compactDrawer.locator(':scope > .drawing-detail-group').count(),4);

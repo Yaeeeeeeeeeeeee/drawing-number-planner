@@ -13,6 +13,24 @@ it('requests enough initial drawing records for a tall workspace without truncat
 });
 
 describe('DrawingLibraryPage', () => {
+  it('refreshes product catalog metadata after classification even when no new binding was needed',async()=>{
+    const product={id:9,sku:'SKU-ZU70SD',model:'ZU70SD',productCategory:'冰柜',status:'active'};
+    const api={searchDrawings:vi.fn().mockResolvedValue({items:[],total:733}),listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValueOnce([]).mockResolvedValue([product]),getDrawingNavigationCounts:vi.fn().mockResolvedValue({total:733,unassociated:0,recycle:0,categories:[{name:'冰柜',count:733}],products:[{productId:9,count:733}],batches:[]}),classifyDrawingAssociations:vi.fn().mockResolvedValue({updated:0,before:{historicalAssociated:733,historicalTotal:757,plannedAssociated:0,plannedTotal:0},after:{historicalAssociated:733,historicalTotal:757,plannedAssociated:0,plannedTotal:0},issues:[]})};
+    render(<DrawingLibraryPage api={api as never}/>);await waitFor(()=>expect(api.listProducts).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button',{name:'自动归类'}));
+    await screen.findByRole('button',{name:'产品 ZU70SD'});expect(api.listProducts.mock.calls.length).toBeGreaterThan(1);
+  });
+  it('does not discard loaded products when an unrelated dictionary request fails',async()=>{
+    const api={searchDrawings:vi.fn().mockResolvedValue({items:[],total:0}),listDictionaries:vi.fn().mockRejectedValue(new Error('字典暂不可用')),listProducts:vi.fn().mockResolvedValue([{id:9,sku:'SKU-ZU70SD',model:'ZU70SD',productCategory:'冰柜',status:'active'}])};
+    render(<DrawingLibraryPage api={api as never}/>);expect(await screen.findByRole('button',{name:'产品 ZU70SD'})).toBeVisible();
+  });
+  it('reloads the catalog on reactivation and ignores an obsolete product response',async()=>{
+    let release!:(value:unknown)=>void;const product={id:9,sku:'SKU-ZU70SD',model:'ZU70SD',productCategory:'冰柜',status:'active'};
+    const api={searchDrawings:vi.fn().mockResolvedValue({items:[],total:0}),listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;})).mockResolvedValue([product])};
+    const view=render(<DrawingLibraryPage api={api as never}/>);await waitFor(()=>expect(api.listProducts).toHaveBeenCalledOnce());
+    view.rerender(<DrawingLibraryPage api={api as never} active={false}/>);view.rerender(<DrawingLibraryPage api={api as never} active/>);
+    expect(await screen.findByRole('button',{name:'产品 ZU70SD'})).toBeVisible();await act(async()=>{release([]);});expect(screen.getByRole('button',{name:'产品 ZU70SD'})).toBeVisible();
+  });
   it('shows the full drawing number once in the detail header when the display name is identical', async () => {
     const item={id:1,fullCode:'02.0209.010.0501001',displayName:'02.0209.010.0501001',origin:'planned',status:'reserved',readOnly:false,sourceFiles:[],outlinedFiles:[],currentBomUsage:[]};
     const api={searchDrawings:vi.fn().mockResolvedValue({items:[item],total:1}),listDictionaries:vi.fn().mockResolvedValue([]),getDrawing:vi.fn().mockResolvedValue(item)};
@@ -865,6 +883,20 @@ it.each(['active','inactive'])('shows four compact groups and an actionable rele
  fireEvent.click(within(panel).getByRole('button',{name:'取消占号并删除'}));
  expect(await within(panel).findByText(/该图号存在历史扫描占用记录/)).toBeInTheDocument();
  expect(api.getDrawingDeletionPreview).toHaveBeenCalledWith(-7);
+});
+
+it('reactivates with the submitted query while preserving unsubmitted filter input',async()=>{
+ const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockImplementation(async (_query:Record<string,unknown>)=>({items:[],total:0}))};
+ const view=render(<DrawingLibraryPage api={api as never}/>);
+ await waitFor(()=>expect(api.searchDrawings).toHaveBeenCalled());
+ fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'submitted'}});
+ fireEvent.click(screen.getByRole('button',{name:'查询'}));
+ await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'submitted'})));
+ fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'draft-only'}});
+ view.rerender(<DrawingLibraryPage api={api as never} active={false}/>);
+ view.rerender(<DrawingLibraryPage api={api as never} active/>);
+ await waitFor(()=>expect(screen.getByLabelText('关键词')).toHaveValue('draft-only'));
+ expect(api.searchDrawings.mock.calls.some(([query])=>query.keyword==='draft-only')).toBe(false);
 });
 
 it('keeps a reserved number distinct until the user explicitly marks it in use',async()=>{

@@ -32,7 +32,7 @@ describe('read-only PDF navigation endpoint', () => {
       const snapshot = db.serialize();
       const result = await app.inject('/api/files/navigation?presence=all&keyword=unknown&matchStatus=unmatched');
       expect(result.statusCode).toBe(200);
-      expect(result.json()).toEqual({ total: 1, unassociatedProducts: 1, categories: [], products: [], batches: [], appearances: [], appearanceBatches: [] });
+      expect(result.json()).toEqual({ total: 1, unassociatedProducts: 1, categories: [], products: [], batches: [], batchProducts: [], appearances: [], appearanceBatches: [] });
       expect((await app.inject('/api/files/navigation?conversionType=outlined')).json().total).toBe(0);
       expect((await app.inject('/api/files?unassociatedProduct=true&presence=all')).json().total).toBe(1);
       expect((await app.inject('/api/files?unassociatedProduct=false&presence=all')).json().total).toBe(0);

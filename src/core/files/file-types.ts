@@ -95,6 +95,8 @@ export interface FileScanChangesView {
 export type FileNavigationFilters = Pick<FileSearchFilters, 'keyword' | 'matchStatus' | 'conversionType' | 'presence' | 'managementState'>;
 
 export interface FileNavigationResult {
+  /** Stable ownership of indexed batches, independent of the current manual filters. */
+  batchProducts?: Array<{materialBatchId:number;productId:number|null}>;
   appearances?: Array<{appearanceVersionId:number;count:number}>;
   appearanceBatches?: Array<{appearanceVersionId:number;materialBatchId:number;productId:number|null;count:number}>;
   total: number;

@@ -418,6 +418,9 @@ export class FileRepository {
       const { whereSql, parameters } = fileSearchPredicate({ managementState: filters.managementState, keyword: filters.keyword, matchStatus: filters.matchStatus,
         conversionType: filters.conversionType, presence: filters.presence }, this.db);
       const scope = `${FILE_SEARCH_JOINS} ${whereSql}`;
+      const batchProducts = this.db.prepare(`select distinct file.material_batch_id as materialBatchId, product.id as productId
+        ${FILE_SEARCH_JOINS} where file.material_batch_id is not null
+        order by file.material_batch_id, product.id`).all() as FileNavigationResult['batchProducts'];
       const totals = this.db.prepare(`select count(distinct file.id) as total,
         count(distinct case when product.id is null then file.id end) as unassociatedProducts ${scope}`)
         .get(parameters) as Pick<FileNavigationResult, 'total' | 'unassociatedProducts'>;
@@ -442,7 +445,7 @@ export class FileRepository {
         join ${drawingAppearanceRelationsSql} binding on (binding.origin='planned' and binding.record_id=file.drawing_id) or (binding.origin='historical' and binding.record_id=file.historical_drawing_id)
         ${whereSql} ${whereSql ? 'and' : 'where'} file.material_batch_id is not null
         group by binding.appearance_version_id, file.material_batch_id, product.id order by binding.appearance_version_id, file.material_batch_id`).all(parameters) as NonNullable<FileNavigationResult['appearanceBatches']>;
-      return { ...totals, categories, products, batches, appearances, appearanceBatches };
+      return { ...totals, categories, products, batches, batchProducts, appearances, appearanceBatches };
     }).deferred();
   }
 

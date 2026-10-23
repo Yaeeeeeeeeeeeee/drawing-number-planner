@@ -44,6 +44,8 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const [scope, setScope] = useState<CatalogNavigationScope>({kind:'all'});
   const [navigationCounts, setNavigationCounts] = useState<CatalogNavigationCounts | null>(null);
   const countsRequest = useRef(0);
+  const catalogRequest=useRef(0);
+  const [catalogError,setCatalogError]=useState('');
   const [associationResult,setAssociationResult]=useState<DrawingAssociationResult|null>(null);
   const [repairPreview,setRepairPreview]=useState<DrawingAssociationPreviewView|null>(null);
   const [associationProduct,setAssociationProduct]=useState('');
@@ -74,7 +76,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const [deletionMode, setDeletionMode] = useState<'retain_occupied' | 'release'>('retain_occupied');
   const [deletionReason, setDeletionReason] = useState('');
   const [deletionConfirmation, setDeletionConfirmation] = useState('');
-  const appliedQuery = useRef<{values: Record<string, string | number | boolean>; page: number; pageSize: number; scope: CatalogNavigationScope}>({values:emptyFilters,page:1,pageSize:50,scope:{kind:'all'}});
+  const appliedQuery = useRef<{values: Record<string, string | number | boolean>; page: number; pageSize: number; scope: CatalogNavigationScope}>({values:emptyFilters,page:1,pageSize,scope:{kind:'all'}});
   const scopeFilters = (selectedScope: CatalogNavigationScope, values: Record<string, string | number | boolean>) => ({
     appearanceVersionId: selectedScope.appearanceVersionId ?? '', productId: selectedScope.productId ?? '', usageBatchId: selectedScope.batchId ?? '',
     associationState: selectedScope.kind === 'unassociated' ? 'unassociated' : '',
@@ -106,27 +108,45 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     catch (reason) { if (request !== listRequest.current) return; setQueryState('failed'); setQueryError(reason instanceof Error ? reason.message : '图号检索失败'); }
     finally { if (request === listRequest.current) setLoading(false); }
   };
-  const refreshCurrentQuery = () => {
+  const refreshCatalog = async () => {
+    const request=++catalogRequest.current;
+    const results=await Promise.allSettled([
+      api.listProducts?.({status:'all'})??Promise.resolve([]),
+      api.listMaterialBatches?.()??Promise.resolve([]),
+      api.getDrawingNavigation?.()??Promise.resolve({batches:[]}),
+    ]);
+    if(request!==catalogRequest.current)return;
+    const [productResult,batchResult,navigationResult]=results;
+    if(productResult.status==='fulfilled'){
+      setProducts(productResult.value);
+      setProductCategories([...new Set(productResult.value.map(product=>product.productCategory).filter(Boolean))].sort());
+    }
+    if(batchResult.status==='fulfilled')setMaterialBatchOptions(batchResult.value);
+    if(navigationResult.status==='fulfilled')setNavigationBatches(navigationResult.value.batches);
+    const labels=['产品目录','资料批次','图号使用关系'];
+    setCatalogError(results.flatMap((result,index)=>result.status==='rejected'?[`${labels[index]}加载失败：${result.reason instanceof Error?result.reason.message:'请重试'}`]:[]).join('；'));
+  };
+  const refreshCurrentQuery = async () => {
     plannerQueryCache.invalidate('drawing:');
     const current = appliedQuery.current;
-    return search(current.values, current.page, current.pageSize, current.scope, true);
+    await Promise.all([search(current.values,current.page,current.pageSize,current.scope,true),refreshCatalog()]);
   };
   useEffect(() => {
-    void search();
-    void Promise.all([
-      Promise.all(['brand', 'appearance', 'main_category', 'project_item', 'color'].map((type) => api.listDictionaries(type, false))),
-      api.listProducts?.({ status: 'all' }) ?? Promise.resolve([]), api.listMaterialBatches?.() ?? Promise.resolve([]),
-      api.getDrawingNavigation?.() ?? Promise.resolve({batches: []}),
-    ])
-      .then(([[brand, appearance, main_category, project_item, color], products, materialBatches, navigation]) => {
-        setProducts(products); setNavigationBatches(navigation.batches);
-        setOptions({ brand, appearance, main_category, project_item, color });
-        setProductCategories([...new Set(products.map((product) => product.productCategory).filter(Boolean))].sort());
-        setMaterialBatchOptions(materialBatches);
-      })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : '筛选项加载失败'));
-  }, []);
-  useEffect(()=>{const changed=()=>{void refreshCurrentQuery();};window.addEventListener('planner:data-changed',changed);return()=>window.removeEventListener('planner:data-changed',changed);},[api]);
+    if(!active)return;
+    const current=appliedQuery.current;
+    void search(current.values,current.page,current.pageSize,current.scope,true);void refreshCatalog();
+    let live=true;
+    const types=['brand','appearance','main_category','project_item','color'];
+    void Promise.allSettled(types.map(type=>api.listDictionaries(type,false))).then(results=>{
+      if(!live)return;
+      setOptions(current=>({...current,...Object.fromEntries(results.flatMap((result,index)=>result.status==='fulfilled'?[[types[index],result.value]]:[]))}));
+      const failed=results.filter(result=>result.status==='rejected');
+      const firstFailure=failed[0];
+      if(firstFailure?.status==='rejected')setError(firstFailure.reason instanceof Error?firstFailure.reason.message:'筛选项加载失败');
+    });
+    return()=>{live=false;catalogRequest.current++;countsRequest.current++;listRequest.current++;};
+  }, [active,api]);
+  useEffect(()=>{const changed=()=>{if(active)void refreshCurrentQuery();};window.addEventListener('planner:data-changed',changed);return()=>window.removeEventListener('planner:data-changed',changed);},[api,active]);
   const set = (key: keyof typeof filters, value: string | boolean) => setFilters((current) => ({ ...current, [key]: value,
     ...(key === 'mainCategoryId' ? { projectItemId: '' } : {}),
   }));
@@ -313,6 +333,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     <PageHeader title="图号库" description="按产品查看图号与关联资料。"><span className="record-count">{total} 条记录</span></PageHeader>
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
+    {catalogError&&<div className="error-banner" role="alert">{catalogError} <button type="button" className="text-button" onClick={()=>void refreshCatalog()}>重试产品目录</button></div>}
 
     <div className="drawing-library-tools">{!mockMode && api.classifyDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>{
       if(maintainingRef.current)return;

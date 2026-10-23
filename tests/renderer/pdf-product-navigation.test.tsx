@@ -71,3 +71,26 @@ it('uses drawing-number terminology for the shared drawing catalog',()=>{
   expect(screen.getByRole('button',{name:'未关联图号'})).toBeVisible();
   expect(screen.getByLabelText('2 个图号')).toBeVisible();
 });
+
+it('keeps a zero-result batch under its real product when file filters remove its counts',()=>{
+ const counts={total:0,unassociatedProducts:0,categories:[],products:[],batches:[],batchProducts:[{materialBatchId:10,productId:3}]};
+ const product={id:3,sku:'SKU',model:'T40',productCategory:'洗碗机'};
+ const batch={id:10,name:'首批大货',relativePath:'SKU-T40/首批大货',productDirectory:'SKU-T40',productId:null};
+ render(<PdfProductBatchNavigation products={[product] as never} batches={[batch] as never} counts={counts} scope={{kind:'all'}} onSelect={vi.fn()} filters={null}/>);
+ fireEvent.click(screen.getByRole('button',{name:'展开产品 SKU · T40'}));
+ expect(screen.getByRole('button',{name:'批次 首批大货'})).toBeVisible();
+ expect(screen.queryByText(/未关联产品批次/)).not.toBeInTheDocument();
+});
+
+it('keeps drawing usage batches in their products across filtered zero counts and clearing filters',()=>{
+ const products=[{id:3,sku:'SKU',model:'T40',productCategory:'洗碗机'}];
+ const batches=[{id:10,name:'首批大货',relativePath:'old/首批大货',productDirectory:'old',productId:null}];
+ const usageBatches=[{id:10,usageProducts:[{productId:3,state:'historical',drawingCount:8}]}];
+ const full={total:8,unassociated:0,categories:[{name:'洗碗机',count:8}],products:[{productId:3,count:8}],batches:[{materialBatchId:10,productId:3,count:8}]};
+ const zero={...full,total:0,categories:[],products:[],batches:[]};
+ const props={products:products as never,batches:batches as never,usageBatches:usageBatches as never,scope:{kind:'all'} as const,onSelect:vi.fn(),mode:'drawings' as const};
+ const view=render(<ProductCatalogNavigation {...props} counts={full}/>);fireEvent.click(screen.getByRole('button',{name:'展开产品 T40'}));
+ expect(screen.getByRole('button',{name:'批次 首批大货'})).toHaveTextContent('8');
+ view.rerender(<ProductCatalogNavigation {...props} counts={zero}/>);expect(screen.getByRole('button',{name:'批次 首批大货'})).toHaveTextContent('0');
+ view.rerender(<ProductCatalogNavigation {...props} counts={full}/>);expect(screen.getByRole('button',{name:'批次 首批大货'})).toHaveTextContent('8');
+});
