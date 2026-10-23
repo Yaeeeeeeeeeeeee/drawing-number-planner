@@ -148,14 +148,15 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   await page.screenshot({path:path.join(evidence,'Windows-图号一键归类-真实保存.png')});
   const drawingCatalog=page.getByRole('navigation',{name:'图号导航'});
   const drawingBranch=drawingCatalog.locator('.pdf-nav-product').filter({has:page.getByRole('button',{name:'产品 M1',exact:true})});
-  await drawingBranch.waitFor();const drawingExpand=drawingBranch.locator('.pdf-nav-expand').first();if(await drawingExpand.getAttribute('aria-expanded')==='false')await drawingExpand.click();
-  await drawingBranch.getByRole('button',{name:'批次 首批大货',exact:true}).waitFor();
+  await drawingBranch.waitFor();
   await page.getByLabel('关键词',{exact:true}).fill('no-drawing-matches-this-filter');await page.getByRole('button',{name:'查询',exact:true}).click();
   await page.getByRole('heading',{name:'没有符合查询条件的图号',exact:true}).waitFor();
-  assert.equal(await drawingBranch.getByRole('button',{name:'批次 首批大货',exact:true}).count(),1);
-  await page.screenshot({path:path.join(evidence,'Windows-图号筛选零结果-保留产品批次.png')});
+  // Scan-only batches do not establish drawing business usage. Check the real product,
+  // while renderer tests separately cover batches with explicit BOM/outbound usage.
+  await drawingBranch.getByRole('button',{name:'产品 M1',exact:true}).getByLabel('0 个图号',{exact:true}).waitFor();
+  await page.screenshot({path:path.join(evidence,'Windows-图号筛选零结果-保留产品目录.png')});
   await page.getByLabel('关键词',{exact:true}).fill('');await page.getByRole('button',{name:'查询',exact:true}).click();
-  report.drawingCatalogRefresh={productVisibleAfterClassification:true,zeroCountDoesNotReparentBatch:true};
+  report.drawingCatalogRefresh={productVisibleAfterClassification:true,zeroCountKeepsProduct:true};
   await page.getByRole('button',{name:'02.0209.010.0401002',exact:true}).click();
   const compactDrawer=page.locator('.drawing-maintenance');await compactDrawer.waitFor();
   assert.equal(await compactDrawer.locator(':scope > .drawing-detail-group').count(),4);
