@@ -1,5 +1,9 @@
 # 本分支开发进度管理
 
+## 默认使用 Stop That Shit（用户于 2026-10-24 要求）
+
+后续所有本项目任务先读取并应用 `.agents/skills/stop-that-shit/SKILL.md`（原作者 0.2.5）。完成用户要求及其必要连带修改，保留实际需要的数据安全和验收；避免擅自扩展范围、重复验证及无价值的流程。按当前请求区分回答、审查和修改，不将普通开发任务默认锁成只读。此处安装的是 Skill 本体，不宣称已启用 Guard hooks。
+
 每次开始/恢复工作，先读取 PROGRESS.md、NEXT_STEPS.md、docs/progress.json 和 docs/superpowers/plans/2026-09-22-second-acceptance-corrections.md，再核对 git 状态及对应代码测试。不得只凭聊天摘要决定进度。
 
 每完成有意义的实施或测试步骤，更新 docs/progress.json 的逐项状态/证据/时间和任务日志，再执行 `node node_modules/tsx/dist/cli.mjs scripts/update-progress.ts` 生成 PROGRESS.md 与 progress.html。同步维护 NEXT_STEPS.md。

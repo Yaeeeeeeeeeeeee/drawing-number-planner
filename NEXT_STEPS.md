@@ -1,3 +1,9 @@
+# 后续默认 Skill（2026-10-24）
+
+- 用户要求后续都使用Stop That Shit；已安装原作者0.2.5到项目.agents/skills/stop-that-shit并加入AGENTS.md默认读取。
+- 当前Codex用户目录也已安装；使用Skill本体，无Guard hooks。完成必要工作后交付，避免范围膨胀和重复验收，保留数据保护。
+- 本次仅开发指令与Skill文件变更，不重构业务，不重打既有已验证V4安装包。
+
 # V4最终交付（2026-10-23）
 
 - 已交付源码ceaf7ac；最终164文件1392项、类型/Vite/Main全部通过。
