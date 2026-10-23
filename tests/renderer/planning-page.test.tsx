@@ -33,13 +33,15 @@ function apiFixture() {
 }
 
 async function completeFirstRow() {
-  fireEvent.change(await screen.findByLabelText('产品型号'), { target: { value: '1' } });
+  await screen.findByRole('option', { name: 'SKU待补录 · ZC200 · SAMKYO' });
+  fireEvent.change(screen.getByLabelText('产品型号'), { target: { value: '1' } });
   fireEvent.change(screen.getByLabelText('外观'), { target: { value: '3' } });
   fireEvent.change(screen.getByLabelText('第 1 行主类别'), { target: { value: '5' } });
   expect(screen.getByRole('option', { name: '01 · LOGO' })).toBeVisible();
   expect(screen.queryByRole('option', { name: '01 · 纸箱' })).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('第 1 行项目明细'), { target: { value: '6' } });
   fireEvent.change(screen.getByLabelText('第 1 行颜色'), { target: { value: '4' } });
+  expect(screen.getByRole('button', { name: '查重并预览' })).toBeEnabled();
 }
 
 describe('PlanningPage', () => {
@@ -74,7 +76,8 @@ describe('PlanningPage', () => {
 
   it('allows any active packaging items supplied by the dictionary in one batch', async () => {
     const api = apiFixture(); render(<PlanningPage api={api as never} />);
-    fireEvent.change(await screen.findByLabelText('产品型号'), { target: { value: '1' } });
+    await screen.findByRole('option', { name: 'SKU待补录 · ZC200 · SAMKYO' });
+    fireEvent.change(screen.getByLabelText('产品型号'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('外观'), { target: { value: '3' } });
     for (let index = 2; index <= 4; index += 1) fireEvent.click(screen.getByRole('button', { name: '添加项目' }));
     const projectIds = ['8', '9', '10', '11'];

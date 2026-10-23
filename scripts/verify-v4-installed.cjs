@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapshot,go}){
  const dbFile=path.join(legacy,'planner.db');const before=snapshot(dbFile);
  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1920,1080));
+ await page.waitForFunction(()=>innerWidth===1920&&innerHeight===1080);
  const request=async(route,body,method='POST')=>page.evaluate(async({route,body,method})=>{const token=(await(await fetch('/api/session',{method:'POST'})).json()).token;const response=await fetch(route,{method,headers:{'content-type':'application/json','x-planner-token':token},body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw Error(JSON.stringify(result));return result;},{route,body,method});
  const get=route=>page.evaluate(async route=>await(await fetch(route)).json(),route);
  const original=await get('/api/products/5');
@@ -28,8 +29,13 @@ module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapsh
  const geometry=[];
  for(const width of [1920,2560,3840]){
   await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setContentSize(width,1080),width);
+  await page.waitForFunction(width=>innerWidth===width&&innerHeight===1080,width);
   await page.getByRole('button',{name:'恢复默认表格布局',exact:true}).click();const table=page.locator('.files-page table.layout-table');await table.waitFor();
-  const header=table.locator('thead [data-column-key=name]'),grip=header.getByRole('separator'),r=await grip.boundingBox(),old=await header.boundingBox();
+  const header=table.locator('thead [data-column-key=name]'),grip=header.getByRole('separator');
+  await grip.hover();
+  const r=await grip.boundingBox(),old=await header.boundingBox();
+  const pointerTarget=await page.evaluate(({x,y})=>{const element=document.elementFromPoint(x,y);return{resizer:element?.closest('.table-column-resizer')!==null,tag:element?.tagName,className:element?.getAttribute('class'),viewport:{width:innerWidth,height:innerHeight}};},{x:r.x+r.width/2,y:r.y+r.height/2});
+  console.log('[V4 pointer target]',JSON.stringify({width,grip:r,header:old,...pointerTarget}));assert.equal(pointerTarget.resizer,true,'Real pointer must reach the visible column resizer');
   await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+40,r.y+r.height/2,{steps:6});await page.mouse.up();const next=await header.boundingBox();assert.ok(Math.abs(next.width-old.width-40)<2,`V4 pointer boundary ${width}: ${next.width-old.width}`);
   await table.getByRole('columnheader',{name:'资料批次',exact:true}).press('Alt+ArrowLeft');const order=await table.locator('thead th').evaluateAll(cells=>cells.map(cell=>cell.dataset.columnKey));assert.equal(order[1],'batch');
   const row=await table.locator('tbody tr:not(.virtual-table-spacer)').first().locator('td').evaluateAll(cells=>cells.map(cell=>cell.dataset.columnKey));assert.deepEqual(row,order);
