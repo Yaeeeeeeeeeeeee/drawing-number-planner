@@ -2,27 +2,27 @@
 
 面向单人长期使用的 Windows 公司内部工具。当前版本已把真实 Excel 编码规则、SKU、历史资料只读扫描、永久占号、文件完整性、外发资料和桌面安全恢复接入同一套本地工作流，并可用同一套真实数据在 Windows 桌面窗口或浏览器中运行。
 
-## Windows 软件下载（2026-10-23 UI 一致性修正版 · 1b405e5）
+## Windows 软件下载（2026-10-23 PDF管理与目录修正版 · 923932f）
 
-日常使用无需安装 Git、Node 或源码。下载已验证安装ZIP，解压后运行中文EXE，可自定义安装路径；GitHub网页下载工件需登录，工件保留至2026-11-06。
+下载已验证安装ZIP，解压运行中文EXE，可自定义安装路径。GitHub网页下载工件需登录，工件保留至2026-11-06。
 
-- **[下载最新中文安装包 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39893826562/artifacts/12475952463)**
-- [本轮修改、测试与安装说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/ui-consistency-delivery-20261023.md)
+- **[下载最新中文安装包 ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39917811999/artifacts/12485179458)**
+- [本轮修正、测试与安装说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/pdf-catalog-correction-20261023.md)
 - [完整升级、备份与回退步骤](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/codex/v3-business-ui-20261022/docs/v3-installation-20261022.md)
 - [最新源码与提交记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/tree/codex/v3-business-ui-20261022)
-- [Windows实际运行报告与截图工件](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39893826562/artifacts/12476146395)
+- [Windows实际运行报告与截图工件](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/39917811999/artifacts/12486730532)
 
-应用源码 `1b405e5c1ba1e05dd7f962b0f6515b276b38d127`；157文件1345项自动化测试通过，类型及前端/Main构建通过。Windows实际中文安装、自选路径、旧库升级/备份/WAL/回滚/重启、扫描归类、四板块文件行、二维码键盘与原生选择文件流程均通过。
+应用源码 `923932ffa48f6bd0ae9acf4421e086fe3634c429`；158文件1354项自动化测试通过，类型及前端/Main构建通过。Windows实际中文安装、自选路径、旧库升级/备份/WAL/回滚/重启、PDF三个管理按钮、目录归类与筛选、图号详情、二维码原生文件选择均通过。
 
-本轮统一九模块控件和图标；图号详情去重复、去多层白框，保留四色分区与单行文件；PDF采用单一空态和中性批量栏，改善列宽；二维码手动关联弹窗补齐键盘焦点与取消保护。无新增Schema迁移，不改变占号、产品归属、BOM或外发历史规则。
+本轮修复PDF管理预览参数无效及批次改名的JSON请求；图号产品目录在归类和返回页面后正确刷新，字典失败不再阻断目录；PDF和图号筛选只更新数量，不再用0计数推断未归属。切页保留已提交查询和未提交输入。
 
-安装包不带示例业务数据。已有用户先关闭旧版并备份，启动后选择原planner.db，不用空库替代旧库。启动不自动归并ZC100、不删除原始PDF、不释放历史占号。既有自动归类与H10目录修复继续保留。
+安装前关闭旧版并备份完整数据目录，启动后继续选择原planner.db，无需清库或重复关联。无新增Schema迁移，不自动归并ZC100，不删除原始PDF，不释放历史占号。安装包不带测试业务数据。
 
-安装ZIP SHA256：`05440b661aa544812f569268134e83c46ecaafcc0fced71e9c4b020e34ba3275`。物理DPI、跨显示器及用户真实业务库仍需本地核对。Releases此前权限403未发布新版本，旧Release不能代替上方新安装包。Code → Download ZIP、Source code是源码。
+安装ZIP SHA256：`aed9fd95612858729881245fcdd459042a633f1db1585923b36fc16caca6e86b`。用户真实业务库、物理DPI及跨显示器仍需本地核对。Releases此前权限403未发布新版本；旧Release和Source code不是本安装包。
 
 ## 开发启动
 
-请切换到 `codex/v3-business-ui-20261022` 分支；已验证应用源码提交为 `1b405e5`。
+请切换到 `codex/v3-business-ui-20261022` 分支；已验证应用源码提交为 `923932f`。
 
 首次使用先安装依赖：
 
