@@ -49,6 +49,7 @@ export interface OutboundPackageRequest {
 }
 
 export interface OutboundPackagePreviewItem {
+  presenceStatus?: import('../files/pdf-presence.js').PdfPresenceStatus;
   contentSha256?:string|null;sizeBytes?:number|null;defaultSelected?:boolean;source?:string;confirmationReason?:string|null;detail?:string|null;
   comparison?:{batchId:number;batchName:string;files:Array<{pdfFileId:number;fileName:string;relativePath:string;fullCode:string|null;contentSha256:string|null}>};
   conversionType?:'source'|'outlined';appearanceVersionId?:number;

@@ -13,6 +13,7 @@ const contactSchema = z.object({
 const templateSchema = z.object({
   key: z.string().trim().min(1), name: z.string().trim().min(1), materialType: z.enum(['initial', 'update']),
   subjectTemplate: z.string().trim().min(1), bodyTemplate: z.string().trim().min(1),
+  manufacturer: z.string().nullable().optional(), scenario: z.string().nullable().optional(),
 }).strict();
 const blockCreateSchema = z.object({
   key: z.string().trim().min(1), name: z.string().trim().min(1), bodyTemplate: z.string().trim().min(1),
@@ -22,6 +23,11 @@ const blockUpdateSchema = blockCreateSchema.omit({ key: true });
 const signatureSchema = z.object({
   name: z.string().trim().min(1), content: z.string().trim().min(1), isDefault: z.boolean(),
 }).strict();
+const templateLabels: Record<string, string> = { key: '模板编码', name: '模板名称', materialType: '资料类型', subjectTemplate: '主题模板', bodyTemplate: '正文模板', manufacturer: '适用厂家', scenario: '邮件场景' };
+function invalidTemplate(reply: FastifyReply, error: z.ZodError) {
+  const fieldErrors = Object.fromEntries(error.issues.map(issue => [String(issue.path[0] ?? 'template'), `${templateLabels[String(issue.path[0])] ?? String(issue.path[0])}：${issue.message}`]));
+  return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: Object.values(fieldErrors).join('；'), fieldErrors } });
+}
 const renderSchema = z.object({ variables: z.record(z.string(), z.string()) }).strict();
 
 function invalid(reply: FastifyReply, message: string) {
@@ -85,13 +91,14 @@ export function registerOutboundReferenceRoutes(app: FastifyInstance, service: O
     try { return service.getTemplate(params.data.id); } catch (error) { return sendReferenceError(error, reply); }
   });
   app.post('/api/outbound-reference/templates', async (request, reply) => {
-    const body = templateSchema.safeParse(request.body); if (!body.success) return invalid(reply, '邮件模板数据不完整');
+    const body = templateSchema.safeParse(request.body); if (!body.success) return invalidTemplate(reply, body.error);
     try { return reply.code(201).send(service.createTemplate(body.data)); }
     catch (error) { return sendReferenceError(error, reply); }
   });
   app.put('/api/outbound-reference/templates/:id', async (request, reply) => {
     const params = idSchema.safeParse(request.params); const body = templateSchema.safeParse(request.body);
-    if (!params.success || !body.success) return invalid(reply, '邮件模板数据不完整');
+    if (!params.success) return invalid(reply, '邮件模板编号无效');
+    if (!body.success) return invalidTemplate(reply, body.error);
     try { return service.updateTemplate(params.data.id, body.data); }
     catch (error) { return sendReferenceError(error, reply); }
   });

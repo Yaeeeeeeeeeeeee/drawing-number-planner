@@ -29,6 +29,7 @@ export interface HistoricalDrawingScanRecord extends ParsedDrawingCode {
 }
 
 export interface FileSearchFilters {
+  materialSource?: boolean;
   managementState?: 'included' | 'ignored' | 'needs_review' | 'all';
   keyword?: string;
   productId?: number;
@@ -44,6 +45,8 @@ export interface FileSearchFilters {
 }
 
 export interface PdfFileView extends FileScanRecord {
+  presenceStatus?: import('./pdf-presence.js').PdfPresenceStatus;
+  presenceMessage?: string;
   id: number;
   managementState?: 'included' | 'ignored' | 'needs_review';
   historicalDrawingId: number | null;
@@ -95,6 +98,7 @@ export interface FileScanChangesView {
 export type FileNavigationFilters = Pick<FileSearchFilters, 'keyword' | 'matchStatus' | 'conversionType' | 'presence' | 'managementState'>;
 
 export interface FileNavigationResult {
+  sources?: Array<{productId:number;count:number}>;
   /** Stable ownership of indexed batches, independent of the current manual filters. */
   batchProducts?: Array<{materialBatchId:number;productId:number|null}>;
   appearances?: Array<{appearanceVersionId:number;count:number}>;

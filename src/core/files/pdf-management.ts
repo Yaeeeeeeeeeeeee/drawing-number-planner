@@ -29,13 +29,25 @@ export class PdfManagementRepository {
         if (rows.length) result.push({ table: name, column: key.from, rows });
       }
     }
-    // V2 also freezes explicitly confirmed unrecognized PDFs, which cannot have a legacy
-    // drawing/project item FK. Their immutable manifest is a real historical reference.
-    if (this.db.prepare("select 1 from sqlite_master where type='table' and name='outbound_v2_snapshots'").get()) {
-      const rows = this.db.prepare(`select snapshot.* from outbound_v2_snapshots snapshot where exists(
-        select 1 from json_each(snapshot.files_json) entry where json_extract(entry.value, '$.pdfFileId') = ?)` ).all(id);
-      if (rows.length) result.push({table:'outbound_v2_snapshots',column:'files_json.pdfFileId',rows});
+    // Detached snapshots and product-merge provenance remain evidence after live FKs change.
+    for (const [table, columns] of [
+      ['bom_revision_snapshots', ['before_snapshot_json','after_snapshot_json']],
+      ['outbound_v2_snapshots', ['context_json','files_json']],
+    ] as Array<[string,string[]]>) {
+      if (!this.db.prepare("select 1 from sqlite_master where type='table' and name=?").get(table)) continue;
+      const conditions = columns.map(column => `exists(select 1 from json_tree(${quote(column)}) entry
+        where entry.key in ('pdfFileId','pdfIndexId','pdf_file_id','pdf_index_id') and entry.type='integer' and entry.value=?)`).join(' or ');
+      const rows = this.db.prepare(`select * from ${quote(table)} where ${conditions}`).all(...columns.map(()=>id));
+      if(rows.length) result.push({table,column:'snapshot.pdfIndexId',rows});
     }
+    const rows = this.db.prepare(`select * from product_merge_events where exists(
+      select 1 from json_each(before_json,'$.references') reference,json_each(reference.value,'$.ids') listed
+      where json_extract(reference.value,'$.table')='pdf_files' and listed.type='integer' and listed.value=@id
+    ) or exists(
+      select 1 from json_each(after_json,'$.references') reference,json_each(reference.value,'$.ids') listed
+      where json_extract(reference.value,'$.table')='pdf_files' and listed.type='integer' and listed.value=@id
+    )`).all({id});
+    if(rows.length) result.push({table:'product_merge_events',column:'references.pdf_files',rows});
     return result;
   }
 

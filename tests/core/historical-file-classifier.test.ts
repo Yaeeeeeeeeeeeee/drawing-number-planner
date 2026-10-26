@@ -47,7 +47,7 @@ describe('historical PDF classification', () => {
     expect(source).toMatchObject({ conversionType: 'source', classificationWarning: expect.stringContaining('conversion-conflict') });
 
     const outlined = classifyHistoricalPdf({
-      relativePath: join('01.洗碗机', 'SKDWT040JP-T40', '03.量产后的变更文件（已量产的产品看最新日期）', '01.20241210', '02.0404.010.0401007.pdf'),
+      relativePath: join('01.洗碗机', 'SKDWT040JP-T40', '03.量产后的变更文件', '01.20241210', '02.0404.010.0401007.pdf'),
       fileName: '02.0404.010.0401007.pdf', drawings: [],
     });
     expect(outlined).toMatchObject({ conversionType: 'outlined', classificationWarning: null });

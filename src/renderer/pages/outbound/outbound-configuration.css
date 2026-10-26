@@ -32,3 +32,9 @@
 @media (max-width: 800px) { .outbound-page.outbound-integrated .ob-mail-configuration .template-settings .settings-columns > section > article { grid-template-columns: minmax(0, 1fr) auto; } .outbound-page.outbound-integrated .ob-mail-configuration .settings-columns article > div { grid-column: 1 / -1; } }
 @media (max-width: 640px) { .outbound-page.outbound-integrated .ob-mail-configuration .ob-config-editor fieldset { grid-template-columns: minmax(0, 1fr); } }
 .outbound-integrated .ob-workbench-mail > summary {cursor:pointer;margin:8px 0;color:#444;font-weight:600;}
+.ob-template-helper { grid-column: 1 / -1; min-width: 0; }
+.ob-template-insert { display: flex; flex-wrap: wrap; gap: 6px; align-items: end; }
+.ob-template-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 0; }
+.outbound-page.outbound-integrated .ob-mail-configuration .template-settings .settings-columns > section > article { grid-template-columns: minmax(140px, 1fr) minmax(80px, 1fr) 80px auto; }
+@media (max-width: 800px) { .outbound-page.outbound-integrated .ob-mail-configuration .template-settings .settings-columns > section > article { grid-template-columns: minmax(0, 1fr) auto; } }
+.ob-field-error { color: #a52828; font-size: 12px; }

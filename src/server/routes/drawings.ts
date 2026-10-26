@@ -1,3 +1,4 @@
+import { DrawingForceReleaseError } from '../../core/drawings/drawing-force-release-service.js';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
@@ -42,6 +43,7 @@ const deleteDrawingSchema = z.object({
 const scanResolutionSchema = z.object({ resolution: z.enum(['reimport', 'ignore']) }).strict();
 
 function sendDrawingError(reply: FastifyReply, error: unknown) {
+  if (error instanceof DrawingForceReleaseError) return reply.code(error.code==='DRAWING_NOT_FOUND'?404:error.code==='FORCE_CONFIRMATION_REQUIRED'?422:409).send({error:{code:error.code,message:error.message}});
   if (error instanceof DrawingAssociationError) return reply.code(error.code==='ASSOCIATION_STALE'?409:422).send({error:{code:error.code,message:error.message}});
   if (error instanceof DrawingDeletionError) {
     const status = error.code === 'DRAWING_NOT_FOUND' ? 404
@@ -126,6 +128,18 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
   app.delete('/api/drawings/:id', async (request, reply) => {
     return reply.code(405).send({ error: { code: 'USE_DRAWING_DELETE_WORKFLOW',
       message: '请使用统一图号删除流程，并明确选择保留占号或释放图号' } });
+  });
+
+  app.get('/api/drawings/:id/force-release-preview', async (request, reply) => {
+    const params=paramsSchema.safeParse(request.params);
+    if(!params.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'图号编号无效'}});
+    try{return service.forceRelease.preview(params.data.id);}catch(error){return sendDrawingError(reply,error);}
+  });
+  app.post('/api/drawings/:id/force-release', async (request, reply) => {
+    const params=paramsSchema.safeParse(request.params);
+    const input=z.object({fingerprint:z.string().min(1),confirmed:z.literal(true),reason:z.string().max(500).optional()}).strict().safeParse(request.body);
+    if(!params.success||!input.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'强制释放需要影响预览和明确确认'}});
+    try{return service.forceRelease.confirm({signedId:params.data.id,...input.data});}catch(error){return sendDrawingError(reply,error);}
   });
 
   app.get('/api/drawings/:id/deletion-preview', async (request, reply) => {

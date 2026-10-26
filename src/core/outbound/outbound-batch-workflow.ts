@@ -9,7 +9,7 @@ import { listRawProductIds, resolveCanonicalProductId } from '../products/appear
 import { resolveWorkspacePath, toWorkspaceRelativePath } from '../files/workspace-paths.js';
 import type { OutboundPackageRequest, OutboundPackagePreviewItem } from './outbound-types.js';
 import { OutboundPackageRepository, type OutboundIndexedFile } from './outbound-package-repository.js';
-import { OUTBOUND_ZIP_LIMIT_BYTES } from './outbound-partition.js';
+import { inspectIndexedPdfPresence } from '../files/pdf-presence.js';
 import { buildOutboundPackageName } from './package-naming.js';
 import { isSafeWindowsNameComponent } from './windows-safe-name.js';
 
@@ -28,7 +28,7 @@ interface BatchScope {
   isPresent: number; recognitionStatus: string;
 }
 interface FileFact { id: number; path: string; size: number; hash: string }
-interface FileInspection { fact: FileFact | null; problem: string | null }
+interface FileInspection { fact: FileFact | null; problem: string | null; presenceStatus?: import('../files/pdf-presence.js').PdfPresenceStatus }
 
 function slot(file: OutboundIndexedFile): string {
   const parts = file.fullCode ? parseDrawingCode(file.fullCode) : null;
@@ -222,7 +222,8 @@ export class OutboundBatchWorkflow {
         slotKey: slot(file), fullCode: file.fullCode, projectItemId: file.projectItemId, projectItemName: file.projectItemName ?? '项目待确认',
         pdfFileId: file.id, fileName: file.fileName, relativePath: file.relativePath,
         sourceBatchId: file.sourceBatchId ?? batch.id, sourceBatchName: batches.find(item => item.id === file.sourceBatchId)?.name ?? batch.name,
-        status: !fact || !file.isPresent ? 'missing' : conflict && !confirmation ? 'conflict' : !selectable ? 'needs_confirmation' : 'normal',
+        presenceStatus: inspections.get(file.id)?.presenceStatus,
+        status: !fact ? inspections.get(file.id)?.presenceStatus === 'missing' ? 'missing' : 'needs_confirmation' : !file.isPresent ? 'needs_confirmation' : conflict && !confirmation ? 'conflict' : !selectable ? 'needs_confirmation' : 'normal',
         change: changedSameCode ? 'same_code_changed' : identical ? 'copied' : old.length ? 'replaced' : 'new',
         selectable, conflictFullCodes: conflict ? [...new Set(same.flatMap(item => item.fullCode ? [item.fullCode] : []))] : [],
         contentSha256: hash ?? null, sizeBytes: fact?.size ?? null,
@@ -259,6 +260,8 @@ export class OutboundBatchWorkflow {
   }
 
   private inspect(root: string, file: OutboundIndexedFile): FileInspection {
+    const presence = inspectIndexedPdfPresence(root, file);
+    if (!presence.path) return { fact: null, problem: presence.message, presenceStatus: presence.status };
     let descriptor: number | undefined;
     try {
       const path = realpathSync(resolveWorkspacePath(root, file.relativePath, { requireExistingParent: true }));
@@ -266,7 +269,6 @@ export class OutboundBatchWorkflow {
       descriptor = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
       const before = fstatSync(descriptor);
       if (!before.isFile()) return { fact: null, problem: '源文件不是普通 PDF 文件' };
-      if (before.size > OUTBOUND_ZIP_LIMIT_BYTES) return { fact: null, problem: '单个 PDF 超过50MB，不能拆分原文件' };
       const bytes = readFileSync(descriptor);
       const after = fstatSync(descriptor);
       if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || realpathSync(path) !== path) {
@@ -274,7 +276,7 @@ export class OutboundBatchWorkflow {
       }
       toWorkspaceRelativePath(root, realpathSync(path));
       if (!bytes.subarray(0, 8).toString('ascii').startsWith('%PDF-')) return { fact: null, problem: '文件内容不是 PDF，须先在文件中心核查' };
-      return { fact: { id: file.id, path, size: after.size, hash: createHash('sha256').update(bytes).digest('hex') }, problem: null };
+      return { fact: { id: file.id, path, size: after.size, hash: createHash('sha256').update(bytes).digest('hex') }, problem: presence.status === 'index-stale' ? presence.message : null, presenceStatus: presence.status };
     } catch (error) {
       return { fact: null, problem: (error as { code?: string }).code === 'PATH_OUTSIDE_WORKSPACE' ? '实际路径超出资料根目录，禁止外发' : '文件缺失或无法安全读取' };
     } finally { if (descriptor !== undefined) closeSync(descriptor); }

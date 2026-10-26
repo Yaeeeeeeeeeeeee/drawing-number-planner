@@ -5,7 +5,7 @@ export interface BomAppearanceApi {
   listAppearanceBoms?(productId:number,appearanceVersionId:number):Promise<BomVersionSummaryView[]>;
   copyAppearanceBom?(sourceVersionId:number,appearanceVersionId:number,businessChangeDate:string):Promise<{version:BomVersionView;diff:BomDiffView[]}>;
   listAppearanceBomCandidates?(input:{productId:number;appearanceVersionId:number;projectItemId:number;usesWhiteMaterial:boolean;entryMode?:BomEntryModeView;includeReusableMaterials?:boolean}):Promise<BomCandidateView[]>;
-  queryAppearanceBoms?(filters:{appearanceVersionId?:number;model?:string;businessChangeDate?:string;effectiveBatchRelativePath?:string;projectItemId?:number;fullCode?:string}):Promise<BomVersionSummaryView[]>;
+  queryAppearanceBoms?(filters:{productCategory?:string;productId?:number;mainCategoryId?:number;businessDateFrom?:string;businessDateTo?:string;appearanceVersionId?:number;model?:string;businessChangeDate?:string;effectiveBatchRelativePath?:string;projectItemId?:number;fullCode?:string}):Promise<BomVersionSummaryView[]>;
 }
 type Request = <T>(path:string,init?:RequestInit)=>Promise<T>;
 export function createBomAppearanceApi(request:Request):Required<BomAppearanceApi> {

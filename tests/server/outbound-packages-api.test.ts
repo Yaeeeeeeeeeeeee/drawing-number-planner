@@ -53,6 +53,17 @@ beforeEach(() => {
 afterEach(async () => { await app.close(); db.close(); rmSync(root, { recursive: true, force: true }); });
 
 describe('outbound package API', () => {
+  it('previews and packages a real 69MB PDF through the API while preserving source and part facts',async()=>{
+    const row=db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string};
+    const bytes=Buffer.alloc(69_000_000,32);bytes.write('%PDF-1.7\n');writeFileSync(join(root,'workspace',row.path),bytes);
+    const payload={workflowVersion:2,productId,selectedMaterialBatchId:batchId,materialType:'initial',packageMode:'current_complete'};
+    const preview=await app.inject({method:'POST',url:'/api/outbound-packages/preview',payload});expect(preview.statusCode).toBe(200);
+    expect(preview.json().items[0]).toMatchObject({selectable:true,status:'normal',sizeBytes:69_000_000,presenceStatus:'present'});
+    const created=await app.inject({method:'POST',url:'/api/outbound-packages',payload:{...payload,previewToken:preview.json().previewToken,selectedPdfFileIds:[pdfId]}});
+    expect(created.statusCode).toBe(201);expect(created.json().parts[0]).toMatchObject({fileCount:1,files:[{pdfFileId:pdfId}]});
+    expect((await app.inject({method:'GET',url:'/api/outbound-packages'})).json()).toHaveLength(1);
+  },30000);
+
   it('reads all persisted package parts after file indexes are cleared', async () => {
     const payload = { productId, selectedMaterialBatchId: batchId, materialType: 'initial', packageMode: 'current_complete' };
     const preview = await app.inject({ method: 'POST', url: '/api/outbound-packages/preview', payload });

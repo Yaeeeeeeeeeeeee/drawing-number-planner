@@ -45,6 +45,19 @@ async function completeFirstRow() {
 }
 
 describe('PlanningPage', () => {
+  it('links product category to actual product IDs and clears incompatible selection and appearance', async () => {
+    const api = apiFixture();
+    const products = await api.listProducts();
+    api.listProducts.mockResolvedValue([...products, {...products[0],id:2,model:'F20',productCategory:'空气炸锅'}]);
+    render(<PlanningPage api={api as never}/>);
+    await screen.findByRole('option',{name:'SKU待补录 · ZC200 · SAMKYO'});
+    fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'冰柜'}});
+    expect(screen.queryByRole('option',{name:'SKU待补录 · F20 · SAMKYO'})).toBeNull();
+    fireEvent.change(screen.getByLabelText('产品型号'),{target:{value:'1'}});
+    expect(screen.getByLabelText('外观')).toHaveValue('3');
+    fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'空气炸锅'}});
+    expect(screen.getByLabelText('产品型号')).toHaveValue('');expect(screen.getByLabelText('外观')).toHaveValue('');
+  });
   it('previews a complete row and reserves only after explicit confirmation', async () => {
     const api = apiFixture(); render(<PlanningPage api={api as never} />);
     await completeFirstRow();

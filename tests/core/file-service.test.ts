@@ -77,14 +77,14 @@ describe('FileService', () => {
   });
 
   it('scans real files, matches drawings, and marks absent files missing on the next complete scan', async () => {
-    const drawing = createDrawing(); const workspace = join(dataDir, 'library'); mkdirSync(workspace);
-    writeFileSync(join(workspace, `${drawing.fullCode}-LOGO.pdf`), '%PDF source');
-    writeFileSync(join(workspace, `${drawing.fullCode}-LOGO（转曲）.PDF`), '%PDF outlined');
+    const drawing = createDrawing(); const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true});
+    writeFileSync(join(material, `${drawing.fullCode}-LOGO.pdf`), '%PDF source');
+    mkdirSync(join(workspace,'测试','SKU-M','03.量产后的变更文件'),{recursive:true}); writeFileSync(join(workspace,'测试','SKU-M','03.量产后的变更文件', `${drawing.fullCode}-LOGO（转曲）.PDF`), '%PDF outlined');
     const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
 
     expect(await service.scan()).toMatchObject({ total: 2, matched: 2, unmatched: 0, conflict: 0, source: 1, outlined: 1, missing: 0 });
     expect(db.prepare('select count(content_sha256) as count from pdf_files where is_present = 1').get()).toEqual({ count: 2 });
-    unlinkSync(join(workspace, `${drawing.fullCode}-LOGO.pdf`));
+    unlinkSync(join(material, `${drawing.fullCode}-LOGO.pdf`));
     expect(await service.scan()).toMatchObject({ total: 1, matched: 1, missing: 1 });
     expect(service.search({ presence: 'missing' }).items).toEqual([
       expect.objectContaining({ fileName: `${drawing.fullCode}-LOGO.pdf`, isPresent: false }),
@@ -92,8 +92,8 @@ describe('FileService', () => {
   });
 
   it('does not alter the previous index when filesystem enumeration fails', async () => {
-    const workspace = join(dataDir, 'library'); mkdirSync(workspace); settings.setWorkspaceRoot(workspace);
-    repository.replaceScan([{ relativePath: 'kept.pdf', fileName: 'kept.pdf', drawingId: null, matchStatus: 'unmatched',
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true}); settings.setWorkspaceRoot(workspace);
+    repository.replaceScan([{ relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf', fileName: 'kept.pdf', drawingId: null, matchStatus: 'unmatched',
       detectedCodes: [], conversionType: 'source', sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z' }],
     [], '2026-08-25T00:00:00.000Z');
     const scanner = vi.fn().mockRejectedValue(new Error('access denied'));
@@ -121,7 +121,7 @@ describe('FileService', () => {
   });
 
   it('rejects a concurrent scan while the first scan is still running', async () => {
-    const workspace = join(dataDir, 'library'); mkdirSync(workspace); settings.setWorkspaceRoot(workspace);
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true}); settings.setWorkspaceRoot(workspace);
     let release!: (value: []) => void; const scanner = vi.fn(() => new Promise<[]>((resolve) => { release = resolve; }));
     const service = new FileService(repository, settings, scanner); const first = service.scan();
 
@@ -142,15 +142,15 @@ describe('FileService', () => {
   });
 
   it('reports a configured root as unavailable if it is no longer a directory', () => {
-    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const service = new FileService(repository, settings);
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true}); const service = new FileService(repository, settings);
     service.updateSettings({ workspaceRoot: workspace }); rmSync(workspace, { recursive: true }); writeFileSync(workspace, 'not a directory');
 
     expect(service.getSettings()).toMatchObject({ configured: true, available: false });
   });
 
   it('does not rename, move, or rewrite scanned PDF files', async () => {
-    const workspace = join(dataDir, 'library'); mkdirSync(workspace);
-    const filePath = join(workspace, '02.0404.010.0401007-history.pdf'); writeFileSync(filePath, '%PDF unchanged');
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true});
+    const filePath = join(material, '02.0404.010.0401007-history.pdf'); writeFileSync(filePath, '%PDF unchanged');
     const before = statSync(filePath); const service = new FileService(repository, settings);
     service.updateSettings({ workspaceRoot: workspace });
 
@@ -161,7 +161,7 @@ describe('FileService', () => {
   });
 
   it('validates cleanup IDs before removing only missing PDF index records', () => {
-    repository.replaceScan([{ relativePath: 'stale.pdf', fileName: 'stale.pdf', drawingId: null, matchStatus: 'unmatched',
+    repository.replaceScan([{ relativePath: '测试\\SKU-M\\02.未转曲源文件\\stale.pdf', fileName: 'stale.pdf', drawingId: null, matchStatus: 'unmatched',
       detectedCodes: [], conversionType: 'source', sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z' }], [], '2026-08-25T00:00:00.000Z');
     repository.replaceScan([], [], '2026-08-26T00:00:00.000Z');
     const service = new FileService(repository, settings);
@@ -182,7 +182,7 @@ describe('FileService', () => {
   });
 
   it('rejects an index clear while a scan is active', async () => {
-    const workspace = join(dataDir, 'library'); mkdirSync(workspace); settings.setWorkspaceRoot(workspace);
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true}); settings.setWorkspaceRoot(workspace);
     let release!: (value: []) => void; const scanner = vi.fn(() => new Promise<[]>((resolve) => { release = resolve; }));
     const service = new FileService(repository, settings, scanner); const activeScan = service.scan();
 
@@ -192,8 +192,8 @@ describe('FileService', () => {
   });
 
   it('blocks clearing established history and rescans without duplicating occupancy or changing PDF files', async () => {
-    const drawing = createDrawing(); const workspace = join(dataDir, 'library'); mkdirSync(workspace);
-    const historyPath = join(workspace, '02.0404.010.0401002-history.pdf'); writeFileSync(historyPath, '%PDF unchanged');
+    const drawing = createDrawing(); const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true});
+    const historyPath = join(material, '02.0404.010.0401002-history.pdf'); writeFileSync(historyPath, '%PDF unchanged');
     const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
     expect(await service.scan()).toMatchObject({ historicalRegistered: 1, total: 1 });
     const refs = db.prepare(`select product_id as productId, color_id as colorId, main_category_id as mainCategoryId,
@@ -217,10 +217,10 @@ describe('FileService', () => {
   });
 
   it('scans PDFs without inferring new QR configuration and retains historical QR indices unchanged', async () => {
-    const workspace = join(dataDir, 'library'); mkdirSync(workspace);
+    const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true});
     writeFileSync(join(workspace,'QR100-User Manual（网址编码）.png'),'png');
-    writeFileSync(join(workspace,'QR100-Warranty（网址编码）.pdf'),'%PDF warranty');
-    writeFileSync(join(workspace,'02.0404.010.0401007-history.pdf'),'%PDF history');
+    writeFileSync(join(material,'QR100-Warranty（网址编码）.pdf'),'%PDF warranty');
+    writeFileSync(join(material,'02.0404.010.0401007-history.pdf'),'%PDF history');
     db.prepare(`insert into qr_code_files(relative_path,path_key,file_name,mime_type,size_bytes,modified_at,match_status,is_present,first_seen_at,last_seen_at)
       values('old.png','old.png','old.png','image/png',3,'old','pending',1,'old','old')`).run();
     const oldQr = db.prepare('select * from qr_code_files').all();

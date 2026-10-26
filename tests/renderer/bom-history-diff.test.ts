@@ -43,7 +43,8 @@ describe('BOM history presentation diff',()=>{
  });
  it('uses valid content hashes for attachments, never filenames',()=>{
   expect(compareAttachments([asset()],[asset('b'.repeat(64))]).kind).toBe('replaced');
-  expect(compareAttachments([asset()],[asset('a'.repeat(64),2)]).kind).toBe('association');
+  expect(compareAttachments([asset()],[asset('a'.repeat(64),2)]).kind).toBe('unchanged');
+  expect(compareBomItems([item(1,{assets:[asset('a'.repeat(64),2)]})],[item(1,{assets:[asset()]})]).counts.unchanged).toBe(1);
   expect(compareAttachments([asset()],[asset()]).kind).toBe('unchanged');
  });
  it('marks unverified content or duplicate roles pending rather than unchanged',()=>{

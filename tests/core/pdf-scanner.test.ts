@@ -8,15 +8,15 @@ import { scanPdfWorkspace } from '../../src/core/files/pdf-scanner';
 
 describe('PDF workspace scanner', () => {
   it('recursively returns only real PDF files with relative metadata', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'planner-scan-')); const nested = join(root, 'SAMKYO', 'ZC100');
+    const root = mkdtempSync(join(tmpdir(), 'planner-scan-')); const nested = join(root, 'SAMKYO', 'ZC100', '02.未转曲源文件');
     mkdirSync(nested, { recursive: true }); writeFileSync(join(nested, 'a.pdf'), '%PDF-1.4\nA');
     writeFileSync(join(root, 'B.PDF'), '%PDF-1.4\nBBBB'); writeFileSync(join(root, 'ignore.ai'), 'AI');
 
     const result = await scanPdfWorkspace(root);
 
-    expect(result.map((file) => file.relativePath)).toEqual(['B.PDF', join('SAMKYO', 'ZC100', 'a.pdf')]);
-    expect(result[0]).toMatchObject({ fileName: 'B.PDF', sizeBytes: 13 });
-    expect(result[0].absolutePath).toBe(realpathSync.native(join(root, 'B.PDF')));
+    expect(result.map((file) => file.relativePath)).toEqual([join('SAMKYO', 'ZC100', '02.未转曲源文件', 'a.pdf')]);
+    expect(result[0]).toMatchObject({ fileName: 'a.pdf', sizeBytes: 10 });
+    expect(result[0].absolutePath).toBe(realpathSync.native(join(nested, 'a.pdf')));
     expect(new Date(result[0].modifiedAt).toISOString()).toBe(result[0].modifiedAt);
   });
 

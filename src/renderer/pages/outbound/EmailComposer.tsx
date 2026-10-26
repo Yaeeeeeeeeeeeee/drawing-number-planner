@@ -137,6 +137,11 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
     try {
       const rendered = await api.renderOutboundTemplate(template.id, {
         package_name: mailContext?.packageName ?? subject,
+        brand: mailContext?.product.brandName ?? '',
+        category: mailContext?.product.productCategory ?? '',
+        date: new Date().toLocaleDateString('sv-SE'),
+        batch: mailContext?.batchName ?? '',
+        count: String(mailContext?.packageFiles?.length ?? 0),
         company_name: primary?.company ?? '',
         contact_salutation: primary?.contactName ?? '',
         model: mailContext?.product.model ?? '',

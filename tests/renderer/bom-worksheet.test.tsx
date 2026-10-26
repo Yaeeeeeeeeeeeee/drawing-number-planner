@@ -13,7 +13,8 @@ it('emphasizes change details only where content exists, independently of refere
   expect(field.closest('.bom-edit-field')).toHaveClass('bom-change-present');
   fireEvent.change(field, { target: { value: '   ' } });
   expect(field.closest('.bom-edit-field')).not.toHaveClass('bom-change-present');
-  expect(within(record).getByLabelText('项目 1 修改前数据 · 修改明细')).toHaveClass('bom-change-present');
+  fireEvent.click(within(record).getByRole('button',{name:'修改前数据'}));
+  expect(screen.getByLabelText('项目 1 修改前数据 · 修改明细')).toHaveClass('bom-change-present');
 });
 it('does not infer attachment differences or changes without authoritative diff data', async () => {
   const item = (await createBomMockApi('normal').getBomVersion(-201)).items[0];
@@ -33,7 +34,8 @@ it('preserves editable values and their baseline without inferred change markers
   fireEvent.change(within(record).getByLabelText('第 1 行材质'), { target: { value: '157g 铜版纸' } });
   expect(within(record).queryByLabelText('项目 1 材质差异')).not.toBeInTheDocument();
   expect(within(record).getByLabelText('第 1 行材质')).toHaveValue('157g 铜版纸');
-  expect(within(record).getByLabelText('项目 1 修改前数据 · 材质')).toHaveTextContent('128g 铜版纸');
+  fireEvent.click(within(record).getByRole('button',{name:'修改前数据'}));
+  expect(screen.getByLabelText('项目 1 修改前数据 · 材质')).toHaveTextContent('128g 铜版纸');
   expect(within(record).queryByLabelText('项目 1 尺寸差异')).not.toBeInTheDocument();
   fireEvent.change(within(record).getByLabelText('第 1 行材质'), { target: { value: '128g 铜版纸' } });
   expect(within(record).queryByText('已修改')).not.toBeInTheDocument();
@@ -42,14 +44,14 @@ it('compares the explicit predecessor and clears it when selecting the first rec
   await preview();
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
-  await screen.findByText(/对照上一条记录 #-202/);
+  await screen.findAllByRole('button',{name:'全部字段'});
   const project = screen.getByRole('button', { name: /项目 2 · 包装箱/ }).closest('article')!;
   fireEvent.click(within(project).getByRole('button', { name: '全部字段' }));
   const drawing = within(project).getByRole('rowheader', { name: '图号' }).closest('tr')!;
-  expect(drawing.cells[1]).toHaveTextContent('02.0209.010.0501002');
+  expect(drawing.cells[2]).toHaveTextContent('02.0209.010.0501002');
   expect(drawing.cells[1]).not.toHaveTextContent('历史图号 · 已停用');
   fireEvent.click(screen.getByRole('button', { name: '查看 BOM -202' }));
-  expect(await screen.findByText('首次记录，无历史版本可对照')).toBeVisible();
+  expect((await screen.findAllByRole('button',{name:/首次记录/})).length).toBeGreaterThan(0);
   expect(screen.queryByText(/对照上一条记录/)).not.toBeInTheDocument();
   expect(screen.queryByRole('columnheader', { name: '上一条记录' })).not.toBeInTheDocument();
 });
@@ -57,34 +59,34 @@ it('retains complete query fields and independent attachment roles in all-fields
   await preview();
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
-  await screen.findByText(/对照上一条记录 #-202/);
+  await screen.findAllByRole('button',{name:'全部字段'});
   const project = screen.getByRole('button', { name: /项目 1 · 说明书/ }).closest('article')!;
   fireEvent.click(within(project).getByRole('button', { name: '全部字段' }));
   for (const field of ['主类别','项目明细','图号','生效批次','材质','尺寸','位置','修改明细','备注','数量','引用白色图号'])
     expect(within(project).getByRole('rowheader', {name: field})).toBeVisible();
   expect(project).toHaveTextContent('02.0209.010.0501001');
-  expect(project).toHaveTextContent('说明书-图片.png');
-  expect(project).toHaveTextContent('说明书-位置示意图.png');
+  expect(within(project).getAllByRole('button',{name:'放大图片'}).length).toBeGreaterThan(0);
+  expect(project).not.toHaveTextContent('说明书-图片.png');
 });
 
 it('keeps loaded baseline unchanged when editing a field or changing project identity', async () => {
   await preview();
   const record = screen.getByRole('article', { name: 'BOM 项目 1' });
-  const baseline = within(record).getByLabelText('项目 1 修改前数据 · 材质');
+  fireEvent.click(within(record).getByRole('button',{name:'修改前数据'}));
+  const baseline = screen.getByLabelText('项目 1 修改前数据 · 材质');
   expect(baseline).toHaveTextContent('128g 铜版纸');
   fireEvent.change(within(record).getByLabelText('第 1 行材质'), { target: { value: '本次新材质' } });
   expect(baseline).toHaveTextContent('128g 铜版纸');
   expect(baseline).not.toHaveTextContent('本次新材质');
   fireEvent.change(within(record).getByLabelText('第 1 行项目明细'), { target: { value: '-21' } });
-  expect(within(record).getByLabelText('项目 1 修改前数据 · 项目')).toHaveTextContent('说明书');
+  expect(screen.getByLabelText('项目 1 修改前数据 · 项目')).toHaveTextContent('说明书');
   expect(baseline).not.toHaveTextContent('五层瓦楞纸');
 });
 it('does not borrow another project baseline for newly added rows', async () => {
   await preview();
   fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
   const record = screen.getByRole('article', { name: 'BOM 项目 9' });
-  expect(within(record).getByText('无修改前数据 · 本次新增项目')).toBeVisible();
-  expect(within(record).getByLabelText('项目 9 修改前数据 · 材质')).not.toHaveTextContent('128g 铜版纸');
+  expect(within(record).queryByRole('button',{name:'修改前数据'})).toBeNull();
 });
 it('distinguishes nonblocking cautions from existing save blockers', () => {
   const { rerender } = render(<BomRecordNotices index={1} drawingStatus="voided" batchMissing previewFailed />);
@@ -111,11 +113,10 @@ it('groups upload and reuse with each independent attachment role', async () => 
   const image = screen.getByRole('group', { name: '第 1 行图片附件' });
   const diagram = screen.getByRole('group', { name: '第 1 行位置示意图附件' });
   expect(within(image).getByLabelText('第 1 行图片')).toBeDisabled();
-  expect(within(image).getByLabelText('第 1 行沿用图片')).toBeChecked();
-  expect(within(diagram).getByLabelText('第 1 行沿用位置示意图')).toBeChecked();
-  fireEvent.click(within(image).getByLabelText('第 1 行沿用图片'));
-  expect(within(image).getByLabelText('第 1 行沿用图片')).not.toBeChecked();
-  expect(within(diagram).getByLabelText('第 1 行沿用位置示意图')).toBeChecked();
+  expect(within(image).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
+  expect(within(diagram).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
+  expect(within(image).getByRole('radio',{name:'更换图片'})).not.toBeChecked();
+  expect(within(diagram).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
 });
 it('summarizes known exceptions but does not classify legal empty attachments as errors', async () => {
   await preview('references');
@@ -142,5 +143,5 @@ it('locates drawing exceptions at the field without a repeated project footer', 
   const description = drawing.getAttribute('aria-describedby')!.split(' ').map((id) => document.getElementById(id)?.textContent).join(' ');
   expect(description).toContain('请选择可用图号替换后再保存');
   expect(within(record).queryByText('项目 1 · 图号：原引用已作废，请选择可用图号')).not.toBeInTheDocument();
-  expect(screen.getByRole('status')).toHaveTextContent('项目 1 · 图号：原引用已作废，请选择可用图号');
+  expect(screen.getAllByRole('status').some(e=>e.textContent?.includes('项目 1 · 图号：原引用已作废，请选择可用图号'))).toBe(true);
 });

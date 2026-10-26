@@ -57,9 +57,9 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
     drawing.project_item_id, project_item.name as project_item_name,
     drawing.brand_code, drawing.product_size_code, drawing.appearance_code, drawing.color_code,
     drawing.main_category_code, drawing.project_item_code, drawing.sequence, drawing.status,
-    drawing.previous_drawing_id, previous.full_code as previous_full_code, drawing.change_reason,
+    drawing.previous_drawing_id, coalesce(previous.deleted_full_code,previous.full_code) as previous_full_code, drawing.change_reason,
     drawing.source_product_id, source_product.model as source_product_model,
-    drawing.source_drawing_id, source_drawing.full_code as source_drawing_full_code,
+    drawing.source_drawing_id, coalesce(source_drawing.deleted_full_code,source_drawing.full_code) as source_drawing_full_code,
     drawing.notes, drawing.created_at, drawing.deleted_at, drawing.deletion_mode,
     drawing.deleted_previous_status, drawing.deleted_reason,
     exists(select 1 from pdf_files file left join historical_drawing_numbers file_history
@@ -82,6 +82,7 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
   left join drawing_numbers previous on previous.id = drawing.previous_drawing_id
   left join products source_product on source_product.id = drawing.source_product_id
   left join drawing_numbers source_drawing on source_drawing.id = drawing.source_drawing_id
+  where not exists(select 1 from drawing_force_releases r where r.origin='planned' and r.record_id=drawing.id)
 
   union all
 
@@ -120,8 +121,9 @@ const unifiedCte = (scoped = false) => `${businessUsageCte}, drawing_records as 
   left join dictionary_items main_category on main_category.type = 'main_category' and main_category.code = historical.main_category_code
   left join dictionary_items project_item on project_item.type = 'project_item'
     and project_item.code = historical.project_item_code and project_item.parent_id = main_category.id
-  ${scoped ? '' : `where historical.deleted_at is not null or not exists(select 1 from drawing_numbers drawing
-    where drawing.deleted_at is null and drawing.full_code = historical.full_code)`}
+  where not exists(select 1 from drawing_force_releases r where r.origin='historical' and r.record_id=historical.id)
+  ${scoped ? '' : `and (historical.deleted_at is not null or not exists(select 1 from drawing_numbers drawing
+    where drawing.deleted_at is null and drawing.full_code = historical.full_code))`}
 )`;
 
 const mapRow = (row: DrawingRow): DrawingRecord => ({

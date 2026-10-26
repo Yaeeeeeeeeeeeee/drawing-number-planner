@@ -1,3 +1,4 @@
+import { isSourcePdfPath } from './directory-policy.js';
 import { pdfDirectoryProductSql } from './pdf-product-context.js';
 import { effectiveDrawingProductSql,canonicalProductSql } from '../drawings/drawing-product-evidence.js';
 import {drawingAppearanceRelationsSql} from '../drawings/drawing-appearance-scope.js';
@@ -38,6 +39,13 @@ export interface FileIndexClearResult {
 }
 
 const FINGERPRINT_LOOKUP_CHUNK_SIZE = 900;
+const normalizedFilePathSql = "replace(file.relative_path, '/', char(92))";
+const afterCategorySql = `substr(${normalizedFilePathSql}, instr(${normalizedFilePathSql}, char(92)) + 1)`;
+const afterProductSql = `substr(${afterCategorySql}, instr(${afterCategorySql}, char(92)) + 1)`;
+const directorySql = `substr(${afterProductSql}, 1, instr(${afterProductSql}, char(92)) - 1)`;
+const materialScopeSql = `${directorySql} in ('02.未转曲源文件', '03.量产后的变更文件')`;
+const sourceScopeSql = `${directorySql} = '02.未转曲源文件'`;
+
 
 function toView(row: FileRow): PdfFileView {
   const detected = JSON.parse(row.detected_codes_json) as unknown;
@@ -70,13 +78,14 @@ const FILE_SEARCH_JOINS = `from pdf_files file
       left join material_batches batch on batch.id = file.material_batch_id`;
 
 function fileSearchPredicate(filters: FileSearchFilters, db: PlannerDatabase): { whereSql: string; parameters: Record<string, unknown> } {
-  const where: string[] = []; const parameters: Record<string, unknown> = {};
+  const where: string[] = [materialScopeSql]; const parameters: Record<string, unknown> = {};
   if (filters.managementState !== 'all') { where.push('file.management_state = @managementState'); parameters.managementState = filters.managementState ?? 'included'; }
   if (filters.keyword?.trim()) {
     where.push(`(file.relative_path like @keyword escape '\\' or file.file_name like @keyword escape '\\'
       or drawing.full_code like @keyword escape '\\')`);
     parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
   }
+  if (filters.materialSource) where.push(sourceScopeSql);
   if (filters.productId != null) { const ids = listRawProductIds(db, filters.productId); where.push(`product.id in (${ids.map(Number).join(',') || 'null'})`); }
   if (filters.appearanceVersionId != null) {
     where.push(`exists(select 1 from ${drawingAppearanceRelationsSql} binding where binding.appearance_version_id = @appearanceVersionId and
@@ -194,6 +203,18 @@ export class FileRepository {
         }
       }
       let historicalRegistered = 0;
+      // Released file occurrences belong to their archived identity even after code reuse.
+      if (this.db.prepare("select 1 from sqlite_master where type='table' and name='drawing_force_release_files'").get()) {
+        const quarantine = this.db.prepare(`select full_code as fullCode from drawing_force_release_files
+          where lower(replace(relative_path,'/',char(92))) = @path`);
+        for (const record of records) {
+          const codes = quarantine.all({path:toWorkspacePathKey(record.relativePath)}) as Array<{fullCode:string}>;
+          if (!codes.some(row=>record.detectedCodes.includes(row.fullCode))) continue;
+          record.drawingId=null;record.historicalFullCode=null;record.matchStatus='pending';
+          record.classificationWarning='drawing-force-released';
+        }
+      }
+
       const deletedRows = this.db.prepare(`select deleted_full_code as fullCode, deletion_mode as deletionMode,
           scan_resolution as scanResolution from drawing_numbers where deleted_at is not null
         union all
@@ -230,7 +251,7 @@ export class FileRepository {
           detected_product_category = coalesce(excluded.detected_product_category, historical_drawing_numbers.detected_product_category),
           last_seen_at = excluded.last_seen_at`);
       for (const code of new Map(historicalCodes.map((item) => [item.fullCode, item])).values()) {
-        if (suppressedCodes.has(code.fullCode)) continue;
+        if (suppressedCodes.has(code.fullCode) || (records.some(record=>record.detectedCodes.includes(code.fullCode) && record.classificationWarning==='drawing-force-released') && !records.some(record=>record.historicalFullCode===code.fullCode))) continue;
         const context = code.directoryContext;
         const productRows = context ? this.db.prepare(`select id from products
           where sku = ? collate nocase and model = ? and deleted_at is null`).all(context.sku, context.model) as Array<{ id: number }> : [];
@@ -252,6 +273,7 @@ export class FileRepository {
         left join historical_drawing_numbers historical on historical.id=file.historical_drawing_id and historical.deleted_at is null
         where file.path_key=? and (drawing.id is not null or historical.id is not null)`);
       for (const record of records) {
+        if(record.classificationWarning==='drawing-force-released') continue;
         const prior = established.get(record.pathKey!) as {drawingId:number|null;historicalId:number|null;historicalFullCode:string|null;conversionType:FileScanRecord['conversionType']}|undefined;
         if (!prior) continue;
         const differs = prior.drawingId !== record.drawingId || (prior.historicalFullCode ?? null) !== (record.historicalFullCode ?? null);
@@ -273,7 +295,7 @@ export class FileRepository {
         on conflict(path_key) do update set
           relative_path = excluded.relative_path,
           path_key = excluded.path_key,
-          material_batch_id = coalesce((select material_batch_id from pdf_product_assignments where pdf_file_id=pdf_files.id),excluded.material_batch_id),
+          material_batch_id = case when @materialSource = 1 then null else coalesce((select material_batch_id from pdf_product_assignments where pdf_file_id=pdf_files.id),excluded.material_batch_id) end,
           file_name = excluded.file_name,
           drawing_id = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
             and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
@@ -294,7 +316,7 @@ export class FileRepository {
           last_seen_scan_run_id = excluded.last_seen_scan_run_id`);
       for (const record of records) upsert.run({ relativePath: record.relativePath, pathKey: record.pathKey,
         materialBatchId: record.materialBatch ? batchIds.get(record.materialBatch.relativePath) ?? null : null,
-        fileName: record.fileName,
+        fileName: record.fileName, materialSource:isSourcePdfPath(record.relativePath)?1:0,
         drawingId: record.drawingId, historicalFullCode: record.historicalFullCode ?? null,
         matchStatus: record.matchStatus, detectedCodesJson: JSON.stringify(record.detectedCodes),
         conversionType: record.conversionType, classificationWarning: record.classificationWarning ?? null,
@@ -364,6 +386,10 @@ export class FileRepository {
       if (workspaceKey !== undefined) {
         this.management().reconcileMoves(workspaceKey, previous.map(file => ({...file,isPresent:file.isPresent===1})), current, differences, scannedAt);
         this.management().reconcile(workspaceKey);
+      }
+      const outside = this.db.prepare(`select file.id from pdf_files file where not (${materialScopeSql})`).all() as Array<{id:number}>;
+      for (const {id} of outside) {
+        if (this.management().preview({ids:[id],action:'clear'},'').allowed === 1) this.db.prepare('delete from pdf_files where id=?').run(id);
       }
       const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
       return { missing, historicalRegistered };
@@ -449,7 +475,9 @@ export class FileRepository {
         join ${drawingAppearanceRelationsSql} binding on (binding.origin='planned' and binding.record_id=file.drawing_id) or (binding.origin='historical' and binding.record_id=file.historical_drawing_id)
         ${whereSql} ${whereSql ? 'and' : 'where'} file.material_batch_id is not null
         group by binding.appearance_version_id, file.material_batch_id, product.id order by binding.appearance_version_id, file.material_batch_id`).all(parameters) as NonNullable<FileNavigationResult['appearanceBatches']>;
-      return { ...totals, categories, products, batches, batchProducts, appearances, appearanceBatches };
+      const sources = this.db.prepare(`select product.id as productId, count(distinct file.id) as count
+        ${scope} and product.id is not null and ${sourceScopeSql} group by product.id`).all(parameters) as NonNullable<FileNavigationResult['sources']>;
+      return { ...totals, categories, products, sources, batches, batchProducts, appearances, appearanceBatches };
     }).deferred();
   }
 

@@ -21,6 +21,7 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
   const [brands, setBrands] = useState<DictionaryItemView[]>([]);
   const [sizes, setSizes] = useState<DictionaryItemView[]>([]);
   const [productId, setProductId] = useState('');
+  const [productCategory,setProductCategory]=useState('');
   const [appearanceId, setAppearanceId] = useState('');
   const [rows, setRows] = useState<DraftRow[]>([blankRow(1)]);
   const [preview, setPreview] = useState<PlanningPreviewView | null>(null);
@@ -114,7 +115,8 @@ function PlanningWorkspace({ api,onOpenDrawingLibrary }: { api: PlannerApi;onOpe
     <PageHeader title="图号规划" description="选择产品与外观，核对项目及预计图号后确认占号。"></PageHeader>
     <section className="planning-stage" aria-label="产品与外观"><h2><span>01</span> 产品与外观</h2>
     <div className="pp-context">
-      <label><span>产品型号</span><select aria-label="产品型号" disabled={busy} value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.map((item) => <option value={item.id} key={item.id}>{item.sku ?? 'SKU待补录'} · {item.model} · {item.brandName}</option>)}</select></label>
+      <label><span>产品类别</span><select aria-label="产品类别" value={productCategory} disabled={busy} onChange={event=>{setProductCategory(event.target.value);if(productId&&products.find(item=>item.id===Number(productId))?.productCategory!==event.target.value)selectProduct('');}}><option value="">全部类别</option>{[...new Set(products.map(item=>item.productCategory))].sort().map(category=><option key={category} value={category}>{category}</option>)}</select></label>
+      <label><span>产品型号</span><select aria-label="产品型号" disabled={busy} value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.filter(item=>!productCategory||item.productCategory===productCategory).map((item) => <option value={item.id} key={item.id}>{item.sku ?? 'SKU待补录'} · {item.model} · {item.brandName}</option>)}</select></label>
       <label><span>外观</span><select aria-label="外观" disabled={busy} value={appearanceId} onChange={(event) => { setAppearanceId(event.target.value); invalidate(); }}><option value="">请选择</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
     </div>
     <div className="pp-derived"><div className="pp-context-fact"><span>品牌</span><strong>{selectedProduct ? `${brands.find(item=>item.id===selectedProduct.brandId)?.code ? brands.find(item=>item.id===selectedProduct.brandId)?.code+' · ' : ''}${selectedProduct.brandName}` : '随产品确定'}</strong></div><div className="pp-context-fact"><span>品类尺寸</span><strong>{selectedProduct ? `${sizes.find(item=>item.id===selectedProduct.productSizeId)?.code ? sizes.find(item=>item.id===selectedProduct.productSizeId)?.code+' · ' : ''}${selectedProduct.productSizeName}` : '随产品确定'}</strong></div></div>

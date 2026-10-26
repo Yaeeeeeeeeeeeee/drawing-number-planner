@@ -61,3 +61,5 @@
 .qr-manual-page .qr-main-table .qr-expand > svg { flex-shrink: 0; }
 .qr-manual-page .qr-main-table .qr-purpose-summary { display: inline-flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
 .qr-manual-page .qr-url-tail { color: var(--ws-muted, #666); font-size: 12px; align-self: center; }
+
+.qr-manual-subtable .qr-file-empty{display:block;width:100%;text-align:center;}

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { mkdirSync, mkdtempSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -25,7 +25,7 @@ describe('PDF file API', () => {
     const { server, workspace } = await serverFixture();
     await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
       body: JSON.stringify({ workspaceRoot: workspace }) });
-    writeFileSync(join(workspace, 'task.pdf'), '%PDF-1.4');
+    writeFileSync(fixturePdfPath(workspace,'task.pdf'), '%PDF-1.4');
     const started = await fetch(`${server.url}/api/tasks/workspace_scan`, { method: 'POST', headers: writeHeaders,
       body: '{}' });
     expect(started.status).toBe(202); const task = await started.json() as { id: string };
@@ -49,7 +49,7 @@ describe('PDF file API', () => {
     const { server, workspace } = await serverFixture();
     await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
       body: JSON.stringify({ workspaceRoot: workspace }) });
-    writeFileSync(join(workspace, 'kept.pdf'), '%PDF-1.4');
+    writeFileSync(fixturePdfPath(workspace,'kept.pdf'), '%PDF-1.4');
     await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
     const started = await fetch(`${server.url}/api/tasks/index_clear`, { method: 'POST', headers: writeHeaders,
       body: JSON.stringify({ confirmation: '清空资料库索引' }) });
@@ -64,11 +64,11 @@ describe('PDF file API', () => {
   });
   it('returns current scan counts and grouped changes without treating old missing rows as newly deleted', async () => {
     const { server, workspace } = await serverFixture();
-    const retained = join(workspace, 'retained.pdf');
-    const removed = join(workspace, 'removed.pdf');
-    const changed = join(workspace, 'changed.pdf');
-    const removedQr = join(workspace, 'QR100-Manual（网址编码）.png');
-    const addedQr = join(workspace, 'QR100-Warranty（网址编码）.png');
+    const retained = fixturePdfPath(workspace,'retained.pdf');
+    const removed = fixturePdfPath(workspace,'removed.pdf');
+    const changed = fixturePdfPath(workspace,'changed.pdf');
+    const removedQr = fixturePdfPath(workspace,'QR100-Manual（网址编码）.png');
+    const addedQr = fixturePdfPath(workspace,'QR100-Warranty（网址编码）.png');
     await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
       body: JSON.stringify({ workspaceRoot: workspace }) });
     writeFileSync(retained, '%PDF-1.4 retained'); writeFileSync(removed, '%PDF-1.4 removed');
@@ -77,7 +77,7 @@ describe('PDF file API', () => {
     await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
 
     unlinkSync(removed); writeFileSync(changed, '%PDF-1.4 second version');
-    writeFileSync(join(workspace, 'added.pdf'), '%PDF-1.4 added');
+    writeFileSync(fixturePdfPath(workspace,'added.pdf'), '%PDF-1.4 added');
     unlinkSync(removedQr); writeFileSync(addedQr, 'new QR');
     const secondScan = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
     expect(await secondScan.json()).toMatchObject({
@@ -96,17 +96,17 @@ describe('PDF file API', () => {
       scan: { id: latest.id, currentTotal: 3 },
       changes: {
         added: expect.arrayContaining([
-          expect.objectContaining({ relativePath: 'added.pdf', indexKind: 'pdf' }),
+          expect.objectContaining({ relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/added.pdf', indexKind: 'pdf' }),
         ]),
         missing: expect.arrayContaining([
-          expect.objectContaining({ relativePath: 'removed.pdf', indexKind: 'pdf' }),
+          expect.objectContaining({ relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/removed.pdf', indexKind: 'pdf' }),
         ]),
-        changed: [expect.objectContaining({ relativePath: 'changed.pdf' })],
+        changed: [expect.objectContaining({ relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/changed.pdf' })],
       },
     });
     expect(changes.changes.added[0].relativePath).not.toContain(workspace);
 
-    unlinkSync(retained); unlinkSync(changed); unlinkSync(join(workspace, 'added.pdf')); unlinkSync(addedQr);
+    unlinkSync(retained); unlinkSync(changed); unlinkSync(fixturePdfPath(workspace,'added.pdf')); unlinkSync(addedQr);
     await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
     const newest = await (await fetch(`${server.url}/api/files/scans/latest`)).json() as { id: number; currentTotal: number };
     const newestChanges = await (await fetch(`${server.url}/api/files/scans/${newest.id}/changes`)).json();
@@ -128,9 +128,9 @@ describe('PDF file API', () => {
       body: JSON.stringify({ workspaceRoot: workspace }) });
     expect(saved.status).toBe(200);
     expect(await saved.json()).toEqual({ workspaceRoot: realpathSync.native(workspace), configured: true, available: true });
-    writeFileSync(join(workspace, 'unknown（转曲）.PDF'), '%PDF-1.4');
-    writeFileSync(join(workspace, '02.0404.010.0401007-history.pdf'), '%PDF-1.4');
-    writeFileSync(join(workspace, '02.0404.010.0401000-invalid.pdf'), '%PDF-1.4');
+    writeFileSync(fixturePdfPath(workspace,'unknown（转曲）.PDF'), '%PDF-1.4');
+    writeFileSync(fixturePdfPath(workspace,'02.0404.010.0401007-history.pdf'), '%PDF-1.4');
+    writeFileSync(fixturePdfPath(workspace,'02.0404.010.0401000-invalid.pdf'), '%PDF-1.4');
 
     const scan = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
     expect(scan.status).toBe(200);
@@ -139,7 +139,7 @@ describe('PDF file API', () => {
     const listed = await fetch(`${server.url}/api/files?keyword=${encodeURIComponent('转曲')}&matchStatus=unmatched&conversionType=outlined&presence=present&page=1&pageSize=20`);
     expect(listed.status).toBe(200);
     expect(await listed.json()).toMatchObject({ total: 1, items: [expect.objectContaining({
-      relativePath: 'unknown（转曲）.PDF', drawingId: null, conversionType: 'outlined', isPresent: true,
+      relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/unknown（转曲）.PDF', drawingId: null, conversionType: 'outlined', isPresent: true,
     })] });
     const pending = await fetch(`${server.url}/api/files?matchStatus=pending`);
     expect(pending.status).toBe(200);
@@ -177,7 +177,7 @@ describe('PDF file API', () => {
 
   it('authenticates cleanup and blocks missing historical PDF identity removal', async () => {
     const { server, workspace } = await serverFixture();
-    const filePath = join(workspace, '02.0404.010.0401007-history.pdf');
+    const filePath = fixturePdfPath(workspace,'02.0404.010.0401007-history.pdf');
     await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
       body: JSON.stringify({ workspaceRoot: workspace }) });
     writeFileSync(filePath, '%PDF-1.4');
@@ -209,7 +209,7 @@ describe('PDF file API', () => {
 
   it('requires exact confirmation and still blocks clearing established historical PDF identities', async () => {
     const { server, workspace } = await serverFixture();
-    const filePath = join(workspace, '02.0404.010.0401002-history.pdf');
+    const filePath = fixturePdfPath(workspace,'02.0404.010.0401002-history.pdf');
     await fetch(`${server.url}/api/files/settings`, { method: 'PUT', headers: writeHeaders,
       body: JSON.stringify({ workspaceRoot: workspace }) });
     writeFileSync(filePath, '%PDF-1.4 unchanged');
@@ -235,3 +235,10 @@ describe('PDF file API', () => {
     expect(await rescan.json()).toMatchObject({ historicalRegistered: 0, total: 1 });
   });
 });
+
+function fixturePdfPath(root:string,...segments:string[]):string {
+ const parts=segments.flatMap(part=>part.split(/[\\/]+/));
+ const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件'].includes(parts[2]);
+ const target=join(root,...(scoped?parts:['未分类','UNKNOWN-M','02.未转曲源文件',...parts]));
+ mkdirSync(dirname(target),{recursive:true});return target;
+}

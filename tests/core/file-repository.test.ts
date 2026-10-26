@@ -43,11 +43,11 @@ function drawingFixture() {
 
 function records(drawingId: number): FileScanRecord[] {
   return [
-    { relativePath: 'SAMKYO\\ZC100\\logo.pdf', fileName: 'logo.pdf', drawingId, matchStatus: 'matched',
+    { relativePath: 'SAMKYO\\ZC100\\02.未转曲源文件\\logo.pdf', fileName: 'logo.pdf', drawingId, matchStatus: 'matched',
       detectedCodes: ['02.0404.010.0401001'], conversionType: 'source', sizeBytes: 120, modifiedAt: '2026-08-25T01:00:00.000Z' },
-    { relativePath: 'SAMKYO\\ZC100\\unknown（转曲）.PDF', fileName: 'unknown（转曲）.PDF', drawingId: null,
+    { relativePath: 'SAMKYO\\ZC100\\02.未转曲源文件\\unknown（转曲）.PDF', fileName: 'unknown（转曲）.PDF', drawingId: null,
       matchStatus: 'unmatched', detectedCodes: [], conversionType: 'outlined', sizeBytes: 220, modifiedAt: '2026-08-25T02:00:00.000Z' },
-    { relativePath: 'conflict.pdf', fileName: 'conflict.pdf', drawingId: null, matchStatus: 'conflict',
+    { relativePath: '测试\\SKU-M\\02.未转曲源文件\\conflict.pdf', fileName: 'conflict.pdf', drawingId: null, matchStatus: 'conflict',
       detectedCodes: ['02.0404.010.0401001', '99.9999.999.9999999'], conversionType: 'source', sizeBytes: 320,
       modifiedAt: '2026-08-25T03:00:00.000Z' },
   ];
@@ -62,7 +62,7 @@ describe('FileRepository', () => {
 
   it('keeps legal cross-batch file instances while reusing one historical drawing', () => {
     const historical = parseDrawingCode('02.0404.010.0501001')!;
-    const root = '03.量产后的变更文件（已量产的产品看最新日期）';
+    const root = '03.量产后的变更文件';
     const makeRecord = (batch: string): FileScanRecord => {
       const relativePath = `03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\${root}\\${batch}\\${historical.fullCode}-大外箱.pdf`;
       return {
@@ -93,8 +93,8 @@ describe('FileRepository', () => {
   });
 
   it('uses the normalized path key to prevent duplicate indexes for the same actual path', () => {
-    const first = { ...records(0)[1], relativePath: '01.洗碗机\\SKU-T40\\A.PDF', fileName: 'A.PDF' };
-    const second = { ...first, relativePath: '01.洗碗机\\SKU-T40\\a.pdf', fileName: 'a.pdf', sizeBytes: 999 };
+    const first = { ...records(0)[1], relativePath: '01.洗碗机\\SKU-T40\\02.未转曲源文件\\A.PDF', fileName: 'A.PDF' };
+    const second = { ...first, relativePath: '01.洗碗机\\SKU-T40\\02.未转曲源文件\\a.pdf', fileName: 'a.pdf', sizeBytes: 999 };
 
     repository.replaceScan([first], [], '2026-08-25T04:00:00.000Z');
     repository.replaceScan([second], [], '2026-08-26T04:00:00.000Z');
@@ -111,7 +111,7 @@ describe('FileRepository', () => {
   });
 
   it('rolls file presence, batch rows, and history back together when batch persistence fails', () => {
-    const kept = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf' };
+    const kept = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf', fileName: 'kept.pdf' };
     repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
     db.exec(`create trigger reject_material_batch before insert on material_batches
       begin select raise(abort, 'batch rejected'); end`);
@@ -120,14 +120,14 @@ describe('FileRepository', () => {
 
     expect(() => repository.replaceScan([failing], [], '2026-08-26T04:00:00.000Z')).toThrow('batch rejected');
 
-    expect(repository.search().items).toEqual([expect.objectContaining({ relativePath: 'kept.pdf', isPresent: true })]);
+    expect(repository.search().items).toEqual([expect.objectContaining({ relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf', isPresent: true })]);
     expect(db.prepare('select count(*) as count from material_batches').get()).toEqual({ count: 0 });
   });
 
   it('atomically registers only reliable historical codes and links their PDFs', () => {
     const drawing = drawingFixture();
     const historical = parseDrawingCode('02.0404.010.0401007')!;
-    const scan = [{ ...records(0)[1], relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\history.pdf',
+    const scan = [{ ...records(0)[1], relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\02.未转曲源文件\\history.pdf',
       fileName: 'history.pdf', matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
       detectedCodes: [historical.fullCode], classificationWarning: null }];
 
@@ -145,7 +145,7 @@ describe('FileRepository', () => {
 
   it('keeps historical occupancy after its PDF disappears', () => {
     const historical = parseDrawingCode('02.0404.010.0401007')!;
-    const scan = [{ ...records(0)[1], relativePath: 'history.pdf', fileName: 'history.pdf', matchStatus: 'matched' as const,
+    const scan = [{ ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\history.pdf', fileName: 'history.pdf', matchStatus: 'matched' as const,
       historicalFullCode: historical.fullCode, detectedCodes: [historical.fullCode], classificationWarning: null }];
     repository.replaceScan(scan, [{ ...historical, directoryContext: null }], '2026-08-25T04:00:00.000Z');
 
@@ -157,7 +157,7 @@ describe('FileRepository', () => {
   });
 
   it('rolls back file and history changes together when a database constraint fails', () => {
-    const kept = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf' };
+    const kept = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf', fileName: 'kept.pdf' };
     repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
     const parsed = parseDrawingCode('02.0404.010.0401007')!;
 
@@ -165,7 +165,7 @@ describe('FileRepository', () => {
       '2026-08-26T04:00:00.000Z')).toThrow();
 
     expect(repository.search({ presence: 'present' }).items)
-      .toEqual([expect.objectContaining({ relativePath: 'kept.pdf' })]);
+      .toEqual([expect.objectContaining({ relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf' })]);
     expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual({ count: 0 });
   });
   it('atomically upserts a complete scan using relative paths and drawing joins', () => {
@@ -177,12 +177,12 @@ describe('FileRepository', () => {
 
     expect(result.total).toBe(3);
     expect(result.items).toContainEqual(expect.objectContaining({
-      relativePath: 'SAMKYO\\ZC100\\logo.pdf', drawingId: drawing.id, fullCode: drawing.fullCode,
+      relativePath: 'SAMKYO\\ZC100\\02.未转曲源文件\\logo.pdf', drawingId: drawing.id, fullCode: drawing.fullCode,
       model: 'ZC100', brandName: 'SAMKYO', projectItemName: 'LOGO', colorName: '白色',
       detectedCodes: ['02.0404.010.0401001'], isPresent: true,
     }));
     expect(db.prepare('select relative_path from pdf_files where drawing_id = ?').get(drawing.id))
-      .toEqual({ relative_path: 'SAMKYO\\ZC100\\logo.pdf' });
+      .toEqual({ relative_path: 'SAMKYO\\ZC100\\02.未转曲源文件\\logo.pdf' });
     expect(db.prepare('select total_current, added_count, missing_count, moved_count, changed_count, unchanged_count from file_scan_runs').get())
       .toEqual({ total_current: 3, added_count: 3, missing_count: 0, moved_count: 0, changed_count: 0, unchanged_count: 0 });
     expect(db.prepare("select index_kind, change_type, file_index_id from file_scan_changes order by id").all()).toHaveLength(3);
@@ -191,7 +191,7 @@ describe('FileRepository', () => {
 
   it('does not silently recreate a manually deleted historical drawing during rescans', () => {
     const historical = parseDrawingCode('02.0404.010.0501002')!;
-    const file = { ...records(0)[1], relativePath: '03.冰柜\\SKU-ZC100\\history.pdf', fileName: 'history.pdf',
+    const file = { ...records(0)[1], relativePath: '03.冰柜\\SKU-ZC100\\02.未转曲源文件\\history.pdf', fileName: 'history.pdf',
       matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
       detectedCodes: [historical.fullCode], classificationWarning: null };
     const history = [{ ...historical, directoryContext: null }];
@@ -217,7 +217,7 @@ describe('FileRepository', () => {
 
   it('exposes QR additions and missing files in scan history with their index kind', () => {
     const qr: QrFileScanRecord = {
-      relativePath: 'QR100-Manual（网址编码）.png', fileName: 'QR100-Manual（网址编码）.png', mimeType: 'image/png',
+      relativePath: '测试\\SKU-M\\02.未转曲源文件\\QR100-Manual（网址编码）.png', fileName: 'QR100-Manual（网址编码）.png', mimeType: 'image/png',
       sizeBytes: 120, modifiedAt: '2026-08-25T01:00:00.000Z', qrCodeId: null, matchStatus: 'pending', classificationWarning: null,
       detectedIdentifier: '网址编码',
     };
@@ -242,7 +242,7 @@ describe('FileRepository', () => {
     const purposeId = qrService.listPurposes().items.find(item => item.key === 'user_manual')!.id;
     const code = qrService.create({productId,purposeId,name:'历史手工二维码',targetUrl:null,status:'inactive'});
     const qr: QrFileScanRecord = {
-      relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\待确认\\ZC100-User Manual（abc）.pdf',
+      relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\02.未转曲源文件\\待确认\\ZC100-User Manual（abc）.pdf',
       fileName: 'ZC100-User Manual（abc）.pdf', mimeType: 'application/pdf', sizeBytes: 120,
       modifiedAt: '2026-08-25T01:00:00.000Z', qrCodeId: null, matchStatus: 'pending',
       classificationWarning: 'qr-nested-directory', detectedIdentifier: 'abc',
@@ -266,16 +266,16 @@ describe('FileRepository', () => {
   });
 
   it('records a uniquely hash-matched move against the current file index identity', () => {
-    const before = { ...records(0)[1], relativePath: 'before.pdf', fileName: 'before.pdf', contentSha256: 'same-content' };
-    const after = { ...before, relativePath: 'after.pdf', fileName: 'after.pdf' };
+    const before = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\before.pdf', fileName: 'before.pdf', contentSha256: 'same-content' };
+    const after = { ...before, relativePath: '测试\\SKU-M\\02.未转曲源文件\\after.pdf', fileName: 'after.pdf' };
     repository.replaceScan([before], [], '2026-08-25T04:00:00.000Z');
     repository.replaceScan([after], [], '2026-08-26T04:00:00.000Z');
 
-    const currentId = (db.prepare("select id from pdf_files where path_key = 'after.pdf'").get() as { id: number }).id;
+    const currentId = (db.prepare("select id from pdf_files where file_name = 'after.pdf'").get() as { id: number }).id;
     expect(db.prepare('select moved_count, added_count, missing_count from file_scan_runs where id = 2').get())
       .toEqual({ moved_count: 1, added_count: 0, missing_count: 0 });
     expect(db.prepare('select index_kind, file_index_id, relative_path, previous_relative_path from file_scan_changes where scan_run_id = 2').get())
-      .toEqual({ index_kind: 'pdf', file_index_id: currentId, relative_path: 'after.pdf', previous_relative_path: 'before.pdf' });
+      .toEqual({ index_kind: 'pdf', file_index_id: currentId, relative_path: '测试\\SKU-M\\02.未转曲源文件\\after.pdf', previous_relative_path: '测试\\SKU-M\\02.未转曲源文件\\before.pdf' });
   });
 
   it('refreshes seen metadata and marks unseen records missing without deleting them', () => {
@@ -298,19 +298,19 @@ describe('FileRepository', () => {
   it('uses only previously present v7 baseline rows when recording the first scan differences', () => {
     db.prepare(`insert into pdf_files
       (relative_path, path_key, file_name, drawing_id, match_status, detected_codes_json, conversion_type, size_bytes, modified_at, scanned_at, is_present)
-      values ('current.pdf', 'current.pdf', 'current.pdf', null, 'unmatched', '[]', 'source', 1, '2026-08-25T00:00:00.000Z', '2026-08-25T00:00:00.000Z', 1),
+      values ('测试\\SKU-M\\02.未转曲源文件\\current.pdf', '测试\\sku-m\\02.未转曲源文件\\current.pdf', 'current.pdf', null, 'unmatched', '[]', 'source', 1, '2026-08-25T00:00:00.000Z', '2026-08-25T00:00:00.000Z', 1),
         ('old-missing.pdf', 'old-missing.pdf', 'old-missing.pdf', null, 'unmatched', '[]', 'source', 1, '2026-08-25T00:00:00.000Z', '2026-08-25T00:00:00.000Z', 0)`).run();
 
-    repository.replaceScan([{ ...records(0)[1], relativePath: 'current.pdf', fileName: 'current.pdf',
+    repository.replaceScan([{ ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\current.pdf', fileName: 'current.pdf',
       sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z', contentSha256: 'hash-current' }], [], '2026-08-26T00:00:00.000Z');
 
     expect(db.prepare('select missing_count, unchanged_count from file_scan_runs').get()).toEqual({ missing_count: 0, unchanged_count: 1 });
     expect(db.prepare("select relative_path, change_type from file_scan_changes").all())
-      .toEqual([{ relative_path: 'current.pdf', change_type: 'unchanged' }]);
+      .toEqual([{ relative_path: '测试\\SKU-M\\02.未转曲源文件\\current.pdf', change_type: 'unchanged' }]);
   });
 
   it('preserves index rows, scan history, and historical occupancy when change persistence fails', () => {
-    const kept = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf', contentSha256: 'hash-kept' };
+    const kept = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf', fileName: 'kept.pdf', contentSha256: 'hash-kept' };
     repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
     const historical = parseDrawingCode('02.0404.010.0401007')!;
     const before = {
@@ -321,7 +321,7 @@ describe('FileRepository', () => {
     db.exec(`create trigger reject_scan_change before insert on file_scan_changes
       begin select raise(abort, 'scan change rejected'); end`);
 
-    expect(() => repository.replaceScan([{ ...kept, relativePath: 'replacement.pdf', fileName: 'replacement.pdf', contentSha256: 'hash-next' }],
+    expect(() => repository.replaceScan([{ ...kept, relativePath: '测试\\SKU-M\\02.未转曲源文件\\replacement.pdf', fileName: 'replacement.pdf', contentSha256: 'hash-next' }],
       [{ ...historical, directoryContext: null }], '2026-08-26T04:00:00.000Z')).toThrow('scan change rejected');
 
     expect(repository.search({ presence: 'all' })).toEqual(before.files);
@@ -332,8 +332,8 @@ describe('FileRepository', () => {
   it('exposes canonical product identity for planned and historical PDFs and filters by product ID', () => {
     const drawing = drawingFixture();
     const historical = parseDrawingCode('02.0404.010.0401007')!;
-    const planned = { ...records(drawing.id)[0], relativePath: 'planned.pdf', fileName: 'planned.pdf' };
-    const historicalPdf = { ...records(0)[1], relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\historical.pdf',
+    const planned = { ...records(drawing.id)[0], relativePath: '测试\\SKU-M\\02.未转曲源文件\\planned.pdf', fileName: 'planned.pdf' };
+    const historicalPdf = { ...records(0)[1], relativePath: '冰柜\\TEST-FILE-REPOSITORY-ZC100\\02.未转曲源文件\\historical.pdf',
       fileName: 'historical.pdf', matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
       detectedCodes: [historical.fullCode], classificationWarning: null };
 
@@ -351,7 +351,7 @@ describe('FileRepository', () => {
 
   it('preserves a valid manual planned association and explicit type across an unmatched rescan', () => {
     const drawing = drawingFixture();
-    const initial = { ...records(0)[1], relativePath: 'manual.pdf', fileName: 'manual-v1.pdf',
+    const initial = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\manual.pdf', fileName: 'manual-v1.pdf',
       classificationWarning: null };
     repository.replaceScan([initial], [], '2026-08-25T04:00:00.000Z');
     const pdfId = repository.search().items[0].id;
@@ -372,7 +372,7 @@ describe('FileRepository', () => {
 
   it('retains manual attribution and requests review when a rescan proposes a different historical match', () => {
     const drawing = drawingFixture();
-    const initial = { ...records(0)[1], relativePath: 'reclassified.pdf', fileName: 'reclassified.pdf' };
+    const initial = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\reclassified.pdf', fileName: 'reclassified.pdf' };
     repository.replaceScan([initial], [], '2026-08-25T04:00:00.000Z');
     const pdfId = repository.search().items[0].id;
     new DrawingQueryService(db).associatePdf(drawing.id, pdfId, 'source');
@@ -388,7 +388,7 @@ describe('FileRepository', () => {
   });
 
   it('does not preserve a planned drawing reference that no longer resolves', () => {
-    const initial = { ...records(0)[1], relativePath: 'invalid-reference.pdf', fileName: 'invalid-reference.pdf' };
+    const initial = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\invalid-reference.pdf', fileName: 'invalid-reference.pdf' };
     repository.replaceScan([initial], [], '2026-08-25T04:00:00.000Z');
     db.pragma('foreign_keys = OFF');
     db.prepare("update pdf_files set drawing_id = 999999, match_status = 'matched'").run();
@@ -403,9 +403,9 @@ describe('FileRepository', () => {
 
   it('blocks cleanup of missing historical indices and retains historical identity', () => {
     const historical = parseDrawingCode('02.0404.010.0401007')!;
-    const historicalPdf = { ...records(0)[1], relativePath: 'history.pdf', fileName: 'history.pdf',
+    const historicalPdf = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\history.pdf', fileName: 'history.pdf',
       matchStatus: 'matched' as const, historicalFullCode: historical.fullCode, detectedCodes: [historical.fullCode] };
-    const presentPdf = { ...records(0)[1], relativePath: 'present.pdf', fileName: 'present.pdf' };
+    const presentPdf = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\present.pdf', fileName: 'present.pdf' };
     repository.replaceScan([historicalPdf, presentPdf], [{ ...historical, directoryContext: null }], '2026-08-25T04:00:00.000Z');
     repository.replaceScan([presentPdf], [], '2026-08-26T04:00:00.000Z');
     const missingId = repository.search({ presence: 'missing' }).items[0].id;
@@ -564,12 +564,12 @@ describe('FileRepository', () => {
 
   it.each(['', '.', '..\\outside.pdf', 'folder\\..\\outside.pdf', 'C:\\outside.pdf', '\\\\server\\share\\outside.pdf', 'bad\0name.pdf'])
   ('rejects unsafe relative path %j before altering the current index', (relativePath) => {
-    const safe = { ...records(0)[1], relativePath: 'kept.pdf', fileName: 'kept.pdf' };
+    const safe = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf', fileName: 'kept.pdf' };
     repository.replaceScan([safe], [], '2026-08-25T04:00:00.000Z');
 
     expect(() => repository.replaceScan([{ ...safe, relativePath }], [], '2026-08-25T05:00:00.000Z'))
       .toThrowError(FileError);
-    expect(repository.search({ presence: 'present' }).items).toEqual([expect.objectContaining({ relativePath: 'kept.pdf' })]);
+    expect(repository.search({ presence: 'present' }).items).toEqual([expect.objectContaining({ relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf' })]);
   });
 
   it('also enforces traversal rejection in the SQLite schema', () => {
@@ -578,4 +578,19 @@ describe('FileRepository', () => {
       values ('..\\outside.pdf', 'outside.pdf', null, 'unmatched', '[]', 'source', 1, '2026-08-25', '2026-08-25')`).run())
       .toThrow();
   });
+});
+
+it('excludes out-of-scope index records while retaining their drawing and business history',()=>{
+ const drawing=drawingFixture();
+ const retained={...records(drawing.id)[0],relativePath:'冰柜\\TEST-FILE-REPOSITORY-ZC100\\root.pdf'};
+ const disposable={...records(0)[1],relativePath:'冰柜\\TEST-FILE-REPOSITORY-ZC100\\other\\unused.pdf'};
+ const source={...records(drawing.id)[0],relativePath:'冰柜\\TEST-FILE-REPOSITORY-ZC100\\02.未转曲源文件\\source.pdf'};
+ repository.replaceScan([retained,disposable,source],[],'2026-10-26T00:00:00Z');
+ expect(repository.search({presence:'all'}).items.map(file=>file.relativePath)).toEqual([source.relativePath]);
+ expect(db.prepare('select relative_path from pdf_files where drawing_id=?').all(drawing.id)).toEqual(expect.arrayContaining([{relative_path:retained.relativePath},{relative_path:source.relativePath}]));
+ expect(db.prepare('select id from drawing_numbers where id=?').get(drawing.id)).toBeTruthy();
+ expect(db.prepare('select id from pdf_files where relative_path=?').get(disposable.relativePath)).toBeUndefined();
+ expect(repository.navigation({presence:'all'})).toMatchObject({total:1,sources:[{productId:(db.prepare('select product_id from drawing_numbers where id=?').get(drawing.id) as {product_id:number}).product_id,count:1}]});
+ expect(repository.search({materialSource:true,presence:'all'}).items).toHaveLength(1);
+ expect(db.pragma('foreign_key_check')).toEqual([]);
 });

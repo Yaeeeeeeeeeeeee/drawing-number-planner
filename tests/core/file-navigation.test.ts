@@ -28,6 +28,9 @@ beforeEach(() => {
 afterEach(() => { if (db.open) db.close(); });
 
 function record(relativePath: string, fullCode?: string): FileScanRecord {
+  const segments=relativePath.split('\\');
+  if(segments.length<3) relativePath=`未分类\\UNKNOWN-M\\02.未转曲源文件\\${relativePath}`;
+  else if(segments.length===3) relativePath=[...segments.slice(0,2),'02.未转曲源文件',segments[2]].join('\\');
   return { relativePath, fileName: relativePath.split('\\').at(-1)!, drawingId: null,
     historicalFullCode: fullCode ?? null, matchStatus: fullCode ? 'matched' : 'unmatched',
     detectedCodes: fullCode ? [fullCode] : [], conversionType: 'source', sizeBytes: 1, modifiedAt: timestamp,
@@ -167,7 +170,7 @@ describe('PDF navigation statistics', () => {
     repository.replaceScan(Array.from({ length: 10_001 }, (_, i) => record(`indexed-${i}.pdf`)), [], timestamp);
     expect(repository.search({ pageSize: 200 }).items).toHaveLength(200);
     expect(repository.navigation({ presence: 'all' })).toEqual({ total: 10_001, unassociatedProducts: 10_001,
-      categories: [], products: [], batches: [], batchProducts: [], appearances: [], appearanceBatches: [] });
+      categories: [], products: [], sources: [], batches: [], batchProducts: [], appearances: [], appearanceBatches: [] });
   });
 });
 
@@ -206,7 +209,7 @@ it('does not choose between ambiguous SKU-model directory combinations or guess 
 
 it('repairs existing unbatched H10 scan indexes on rescan without changing file IDs or drawing history',()=>{
  db.prepare("update products set sku='AKVCH010JP',model='H10',product_category='吸尘器' where id=?").run(productId);
- const path='吸尘器\\AKVCH010JP-H10\\03.量产后的变更明细（已量产的产品看最新日期）\\00.首批大货\\铭牌.pdf';
+ const path='吸尘器\\AKVCH010JP-H10\\03.量产后的变更文件\\00.首批大货\\铭牌.pdf';
  const old=record(path);old.materialBatch=null;
  repository.replaceScan([old],[],timestamp);
  const original=(db.prepare('select id from pdf_files').get() as {id:number}).id;

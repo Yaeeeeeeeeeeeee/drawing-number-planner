@@ -6,8 +6,9 @@ describe('outbound whole-file partitioning', () => {
     const files = [{ id: 1, sizeBytes: 22_000_000 }, { id: 2, sizeBytes: 5_000_000 }, { id: 3, sizeBytes: 31_000_000 }];
     expect(partitionOutboundFiles(files).map((part) => part.map((file) => file.id))).toEqual([[1, 2], [3]]);
   });
-  it('rejects a 63MB original instead of dividing its contents', () => {
-    expect(() => partitionOutboundFiles([{ id: 1, sizeBytes: 63_000_000 }])).toThrow(/50MB/);
+  it('keeps oversized originals intact in their own parts', () => {
+    const files = [1,50,69,100,200].map((mb,id)=>({id,sizeBytes:mb*1_000_000}));
+    expect(partitionOutboundFiles(files).map(part=>part.map(file=>file.id))).toEqual([[0],[1],[2],[3],[4]]);
   });
   it('keeps a file above the safety target but within the hard limit alone for measured ZIP validation', () => {
     expect(partitionOutboundFiles([{ id: 1, sizeBytes: 49_500_000 }, { id: 2, sizeBytes: 10 }])

@@ -2,9 +2,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OutboundPage } from '../../src/renderer/pages/OutboundPage';
+import { PackageHistory } from '../../src/renderer/pages/outbound/PackageHistory';
 import { EmailComposer } from '../../src/renderer/pages/outbound/EmailComposer';
 
-const product = { id: 3, sku: 'SKU-F60', model: 'F60', productCategory: '空气炸锅', brandId: 1, brandName: 'SAMKYO', status: 'active' };
+const product = { id: 3, sku: 'SKU-F60', model: 'F60', productCategory: '空气炸锅', productSizeId: 11, brandId: 1, brandName: 'SAMKYO', status: 'active' };
 const batch = { id: 8, name: '06.20260910', productId: 3, sku: 'SKU-F60', model: 'F60', productCategory: '空气炸锅', recognitionStatus: 'recognized', isPresent: true };
 const preview = { previewToken: 'preview-1', packageName: 'D&D - SAMKYO F60空气炸锅 【更新包材资料-2026年9月15日】', items: [
   { slotKey: '0201', fullCode: '02.0101.010.0201004', projectItemId: 1, projectItemName: '铭牌', pdfFileId: 41, fileName: '铭牌（转曲）.pdf', relativePath: '空气炸锅/SKU-F60-F60/06.20260910/铭牌（转曲）.pdf', sourceBatchId: 8, sourceBatchName: '06.20260910', status: 'normal', change: 'replaced', selectable: true, conflictFullCodes: [] },
@@ -34,7 +35,9 @@ function apiFixture() {
 // Wait for the actual selectable product, rather than dispatching a change to
 // an empty native select (which coerces the requested value back to "").
 async function selectLoadedProduct() {
-  const control=await screen.findByLabelText('产品');
+  await within(screen.getByLabelText('产品类别')).findByRole('option',{name:product.productCategory});
+  fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'11'}});
+  const control=await screen.findByLabelText('产品型号');
   await within(control).findByRole('option',{name:`${product.sku} · ${product.model} · ${product.productCategory}`});
   fireEvent.change(control,{target:{value:'3'}});
   expect(control).toHaveValue('3');
@@ -43,14 +46,11 @@ async function selectLoadedProduct() {
 afterEach(() => { delete window.plannerDesktop; vi.restoreAllMocks(); });
 
 describe('OutboundPage', () => {
-  it('opens completed history without requiring a still-active product', async () => {
-    const api = apiFixture(); api.listProducts.mockResolvedValue([]);
-    api.listOutboundPackages.mockResolvedValue([{ id: 90, packageName: '已退出型号历史包', zipRelativePath: 'old.zip',
-      fileCount: 1, createdAt: '2026-09-20', parts: [{ partNumber: 1, zipRelativePath: 'old.zip', sizeBytes: 100 }] }] as never);
-    render(<OutboundPage api={api as never} />);
-    fireEvent.click(await screen.findByRole('button', { name: '查询全部外发历史（含退出产品）' }));
-    expect(await screen.findByText('已退出型号历史包')).toBeVisible();
-    expect(api.listOutboundPackages).toHaveBeenCalledWith(undefined);
+  it('omits historical packages from the normal outbound workspace', async () => {
+    const api=apiFixture();render(<OutboundPage api={api as never}/>);await selectLoadedProduct();
+    expect(screen.queryByText('已生成的压缩包')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:/查询全部外发历史/})).not.toBeInTheDocument();
+    expect(api.listOutboundPackages).not.toHaveBeenCalled();
   });
   it.each(['missing', 'matched'])('warns about %s BOM change details before packaging', async (status) => {
     const api = apiFixture();
@@ -113,8 +113,7 @@ describe('OutboundPage', () => {
       ] }] as never);
     const showOutboundPackageInFolder = vi.fn().mockResolvedValue({ ok: true });
     window.plannerDesktop = { showOutboundPackageInFolder } as never;
-    render(<OutboundPage api={api as never} />);
-    await selectLoadedProduct();
+    render(<PackageHistory api={api as never} productId={3} />);
     fireEvent.click(screen.getByText('已生成的压缩包',{selector:'summary'}));
     expect(await screen.findByText('历史包-2.zip')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '打开历史包第2份位置' }));
@@ -289,9 +288,9 @@ describe('OutboundPage', () => {
       })));
       expect(await screen.findByRole('table',{name:'ZIP 分包结果'})).toBeVisible();
       expect(screen.getByText(`${materialType}.zip`)).toBeVisible();
-      expect(screen.getByText('1 个文件 · 1 个分包')).toBeVisible();
-      fireEvent.click(screen.getByRole('button', { name: '打开位置' }));
-      await waitFor(() => expect(showOutboundPackageInFolder).toHaveBeenCalledWith(packageResult.id));
+      expect(screen.getByText('1 个')).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: '打开第1份位置' }));
+      await waitFor(() => expect(showOutboundPackageInFolder).toHaveBeenCalledWith(packageResult.id, 1));
     });
   }
 
@@ -301,6 +300,7 @@ describe('OutboundPage', () => {
     await within(brand).findByRole('option',{name:'SAMKYO'});
     expect(brand.tagName).toBe('SELECT');
     fireEvent.change(brand, { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'11'}});
     expect(screen.getByRole('option', { name: 'SKU-F60 · F60 · 空气炸锅' })).toBeVisible();
     expect(api.listDictionaries).toHaveBeenCalledWith('brand', false);
   });
@@ -321,7 +321,7 @@ describe('OutboundPage', () => {
     expect(screen.getAllByText('缺失').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '全选可用文件' })).toBeVisible();
     expect(screen.getByRole('button', { name: '生成压缩包' })).toBeEnabled();
-    expect(screen.getByText(/未选中的异常文件不会阻止其他有效文件外发/)).toBeVisible();
+    expect(screen.queryByText(/未选中的异常文件不会阻止其他有效文件外发/)).not.toBeInTheDocument();
     expect(screen.getByRole('table',{name:'外发文件预览'}).querySelectorAll('th')).toHaveLength(6);
     const table=screen.getByRole('table',{name:'外发文件预览'});
     fireEvent.keyDown(within(table).getByRole('columnheader',{name:'完整图号'}),{altKey:true,key:'ArrowLeft'});
@@ -383,7 +383,7 @@ describe('OutboundPage', () => {
     await screen.findByText('铭牌（转曲）.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
     fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
-    await screen.findByText('压缩包已生成');
+    await screen.findByRole('table',{name:'ZIP 分包结果'});
     expect(screen.getByRole('table',{name:'ZIP 分包结果'})).toBeVisible();
     expect(screen.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
     fireEvent.change(await screen.findByLabelText('本次变更内容'), { target: { value: '铭牌文字修正' } });
@@ -409,7 +409,7 @@ describe('OutboundPage', () => {
     await screen.findByText('A铭牌.pdf');
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
     fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
-    await screen.findByText('压缩包已生成');
+    await screen.findByRole('table',{name:'ZIP 分包结果'});
 
     fireEvent.change(screen.getByLabelText('打包模式'),{target:{value:'current_complete'}});
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '预览文件' })); });
@@ -706,7 +706,7 @@ describe('OutboundPage', () => {
   it('queries history through real server filters and reads immutable file/part snapshots',async()=>{
     const api={...apiFixture(),getOutboundPackageDetails:vi.fn().mockResolvedValue({id:90,context:{warnings:['当时的警告'],request:{workflowVersion:2}},files:[{fileName:'历史原始文件.pdf',fullCode:'历史图号',contentSha256:'a'.repeat(64)}],parts:[{partNumber:1,zipRelativePath:'old.zip',fileCount:1,isPresent:false}]})};
     api.listOutboundPackages.mockResolvedValue([{id:90,packageName:'冻结外发历史',zipRelativePath:'old.zip',fileCount:1,createdAt:'2026-10-20',parts:[{partNumber:1,zipRelativePath:'old.zip',sizeBytes:100,fileCount:1}]}] as never);
-    render(<OutboundPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查询全部外发历史（含退出产品）'}));
+    render(<PackageHistory api={api as never}/>);
     fireEvent.change(screen.getByLabelText('历史SKU'),{target:{value:'OLD-SKU'}});fireEvent.change(screen.getByLabelText('历史资料类型'),{target:{value:'update'}});fireEvent.click(screen.getByRole('button',{name:'查询历史'}));
     await waitFor(()=>expect(api.listOutboundPackages).toHaveBeenLastCalledWith(undefined,expect.objectContaining({sku:'OLD-SKU',materialType:'update'})));
     fireEvent.click(await screen.findByRole('button',{name:'查看历史详情 #90'}));
@@ -752,7 +752,7 @@ describe('OutboundPage', () => {
     const confirm=await screen.findByRole('button',{name:'确认生成'});await act(async()=>{fireEvent.click(confirm);});
     expect(phase==='directory'?picked:api.createOutboundPackage).toHaveBeenCalledOnce();
     if(phase==='create')expect(api.createOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({productId:3,selectedPdfFileIds:[41]}));
-    const changedScope=screen.getByLabelText(scope==='product'?'产品':'打包模式');
+    const changedScope=screen.getByLabelText(scope==='product'?'产品型号':'打包模式');
     await act(async()=>{fireEvent.change(changedScope,{target:{value:scope==='product'?'':'current_complete'}});});
     expect(changedScope).toHaveValue(scope==='product'?'':'current_complete');
     const renderedDrafts=api.renderOutboundTemplate.mock.calls.length;

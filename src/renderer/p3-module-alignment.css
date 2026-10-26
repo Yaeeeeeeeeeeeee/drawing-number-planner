@@ -37,3 +37,8 @@
     .dictionaries-real-page .dm-toolbar > input { grid-column: 1 / -1; }
   }
 }
+
+.page-surface > .standard-page-header{min-height:48px;padding-bottom:12px;margin-bottom:12px;}
+.standard-page-header .page-heading-copy h1{margin:0;}
+.planning-real-page .planning-stage .pp-context{grid-template-columns:minmax(130px,.8fr) minmax(240px,1.6fr) minmax(160px,1fr);max-width:1100px;}
+@media(max-width:800px){.planning-real-page .planning-stage .pp-context{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}}

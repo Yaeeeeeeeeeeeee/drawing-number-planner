@@ -1,3 +1,4 @@
+import {stripV5Schema} from './strip-v5-schema';
 import { openDatabase, type PlannerDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import { schemaVersionSeventeen } from '../../src/db/schema.sql';
@@ -12,6 +13,7 @@ export function restoreV19DrawingUsageTrigger(db: PlannerDatabase) {
 export function createV19Fixture() {
   const db = openDatabase(':memory:');
   migrateDatabase(db, { databaseExists: false, createBackup() {} });
+  stripV5Schema(db);
   restoreV19DrawingUsageTrigger(db);
   db.prepare('delete from schema_migrations where version > 19').run();
   return db;

@@ -9,6 +9,6 @@ describe('BOM image preview', () => {
     expect(image).toHaveAttribute('src', '/api/boms/assets/31/preview');
     fireEvent.error(image);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(screen.getByText('图片缺失或无法预览')).toBeVisible();
+    expect(screen.getByText('预览失败，正在核验文件状态…')).toBeVisible();
   });
 });

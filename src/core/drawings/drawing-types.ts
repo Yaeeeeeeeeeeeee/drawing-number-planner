@@ -58,6 +58,9 @@ export interface DrawingRecord {
 }
 
 export interface DrawingFileRecord {
+  presenceStatus?: import('../files/pdf-presence.js').PdfPresenceStatus;
+  presenceMessage?: string;
+  indexedIsPresent?: boolean;
   pdfIndexId: number;
   materialBatchId?: number | null;
   fileName: string;

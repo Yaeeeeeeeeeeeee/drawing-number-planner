@@ -248,8 +248,8 @@ export class OutboundPackageService {
         options.signal?.throwIfAborted();
         continue writePass;
       }
-      if (zipBytes > OUTBOUND_ZIP_LIMIT_BYTES) throw this.error('ZIP_TOO_LARGE');
-      if(input.workflowVersion===2){try{verifyOutboundZip(part.temporaryPath,part.group.map(({item})=>({fileName:item.fileName!,contentSha256:item.contentSha256!})));}catch(error){throw new OutboundPackageError('PACKAGE_PUBLISH_FAILED',`ZIP 内容核对失败：${error instanceof Error?error.message:'无效压缩包'}`,{cause:error});}}
+      if (zipBytes > OUTBOUND_ZIP_LIMIT_BYTES) throw new OutboundPackageError('ZIP_TOO_LARGE', '源 PDF 存在且可读取，但压缩后的单文件 ZIP 仍超过50MB，无法拆分原文件，请另行安排传输。');
+      if(input.workflowVersion===2){try{verifyOutboundZip(part.temporaryPath,part.group.map(({item,sizeBytes})=>({fileName:item.fileName!,contentSha256:item.contentSha256!,sizeBytes})));}catch(error){throw new OutboundPackageError('PACKAGE_PUBLISH_FAILED',`ZIP 内容核对失败：${error instanceof Error?error.message:'无效压缩包'}`,{cause:error});}}
       part.sizeBytes = zipBytes;
       processedFiles += part.group.length;
       }
@@ -421,9 +421,6 @@ export class OutboundPackageService {
             physicalFileMissing = true;
           } else {
             const stats = statSync(absolutePath);
-            if (stats.size > OUTBOUND_ZIP_LIMIT_BYTES) {
-              throw new OutboundPackageError('FILE_TOO_LARGE', `${indexed.fileName} 单文件大小为 ${(stats.size / 1_000_000).toFixed(2)}MB，超过50MB，不能切割原文件，请先处理该文件。`);
-            }
             liveFiles.set(indexed.id, { indexed, absolutePath });
             fileFacts.push({ id: indexed.id, path: absolutePath, size: stats.size, mtimeMs: stats.mtimeMs });
           }

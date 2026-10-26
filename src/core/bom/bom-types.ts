@@ -125,6 +125,11 @@ export interface ProductBomDeletionResult {
 }
 
 export interface BomQueryFilters {
+  productCategory?: string;
+  productId?: number;
+  mainCategoryId?: number;
+  businessDateFrom?: string;
+  businessDateTo?: string;
   appearanceVersionId?: number;
   model?: string;
   businessChangeDate?: string;

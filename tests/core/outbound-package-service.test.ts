@@ -4,7 +4,7 @@ import { AppearanceService } from '../../src/core/products/appearance-service';
 import { closeSync, existsSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
+import { createHash, randomFillSync } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { cleanupStaleOutboundArtifacts } from '../../src/core/outbound/outbound-artifact-ownership';
@@ -301,11 +301,11 @@ describe('OutboundPackageService', () => {
       .all(result.id)).toEqual([{ part_number: 1, zip_relative_path: result.zipRelativePath,
         size_bytes: statSync(join(output, result.zipRelativePath)).size }]);
   });
-  it('rejects an oversized actual source before creating any ZIP or history record', () => {
+  it('allows an oversized actual source in preview without creating history', () => {
     const row = db.prepare('select relative_path from pdf_files where id = ?').get(pdfId) as { relative_path: string };
     const descriptor = openSync(join(workspace, row.relative_path), 'r+');
     try { ftruncateSync(descriptor, 63_000_000); } finally { closeSync(descriptor); }
-    expect(() => service.previewPackage(request())).toThrowError(expect.objectContaining({ code: 'FILE_TOO_LARGE', message: expect.stringContaining('63.00MB') }));
+    expect(service.previewPackage(request()).items[0].selectable).toBe(true);
     expect(readdirSync(output)).toEqual([]);
     expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
   });
@@ -671,6 +671,33 @@ describe('batch-first V2 workflow',()=>{
   function scope(id:number,appearanceVersionId:number,sequenceComplete=true){db.prepare(`insert into outbound_batch_scopes(batch_id,appearance_version_id,completeness,revision,updated_at,reason) values(?,?,?,1,?,'人工确认历史批次归属')`).run(id,appearanceVersionId,sequenceComplete?'complete':'pending',now);}
   function bind(id:number,appearanceVersionId:number){const row=db.prepare('select historical_drawing_id as id from pdf_files where id=?').get(id) as {id:number};db.prepare("insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,updated_at) values('historical',?,?,?,'manual',?)").run(row.id,productId,appearanceVersionId,now);}
   function pdfBytes(id:number,text:string){const file=db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string};writeFileSync(join(workspace,file.path),'%PDF-1.7\n'+text);}
+  it.each([1,50,69,100,200])('includes a real %iMB PDF byte-for-byte with accurate part counts', async mb=>{
+    const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);
+    const row=db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string};
+    const path=join(workspace,row.path);const bytes=Buffer.alloc(mb*1_000_000,32);bytes.write('%PDF-1.7\n');writeFileSync(path,bytes);
+    const hash=createHash('sha256').update(bytes).digest('hex');
+    const input={...request(),workflowVersion:2 as const,appearanceVersionId};
+    const preview=service.previewPackage(input);expect(preview.items[0]).toMatchObject({selectable:true,status:'normal',sizeBytes:bytes.length,contentSha256:hash});
+    const result=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    for(const part of result.parts??[]){const actual=decodedZipEntries(join(output,part.zipRelativePath));expect(part.fileCount).toBe(actual.size);expect(createHash('sha256').update([...actual.values()][0]).digest('hex')).toBe(hash);}
+    expect(createHash('sha256').update(readFileSync(path)).digest('hex')).toBe(hash);
+  },30000);
+  it('reports an existing incompressible PDF exceeding the actual ZIP cap without publishing or changing it',async()=>{
+    const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);
+    const row=db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string};
+    const path=join(workspace,row.path);const bytes=randomFillSync(Buffer.alloc(51_000_000));bytes.write('%PDF-1.7\n');writeFileSync(path,bytes);
+    const hash=createHash('sha256').update(bytes).digest('hex');const input={...request(),workflowVersion:2 as const,appearanceVersionId};
+    const preview=service.previewPackage(input);expect(preview.items[0]).toMatchObject({selectable:true,status:'normal',presenceStatus:'present'});
+    await expect(service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]})).rejects.toThrow(/源 PDF 存在且可读取.*50MB/);
+    expect(service.listCompleted(productId)).toHaveLength(0);expect(readdirSync(output)).toEqual([]);
+    expect(createHash('sha256').update(readFileSync(path)).digest('hex')).toBe(hash);
+  },30000);
+  it('distinguishes a stale file index from a physically missing PDF',()=>{
+    const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);pdfBytes(pdfId,'present');
+    db.prepare('update pdf_files set is_present=0 where id=?').run(pdfId);
+    const input={...request(),workflowVersion:2 as const,appearanceVersionId};
+    const preview=service.previewPackage(input);expect(preview.items[0]).toMatchObject({presenceStatus:'index-stale',status:'needs_confirmation',selectable:false,detail:'文件存在，索引待更新'});
+  });
   it('packages selected batch without BOM and persists real part manifests',async()=>{
     const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);pdfBytes(pdfId,'actual current');
     const input={...request(),workflowVersion:2 as const,appearanceVersionId};const preview=service.previewPackage(input);

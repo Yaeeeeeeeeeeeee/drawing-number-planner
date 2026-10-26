@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
-import { OUTBOUND_ZIP_LIMIT_BYTES } from './outbound-partition.js';
 
 const crcTable = Array.from({ length: 256 }, (_, index) => {
   let value = index;
@@ -15,7 +14,7 @@ function crc32(bytes: Buffer): number {
 }
 
 /** Validate bounded ZIP32 output independently of the writer, without extracting it. */
-export function verifyOutboundZip(path: string, expected: Array<{ fileName: string; contentSha256: string }>): void {
+export function verifyOutboundZip(path: string, expected: Array<{ fileName: string; contentSha256: string; sizeBytes?: number }>): void {
   const zip = readFileSync(path);
   let end = -1;
   for (let index = zip.length - 22; index >= Math.max(0, zip.length - 65557); index--) {
@@ -45,9 +44,10 @@ export function verifyOutboundZip(path: string, expected: Array<{ fileName: stri
     if (!(flags & 8) && (zip.readUInt32LE(offset + 14) !== crc || zip.readUInt32LE(offset + 18) !== compressed || zip.readUInt32LE(offset + 22) !== size)) throw new Error('压缩包本地文件属性不一致');
     if (ranges.some(([start, finish]) => offset < finish && data + compressed > start)) throw new Error('压缩包文件数据重叠');
     ranges.push([offset, data + compressed]);
-    if (size > OUTBOUND_ZIP_LIMIT_BYTES) throw new Error('压缩包单文件超过大小限制');
+    const expectedSize = wanted.sizeBytes ?? 50_000_000;
+    if (size > expectedSize || wanted.sizeBytes !== undefined && size !== wanted.sizeBytes) throw new Error('压缩包单文件大小与原文件不一致');
     const bytes = method === 0 ? zip.subarray(data, data + compressed)
-      : method === 8 ? inflateRawSync(zip.subarray(data, data + compressed), { maxOutputLength: OUTBOUND_ZIP_LIMIT_BYTES }) : null;
+      : method === 8 ? inflateRawSync(zip.subarray(data, data + compressed), { maxOutputLength: Math.max(1, expectedSize) }) : null;
     if (!bytes || bytes.length !== size || crc32(bytes) !== crc || createHash('sha256').update(bytes).digest('hex') !== wanted.contentSha256) throw new Error('压缩包文件内容校验不一致');
     seen.add(name);
     cursor += 46 + nameLength + extra + comment;

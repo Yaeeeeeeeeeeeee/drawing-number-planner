@@ -2,10 +2,25 @@ import {beforeEach,describe,expect,it} from 'vitest';
 import {fireEvent,render,screen,within} from '@testing-library/react';
 import {DataTable} from '../../src/renderer/components/DataTable';
 import {LayoutTable} from '../../src/renderer/components/LayoutTable';
-import {normalizeLayout} from '../../src/renderer/components/useTableLayout';
+import {fillTrailingColumn,normalizeLayout} from '../../src/renderer/components/useTableLayout';
 const columns=[{key:'select',label:'选择',locked:'start' as const,width:48,minWidth:48,render:()=> 'check'},{key:'name',label:'名称',width:160,render:(x:{id:number})=>`Name ${x.id}`},{key:'batch',label:'批次',render:()=> 'Batch'},{key:'actions',label:'操作',locked:'end' as const,render:()=> 'Open'}];
 beforeEach(()=>localStorage.clear());
 describe('shared table layouts',()=>{
+ it('fills only the current trailing column without changing stored requested widths',()=>{
+  const widths={name:160,batch:140};
+  expect(fillTrailingColumn([{key:'name'},{key:'batch'}],widths,600)).toEqual({name:160,batch:440});
+  expect(fillTrailingColumn([{key:'batch'},{key:'name'}],widths,600)).toEqual({name:460,batch:140});
+  expect(fillTrailingColumn([{key:'name'},{key:'batch'}],widths,200)).toEqual(widths);
+  expect(widths).toEqual({name:160,batch:140});
+ });
+ it('retains header dragging, edge resizing and reset without six-dot handles or instructional text',()=>{
+  const view=render(<DataTable columns={columns} items={[{id:1}]}/>);
+  expect(view.container.querySelector('.table-column-drag-handle')).toBeNull();
+  expect(screen.queryByText('拖动表头换序 · 列边调宽')).toBeNull();
+  expect(screen.getByRole('columnheader',{name:'名称'})).toHaveAttribute('draggable','true');
+  expect(screen.getByRole('separator',{name:'调整名称列宽'})).toBeVisible();
+  expect(screen.getByRole('button',{name:'恢复默认表格布局'})).toBeVisible();
+ });
  it('restores width and order through a visible button without resetting another table or its records',()=>{
   const view=render(<><DataTable tableId="first-reset" columns={columns} items={[{id:1}]}/><DataTable tableId="second-reset" columns={columns} items={[{id:2}]}/></>);
   const [first,second]=Array.from(view.container.querySelectorAll('table'));
@@ -27,7 +42,7 @@ describe('shared table layouts',()=>{
   const separator=screen.getByRole('separator',{name:'调整名称列宽'});const pointer=(type:string,x:number)=>{const event=new Event(type,{bubbles:true});Object.defineProperty(event,'clientX',{value:x});fireEvent(type==='pointerdown'?separator:window,event);};
   pointer('pointerdown',200);pointer('pointermove',242);pointer('pointerup',242);
   expect(separator).toHaveAttribute('aria-valuenow','502');const stored=JSON.parse(localStorage.getItem('table-layout:v1:wide')!);expect(stored.fixed).toBe(true);expect(stored.widths.name).toBe(502);
-  expect(parseFloat(screen.getByRole('table').style.minWidth)).toBe(0);
+  expect(screen.getByRole('table').style.minWidth).toBe('100%');
  });
  it('sanitizes malformed/versioned storage and locks edges',()=>{expect(normalizeLayout(columns,{version:1,order:['actions','batch','bad','batch','select'],widths:{name:-5,batch:Infinity}})).toEqual({order:['select','batch','name','actions'],widths:{select:48,name:80,batch:160,actions:180}});expect(normalizeLayout(columns,{version:0,order:['batch']} ).order).toEqual(columns.map(c=>c.key));});
  it('keeps real cells aligned through keyboard reorder, persists independently and resets',()=>{const view=render(<DataTable tableId="test" columns={columns} items={[{id:1}]} renderExpandedRow={()=>'Details'}/>);fireEvent.keyDown(screen.getByRole('columnheader',{name:'名称'}),{key:'ArrowRight',altKey:true});let rows=screen.getAllByRole('row');expect(within(rows[1]).getAllByRole('cell').map(c=>c.textContent)).toEqual(['check','Batch','Name 1','Open']);expect(screen.getByText('Details').getAttribute('colspan')).toBe('4');fireEvent.keyDown(screen.getByRole('separator',{name:'调整名称列宽'}),{key:'ArrowRight'});view.unmount();render(<DataTable tableId="test" columns={columns} items={[{id:2}]}/>);expect(screen.getByRole('separator',{name:'调整名称列宽'})).toHaveAttribute('aria-valuenow','170');expect(JSON.parse(localStorage.getItem('table-layout:v1:test')!).order).toEqual(['select','batch','name','actions']);fireEvent.contextMenu(screen.getByRole('columnheader',{name:'名称'}));expect(screen.getByRole('separator',{name:'调整名称列宽'})).toHaveAttribute('aria-valuenow','160');expect(JSON.parse(localStorage.getItem('table-layout:v1:test')!).order).toEqual(columns.map(c=>c.key));});

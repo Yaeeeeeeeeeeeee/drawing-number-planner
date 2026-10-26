@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
@@ -21,7 +21,7 @@ it('executes all three PDF actions for 23 selected records through the real clie
  try{
   migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});
   const service=new FileService(new FileRepository(db),new WorkspaceSettingsStore(join(root,'settings.json')));service.updateSettings({workspaceRoot:root});
-  const names=Array.from({length:23},(_,i)=>`plain-${i+1}.pdf`);for(const name of names)writeFileSync(join(root,name),'%PDF-1.4\n'+name);
+  const names=Array.from({length:23},(_,i)=>`plain-${i+1}.pdf`);for(const name of names)writeFileSync(fixturePdfPath(root,name),'%PDF-1.4\n'+name);
   await service.scan();const ids=service.search().items.map(item=>item.id);expect(ids).toHaveLength(23);
   app.post('/api/session',async()=>({token:'isolated-pdf-test'}));registerFileRoutes(app,service);
   const origin=await app.listen({host:'127.0.0.1',port:0});vi.stubGlobal('fetch',(path:string,init?:RequestInit)=>nativeFetch(new URL(path,origin),init));resetApiSession();
@@ -31,7 +31,7 @@ it('executes all three PDF actions for 23 selected records through the real clie
    expect(service.search().total).toBe(action==='restore'?23:0);
    if(action==='ignore'){await service.scan();expect(service.search().total).toBe(0);expect(service.search({managementState:'ignored'}).total).toBe(23);}
   }
-  for(const name of names)expect(readFileSync(join(root,name),'utf8')).toBe('%PDF-1.4\n'+name);
+  for(const name of names)expect(readFileSync(fixturePdfPath(root,name),'utf8')).toBe('%PDF-1.4\n'+name);
   await service.scan();expect(service.search().total).toBe(23);
  }finally{vi.unstubAllGlobals();await app.close();db.close();rmSync(root,{recursive:true,force:true});}
 });
@@ -68,3 +68,10 @@ it('preflights and confirms empty batch deletion over real HTTP, keeps physical 
   await service.scan();expect(batches.list()).toHaveLength(1);expect(service.search().total).toBe(1);expect(readFileSync(original,'utf8')).toBe('%PDF-1.4 retained');
  }finally{vi.unstubAllGlobals();await app.close();db.close();rmSync(root,{recursive:true,force:true});}
 });
+
+function fixturePdfPath(root:string,...segments:string[]):string {
+ const parts=segments.flatMap(part=>part.split(/[\\/]+/));
+ const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件'].includes(parts[2]);
+ const target=join(root,...(scoped?parts:['未分类','UNKNOWN-M','02.未转曲源文件',...parts]));
+ mkdirSync(dirname(target),{recursive:true});return target;
+}

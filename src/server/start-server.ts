@@ -109,9 +109,9 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     const qrManual = new QrManualService(database);
     registerAppearanceRoutes(server, new AppearanceService(database));
     registerQrCodeRoutes(server, new QrService(database), qrManual);
-    registerDrawingRoutes(server, new DrawingQueryService(database));
+    registerDrawingRoutes(server, new DrawingQueryService(database, () => workspaceSettings.get().workspaceRoot));
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings), tasks);
-    registerMaterialBatchRoutes(server, new MaterialBatchService(database));
+    registerMaterialBatchRoutes(server, new MaterialBatchService(database, () => workspaceSettings.get().workspaceRoot));
     registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));
     registerOutboundPackageRoutes(server, new OutboundPackageService(database, {
       workspaceRoot: () => workspaceSettings.get().workspaceRoot,

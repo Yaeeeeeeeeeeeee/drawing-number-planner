@@ -1,6 +1,17 @@
 import {useEffect,useState} from 'react';
 export interface LayoutColumn {key:string;label:string; width?:number; minWidth?:number; align?:'left'|'center'|'right'; locked?:'start'|'end'}
-export function columnAlignment(c:LayoutColumn){return c.align??(/status|count|quantity|date|time|created|updated|action|operation|select|checkbox|^qty$/i.test(c.key)?'center':'left');}
+export function columnAlignment(c:LayoutColumn){
+ if(/^(sku|model|brand|name|fileName|filename)$/i.test(c.key))return 'left';
+ if(/status|count|quantity|date|time|created|updated|color|action|operation|select|checkbox|^qty$/i.test(c.key))return 'center';
+ return c.align??'left';
+}
+/** Fill the available space using the actual final column without persisting automatic stretch. */
+export function fillTrailingColumn(columns: Array<{key:string}>, widths:Record<string,number>, available:number){
+ const result={...widths};const last=columns.at(-1);if(!last)return result;
+ const total=columns.reduce((sum,column)=>sum+(widths[column.key]??0),0);
+ if(available>total)result[last.key]=(result[last.key]??0)+available-total;
+ return result;
+}
 export interface TableLayout {fixed?:boolean;order:string[];widths:Record<string,number>}
 const PREFIX='table-layout:v1:';
 export function columnMinimum(c:LayoutColumn){return c.minWidth??(c.locked==='start'?48:80);}

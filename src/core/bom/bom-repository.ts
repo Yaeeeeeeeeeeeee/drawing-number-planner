@@ -132,10 +132,15 @@ export class BomRepository {
   queryVersions(filters: BomQueryFilters): BomVersionSummary[] {
     const conditions: string[] = []; const values: Array<string | number> = [];
     if (filters.appearanceVersionId !== undefined) { conditions.push('version.appearance_version_id = ?'); values.push(filters.appearanceVersionId); }
+    if (filters.productCategory?.trim()) { conditions.push('product.product_category = ?'); values.push(filters.productCategory.trim()); }
+    if (filters.productId !== undefined) { conditions.push('version.product_id = ?'); values.push(filters.productId); }
+    if (filters.businessDateFrom) { conditions.push('version.business_change_date >= ?'); values.push(filters.businessDateFrom); }
+    if (filters.businessDateTo) { conditions.push('version.business_change_date <= ?'); values.push(filters.businessDateTo); }
     if (filters.model?.trim()) { conditions.push('product.model like ?'); values.push(`%${filters.model.trim()}%`); }
     if (filters.businessChangeDate?.trim()) { conditions.push('version.business_change_date = ?'); values.push(filters.businessChangeDate.trim()); }
-    if (filters.projectItemId !== undefined || filters.fullCode?.trim() || filters.effectiveBatchRelativePath?.trim()) {
+    if (filters.mainCategoryId !== undefined || filters.projectItemId !== undefined || filters.fullCode?.trim() || filters.effectiveBatchRelativePath?.trim()) {
       const itemConditions: string[] = [];
+      if (filters.mainCategoryId !== undefined) { itemConditions.push('exists (select 1 from dictionary_items project where project.id = item.project_item_id and project.parent_id = ?)'); values.push(filters.mainCategoryId); }
       if (filters.projectItemId !== undefined) { itemConditions.push('item.project_item_id = ?'); values.push(filters.projectItemId); }
       if (filters.fullCode?.trim()) { itemConditions.push('coalesce(drawing.deleted_full_code, drawing.full_code, historical.deleted_full_code, historical.full_code) like ?'); values.push(`%${filters.fullCode.trim()}%`); }
       if (filters.effectiveBatchRelativePath?.trim()) {

@@ -154,3 +154,7 @@
 .drawing-association-result {flex-shrink:0;}
 @media(min-width:2200px) {.drawing-library-page .drawing-workspace .module-detail.module-drawer {width:680px;}}
 @media(max-width:640px) {.drawing-library-page .workspace-drawing-detail {padding:16px;}.drawing-library-page .drawing-detail-header h2 {font-size:20px;}.drawing-library-page .workspace-drawing-detail .drawing-detail-group {padding:16px;}.drawing-library-page .drawing-detail-group .drawing-detail-attributes {gap:14px;}}
+
+.drawing-force-release{padding:10px 0;border-top:1px solid var(--border-color,#e2e8f0)}
+.drawing-force-release h4{margin:0 0 8px}
+.drawing-force-release .deletion-reference-list{margin:8px 0}

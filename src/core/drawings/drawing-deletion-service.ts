@@ -1,3 +1,4 @@
+import { referencesIdentity } from './drawing-force-release-service.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { OccupiedNumberRepository } from '../planning/occupied-number-repository.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
@@ -88,6 +89,8 @@ export class DrawingDeletionService {
 
   restore(signedId: number) {
     this.db.transaction(() => {
+      if (this.db.prepare('select 1 from drawing_force_releases where origin=? and record_id=?').get(signedId<0?'historical':'planned',Math.abs(signedId)))
+        throw new DrawingDeletionError('DRAWING_RESTORE_CONFLICT', '强制释放的原身份不能恢复，请重新规划图号');
       const row = this.getRow(signedId);
       if (!row) throw new DrawingDeletionError('DRAWING_NOT_FOUND', '图号记录不存在');
       if (!row.deletedAt || !row.deletionMode || !row.previousStatus) {
@@ -152,10 +155,12 @@ export class DrawingDeletionService {
       sum(case when conversion_type = 'outlined' then 1 else 0 end) as outlinedPdf
       from pdf_files where ${referenceColumn} = ?`).get(row.id) as Record<string, number | null>;
     const bom = this.db.prepare(`select
-      sum(case when current.version_id = item.bom_version_id then 1 else 0 end) as currentBom,
-      sum(case when current.version_id is null or current.version_id <> item.bom_version_id then 1 else 0 end) as historicalBom
-      from bom_items item left join bom_current current on current.version_id = item.bom_version_id
-      where item.${referenceColumn} = ? and item.deleted_at is null`).get(row.id) as Record<string, number | null>;
+      sum(case when current.version_id = item.bom_version_id and item.deleted_at is null and version.deleted_at is null then 1 else 0 end) as currentBom,
+      sum(case when (current.version_id is null or current.version_id <> item.bom_version_id) and item.deleted_at is null and version.deleted_at is null then 1 else 0 end) as historicalBom,
+      sum(case when item.deleted_at is not null or version.deleted_at is not null then 1 else 0 end) as deletedBom
+      from bom_items item join bom_versions version on version.id=item.bom_version_id left join bom_current current on current.version_id = item.bom_version_id
+      where item.${referenceColumn} = ?`).get(row.id) as Record<string, number | null>;
+    const bomSnapshots=(this.db.prepare('select before_snapshot_json,after_snapshot_json from bom_revision_snapshots').all() as Array<{before_snapshot_json:string;after_snapshot_json:string}>).filter(snapshot=>[snapshot.before_snapshot_json,snapshot.after_snapshot_json].some(json=>referencesIdentity(JSON.parse(json),row.origin,row.id,row.fullCode))).length;
     const usage = this.batches.getDrawingUsage(row.fullCode, row.status);
     const lineage = row.origin === 'planned' ? (this.db.prepare(`select count(*) as count from drawing_numbers
       where deleted_at is null and id <> ? and (previous_drawing_id = ? or source_drawing_id = ?)`)
@@ -165,7 +170,7 @@ export class DrawingDeletionService {
     const references: DrawingDeletionReferenceCounts = {
       presentPdf: pdf.presentPdf ?? 0, missingPdf: pdf.missingPdf ?? 0,
       sourcePdf: pdf.sourcePdf ?? 0, outlinedPdf: pdf.outlinedPdf ?? 0,
-      currentBom: bom.currentBom ?? 0, historicalBom: bom.historicalBom ?? 0,
+      currentBom: bom.currentBom ?? 0, historicalBom: bom.historicalBom ?? 0, deletedBom: bom.deletedBom ?? 0, bomSnapshots,
       currentMaterial: usage.currentProductCount, historicalMaterial: usage.historicalProductCount,
       lineage, outboundSnapshot, emailDraft: 0, qrCode: 0,
     };
@@ -188,7 +193,7 @@ export class DrawingDeletionService {
       (select count(*) from drawing_deletion_events event where event.origin=@origin and event.record_id=@id and exists(select 1 from json_each(event.reference_summary_json) refs where cast(refs.value as integer)>0)) as previousReferences,
       (select count(*) from drawing_numbers drawing where @origin='planned' and (drawing.previous_drawing_id=@id or drawing.source_drawing_id=@id)) as lineage
     `).get({id:row.id,code:row.fullCode,origin:row.origin}) as Record<string,number>);
-    const protectedCount=Object.values(protectedRows).reduce((sum,count)=>sum+count,0);
+    const protectedCount=Object.values(protectedRows).reduce((sum,count)=>sum+count,0)+bomSnapshots;
     if(protectedCount)releaseBlockers.push({kind:'protected_history',count:protectedCount,message:'该图号存在受保护的 PDF、BOM、外发、图号关系或删除前历史引用，无法释放号码；须保留占号与追溯。'});
     return { signedId, origin: row.origin, fullCode: row.fullCode, status: row.status,
       deletable: blockers.length === 0, releaseEligible:releaseBlockers.length===0,releaseBlockers, references, blockers };

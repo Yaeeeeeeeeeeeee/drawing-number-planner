@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseMaterialBatch } from '../../src/core/files/material-batch-parser';
 
-const productionRoot = '03.量产后的变更文件（已量产的产品看最新日期）';
+const productionRoot = '03.量产后的变更文件';
 
 describe('material batch parser', () => {
   it('recognizes a dated numbered batch from the real product directory shape', () => {
@@ -55,7 +55,7 @@ describe('material batch parser', () => {
   });
 });
 
-it('recognizes H10 initial production under the existing change-details directory spelling', () => {
+it('excludes the legacy change-details directory from new batch parsing', () => {
   expect(parseMaterialBatch('吸尘器/AKVCH010JP-H10/03.量产后的变更明细（已量产的产品看最新日期）/00.首批大货/铭牌.pdf'))
-    .toMatchObject({ name: '00.首批大货', sequenceNumber: 0, recognitionStatus: 'recognized', directoryContext: {sku:'AKVCH010JP',model:'H10'} });
+    .toBeNull();
 });

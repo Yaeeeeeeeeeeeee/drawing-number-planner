@@ -19,6 +19,9 @@ const candidateQuery = z.object({
   entryMode: z.enum(['current', 'historical']).default('current'),
 }).strict();
 const bomQuery = z.object({
+  productCategory: z.string().trim().optional(), productId: z.coerce.number().int().positive().optional(),
+  mainCategoryId: z.coerce.number().int().positive().optional(),
+  businessDateFrom: z.iso.date().optional(), businessDateTo: z.iso.date().optional(),
   appearanceVersionId: z.coerce.number().int().positive().optional(),
   model: z.string().trim().optional(), businessChangeDate: z.string().trim().optional(),
   effectiveBatchRelativePath: z.string().trim().optional(), projectItemId: z.coerce.number().int().positive().optional(),

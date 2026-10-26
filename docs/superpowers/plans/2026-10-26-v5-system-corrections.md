@@ -1,6 +1,6 @@
 # V5 全系统增量修正 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use superpowers:dispatching-parallel-agents for independent domains with exclusive file ownership; integrate and review sequentially. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 完成 V5.0 的共享布局、PDF 范围、BOM、受控强制释放、外发和邮件修正，保持真实文件与历史身份安全。
 **Architecture:** 沿用 React/Electron + SQLite 服务/API；共享表格和图像预览统一修改。普通释放不放宽，独立强制流程以事务、影响指纹、脱钩快照隔离旧引用；新 Schema 由父执行器统一登记，先备份后迁移。

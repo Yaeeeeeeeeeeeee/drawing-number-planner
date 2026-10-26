@@ -103,3 +103,18 @@ describe('outbound reference API', () => {
     expect(response.json()).toEqual({ error: { code: 'INVALID_REQUEST', message: '外发联系人数据不完整' } });
   });
 });
+
+it('saves independent manufacturer/scenario templates and identifies failing fields', async () => {
+  const invalid = await app.inject({ method: 'POST', url: '/api/outbound-reference/templates', payload: {
+    key: '厂家A-首批', name: '', materialType: 'initial', subjectTemplate: '主题', bodyTemplate: '正文',
+  } });
+  expect(invalid.statusCode).toBe(400);
+  expect(invalid.json().error.fieldErrors.name).toContain('模板名称');
+  const created = await app.inject({ method: 'POST', url: '/api/outbound-reference/templates', payload: {
+    key: '厂家A-首批', name: '首批', materialType: 'initial', manufacturer: '厂家A', scenario: '首批资料', subjectTemplate: '{{brand}}', bodyTemplate: '正文',
+  } });
+  expect(created.statusCode).toBe(201);
+  expect(created.json()).toMatchObject({ manufacturer: '厂家A', scenario: '首批资料' });
+  const rendered = await app.inject({ method: 'POST', url: `/api/outbound-reference/templates/${created.json().id}/render`, payload: { variables: { brand: '品牌', signature: '签名' } } });
+  expect(rendered.json()).toEqual({ subject: '品牌', body: '正文\n\n签名' });
+});

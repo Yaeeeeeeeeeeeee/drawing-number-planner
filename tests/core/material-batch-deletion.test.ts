@@ -107,3 +107,43 @@ it('also protects table-tagged batch IDs when present in a merge after snapshot'
  db.prepare("insert into product_merge_events(canonical_product_id,fingerprint,before_json,after_json,created_at) values(?,'proof','{}',?,'now')").run(product,JSON.stringify({references:[{table:'drawing_numbers',ids:[other]},{table:'material_batches',ids:[batch]}]}));
  blocked('product_merge_events.json');
 });
+
+it('cleans stale unprotected indices only after successful empty directory observation',async()=>{
+ const {mkdtempSync,mkdirSync,rmSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const root=mkdtempSync(join(tmpdir(),'v5-empty-batch-'));const directory=join(root,...path.split('\\'));mkdirSync(directory,{recursive:true});
+ try {
+  const observed=new MaterialBatchService(db,()=>root);
+  db.prepare('update pdf_files set material_batch_id=?,is_present=0 where id=?').run(batch,pdf);
+  expect(observed.list().find(item=>item.id===batch)?.fileCount).toBe(0);
+  const preview=observed.previewDeletion(batch)!;expect(preview.allowed).toBe(true);
+  expect(observed.delete(batch,{fingerprint:preview.fingerprint,confirmation:'删除批次'})).toEqual({deleted:batch});
+  expect(db.prepare('select id from pdf_files where id=?').get(pdf)).toBeUndefined();
+  expect(db.prepare('select id from material_batches where id=?').get(other)).toBeTruthy();
+  expect(db.pragma('foreign_key_check')).toEqual([]);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+it('does not infer empty from unavailable directory even with zero indexed PDFs',()=>{
+ const observed=new MaterialBatchService(db,()=>'/does/not/exist');
+ const preview=observed.previewDeletion(batch)!;expect(preview.allowed).toBe(false);
+ expect(preview.reason).toContain('无法访问');
+});
+it('rechecks physical PDFs appearing after the empty preview',async()=>{
+ const {mkdtempSync,mkdirSync,rmSync,writeFileSync,readFileSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const root=mkdtempSync(join(tmpdir(),'v5-race-batch-'));const directory=join(root,...path.split('\\'));mkdirSync(directory,{recursive:true});
+ try{
+  const observed=new MaterialBatchService(db,()=>root);const preview=observed.previewDeletion(batch)!;expect(preview.allowed).toBe(true);
+  const physical=join(directory,'real.pdf');writeFileSync(physical,'%PDF immutable');
+  expect(()=>observed.delete(batch,{fingerprint:preview.fingerprint,confirmation:'删除批次'})).toThrow('重新预检');
+  expect(readFileSync(physical,'utf8')).toBe('%PDF immutable');
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+it('preserves a protected drawing-linked index even when the physical batch is successfully observed empty',async()=>{
+ const {mkdtempSync,mkdirSync,rmSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const root=mkdtempSync(join(tmpdir(),'v5-protected-batch-'));mkdirSync(join(root,...path.split('\\')),{recursive:true});
+ try{
+  db.prepare("update pdf_files set material_batch_id=?,drawing_id=?,match_status='matched',is_present=0 where id=?").run(batch,drawing,pdf);
+  const observed=new MaterialBatchService(db,()=>root);expect(observed.previewDeletion(batch)?.allowed).toBe(false);
+  expect(db.prepare('select drawing_id from pdf_files where id=?').get(pdf)).toEqual({drawing_id:drawing});
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

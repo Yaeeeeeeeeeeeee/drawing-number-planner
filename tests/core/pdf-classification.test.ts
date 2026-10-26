@@ -23,7 +23,7 @@ function fixture(){
  const products=new ProductService(db);const input={brandId:brand.id,productSizeId:size.id,model:'same',sku:'SAME',productCategory:'test'};const a=products.create(input),b=products.create(input);
  const batch=(name:string,product:number)=>Number(db.prepare(`insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,first_seen_at,last_seen_at) values(?,?,?,?,'pending','now','now')`).run(name,'test',product,'same name').lastInsertRowid);
  const batchA=batch('a',a.id),batchB=batch('b',a.id);
- const files:FileScanRecord[]=Array.from({length:12},(_,i)=>({relativePath:`test/SAME-same/file${i}.pdf`,fileName:`file${i}.pdf`,drawingId:null,matchStatus:'unmatched',detectedCodes:[],conversionType:'source',sizeBytes:5,modifiedAt:'now',contentSha256:'a'.repeat(64)}));
+ const files:FileScanRecord[]=Array.from({length:12},(_,i)=>({relativePath:`test/SAME-same/03.量产后的变更文件/待归纳/file${i}.pdf`,fileName:`file${i}.pdf`,drawingId:null,matchStatus:'unmatched',detectedCodes:[],conversionType:'source',sizeBytes:5,modifiedAt:'now',contentSha256:'a'.repeat(64)}));
  const repository=new FileRepository(db);repository.replaceScan(files,[],'now');const ids=repository.search().items.map(f=>f.id);
  return {db,dir,path,a,b,batchA,batchB,files,repository,ids,classification:new PdfClassificationRepository(db)};
 }

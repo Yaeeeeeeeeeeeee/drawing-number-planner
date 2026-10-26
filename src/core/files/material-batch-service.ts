@@ -1,3 +1,7 @@
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { resolveWorkspacePath } from './workspace-paths.js';
+import { PdfManagementRepository } from './pdf-management.js';
 import { createHash } from 'node:crypto';
 import { MaterialBatchRepository } from './material-batch-repository.js';
 import { selectLatestBusinessBatch, codeScopeFromFullCode } from './batch-business-order.js';
@@ -36,7 +40,25 @@ interface OccurrenceRow {
 }
 
 export class MaterialBatchService {
-  constructor(private readonly db: PlannerDatabase) {}
+  constructor(private readonly db: PlannerDatabase, private readonly workspaceRoot?: () => string | null) {}
+
+  private observeBatch(relativePath: string): 'empty' | 'nonempty' | 'unavailable' {
+    const root = this.workspaceRoot?.();
+    if (!root) return 'unavailable';
+    try {
+      const walk = (path: string): boolean => readdirSync(path, {withFileTypes:true}).some(entry => {
+        if (entry.isSymbolicLink()) return true; // Never treat unobserved linked content as empty.
+        return entry.isDirectory() ? walk(join(path,entry.name)) : entry.isFile() && /\.pdf$/i.test(entry.name);
+      });
+      return walk(resolveWorkspacePath(root,relativePath)) ? 'nonempty' : 'empty';
+    } catch { return 'unavailable'; }
+  }
+
+  private staleBatchIndices(id: number): {id:number;allowed:boolean}[] {
+    const ids = (this.db.prepare('select id from pdf_files where material_batch_id=?').all(id) as Array<{id:number}>).map(row=>row.id);
+    const management = new PdfManagementRepository(this.db);
+    return ids.flatMap(id=>management.preview({ids:[id],action:'clear'},'').entries.map(entry=>({id:entry.id,allowed:entry.allowed})));
+  }
 
   rename(id: number, displayName: string, revision?: number): MaterialBatchView | null {
     const name = displayName.trim();
@@ -53,10 +75,14 @@ export class MaterialBatchService {
   previewDeletion(id: number): MaterialBatchDeletionPreview | null {
     const row = this.db.prepare('select * from material_batches where id=?').get(id) as Record<string,unknown> | undefined;
     if (!row) return null;
-    const references = new MaterialBatchRepository(this.db).deletionReferences(id,String(row.relative_path));
+    const observation = this.observeBatch(String(row.relative_path));
+    const indices = observation === 'empty' ? this.staleBatchIndices(id) : [];
+    const references = new MaterialBatchRepository(this.db).deletionReferences(id,String(row.relative_path))
+      .filter(reference => !(reference.source === 'pdf_files.material_batch_id' && observation === 'empty' && indices.every(entry=>entry.allowed)));
+    if (this.workspaceRoot && observation !== 'empty') references.push({source:'disk.observation',label:observation==='nonempty'?'目录仍有 PDF':'目录无法访问或扫描失败',count:1});
     const reason = references.length ? `批次仍被引用：${references.map(ref=>`${ref.label} ${ref.count} 条`).join('；')}` : null;
     return {id, name:String(row.display_name ?? row.name), relativePath:String(row.relative_path), allowed:!references.length, reason, references,
-      fingerprint:createHash('sha256').update(JSON.stringify({row,references})).digest('hex')};
+      fingerprint:createHash('sha256').update(JSON.stringify({row,references,observation,indices})).digest('hex')};
   }
 
   delete(id: number, input: MaterialBatchDeletionInput): {deleted:number} | null {
@@ -66,6 +92,14 @@ export class MaterialBatchService {
       if (input.fingerprint !== preview.fingerprint) throw new FileError('PDF_PREVIEW_STALE','批次或引用已变化，请重新预检');
       if (!preview.allowed) throw new FileError('PDF_CLEANUP_NOT_ALLOWED',preview.reason!);
       if (input.confirmation !== '删除批次') throw new FileError('INVALID_CLEAR_INDEX_CONFIRMATION','请确认删除批次');
+      // A fresh successful empty observation and the transaction preview are both required.
+      const observation = this.observeBatch(preview.relativePath);
+      if (this.workspaceRoot && observation !== 'empty') throw new FileError('PDF_PREVIEW_STALE','目录已变化或无法访问，请重新预检');
+      if (observation === 'empty') {
+        const entries = this.staleBatchIndices(id);
+        if (entries.some(entry=>!entry.allowed)) throw new FileError('PDF_CLEANUP_NOT_ALLOWED','PDF 索引仍有历史引用');
+        this.db.prepare('delete from pdf_files where material_batch_id=?').run(id);
+      }
       this.db.prepare('delete from material_batches where id=?').run(id);
       return {deleted:id};
     }).immediate();
@@ -113,7 +147,7 @@ export class MaterialBatchService {
         coalesce(batch.display_name, batch.name) as name, batch.name as originalName,
         batch.display_name as displayName, batch.display_revision as displayRevision, batch.sequence_number as sequenceNumber, batch.business_date as businessDate,
         batch.recognition_status as recognitionStatus, batch.classification_warning as classificationWarning,
-        batch.is_present as isPresent, count(file.id) as fileCount
+        batch.is_present as isPresent, count(case when file.is_present=1 and file.management_state='included' then file.id end) as fileCount
       from material_batches batch
       left join product_identity_members identity on identity.raw_product_id = batch.product_id
       left join products product on product.id = coalesce(identity.canonical_product_id, batch.product_id)

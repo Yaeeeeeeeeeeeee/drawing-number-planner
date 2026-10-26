@@ -1,3 +1,5 @@
+import { inspectIndexedPdfPresence } from './pdf-presence.js';
+import { isMaterialPdfPath } from './directory-policy.js';
 import type {PdfClassificationInput,PdfClassificationApplyInput} from './pdf-classification.js';
 import { createHash } from 'node:crypto';
 import { openSync, closeSync, readSync, statSync, existsSync } from 'node:fs';
@@ -47,7 +49,14 @@ export class FileService {
     return { ...current, configured: true, available: true };
   }
 
-  search(filters: FileSearchFilters = {}): FileSearchResult { return this.repository.search(filters); }
+  search(filters: FileSearchFilters = {}): FileSearchResult {
+    const result = this.repository.search(filters);
+    const root = this.settings.get().workspaceRoot;
+    return {...result,items:result.items.map(file=>{
+      const fact = inspectIndexedPdfPresence(root,file);
+      return {...file,presenceStatus:fact.status,presenceMessage:fact.message};
+    })};
+  }
 
   navigation(filters: FileNavigationFilters = {}): FileNavigationResult { return this.repository.navigation(filters); }
 
@@ -123,7 +132,7 @@ export class FileService {
         context?.throwIfCancelled();
         context?.report({ processed, total, phase: 'scanning', message: relativePath });
       };
-      const files = await this.scanner(workspaceRoot, { signal: context?.signal, onProgress: progress });
+      const files = (await this.scanner(workspaceRoot, { signal: context?.signal, onProgress: progress })).filter(file => isMaterialPdfPath(file.relativePath));
       context?.throwIfCancelled();
       const drawings = this.repository.listDrawingCodes();
       let fingerprinted = 0; const fingerprintTotal = files.length;

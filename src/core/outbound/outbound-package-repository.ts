@@ -37,7 +37,7 @@ interface FileRow {
 
 const fileSelect = `select file.id, file.relative_path, file.file_name, file.is_present, file.conversion_type,
   file.match_status, file.drawing_id, file.historical_drawing_id,
-  coalesce(drawing.full_code, historical.full_code) as full_code,
+  coalesce(drawing.deleted_full_code,drawing.full_code,historical.deleted_full_code,historical.full_code) as full_code,
   coalesce(drawing.project_item_id, historical_project.id) as project_item_id,
   coalesce(planned_project.name, historical_project.name) as project_item_name,
   batch.id as source_batch_id, batch.name as source_batch_name

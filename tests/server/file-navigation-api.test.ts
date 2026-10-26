@@ -17,7 +17,7 @@ async function fixture() {
   const db = openDatabase(':memory:'); databases.push(db);
   migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });
   const repository = new FileRepository(db);
-  repository.replaceScan([{ relativePath: 'unknown.pdf', fileName: 'unknown.pdf', drawingId: null,
+  repository.replaceScan([{ relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/unknown.pdf', fileName: 'unknown.pdf', drawingId: null,
     matchStatus: 'unmatched', detectedCodes: [], conversionType: 'source', sizeBytes: 1,
     modifiedAt: '2026-10-19T00:00:00.000Z' }], [], '2026-10-19T00:00:00.000Z');
   const service = new FileService(repository, new WorkspaceSettingsStore('/nonexistent/pdf-navigation-settings.json'));
@@ -51,7 +51,7 @@ describe('read-only PDF navigation endpoint', () => {
         conversionType: 'source' as const, sizeBytes: 1, modifiedAt: '2026-10-19T00:00:00.000Z',
         materialBatch: parseMaterialBatch(`${root}\\${batch}\\same.pdf`),
       })),
-      { relativePath: 'pending.pdf', fileName: 'pending.pdf', drawingId: null, matchStatus: 'pending',
+      { relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/pending.pdf', fileName: 'pending.pdf', drawingId: null, matchStatus: 'pending',
         detectedCodes: [], conversionType: 'outlined', sizeBytes: 1, modifiedAt: '2026-10-19T00:00:00.000Z' },
       { relativePath: `${root}\\01.20241210\\missing.pdf`, fileName: 'missing.pdf', drawingId: null,
         matchStatus: 'unmatched', detectedCodes: [], conversionType: 'source', sizeBytes: 1,

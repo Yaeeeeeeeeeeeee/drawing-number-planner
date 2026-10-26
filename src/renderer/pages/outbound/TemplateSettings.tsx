@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useConfigurationEditor, type RegisterLeaveGuard } from './useConfigurationEditor';
 import type {
   OutboundEmailTemplateInputView,
@@ -22,11 +22,14 @@ const previewFields = [
   ['change_files', '资料与修改明细', '1. 包装箱：更新文字与排版。\n　新文件：F60白色-包装箱（转曲）'],
   ['package_files', '分包附件', '分包附件：\nF60-包材资料-1001-part01\nF60-包材资料-1001-part02'],
   ['optional_blocks', '附加段落', '请核对资料后安排生产。'],
-  ['signature', '邮件签名', '样例项目组'],
+  ['brand', '品牌', 'SAMKYO'], ['model', '产品型号', 'F60'], ['category', '产品类别', '空气炸锅'],
+  ['date', '日期', '2026-10-26'], ['batch', '资料批次', '首批资料'], ['count', '压缩包数量', '2'],
 ] as const;
-const samplePreview = (text: string) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (token, key: string) => previewFields.find(field => field[0] === key)?.[2] ?? token);
+const legacySamples: Record<string, string> = { brand_name: 'SAMKYO', product_category: '空气炸锅', company_name: '厂家A', file_list: '包装箱.pdf', change_description: '更新包装箱', signature: '样例项目组' };
+const samplePreview = (text: string) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (token, key: string) => previewFields.find(field => field[0] === key)?.[2] ?? legacySamples[key] ?? token);
 
-export function TemplateSettings({ api, fieldHelper = false, mode, registerLeaveGuard }: { api: PlannerApi; fieldHelper?: boolean; mode?: 'templates' | 'signatures'; registerLeaveGuard?: RegisterLeaveGuard }) {
+export function TemplateSettings({ api, fieldHelper = true, mode, registerLeaveGuard }: { api: PlannerApi; fieldHelper?: boolean; mode?: 'templates' | 'signatures'; registerLeaveGuard?: RegisterLeaveGuard }) {
+  const templateFormRef = useRef<HTMLFormElement>(null);
   const [insertTarget, setInsertTarget] = useState<'subjectTemplate' | 'bodyTemplate'>('bodyTemplate');
   const [templates, setTemplates] = useState<OutboundEmailTemplateView[]>([]);
   const [signatures, setSignatures] = useState<OutboundSignatureView[]>([]);
@@ -68,7 +71,10 @@ export function TemplateSettings({ api, fieldHelper = false, mode, registerLeave
         }
       });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '操作失败');
+      const reason = error instanceof Error ? error.message : '操作失败';
+      setMessage(reason);
+      const field = ['模板编码', '模板名称', '模板资料类型', '主题模板', '正文模板'].find(label => reason.includes(label)) ?? (reason.includes('变量') ? '正文模板' : null);
+      if (field) templateFormRef.current?.querySelector<HTMLElement>(`[aria-label="${field}"]`)?.focus();
       return false;
     }
   };
@@ -88,31 +94,35 @@ export function TemplateSettings({ api, fieldHelper = false, mode, registerLeave
     if (ok && editsDeletedRecord) { guard.reset(); setEditTemplate(null); setBlockEditor(null); setEditSignature(null); }
   };
 
+  const fieldError = (label: string) => message.includes(label) ? <span className="ob-field-error" role="alert">{message}</span> : null;
   const templateForm = (value: OutboundEmailTemplateInputView & { id?: number }) => (
     <form
+      ref={templateFormRef}
       aria-label="邮件模板编辑"
       onSubmit={(event) => {
         event.preventDefault();
         void (async () => {
-          const input = { key: value.key, name: value.name, materialType: value.materialType, subjectTemplate: value.subjectTemplate, bodyTemplate: value.bodyTemplate };
+          const input = { manufacturer: value.manufacturer, scenario: value.scenario, key: value.key, name: value.name, materialType: value.materialType, subjectTemplate: value.subjectTemplate, bodyTemplate: value.bodyTemplate };
           const ok = await run(() => value.id ? api.updateOutboundTemplate(value.id, input) : api.createOutboundTemplate(input));
           if (ok) { guard.reset(); setEditTemplate(null); }
         })();
       }}
     >
       <fieldset disabled={guard.busy}>
-      <label><span>模板编码</span><input aria-label="模板编码" required value={value.key} onChange={(event) => setEditTemplate({ ...value, key: event.target.value })} /></label>
-      <label><span>模板名称</span><input aria-label="模板名称" required value={value.name} onChange={(event) => setEditTemplate({ ...value, name: event.target.value })} /></label>
+      <label><span>模板编码</span>{fieldError('模板编码')}<input aria-label="模板编码" required value={value.key} onChange={(event) => setEditTemplate({ ...value, key: event.target.value })} /></label>
+      <label><span>模板名称</span>{fieldError('模板名称')}<input aria-label="模板名称" required value={value.name} onChange={(event) => setEditTemplate({ ...value, name: event.target.value })} /></label>
       <label>
         <span>资料类型</span>
         <select aria-label="模板资料类型" value={value.materialType} onChange={(event) => setEditTemplate({ ...value, materialType: event.target.value as 'initial' | 'update' })}>
           <option value="initial">首批资料</option><option value="update">更新资料</option>
         </select>
       </label>
-      <label><span>主题模板</span><input aria-label="主题模板" required value={value.subjectTemplate} onChange={(event) => setEditTemplate({ ...value, subjectTemplate: event.target.value })} /></label>
-      <label><span>正文模板</span><textarea aria-label="正文模板" rows={6} required value={value.bodyTemplate} onChange={(event) => setEditTemplate({ ...value, bodyTemplate: event.target.value })} /></label>
-      {fieldHelper && <div className="ob-template-helper">
-        <div className="ob-template-insert"><label>插入到<select aria-label="字段插入位置" value={insertTarget} onChange={event => setInsertTarget(event.target.value as 'subjectTemplate' | 'bodyTemplate')}><option value="subjectTemplate">主题</option><option value="bodyTemplate">正文</option></select></label>{previewFields.map(([key, label]) => { const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'); const present = new RegExp(pattern.source).test(value[insertTarget]); return <button className={`text-button ${present ? 'is-inserted' : ''}`} aria-pressed={present} type="button" key={key} onClick={() => beginTemplate({ ...value, [insertTarget]: present ? value[insertTarget].replace(pattern, '') : `${value[insertTarget]}${insertTarget === 'bodyTemplate' && value[insertTarget] ? '\n' : ''}{{${key}}}` })}>{label} · {present ? '移除' : '添加'}</button>; })}</div>
+      <label><span>适用厂家</span><input aria-label="适用厂家" value={value.manufacturer ?? ''} onChange={event => setEditTemplate({ ...value, manufacturer: event.target.value })} /></label>
+      <label><span>邮件场景</span><input aria-label="邮件场景" list="mail-scenarios" value={value.scenario ?? ''} onChange={event => setEditTemplate({ ...value, scenario: event.target.value })} /><datalist id="mail-scenarios">{['首批资料', '铭牌待更新', '补充铭牌', '正式铭牌', '完整资料交付', '更新资料'].map(name => <option key={name} value={name} />)}</datalist></label>
+      <label><span>主题模板</span>{fieldError('主题模板')}<input aria-label="主题模板" required value={value.subjectTemplate} onChange={(event) => setEditTemplate({ ...value, subjectTemplate: event.target.value })} /></label>
+      <label><span>正文模板</span>{fieldError('正文模板')}<textarea aria-label="正文模板" rows={6} required value={value.bodyTemplate} onChange={(event) => setEditTemplate({ ...value, bodyTemplate: event.target.value })} /></label>
+      {(fieldHelper || mode === 'templates') && <div className="ob-template-helper">
+        <div className="ob-template-insert"><label>插入到<select aria-label="字段插入位置" value={insertTarget} onChange={event => setInsertTarget(event.target.value as 'subjectTemplate' | 'bodyTemplate')}><option value="subjectTemplate">主题</option><option value="bodyTemplate">正文</option></select></label>{previewFields.map(([key, label]) => { const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'); const present = new RegExp(pattern.source).test(value[insertTarget]); return <button className={`text-button ${present ? 'is-inserted' : ''}`} aria-pressed={present} type="button" key={key} onClick={() => setEditTemplate({ ...value, [insertTarget]: present ? value[insertTarget].replace(pattern, '') : `${value[insertTarget]}${insertTarget === 'bodyTemplate' && value[insertTarget] ? '\n' : ''}{{${key}}}` })}>{label} · {present ? '移除' : '添加'}</button>; })}</div>
         <details className="ob-template-preview" open><summary>样例效果预览</summary><div className="ob-template-preview-content"><strong>{samplePreview(value.subjectTemplate) || '（主题未填写）'}</strong><pre>{samplePreview(value.bodyTemplate) || '（正文未填写）'}</pre></div></details>
       </div>}
       <button className="primary-button" type="submit">保存模板</button>
@@ -174,10 +184,10 @@ export function TemplateSettings({ api, fieldHelper = false, mode, registerLeave
   return (
     <section className="template-settings">
       <h3>{mode === 'signatures' ? '邮件签名' : '邮件模板'}</h3>
-      <p className="muted-text">模板中的可变字段由系统校验，特殊说明使用附加段落管理。</p>
-      {message && <p role="alert" className="error-banner">{message}</p>}
+
+      {message && !(editTemplate && ['模板编码', '模板名称', '主题模板', '正文模板'].some(label => message.includes(label))) && <p role="alert" className="error-banner">{message}</p>}
       {refreshFailed && <button type="button" className="text-button" disabled={guard.busy} onClick={() => void reload()}>重新加载列表</button>}
-      <div className="ob-config-editor">{editTemplate && templateForm(editTemplate)}{blockEditor && blockForm(blockEditor)}{editSignature && signatureForm(editSignature)}</div>
+      {(editTemplate || blockEditor || editSignature) && <div className="ob-config-editor">{editTemplate && templateForm(editTemplate)}{blockEditor && blockForm(blockEditor)}{editSignature && signatureForm(editSignature)}</div>}
       <fieldset disabled={guard.busy} className="ob-config-list-fieldset">
       <div className="settings-columns">
         {mode !== 'signatures' && <section>
@@ -186,10 +196,10 @@ export function TemplateSettings({ api, fieldHelper = false, mode, registerLeave
           {templates.length === 0 && <p className="muted-text">暂无邮件模板</p>}
           {templates.map((item) => (
             <article key={item.id}>
-              <strong>{item.name}</strong>
+              <strong>{item.name}</strong><small className="ob-template-classification">{[item.manufacturer, item.scenario].filter(Boolean).join(" · ")}</small>
               <small><span className={`ob-template-status ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span></small>
               <div>
-                <button className="text-button" type="button" aria-label={`编辑模板 ${item.name}`} onClick={() => beginTemplate({ id: item.id, key: item.key, name: item.name, materialType: item.materialType, subjectTemplate: item.subjectTemplate, bodyTemplate: item.bodyTemplate })}>编辑</button>
+                <button className="text-button" type="button" aria-label={`编辑模板 ${item.name}`} onClick={() => beginTemplate({ id: item.id, manufacturer: item.manufacturer, scenario: item.scenario, key: item.key, name: item.name, materialType: item.materialType, subjectTemplate: item.subjectTemplate, bodyTemplate: item.bodyTemplate })}>编辑</button>
                 <button className="text-button" type="button" onClick={() => void run(() => item.status === 'active' ? api.deactivateOutboundTemplate(item.id) : api.activateOutboundTemplate(item.id))}>{item.status === 'active' ? '停用' : '启用'}</button>
                 <button className="text-button danger" type="button" onClick={() => void remove(`模板 ${item.name}`, () => api.deleteOutboundTemplate(item.id), editTemplate?.id === item.id || blockEditor?.templateId === item.id)}>删除</button>
               </div>

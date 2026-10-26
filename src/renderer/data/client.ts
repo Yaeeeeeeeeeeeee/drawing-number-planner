@@ -1,3 +1,4 @@
+import type { DrawingForceReleasePreview } from '../../core/drawings/drawing-force-release-types';
 import { createAppearanceApi, type AppearanceApi, type AppearanceVersion } from './appearance-client';
 import { createBomAppearanceApi, type BomAppearanceApi } from './bom-appearance-client';
 import { createDrawingAppearanceApi, type DrawingAppearanceApi } from './drawing-appearance-client';
@@ -48,6 +49,9 @@ export interface DrawingView {
   deletedPreviousStatus: string | null; deletedReason: string | null; occupied: boolean;
 }
 export interface DrawingFileView {
+  presenceStatus?: import('../../core/files/pdf-presence.js').PdfPresenceStatus;
+  presenceMessage?: string;
+  indexedIsPresent?: boolean;
   pdfIndexId: number; fileName: string; relativePath: string; isPresent: boolean; conversionType: 'source' | 'outlined'; materialBatchId?: number | null;
 }
 export interface DrawingBomUsageView {
@@ -219,11 +223,13 @@ export interface OutboundTemplateBlockView {
   status: OutboundReferenceStatusView; createdAt: string; updatedAt: string;
 }
 export interface OutboundEmailTemplateView {
+  manufacturer?: string | null; scenario?: string | null;
   id: number; key: string; name: string; materialType: OutboundMaterialTypeView;
   subjectTemplate: string; bodyTemplate: string; status: OutboundReferenceStatusView;
   createdAt: string; updatedAt: string; blocks: OutboundTemplateBlockView[];
 }
 export interface OutboundEmailTemplateInputView {
+  manufacturer?: string | null; scenario?: string | null;
   key: string; name: string; materialType: OutboundMaterialTypeView; subjectTemplate: string; bodyTemplate: string;
 }
 export interface OutboundTemplateBlockInputView {
@@ -242,6 +248,7 @@ export interface OutboundPackageRequestView {
   productId: number; selectedMaterialBatchId: number; materialType: OutboundMaterialTypeView; packageMode: OutboundPackageModeView;
 }
 export interface OutboundPackagePreviewItemView {
+  presenceStatus?: import('../../core/files/pdf-presence.js').PdfPresenceStatus;
   contentSha256?:string|null;sizeBytes?:number|null;defaultSelected?:boolean;source?:string;confirmationReason?:string|null;detail?:string|null;
   conversionType?:'source'|'outlined';appearanceVersionId?:number;
   comparison?:{batchId:number;batchName:string;files:Array<{pdfFileId:number;fileName:string;relativePath:string;fullCode:string|null;contentSha256:string|null}>};
@@ -282,6 +289,8 @@ export interface FileScanChangesView { scan: FileScanRunView;
 export interface FileIndexClearResultView { pdfFiles: number; qrCodeFiles: number; materialBatches: number; scanChanges: number; scanRuns: number }
 export interface FileIndexClearPreviewView { workspaceRoot: string | null; counts: FileIndexClearResultView }
 export interface PdfFileView {
+  presenceStatus?: import('../../core/files/pdf-presence.js').PdfPresenceStatus;
+  presenceMessage?: string;
   contentSha256?:string|null;
   managementState?: 'included' | 'ignored' | 'needs_review';
   id: number; relativePath: string; fileName: string; drawingId: number | null; historicalDrawingId: number | null;
@@ -312,6 +321,8 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
   getDrawingDeletionPreview(id: number): Promise<DrawingDeletionPreviewView>;
   deleteDrawings(items: Array<{ signedId: number; mode: 'retain_occupied' | 'release'; confirmedCode: string }>):
     Promise<{ items: Array<{ signedId: number; status: 'deleted' | 'skipped' | 'failed'; message?: string }> }>;
+  getDrawingForceReleasePreview?(id: number): Promise<DrawingForceReleasePreview>;
+  forceReleaseDrawing?(id: number, input: {fingerprint:string;confirmed:true;reason?:string}): Promise<{outcome:'force_released';fullCode:string;occupied:false;releaseId:number}>;
   deleteDrawing(id: number, input: { mode: 'retain_occupied' | 'release'; confirmedCode: string; reason?: string }):
     Promise<{ outcome: 'deleted_retained' | 'deleted_released'; fullCode: string; occupied: boolean }>;
   restoreDrawing(id: number): Promise<DrawingDetailView>;
@@ -398,7 +409,7 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
     rows: Array<PlanningRowInputView & { expectedFullCode: string }> }): Promise<ReservedDrawingView[]>;
   getCurrentBom(productId: number): Promise<BomVersionView | null>;
   listBomVersions(productId: number): Promise<BomVersionSummaryView[]>;
-  queryBomVersions(filters?: { model?: string; businessChangeDate?: string; effectiveBatchRelativePath?: string; projectItemId?: number; fullCode?: string }): Promise<BomVersionSummaryView[]>;
+  queryBomVersions(filters?: { productCategory?: string; productId?: number; mainCategoryId?: number; businessDateFrom?: string; businessDateTo?: string; model?: string; businessChangeDate?: string; effectiveBatchRelativePath?: string; projectItemId?: number; fullCode?: string }): Promise<BomVersionSummaryView[]>;
   getBomVersion(id: number): Promise<BomVersionView>;
   previewBomVersionDeletion(id: number): Promise<BomVersionDeletionPreviewView>;
   deleteBomVersion(id: number, confirmed: boolean): Promise<BomVersionDeletionResultView>;
@@ -568,6 +579,8 @@ export const apiClient: PlannerApi = {
   getDrawing: (id) => request(`/api/drawings/${id}`),
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
+  getDrawingForceReleasePreview: (id) => request(`/api/drawings/${id}/force-release-preview`),
+  forceReleaseDrawing: (id, input) => request(`/api/drawings/${id}/force-release`, json('POST', input)),
   getDrawingDeletionPreview: (id) => request(`/api/drawings/${id}/deletion-preview`),
   deleteDrawing: (id, input) => request(`/api/drawings/${id}/delete`, json('POST', input)),
   deleteDrawings: (items) => request('/api/drawings/batch-delete', json('POST', { confirmed: true, items })),

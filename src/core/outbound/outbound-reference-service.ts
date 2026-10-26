@@ -18,7 +18,7 @@ export class OutboundReferenceError extends Error {
 
 export const outboundTemplateVariables = [
   'change_description', 'company_name', 'contact_salutation', 'file_list', 'model', 'optional_blocks',
-  'package_name', 'product_category', 'signature', 'brand_name', 'change_files', 'package_files',
+  'brand', 'category', 'date', 'batch', 'count', 'package_name', 'product_category', 'signature', 'brand_name', 'change_files', 'package_files',
 ] as const;
 type TemplateVariable = typeof outboundTemplateVariables[number];
 
@@ -100,15 +100,21 @@ export class OutboundReferenceService {
     const template = this.getTemplate(id);
     const suppliedUnknown = Object.keys(values).filter((name) => !allowedVariables.has(name)).sort();
     if (suppliedUnknown.length) this.unknownVariables(suppliedUnknown);
-    values = { brand_name: '', package_files: '',
+    values = { brand: values.brand_name, category: values.product_category, brand_name: '', package_files: '',
       change_files: [values.change_description, values.file_list].filter(Boolean).join('\n'), ...values };
-    const required = variablesIn(template.subjectTemplate, template.bodyTemplate);
-    const missing = required.filter((name) => !Object.prototype.hasOwnProperty.call(values, name) || values[name as TemplateVariable] == null);
+    const subjectTemplate = template.subjectTemplate;
+    const bodyTemplate = template.bodyTemplate.replace(/\{\{\s*optional_blocks\s*\}\}/gu, () => values.optional_blocks ?? '{{optional_blocks}}');
+    this.assertKnownVariables(subjectTemplate, bodyTemplate);
+    const required = variablesIn(subjectTemplate, bodyTemplate);
+    const missing = required.filter((name) => !Object.prototype.hasOwnProperty.call(values, name) || values[name as TemplateVariable] == null || (['brand', 'brand_name', 'model', 'category', 'product_category', 'date', 'batch', 'package_name', 'count'].includes(name) && !values[name as TemplateVariable]?.trim()));
     if (missing.length) {
       throw new OutboundReferenceError('MISSING_TEMPLATE_VARIABLE', `邮件模板缺少变量：${missing.join(', ')}`, undefined, missing);
     }
     const render = (value: string) => value.replace(variablePattern, (_match, name: TemplateVariable) => String(values[name] ?? ''));
-    return { subject: render(template.subjectTemplate), body: render(template.bodyTemplate) };
+    let body = render(bodyTemplate);
+    const signature = values.signature?.trim();
+    if (signature && !required.includes('signature') && !body.trimEnd().endsWith(signature)) body = `${body.trimEnd()}\n\n${signature}`;
+    return { subject: render(subjectTemplate), body };
   }
 
   listTemplateBlocks(templateId: number): OutboundTemplateBlock[] {
@@ -178,12 +184,23 @@ export class OutboundReferenceService {
   private normalizeTemplate(input: OutboundEmailTemplateInput): OutboundEmailTemplateInput {
     const key = input.key.trim().toLocaleLowerCase('en-US'); const name = input.name.trim();
     const subjectTemplate = input.subjectTemplate.trim(); const bodyTemplate = input.bodyTemplate.trim();
-    if (!keyPattern.test(key) || !name || !subjectTemplate || !bodyTemplate
-      || !(['initial', 'update'] as OutboundMaterialType[]).includes(input.materialType)) {
-      throw new OutboundReferenceError('INVALID_INPUT', '邮件模板数据不完整');
+    const fields = { key, name, subjectTemplate, bodyTemplate };
+    const labels = { key: '模板编码', name: '模板名称', subjectTemplate: '主题模板', bodyTemplate: '正文模板' };
+    for (const field of Object.keys(fields) as (keyof typeof fields)[]) {
+      if (!fields[field]) throw new OutboundReferenceError('INVALID_INPUT', `${labels[field]}不能为空`);
     }
-    this.assertKnownVariables(subjectTemplate, bodyTemplate);
-    return { key, name, materialType: input.materialType, subjectTemplate, bodyTemplate };
+    if (!(['initial', 'update'] as OutboundMaterialType[]).includes(input.materialType)) {
+      throw new OutboundReferenceError('INVALID_INPUT', '资料类型必须选择首批资料或更新资料');
+    }
+    for (const [label, text] of [['主题模板', subjectTemplate], ['正文模板', bodyTemplate]]) {
+      try { this.assertKnownVariables(text); }
+      catch (error) {
+        if (error instanceof OutboundReferenceError) throw new OutboundReferenceError(error.code, `${label}：${error.message}`, undefined, error.variableNames);
+        throw error;
+      }
+    }
+    return { key, name, materialType: input.materialType, subjectTemplate, bodyTemplate,
+      manufacturer: input.manufacturer?.trim() || null, scenario: input.scenario?.trim() || null };
   }
 
   private normalizeBlock(input: OutboundTemplateBlockInput): OutboundTemplateBlockInput {
@@ -222,6 +239,12 @@ export class OutboundReferenceService {
   }
 
   private assertKnownVariables(...templates: string[]): void {
+    for (const template of templates) {
+      const remaining = template.replace(/\{\{[^{}]*\}\}/gu, '');
+      if (remaining.includes('{{') || remaining.includes('}}')) {
+        throw new OutboundReferenceError('INVALID_INPUT', '变量格式错误，请使用 {{变量名}}');
+      }
+    }
     const unknown = variablesIn(...templates).filter((name) => !allowedVariables.has(name));
     if (unknown.length) this.unknownVariables(unknown);
   }

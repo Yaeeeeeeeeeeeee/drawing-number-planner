@@ -1,3 +1,5 @@
+import { inspectIndexedPdfPresence } from '../files/pdf-presence.js';
+import { DrawingForceReleaseService } from './drawing-force-release-service.js';
 import {DrawingReuseService} from './drawing-reuse-service.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { resolveCanonicalProductId } from '../products/appearance-identity.js';
@@ -13,12 +15,14 @@ export class DrawingQueryError extends Error {
 }
 
 export class DrawingQueryService {
+  readonly forceRelease: DrawingForceReleaseService;
   readonly associations: DrawingAssociationService;
   readonly reuse:DrawingReuseService;
   private readonly repository: DrawingRepository;
   private readonly batches: MaterialBatchService;
   private readonly deletion: DrawingDeletionService;
-  constructor(private readonly database: PlannerDatabase) {
+  constructor(private readonly database: PlannerDatabase,private readonly workspaceRoot?:()=>string|null) {
+    this.forceRelease = new DrawingForceReleaseService(database);
     this.associations = new DrawingAssociationService(database);
     this.reuse = new DrawingReuseService(database);
     this.repository = new DrawingRepository(database);
@@ -64,7 +68,8 @@ export class DrawingQueryService {
   get(id: number): DrawingDetailRecord {
     const drawing = this.repository.getDetail(id);
     if (!drawing) throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
-    return { ...drawing, ...this.firstBusinessReferences(id), associationEvidence: this.associations.preview(undefined,[id]).records[0]?.evidence ?? [], associationHistory: this.associations.history(id), batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
+    const observe=(files:typeof drawing.sourceFiles)=>this.workspaceRoot?files.map(file=>{const fact=inspectIndexedPdfPresence(this.workspaceRoot!(),file);return{...file,indexedIsPresent:file.isPresent,isPresent:fact.status==='present'||fact.status==='index-stale',presenceStatus:fact.status,presenceMessage:fact.message};}):files;
+    return { ...drawing,sourceFiles:observe(drawing.sourceFiles),outlinedFiles:observe(drawing.outlinedFiles), ...this.firstBusinessReferences(id), associationEvidence: this.associations.preview(undefined,[id]).records[0]?.evidence ?? [], associationHistory: this.associations.history(id), batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
   }
 
   private firstBusinessReferences(signedId:number) {

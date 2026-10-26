@@ -30,6 +30,13 @@ function index(relativePath = 'inside.pdf', isPresent = true): number {
 }
 
 describe('IndexedPdfResolver', () => {
+  it('opens a real file even when the previous scan marked its index missing', () => {
+    const target = join(workspace, 'returned.pdf'); writeFileSync(target, '%PDF-1.4');
+    const id = index('returned.pdf', false);
+    expect(resolver.resolve(id)).toBe(realpathSync.native(target));
+    expect(repository.getIndexedFile(id)?.isPresent).toBe(false);
+  });
+
   it('returns the canonical path for a present indexed file inside the configured workspace', () => {
     const target = join(workspace, 'nested', 'inside.pdf'); mkdirSync(join(workspace, 'nested')); writeFileSync(target, '%PDF');
     const id = index(join('nested', 'inside.pdf'));

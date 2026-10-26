@@ -21,11 +21,10 @@ it('isolates BOM preview from every real API, including initial reads', async ()
   expect(await screen.findByLabelText('所选 BOM 记录')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '删除 BOM -201' })).toBeDisabled();
   const desktop = vi.fn(); window.plannerDesktop = { showBomAssetInFolder: desktop } as never;
-  const locations = screen.getAllByRole('button', { name: '打开附件位置 说明书-图片.png' });
-  for (const location of locations) { expect(location).toBeDisabled(); fireEvent.click(location); }
+  expect(screen.queryByRole('button', { name: '打开附件位置 说明书-图片.png' })).toBeNull();
   fireEvent.change(screen.getByLabelText('输入型号确认删除整个 BOM'), { target: { value: 'MOCK-T40' } });
   expect(screen.getByRole('button', { name: '删除整个型号 BOM' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: '检查旧附件归档', hidden: true })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: '检查旧附件归档', hidden: true })).toBeNull();
   expect(desktop).not.toHaveBeenCalled();
   expect(access).not.toHaveBeenCalled();
 });
@@ -99,7 +98,7 @@ it('covers both attachment roles, missing roles, inheritance and preview failure
   expect(record?.items[4].assets[0].inherited).toBe(true);
   window.history.replaceState(null, '', '/?mock=bom');
   render(<BomAssetPreview assetId={-409} name="失败样例" />);
-  expect(screen.getByText(/预览失败/)).toBeInTheDocument();
+  expect(screen.getByText(/无法预览/)).toBeInTheDocument();
 });
 it('never requests the real attachment preview endpoint in Mock', () => {
   window.history.replaceState(null, '', '/?mock=bom');

@@ -159,3 +159,13 @@ it('updates one of three existing versions without POST, preserves original date
  db.prepare('update bom_versions set business_change_date=null where id=?').run(versions[0].id);
  const legacy=await app.inject({method:'PUT',url:`/api/boms/versions/${versions[0].id}`,payload:{input:{...base,expectedCurrentVersionId:versions[2].id},expectedRevision:0}});expect(legacy.statusCode).toBe(200);expect(legacy.json().version.businessChangeDate).toBeNull();expect(legacy.json().version.createdAt).toBe(versions[0].createdAt);
 });
+
+it('combines category, real product identity, main/project, inclusive business-date range and partial code', async()=>{
+ const input={productId:refs.product.id,businessChangeDate:'2026-10-20',expectedCurrentVersionId:null,items:[{projectItemId:refs.logo.id,drawingId:refs.drawing.id,usesWhiteMaterial:true}]};
+ const saved=(await app.inject({method:'POST',url:'/api/boms/versions',payload:input})).json().version;
+ const main=(db.prepare('select parent_id as id from dictionary_items where id=?').get(refs.logo.id) as {id:number}).id;
+ const params=new URLSearchParams({productCategory:'冰柜',productId:String(refs.product.id),mainCategoryId:String(main),projectItemId:String(refs.logo.id),businessDateFrom:'2026-10-20',businessDateTo:'2026-10-20',fullCode:refs.drawing.fullCode.slice(-6)});
+ const query=async()=>app.inject({method:'GET',url:`/api/boms/query?${params}`});
+ expect((await query()).statusCode).toBe(200);expect((await query()).json().items.map((v:{id:number})=>v.id)).toEqual([saved.id]);
+ for(const [key,value] of [['productCategory','其他'],['productId','99999'],['mainCategoryId','99999'],['businessDateFrom','2026-10-21'],['businessDateTo','2026-10-19']] as const){const old=params.get(key)!;params.set(key,value);expect((await query()).json().items).toEqual([]);params.set(key,old);}
+});

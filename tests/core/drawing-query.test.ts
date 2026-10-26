@@ -49,6 +49,16 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('DrawingQueryService', () => {
+  it('observes actual disk files separately from stale scan flags without changing indices',()=>{
+    const root=mkdtempSync(join(tmpdir(),'v5-drawing-presence-'));
+    try{
+      writeFileSync(join(root,'returned.pdf'),'%PDF-1.4');
+      db.prepare(`insert into pdf_files(relative_path,file_name,drawing_id,match_status,detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present) values('returned.pdf','returned.pdf',?,'matched','[]','source',8,'old','old',0)`).run(ids.first);
+      const service=new DrawingQueryService(db,()=>root);
+      expect(service.get(ids.first).sourceFiles[0]).toMatchObject({isPresent:true,presenceStatus:'index-stale'});
+      expect(db.prepare("select is_present from pdf_files where relative_path='returned.pdf'").get()).toEqual({is_present:0});
+    }finally{rmSync(root,{recursive:true,force:true});}
+  });
   it('groups real coding main categories under actual product IDs and applies the same intersection',()=>{
     const record=drawings.get(ids.first);
     expect(drawings.navigation().mainCategories).toContainEqual({productId:record.productId!,mainCategoryId:record.mainCategoryId,name:'印刷件类',code:'04',count:2});

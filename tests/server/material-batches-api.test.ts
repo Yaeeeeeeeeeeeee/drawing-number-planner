@@ -105,3 +105,20 @@ describe('material batch API', () => {
     await app.close();
   });
 });
+
+it('deletes a freshly observed empty batch with stale disposable indices through the API',async()=>{
+ const {mkdtempSync,mkdirSync,rmSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const root=mkdtempSync(join(tmpdir(),'v5-batch-api-'));const id=batch('20260211',null);
+ const row=db.prepare('select relative_path as path from material_batches where id=?').get(id) as {path:string};
+ mkdirSync(join(root,...row.path.split('\\')),{recursive:true});
+ db.prepare(`insert into pdf_files(relative_path,path_key,material_batch_id,file_name,match_status,detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present)
+ values ('stale.pdf','stale.pdf',?,'stale.pdf','unmatched','[]','outlined',1,'now','now',0)`).run(id);
+ const app=Fastify();registerMaterialBatchRoutes(app,new MaterialBatchService(db,()=>root));
+ try{
+  const preview=await app.inject({method:'GET',url:`/api/material-batches/${id}/deletion-preview`});expect(preview.json().allowed).toBe(true);
+  const response=await app.inject({method:'DELETE',url:`/api/material-batches/${id}`,payload:{fingerprint:preview.json().fingerprint,confirmation:'删除批次'}});
+  expect(response.statusCode,response.body).toBe(200);expect(response.json()).toEqual({deleted:id});
+  expect(db.prepare('select count(*) as count from pdf_files').get()).toEqual({count:0});
+  expect((await app.inject('/api/material-batches')).json().items).toEqual([]);
+ }finally{await app.close();rmSync(root,{recursive:true,force:true});}
+});

@@ -87,7 +87,7 @@ describe('OutboundReferenceService templates and blocks', () => {
     expect(db.prepare('select body from outbound_email_drafts where id = ?').get(draftId)).toEqual({ body: 'Original body' });
     service.updateTemplate(template.id, { key: template.key, name: template.name, materialType: 'update',
       subjectTemplate: '{{package_name}}', bodyTemplate: '自定义正文 {{change_description}}' });
-    expect(service.renderTemplate(template.id, values).body).toBe('自定义正文 旧兼容字段');
+    expect(service.renderTemplate(template.id, values).body).toBe('自定义正文 旧兼容字段\n\n顺祝商祺');
   });
 
   it('manages templates and optional blocks without embedding supplier contacts', () => {

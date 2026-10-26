@@ -10,6 +10,8 @@ export interface DrawingDeletionReferenceCounts {
   outlinedPdf: number;
   currentBom: number;
   historicalBom: number;
+  deletedBom?: number;
+  bomSnapshots?: number;
   currentMaterial: number;
   historicalMaterial: number;
   lineage: number;

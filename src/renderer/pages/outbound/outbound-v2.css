@@ -29,3 +29,6 @@
 .outbound-page.approved-outbound .outbound-selection-grid > :is(label,.outbound-product-field){display:grid;grid-template-rows:auto 40px;gap:6px;align-content:start;}
 .outbound-page.approved-outbound .outbound-selection-grid select{height:40px;min-height:40px;margin:0;}
 .outbound-overlay{position:fixed;inset:0;z-index:210;display:grid;place-items:center;background:#0005;padding:16px;}
+
+/* All indexed candidates remain available in one scrollable list. */
+.outbound-full-file-list { max-height: 60vh; overflow: auto; }

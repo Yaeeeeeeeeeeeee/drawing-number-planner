@@ -1,5 +1,6 @@
+import { isMaterialDirectory, isMaterialPdfPath } from './directory-policy.js';
 import { lstat, readdir, realpath } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, join, relative } from 'node:path';
 
 import { toWorkspaceRelativePath, validateWorkspaceRoot } from './workspace-paths.js';
 
@@ -27,9 +28,12 @@ export async function scanPdfWorkspace(rootInput: string, options: WorkspaceScan
       if (entry.isSymbolicLink()) continue;
       const absolutePath = join(directory, entry.name);
       if (entry.isDirectory()) {
+        const depth = relative(root, directory).split(/[\\/]+/).filter(Boolean).length;
+        if (depth === 2 && !isMaterialDirectory(entry.name)) continue;
         const resolved = await realpath(absolutePath); toWorkspaceRelativePath(root, resolved);
         await walk(absolutePath); continue;
       }
+      if (!isMaterialPdfPath(relative(root, absolutePath))) continue;
       if (!entry.isFile() || !entry.name.toLocaleLowerCase('en-US').endsWith('.pdf')) continue;
       const resolved = await realpath(absolutePath); toWorkspaceRelativePath(root, resolved);
       const stats = await lstat(absolutePath);

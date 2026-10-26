@@ -1,3 +1,4 @@
+import { isSourcePdfPath } from '../../core/files/directory-policy';
 import type { AppearanceApi } from '../data/appearance-client';
 import { plannerQueryCache, queryKey } from '../data/query-cache';
 import type { MaterialBatchDeletionPreview, PdfManagementApi, PdfManagementPreview } from '../data/pdf-management-client';
@@ -47,6 +48,7 @@ function FilePath({ path, name, onClose }: { path: string; name: string; onClose
 function FileBatch({ item, batches }: { item: PdfFileView; batches: MaterialBatchView[] }) {
   const batch = batches.find(value => value.id === item.materialBatchId);
   const state=batch?.currentState;
+  if(isSourcePdfPath(item.relativePath)) return <span className="files-source-label">未转曲源文件</span>;
   return state==='current'||state==='historical'?<span className={`files-batch ${state}`}><small className="files-status">{state==='current'?'当前批次':'历史批次'}</small></span>:<span className="muted-text">—</span>;
 }
 
@@ -54,6 +56,7 @@ function searchInput(values: typeof initialFilters, page: number, scope: PdfNavi
   return { ...values, ...(scope.productId ? { productId: scope.productId } : {}),
     ...(scope.batchId ? { materialBatchId: scope.batchId } : {}),
     ...(scope.appearanceVersionId ? {appearanceVersionId:scope.appearanceVersionId} : {}),
+    ...(scope.kind === 'source' ? {materialSource:'true'} : {}),
     ...(scope.kind === 'category' ? { productCategory: scope.category } : {}),
     ...(scope.kind === 'unassociated' ? { unassociatedProduct: 'true' } : {}), page, pageSize };
 }
@@ -500,12 +503,12 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
         { key: 'matchStatus', label: '匹配状态',width:92,minWidth:88,align:'center', render: item => <span title={item.classificationWarning ?? undefined} className={`file-match ${item.fullCode ? 'matched' : item.matchStatus}`}>
           <span className="files-match-badge">{item.fullCode ? '已匹配' : item.matchStatus === 'pending' ? '待确认' : item.matchStatus === 'conflict' ? '多图号冲突' : '未匹配'}</span></span> },
         { key: 'conversion', label: '类型',width:78,minWidth:72,align:'center', render: (item) => <span className={`conversion-label ${item.conversionType}`}>{item.conversionType === 'outlined' ? '转曲后' : '转曲前'}</span> },
-        { key: 'presence', label: '文件状态',width:90,minWidth:80,align:'center', render: (item) => <span className={`presence-label ${item.isPresent ? 'present' : 'missing'}`}>{item.managementState === 'ignored' ? '暂不纳入' : item.managementState === 'needs_review' ? '待复核' : item.isPresent ? '存在' : '缺失'}</span> },
+        { key: 'presence', label: '文件状态',width:90,minWidth:80,align:'center', render: (item) => <span className={`presence-label ${item.isPresent ? 'present' : 'missing'}`}>{item.managementState === 'ignored' ? '暂不纳入' : item.managementState === 'needs_review' ? '待复核' : item.presenceMessage ?? (item.isPresent ? '存在' : '缺失')}</span> },
         { key: 'actions', label: '操作', width: 160, minWidth: 154, locked: 'end', render: (item) => <div className="file-row-actions">
           <button id={`file-path-toggle-${item.id}`} type="button" className="files-path-button" aria-label={`查看 ${item.fileName} 的完整相对路径`}
             aria-expanded={expandedPathId === item.id} aria-controls={`file-path-${item.id}`}
             onClick={() => setExpandedPathId(expandedPathId === item.id ? null : item.id)}>{expandedPathId === item.id ? '收起路径' : '查看路径'}</button>
-          <button className="text-button" type="button" disabled={!item.isPresent}
+          <button className="text-button" type="button" disabled={item.presenceStatus ? !['present','index-stale'].includes(item.presenceStatus) : !item.isPresent}
             aria-label={`打开 ${item.fileName} 的位置`} onClick={() => void openLocation(item.id)}>打开位置</button>
 
         </div> },

@@ -37,3 +37,6 @@
 .bom-history-comparison .bom-history-batch-snapshots dl { display:grid; grid-template-columns:80px minmax(0,1fr); gap:6px; }
 .bom-history-comparison .bom-history-batch-snapshots :is(dt,dd) { margin:0; min-width:0; overflow-wrap:anywhere; }
 .bom-page .bom-value-text { overflow-wrap:anywhere; white-space:pre-wrap; }
+/* Static field labels stay compact; these detail tables have no saved layout. */
+.bom-page .bom-history-comparison .bom-history-fields col.bom-history-label-col { width:clamp(100px,22%,180px); }
+.bom-page .bom-history-comparison .bom-history-fields { min-width:0; }

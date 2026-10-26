@@ -19,12 +19,12 @@ export interface OutboundTemplateBlock {
 }
 
 export interface OutboundEmailTemplate {
-  id: number; key: string; name: string; materialType: OutboundMaterialType; subjectTemplate: string; bodyTemplate: string;
+  id: number; key: string; name: string; materialType: OutboundMaterialType; subjectTemplate: string; bodyTemplate: string; manufacturer?: string | null; scenario?: string | null;
   status: OutboundReferenceStatus; createdAt: string; updatedAt: string; blocks: OutboundTemplateBlock[];
 }
 
 export interface OutboundEmailTemplateInput {
-  key: string; name: string; materialType: OutboundMaterialType; subjectTemplate: string; bodyTemplate: string;
+  key: string; name: string; materialType: OutboundMaterialType; subjectTemplate: string; bodyTemplate: string; manufacturer?: string | null; scenario?: string | null;
 }
 
 export interface OutboundTemplateBlockInput {
@@ -47,7 +47,7 @@ interface ContactRow {
   status: OutboundReferenceStatus; notes: string | null; created_at: string; updated_at: string;
 }
 interface TemplateRow {
-  id: number; key: string; name: string; material_type: OutboundMaterialType; subject_template: string; body_template: string;
+  id: number; key: string; name: string; material_type: OutboundMaterialType; subject_template: string; body_template: string; manufacturer: string | null; scenario: string | null;
   status: OutboundReferenceStatus; created_at: string; updated_at: string;
 }
 interface BlockRow {
@@ -126,16 +126,16 @@ export class OutboundReferenceRepository {
   createTemplate(input: OutboundEmailTemplateInput): OutboundEmailTemplate {
     const now = new Date().toISOString();
     const id = Number(this.db.prepare(`insert into outbound_email_templates
-      (key, name, material_type, subject_template, body_template, status, created_at, updated_at)
-      values (?, ?, ?, ?, ?, 'active', ?, ?)`).run(input.key, input.name, input.materialType,
-      input.subjectTemplate, input.bodyTemplate, now, now).lastInsertRowid);
+      (key, name, material_type, subject_template, body_template, manufacturer, scenario, status, created_at, updated_at)
+      values (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`).run(input.key, input.name, input.materialType,
+      input.subjectTemplate, input.bodyTemplate, input.manufacturer ?? null, input.scenario ?? null, now, now).lastInsertRowid);
     return this.getTemplate(id)!;
   }
 
   updateTemplate(id: number, input: OutboundEmailTemplateInput): OutboundEmailTemplate | null {
     const changed = this.db.prepare(`update outbound_email_templates set key = ?, name = ?, material_type = ?,
-      subject_template = ?, body_template = ?, updated_at = ? where id = ?`).run(input.key, input.name,
-      input.materialType, input.subjectTemplate, input.bodyTemplate, new Date().toISOString(), id).changes;
+      subject_template = ?, body_template = ?, manufacturer = ?, scenario = ?, updated_at = ? where id = ?`).run(input.key, input.name,
+      input.materialType, input.subjectTemplate, input.bodyTemplate, input.manufacturer ?? null, input.scenario ?? null, new Date().toISOString(), id).changes;
     return changed ? this.getTemplate(id) : null;
   }
 
@@ -242,7 +242,7 @@ export class OutboundReferenceRepository {
 
   private toTemplate(row: TemplateRow): OutboundEmailTemplate {
     return { id: row.id, key: row.key, name: row.name, materialType: row.material_type,
-      subjectTemplate: row.subject_template, bodyTemplate: row.body_template, status: row.status,
+      manufacturer: row.manufacturer, scenario: row.scenario, subjectTemplate: row.subject_template, bodyTemplate: row.body_template, status: row.status,
       createdAt: row.created_at, updatedAt: row.updated_at, blocks: this.listBlocks(row.id) };
   }
 

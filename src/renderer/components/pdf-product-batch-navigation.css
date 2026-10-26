@@ -47,3 +47,7 @@
 .pdf-batch-context-menu button:hover,.pdf-batch-context-menu button:focus-visible {background:#edf0f3;outline:2px solid transparent;}
 .pdf-batch-context-menu [role=separator] {height:1px;margin:4px;background:var(--ws-line,#d7dce1);}
 .pdf-batch-context-menu .pdf-batch-delete {color:#a53d3d;}
+
+/* Keep the narrow navigation filter readable and inside its scrolling region. */
+.files-page .pdf-nav-filters .files-filter > button.primary-button {color:#fff;background:#365da8;min-height:36px;flex:none;align-self:stretch;width:100%;margin:2px 0 8px;white-space:nowrap;}
+.files-page .pdf-nav-filters .files-filter > button.primary-button:disabled {color:#fff;background:#727e94;opacity:1;cursor:wait;}

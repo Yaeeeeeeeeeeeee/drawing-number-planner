@@ -17,12 +17,12 @@ export function ModuleWorkspace({ children, navigation, detail, detailLabel, det
   const { width, height } = useWorkspaceExtent(root);
   const [navigationOpen, setNavigationOpen] = useState(false), [navigationCollapsed, setNavigationCollapsed] = useState(false);
   const catalogWorkspace = fileWorkspace || drawingWorkspace;
-  const defaultNavigation = catalogWorkspace ? 300 : 220;
-  const minimumNavigation = catalogWorkspace ? 260 : 180;
+  const defaultNavigation = fileWorkspace ? 260 : catalogWorkspace ? 300 : 220;
+  const minimumNavigation = fileWorkspace ? 220 : catalogWorkspace ? 260 : 180;
   const [preferredNavigation, setPreferredNavigation] = useState(defaultNavigation), [preferredDetail, setPreferredDetail] = useState(drawingWorkspace ? 640 : 380);
   const closeRef = useRef(onCloseDetail); closeRef.current = onCloseDetail;
   useEffect(()=>{const reset=()=>{setPreferredNavigation(defaultNavigation);setPreferredDetail(drawingWorkspace?640:380);};window.addEventListener('module-workspace:reset-layout',reset);return()=>window.removeEventListener('module-workspace:reset-layout',reset);},[defaultNavigation,drawingWorkspace]);
-  const maxNavigation = Math.max(minimumNavigation, Math.min(catalogWorkspace ? 420 : 280, width - 820));
+  const maxNavigation = Math.max(minimumNavigation, Math.min(fileWorkspace ? 320 : catalogWorkspace ? 420 : 280, width - 820));
   const navigationWidth = clamp(preferredNavigation, minimumNavigation, maxNavigation);
   const navigationDocked = width >= navigationWidth + 820 && !navigationCollapsed;
   const centerWidth = width - (navigation && navigationDocked ? navigationWidth + 10 : 0);

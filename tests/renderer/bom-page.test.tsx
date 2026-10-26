@@ -241,7 +241,7 @@ describe('BomPage product-level BOM', () => {
       if (!enabled) continue;
       const file = new File(['image'], name, { type: 'image/png' });
       fireEvent.change(screen.getByLabelText(`第 1 行${label}`), { target: { files: [file] } });
-      await screen.findByText(name);
+      await screen.findByRole('img',{name});
     }
     fireEvent.click(screen.getByRole('button', { name: '保存当前 BOM' }));
     await waitFor(() => expect(api.saveBomVersion).toHaveBeenCalled());
@@ -256,11 +256,12 @@ describe('BomPage product-level BOM', () => {
     const api = apiFixture(); api.queryBomVersions.mockResolvedValue([{ id: 20, productId: 1, model: 'ZC100', versionNumber: 1,
       previousVersionId: null, businessChangeDate: null, businessChangeDateLabel: '未补录', notes: null, createdAt: '2026-09-02T00:00:00Z' }]);
     render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
-    for (const label of ['查询 BOM 型号', '查询 BOM 业务日期', '查询 BOM 生效批次', '查询 BOM 主类别', '查询 BOM 项目明细', '查询 BOM 图号']) expect(screen.getByLabelText(label)).toBeVisible();
-    fireEvent.change(screen.getByLabelText('查询 BOM 型号'), { target: { value: 'ZC100' } });
-    fireEvent.change(screen.getByLabelText('查询 BOM 业务日期'), { target: { value: '2026-09-02' } });
-    expect(screen.getByLabelText('查询 BOM 生效批次')).toHaveAttribute('type', 'text');
-    fireEvent.change(screen.getByLabelText('查询 BOM 生效批次'), { target: { value: 'legacy/removed-snapshot' } });
+    for (const label of ['查询 BOM 产品类别', '查询 BOM 产品型号', '查询 BOM 开始日期', '查询 BOM 结束日期', '查询 BOM 主类别', '查询 BOM 项目明细', '查询 BOM 图号']) expect(screen.getByLabelText(label)).toBeVisible();
+    await waitFor(()=>expect(screen.getByLabelText('查询 BOM 产品型号').querySelectorAll('option')).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText('查询 BOM 产品类别'), { target: { value: '冰柜' } });
+    fireEvent.change(screen.getByLabelText('查询 BOM 产品型号'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('查询 BOM 开始日期'), { target: { value: '2026-09-02' } });
+    fireEvent.change(screen.getByLabelText('查询 BOM 结束日期'), { target: { value: '2026-09-30' } });
     fireEvent.change(screen.getByLabelText('查询 BOM 主类别'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('查询 BOM 项目明细'), { target: { value: '7' } });
     fireEvent.change(screen.getByLabelText('查询 BOM 图号'), { target: { value: '0401001' } });
@@ -273,8 +274,7 @@ describe('BomPage product-level BOM', () => {
     expect(table.querySelectorAll('tbody tr')[0].querySelectorAll('td')[1]).toHaveTextContent('ZC100');
     expect(within(table).getByRole('button',{name:'查看 BOM 20'})).toBeEnabled();
 
-    await waitFor(() => expect(api.queryBomVersions).toHaveBeenLastCalledWith({ model: 'ZC100', businessChangeDate: '2026-09-02',
-      effectiveBatchRelativePath: 'legacy/removed-snapshot', projectItemId: 7, fullCode: '0401001' }));
+    await waitFor(() => expect(api.queryBomVersions).toHaveBeenLastCalledWith({ productCategory:'冰柜',productId:1,mainCategoryId:6,businessDateFrom:'2026-09-02',businessDateTo:'2026-09-30',projectItemId:7,fullCode:'0401001' }));
   });
 
   it('keeps voided drawings visible for replacement without exposing historical QR editing', async () => {
@@ -290,14 +290,14 @@ describe('BomPage product-level BOM', () => {
   it('only offers previous-asset reuse when a source exists and makes a new upload replace it', async () => {
     const api = apiFixture();
     api.getCurrentBom.mockResolvedValue(activeCurrent); render(<BomPage api={api as never} />); await selectProduct(false);
-    expect(await screen.findByLabelText('第 1 行沿用图片')).toBeChecked();
-    expect(screen.getByLabelText('第 1 行沿用图片')).toBeChecked();
+    expect(await within(await screen.findByRole('group',{name:'第 1 行图片附件'})).findByRole('radio',{name:'使用上一版图片'})).toBeChecked();
+    expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
     const replacement = new File(['new'], '新版图片.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('第 1 行图片'), { target: { files: [replacement] } });
     await waitFor(() => expect(api.uploadBomAsset).toHaveBeenCalledWith(1, replacement));
-    expect(screen.getByLabelText('第 1 行沿用图片')).not.toBeChecked();
+    expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).not.toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
-    expect(screen.queryByLabelText('第 2 行沿用图片')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('group',{name:'第 2 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).toBeDisabled();
   });
 
   it('reloads eligible candidates after saving so an item can be replaced immediately', async () => {
@@ -317,12 +317,12 @@ describe('BomPage product-level BOM', () => {
     const api = apiFixture(); api.listDictionaries.mockResolvedValue([project, secondProject]);
     api.getCurrentBom.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], qrCodes: [{ id: 9, name: '说明书二维码', purposeDisplayName: '说明书', status: 'active' as const }] }] });
     render(<BomPage api={api as never} />); await selectProduct(false);
-    await screen.findByLabelText('第 1 行沿用图片');
+    await within(await screen.findByRole('group',{name:'第 1 行图片附件'})).findByRole('radio',{name:'使用上一版图片'});
     fireEvent.change(screen.getByLabelText('第 1 行项目明细'), { target: { value: '8' } });
     await waitFor(() => expect(api.listBomCandidates).toHaveBeenLastCalledWith({ productId: 1, projectItemId: 8, usesWhiteMaterial: false, entryMode: 'current' }));
     expect(screen.getByLabelText('第 1 行图号')).toHaveValue('');
     expect(within(screen.getByRole('group', { name: '第 1 行图片附件' })).queryByText('客户示意图.png')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('第 1 行沿用图片')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).toBeDisabled();
     expect(screen.queryByLabelText('第 1 行二维码 9')).not.toBeInTheDocument();
   });
 
@@ -376,12 +376,9 @@ describe('BomPage product-level BOM', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '查询' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
-    expect(await screen.findByText('客户示意图.png')).toBeVisible();
-    expect(screen.getByText(/一段非常长但必须完整显示/)).not.toBeVisible();
-    expect(screen.getByRole('button', { name: '打开附件位置 客户示意图.png' })).toBeDisabled();
-    fireEvent.load(screen.getByRole('img', { name: '客户示意图.png' }));
-    fireEvent.click(screen.getByRole('button', { name: '打开附件位置 客户示意图.png' }));
-    await waitFor(() => expect(desktopAction).toHaveBeenCalledWith(31));
+    expect(await screen.findByRole('img',{name:'客户示意图.png'})).toBeVisible();
+    expect(screen.queryByText('客户示意图.png')).toBeNull();expect(screen.queryByRole('button',{name:/打开附件位置/})).toBeNull();
+    fireEvent.click(screen.getByRole('button',{name:'放大图片'}));expect(screen.getByRole('dialog')).toBeVisible();expect(desktopAction).not.toHaveBeenCalled();
     delete window.plannerDesktop;
   });
 
@@ -447,4 +444,32 @@ it('reopens the editor using saved archived asset identities rather than replayi
  fireEvent.click(screen.getByRole('button',{name:'保存修改'}));await screen.findByLabelText('所选 BOM 记录');fireEvent.click(screen.getByRole('button',{name:'编辑 BOM'}));
  fireEvent.change(await screen.findByLabelText('第 1 行备注'),{target:{value:'仅改备注'}});fireEvent.click(screen.getByRole('button',{name:'保存修改'}));
  await waitFor(()=>expect(api.updateBomVersion).toHaveBeenCalledTimes(2));expect(api.updateBomVersion.mock.calls[1][1].items[0].assets).toEqual([{role:'image',assetId:42}]);expect(api.saveBomVersion).not.toHaveBeenCalled();
+});
+
+it('filters category/model by real product IDs, clears incompatible models, and resets seven query fields',async()=>{
+ const api=apiFixture();api.listProducts.mockResolvedValue([product,{...product,id:2,model:'ZC100',productCategory:'冰箱'}]);
+ render(<BomPage api={api as never}/>);
+ const category=await screen.findByLabelText('BOM 产品类别');await waitFor(()=>expect(category.querySelectorAll('option')).toHaveLength(3));
+ fireEvent.change(category,{target:{value:'冰柜'}});const model=screen.getByLabelText('BOM 产品型号');expect(model.querySelectorAll('option')).toHaveLength(2);
+ fireEvent.change(model,{target:{value:'1'}});await screen.findByText('尚未建立 BOM');
+ fireEvent.change(category,{target:{value:'冰箱'}});expect(model).toHaveValue('');expect(api.getCurrentBom).not.toHaveBeenCalledWith(2);
+ fireEvent.click(screen.getByRole('button',{name:'查询 BOM'}));
+ fireEvent.change(screen.getByLabelText('查询 BOM 产品类别'),{target:{value:'冰柜'}});
+ fireEvent.change(screen.getByLabelText('查询 BOM 产品型号'),{target:{value:'1'}});
+ fireEvent.change(screen.getByLabelText('查询 BOM 产品类别'),{target:{value:'冰箱'}});expect(screen.getByLabelText('查询 BOM 产品型号')).toHaveValue('');
+ await waitFor(()=>expect(screen.getByRole('button',{name:'重置'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'重置'}));expect(screen.getByLabelText('查询 BOM 产品类别')).toHaveValue('');
+ expect(screen.getAllByRole('combobox')).toHaveLength(4);expect(screen.queryByLabelText('查询 BOM 生效批次')).toBeNull();
+});
+it('restores the real source asset when replacing then choosing reuse, independently of the diagram',async()=>{
+ const api=apiFixture();api.getCurrentBom.mockResolvedValue(activeCurrent);api.uploadBomAsset.mockResolvedValue({...asset,id:99,originalFileName:'new.png'});
+ render(<BomPage api={api as never}/>);await selectProduct(false);
+ const image=await screen.findByRole('group',{name:'第 1 行图片附件'});
+ fireEvent.change(within(image).getByLabelText('第 1 行图片'),{target:{files:[new File(['new'],'new.png',{type:'image/png'})]}});
+ await within(image).findByRole('img',{name:'new.png'});
+ expect(within(image).getByRole('radio',{name:'更换图片'})).toBeChecked();
+ fireEvent.click(within(image).getByRole('radio',{name:'使用上一版图片'}));
+ expect(within(image).getByRole('img',{name:asset.originalFileName})).toHaveAttribute('src','/api/boms/assets/31/preview');
+ const diagram=screen.getByRole('group',{name:'第 1 行位置示意图附件'});expect(within(diagram).getByRole('radio',{name:'使用上一版图片'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'保存当前 BOM'}));
+ await waitFor(()=>expect(api.saveBomVersion).toHaveBeenCalled());expect(api.saveBomVersion.mock.calls[0][0].items[0].assets).toEqual([{role:'image',reusePrevious:true}]);
 });

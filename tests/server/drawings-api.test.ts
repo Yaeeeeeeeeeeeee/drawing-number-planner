@@ -360,3 +360,25 @@ it('round-trips formal and historical business status through strict APIs withou
     expect((await app.inject({method:'GET',url:'/api/drawings?status=inactive'})).json().total).toBe(0);
   } finally { await app.close(); }
 });
+
+
+describe('V5 explicit force release API',()=>{
+  it('keeps ordinary release blocked, requires impact+confirmation, and rejects stale impact',async()=>{
+    const drawing=seedPlannedDrawing(db,'active');
+    const app=Fastify();registerDrawingRoutes(app,new DrawingQueryService(db));
+    try {
+      const ordinary=await app.inject({method:'POST',url:`/api/drawings/${drawing.id}/delete`,payload:{mode:'release',confirmedCode:drawing.fullCode}});
+      expect(ordinary.statusCode).toBe(409);
+      const preview=await app.inject({method:'GET',url:`/api/drawings/${drawing.id}/force-release-preview`});
+      expect(preview.statusCode).toBe(200);
+      const missing=await app.inject({method:'POST',url:`/api/drawings/${drawing.id}/force-release`,payload:{fingerprint:preview.json().fingerprint}});
+      expect(missing.statusCode).toBe(400);
+      const stale=await app.inject({method:'POST',url:`/api/drawings/${drawing.id}/force-release`,payload:{fingerprint:'old',confirmed:true}});
+      expect(stale.statusCode).toBe(409);
+      const released=await app.inject({method:'POST',url:`/api/drawings/${drawing.id}/force-release`,payload:{fingerprint:preview.json().fingerprint,confirmed:true}});
+      expect(released.statusCode).toBe(200);expect(released.json().occupied).toBe(false);
+      expect((await app.inject({method:'GET',url:`/api/drawings/${drawing.id}`})).statusCode).toBe(404);
+      expect(db.pragma('foreign_key_check')).toEqual([]);
+    }finally{await app.close();}
+  });
+});

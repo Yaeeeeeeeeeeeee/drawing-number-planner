@@ -1,3 +1,4 @@
+import {DrawingForceRelease} from './DrawingForceRelease';
 import {selectDrawingFiles} from './drawing-file-selection';
 import {drawingCategoryStyle,drawingBusinessState,drawingBusinessLabel,upgradeDrawingColumnLayout} from './drawing-library-presentation';
 import './drawing-library.css';
@@ -337,7 +338,8 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
       <select aria-label="关联产品型号" value={associationProduct} onChange={event=>setAssociationProduct(event.target.value)}><option value="">请选择产品</option>{products.map(p=><option key={p.id} value={p.id}>{p.sku} · {p.model} · {p.productCategory} · ID {p.id}</option>)}</select>
       <input aria-label="关联修正原因" value={associationReason} onChange={event=>setAssociationReason(event.target.value)} placeholder="核对依据与修正原因" />
       <button type="button" disabled={maintaining||!associationProduct||!associationReason.trim()} onClick={()=>{setMaintaining(true);void api.correctDrawingAssociation!({signedId:selected.id,productId:Number(associationProduct),appearanceVersionId:null,reason:associationReason,confirmed:true}).then(async(result)=>{setAssociationResult(result);await refreshDetail(selected.id);await refreshCurrentQuery();setEditing(false);}).catch(reason=>setError(reason instanceof Error?reason.message:'关联修正失败')).finally(()=>setMaintaining(false));}}>确认修正关联</button></section>;
-  const detailPanel = selected ? <DrawingDetailPanel key={`${selected.id}-${detailRequest.current}`} associationEditor={associationEditor} selected={selected} contextBatchId={scope.batchId} contextProductId={scope.productId} editing={editing} onManage={() => {setEditing(true); setError('');}} onCancelManage={() => {setEditing(false); setStaged([]); setDeletionPreview(null); setError('');}} onSave={() => void saveAssociations()} staged={staged} onNavigatePdf={onNavigatePdf ? () => onNavigatePdf({fullCode:selected.fullCode,...((scope.productId ?? selected.productId) != null ? {productId:scope.productId ?? selected.productId!} : {}),...(scope.batchId ? {materialBatchId:scope.batchId} : {})}) : undefined} errorMessage={error} previewOnly={mockMode} maintaining={maintaining || mockMode}
+  const forceReleaseAction = selected && !mockMode && (!selected.deletedAt || selected.deletionMode === 'retain_occupied') ? <DrawingForceRelease key={selected.id} api={api} signedId={selected.id} disabled={maintaining} onError={setError} onReleased={async()=>{setSelected(null);setDeletionPreview(null);plannerQueryCache.invalidate();await search(filters,1,pageSize);}}/> : null;
+  const detailPanel = selected ? <DrawingDetailPanel forceReleaseAction={forceReleaseAction} key={`${selected.id}-${detailRequest.current}`} associationEditor={associationEditor} selected={selected} contextBatchId={scope.batchId} contextProductId={scope.productId} editing={editing} onManage={() => {setEditing(true); setError('');}} onCancelManage={() => {setEditing(false); setStaged([]); setDeletionPreview(null); setError('');}} onSave={() => void saveAssociations()} staged={staged} onNavigatePdf={onNavigatePdf ? () => onNavigatePdf({fullCode:selected.fullCode,...((scope.productId ?? selected.productId) != null ? {productId:scope.productId ?? selected.productId!} : {}),...(scope.batchId ? {materialBatchId:scope.batchId} : {})}) : undefined} errorMessage={error} previewOnly={mockMode} maintaining={maintaining || mockMode}
         pdfKeyword={pdfKeyword} setPdfKeyword={setPdfKeyword} pdfCandidates={pdfCandidates} selectedPdfId={selectedPdfId}
         setSelectedPdfId={setSelectedPdfId} onClose={() => { if (maintainingRef.current) return; detailRequest.current++; setSelected(null); disclosureButtons.current.get(selected.id)?.focus(); }} onStatus={changeStatus} onOpen={openLocation}
         onSearchPdf={(keyword) => loadPdfCandidates(keyword)} onAssociate={associatePdf} onHistoricalStatus={changeHistoricalStatus}
@@ -414,7 +416,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
 
 function DrawingDetailPanel({associationEditor, selected, contextBatchId, contextProductId, editing, onManage, onCancelManage, onSave, staged, onNavigatePdf, errorMessage, previewOnly = false, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
   setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus,
-  onBeginDelete, deletionPreview, deletionMode, setDeletionMode, deletionReason, setDeletionReason,
+  forceReleaseAction, onBeginDelete, deletionPreview, deletionMode, setDeletionMode, deletionReason, setDeletionReason,
   deletionConfirmation, setDeletionConfirmation, onConfirmDelete, onCancelDelete, onRestore, onError }: {
   associationEditor?: import('react').ReactNode; contextBatchId?: number; contextProductId?: number; editing: boolean; onManage(): void; onCancelManage(): void; onSave(): void; staged: Array<{pdfId:number;type:'source'|'outlined'}>; onNavigatePdf?(): void;
   selected: DrawingDetailView; errorMessage: string; previewOnly?: boolean; maintaining: boolean; pdfKeyword: string; setPdfKeyword(value: string): void;
@@ -422,6 +424,7 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
   onStatus(target: 'active' | 'voided'): Promise<void>; onOpen(id: number): Promise<void>;
   onSearchPdf(keyword: string): Promise<void>; onAssociate(type: 'source' | 'outlined'): Promise<void>;
   onHistoricalStatus(target: 'active' | 'inactive'): Promise<void>;
+  forceReleaseAction?: React.ReactNode;
   onBeginDelete(mode?:'retain_occupied'|'release'): Promise<void>; deletionPreview: DrawingDeletionPreviewView | null;
   deletionMode: 'retain_occupied' | 'release'; setDeletionMode(value: 'retain_occupied' | 'release'): void;
   deletionReason: string; setDeletionReason(value: string): void;
@@ -462,7 +465,7 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
         if(selected.origin==='historical')void onHistoricalStatus(event.target.value==='active'?'active':'inactive');
         else void onStatus(event.target.value==='active'?'active':'voided');
       }}><option value="active">使用中</option><option value="inactive">已停用</option></select></label>{associationEditor}
-    <div className="drawing-detail-toolbar">{editing ? <><button className="primary-button" disabled={maintaining} onClick={onSave} type="button">保存并返回详情</button><button className="secondary-button" disabled={maintaining} onClick={onCancelManage} type="button">取消编辑</button></> : <button className="secondary-button" disabled={previewOnly} onClick={onManage} type="button">改变产品所属</button>}{onNavigatePdf && <button className="text-button" type="button" onClick={onNavigatePdf}>查看 PDF 文件</button>}</div>    {<section className={`drawing-detail-section danger-zone${!selected.deletedAt && !deletionPreview ? ' danger-compact' : ''}`}>
+    <div className="drawing-detail-toolbar">{editing ? <><button className="primary-button" disabled={maintaining} onClick={onSave} type="button">保存并返回详情</button><button className="secondary-button" disabled={maintaining} onClick={onCancelManage} type="button">取消编辑</button></> : <button className="secondary-button" disabled={previewOnly} onClick={onManage} type="button">改变产品所属</button>}{onNavigatePdf && <button className="text-button" type="button" onClick={onNavigatePdf}>查看 PDF 文件</button>}</div>    {forceReleaseAction}{<section className={`drawing-detail-section danger-zone${!selected.deletedAt && !deletionPreview ? ' danger-compact' : ''}`}>
       {selected.deletedAt ? <><p>删除方式：{selected.deletionMode === 'release' ? '彻底删除并释放图号' : '删除记录并保留占号'}</p>
         {selected.deletedReason && <p className="muted-text">原因：{selected.deletedReason}</p>}
         <button className="secondary-button" disabled={maintaining} onClick={() => void onRestore()} type="button">恢复记录</button>
@@ -493,7 +496,7 @@ function DrawingDetailPanel({associationEditor, selected, contextBatchId, contex
 function DeletionReferenceSummary({ preview }: { preview: DrawingDeletionPreviewView }) {
   const labels: Array<[string, string]> = [
     ['presentPdf', '当前 PDF'], ['missingPdf', '缺失 PDF'], ['currentBom', '当前 BOM'], ['historicalBom', '历史 BOM'],
-    ['currentMaterial', '当前资料'], ['historicalMaterial', '历史批次'], ['lineage', '图号关系'], ['outboundSnapshot', '历史外发'],
+    ['deletedBom', '已删除 BOM 保留明细'], ['bomSnapshots', 'BOM 纠错快照'], ['currentMaterial', '当前资料'], ['historicalMaterial', '历史批次'], ['lineage', '图号关系'], ['outboundSnapshot', '历史外发'],
   ];
   return <ul className="deletion-reference-list">{labels.map(([key, label]) => <li key={key}>{label}：{preview.references[key] ?? 0}</li>)}</ul>;
 }
@@ -512,7 +515,7 @@ function CurrentOutlinedFiles({ selected, contextBatchId, contextProductId, onOp
   </>;
 }
 function FileSection({ title, selection, onOpen, previewOnly = false }: { title: string; selection:ReturnType<typeof selectDrawingFiles>; previewOnly?: boolean; onOpen(id: number): Promise<void> }) {
-  return <section className="drawing-detail-section drawing-file-section"><h3>{title}<span className={`drawing-file-presence ${selection.state}`}>{selection.state==='present'?'存在':selection.state==='ambiguous'?'待确认':'缺失'}</span></h3>
+  return <section className="drawing-detail-section drawing-file-section"><h3>{title}<span className={`drawing-file-presence ${selection.state}`}>{selection.state==='present'?(selection.message??'存在'):selection.state==='ambiguous'?'待确认':selection.state==='unavailable'?'无法核验':selection.state==='unlinked'?'未关联':'缺失'}</span></h3>
     {selection.files.length===0?<p className="muted-text">{selection.message??`暂无${title}`}</p>:<ul>{selection.files.map(file=><li key={file.pdfIndexId} className="drawing-file-row"><span className="drawing-file-identity"><strong className="drawing-file-name" title={file.fileName}>{file.fileName}</strong></span><button className="text-button" type="button" disabled={previewOnly||!file.isPresent} title={previewOnly?'Mock 不支持磁盘操作':undefined} aria-label={`打开${title} ${file.fileName} 的位置`} onClick={()=>void onOpen(file.pdfIndexId)}>打开位置</button></li>)}</ul>}
   </section>;
 }

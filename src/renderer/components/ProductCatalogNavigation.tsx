@@ -5,8 +5,9 @@ import { materialBatchLabel } from '../../core/files/material-batch-label';
 import { FileText, Folder, Package, Link2, Link2Off, Trash2, ChevronDown, ChevronRight, Search, Pencil } from 'lucide-react';
 import './pdf-product-batch-navigation.css';
 
-export type CatalogNavigationScope = { kind: 'all' | 'category' | 'product' | 'main-category' | 'appearance' | 'batch' | 'unassociated' | 'recycle'; category?: string; productId?: number; batchId?: number; mainCategoryId?:number;appearanceVersionId?: number };
+export type CatalogNavigationScope = { kind: 'all' | 'category' | 'product' | 'main-category' | 'appearance' | 'source' | 'batch' | 'unassociated' | 'recycle'; category?: string; productId?: number; batchId?: number; mainCategoryId?:number;appearanceVersionId?: number };
 export interface CatalogNavigationCounts {
+  sources?: Array<{productId:number;count:number}>;
   mainCategories?: Array<{productId:number;mainCategoryId:number;name:string;code:string;count:number}>;
   batchProducts?: Array<{materialBatchId:number;productId:number|null}>;
   appearances?: Array<{appearanceVersionId:number;count:number}>;
@@ -85,6 +86,7 @@ export function ProductCatalogNavigation({ products, batches, counts, scope, onS
             const title = mode === 'drawings' ? product.model : `${product.sku ?? '待补录'} · ${product.model}`;
             const opened = Boolean(query) || openProducts.includes(product.id);
             return <div className="pdf-nav-product" data-product-id={product.id} key={product.id}><div className="pdf-nav-branch"><button type="button" className="pdf-nav-expand" aria-label={`${opened ? '收起' : '展开'}产品 ${title}`} aria-expanded={opened} onClick={() => setOpenProducts(current => current.includes(product.id) ? current.filter(id => id !== product.id) : [...current, product.id])}>{opened ? <ChevronDown size={18} strokeWidth={1.8}/> : <ChevronRight size={18} strokeWidth={1.8}/>}</button>{select(`产品 ${title}`, scope.kind === 'product' && scope.productId === product.id, { kind: 'product', productId: product.id }, counts?.products.find(item => item.productId === product.id)?.count, title)}</div>
+              {opened&&mode==='files'&&<div className="pdf-nav-batch">{select('未转曲源文件',scope.kind==='source'&&scope.productId===product.id,{kind:'source',productId:product.id},counts?.sources?.find(item=>item.productId===product.id)?.count ?? 0,'未转曲源文件')}</div>}
               {opened&&(mode==='drawings'?mainCategories.filter(item=>item.productId===product.id&&item.count>0).map(item=><div className="pdf-nav-batch" key={item.mainCategoryId}>{select(`主类别 ${item.name}`,scope.kind==='main-category'&&scope.productId===product.id&&scope.mainCategoryId===item.mainCategoryId,{kind:'main-category',productId:product.id,mainCategoryId:item.mainCategoryId},counts?.mainCategories?.find(value=>value.productId===product.id&&value.mainCategoryId===item.mainCategoryId)?.count,item.name)}</div>):batches.filter(batch=>belongsToProduct(batch,product.id)).map(batch=>renderBatch(batch,product.id)))}</div>;
           })}
         </section>;
@@ -107,7 +109,7 @@ export function ProductCatalogNavigation({ products, batches, counts, scope, onS
       }}>
       <button type="button" role="menuitem" disabled={!onRenameBatch} onClick={()=>{const batch=batchMenu.batch;setBatchMenu(null);onRenameBatch?.(batch);}}><Pencil size={15} aria-hidden="true"/>重命名批次</button>
       <div role="separator"/>
-      <button type="button" role="menuitem" className="pdf-batch-delete" disabled={!onDeleteBatch} onClick={()=>{const batch=batchMenu.batch;setBatchMenu(null);onDeleteBatch?.(batch);}}>删除批次</button>
+      <button type="button" role="menuitem" className="pdf-batch-delete" disabled={!onDeleteBatch} onClick={()=>{const batch=batchMenu.batch;setBatchMenu(null);onDeleteBatch?.(batch);}}><Trash2 size={15} aria-hidden="true"/>删除批次</button>
     </div>,document.body)}
   </nav>;
 }
