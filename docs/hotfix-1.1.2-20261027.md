@@ -15,3 +15,9 @@
 用户正式数据库和原PDF未在环境，验收使用原样目录/文件名的隔离真实文件。升级保留原数据请选择旧库，再执行一次扫描；创建新库不要求文件选择，且不覆盖旧库。
 
 最终源码 `2a0a406e9d1ccd06d1ef92032239e5efe64ec64b`，Windows运行 [40451075353](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/40451075353)。Setup工件12710597548、验证工件12710447538，发布器固定来源及摘要，并要求sourceBatchColumnsCorrect为真、两次实际重装/新库/旧库保护及五档列宽均通过。旧版本保留，Tag不移动。
+
+## 正式交付
+
+发布运行 [40451597168](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/40451597168) 成功，正式 [v1.1.2](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.2) 非草稿、五份附件及首页均已更新。EXE已实际下载，大小145,092,838字节，MZ头正确，SHA256 `ebe642c7986c38bba35874dc4f61f251c796cf73699df396c9ea648ddfa4e0b8`。公开报告ZIP摘要也匹配；原生报告sourceBatchColumnsCorrect为真，两个独立新库/旧库保留及五档容器宽度均通过。
+
+应用修改提交：1763e77（三项修复）、a1e9584（真实列表等待）、2a0a406（源文件列归位）；Tag固定2a0a406。发布与说明提交不改变该已验证应用源码。
