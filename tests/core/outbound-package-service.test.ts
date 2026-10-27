@@ -971,3 +971,48 @@ describe('simplified outbound batch workflow', () => {
     expect(result.fileCount).toBe(1);
   });
 });
+
+describe('V5.1 truthful completed mail facts',()=>{
+  const bytes=(id:number,text:string)=>{const row=db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string};writeFileSync(join(workspace,row.path),`%PDF-1.7\n${text}`);};
+  const req=()=>({...request(),workflowVersion:2 as const,materialType:'update' as const,packageMode:'change_only' as const});
+  function comparison(){
+    db.prepare("update dictionary_items set name='铭牌' where type='project_item' and code='01'").run();
+    const main=db.prepare("select id from dictionary_items where type='main_category' and code='04'").get() as {id:number};dictionary('project_item','02','说明书',main.id);
+    bytes(pdfId,'nameplate before');
+    const priorManual=addOutlined({relativePath:'manual-old（转曲）.pdf',fullCode:'02.0209.010.0402001'});
+    db.prepare("update historical_drawing_numbers set project_item_code='02' where full_code='02.0209.010.0402001'").run();bytes(priorManual,'unchanged manual');
+    const next=addBatch('01.20261027',1);
+    const label=addOutlined({batch:next,relativePath:'铭牌-new（转曲）.pdf'});bytes(label,'nameplate after');
+    const manual=addOutlined({batch:next,relativePath:'manual-new（转曲）.pdf',fullCode:'02.0209.010.0402001'});bytes(manual,'unchanged manual');
+    return {next,label,manual,priorManual};
+  }
+  it('omits unchanged copies from change-only scope, confirms the single actual changed PDF and returns its frozen ZIP facts',async()=>{
+    const {next,label,manual,priorManual}=comparison();const input={...req(),selectedMaterialBatchId:next};
+    const before=[pdfId,label,manual,priorManual].map(id=>{const row=db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string};return readFileSync(join(workspace,row.path));});
+    const preview=service.previewPackage(input);
+    expect(preview.items.map(item=>item.pdfFileId)).toEqual([label]);
+    expect(preview.items[0]).toMatchObject({change:'same_code_changed',selectable:false});
+    const confirmed={...input,fileConfirmations:[{pdfFileId:label,reason:'已经逐页核对铭牌实际变更',contentSha256:preview.items[0].contentSha256!}]};
+    const ready=service.previewPackage(confirmed);expect(ready.items[0].selectable).toBe(true);
+    const result=await service.createPackage({...confirmed,previewToken:ready.previewToken,selectedPdfFileIds:[label]});
+    expect(result).toHaveProperty('mailFacts');
+    expect(result.mailFacts).toMatchObject({materialType:'update',packageMode:'change_only',batchName:'01.20261027',product:{id:productId,brandName:'SAMKYO',model:'T40',productCategory:'洗碗机'},items:[{pdfFileId:label,projectItemName:'铭牌',mainCategoryName:'印刷件类',fullCode:'02.0209.010.0401001',fileName:'铭牌-new（转曲）.pdf',change:'same_code_changed'}]});
+    expect([...decodedZipEntries(join(output,result.zipRelativePath)).keys()]).toEqual(['铭牌-new（转曲）.pdf']);
+    expect(service.historyDetail(result.id).files.map((file:Record<string,unknown>)=>file.pdfFileId)).toEqual([label]);
+    for(const [i,id] of [pdfId,label,manual,priorManual].entries()){const row=db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string};expect(readFileSync(join(workspace,row.path))).toEqual(before[i]);}
+  });
+  it('compares current-complete update files too, while preserving unchanged PDFs as copied rather than newly changed',()=>{
+    const {next,label,manual}=comparison();const preview=service.previewPackage({...req(),selectedMaterialBatchId:next,packageMode:'current_complete'});
+    expect(preview.baselineBatchId).toBe(batchId);
+    expect(preview.items.find(item=>item.pdfFileId===manual)).toMatchObject({change:'copied',selectable:true});
+    expect(preview.items.find(item=>item.pdfFileId===label)).toMatchObject({change:'same_code_changed',selectable:false});
+  });
+  it('requires explicit hash-bound review before declaring uncomparable update files changed',()=>{
+    bytes(pdfId,'actual first file');const input=req();const preview=service.previewPackage(input);
+    expect(preview.items[0]).toMatchObject({selectable:false,defaultSelected:false,status:'needs_confirmation'});
+    expect(preview.items[0].detail).toMatch(/变更.*核对/);
+    const ready=service.previewPackage({...input,fileConfirmations:[{pdfFileId:pdfId,reason:'已对照业务要求确认本次变更',contentSha256:preview.items[0].contentSha256!}]});
+    expect(ready.items[0]).toMatchObject({selectable:true});
+    bytes(pdfId,'different after review');expect(service.previewPackage({...input,fileConfirmations:[{pdfFileId:pdfId,reason:'已对照业务要求确认本次变更',contentSha256:preview.items[0].contentSha256!}]}).items[0].selectable).toBe(false);
+  });
+});

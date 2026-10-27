@@ -33,6 +33,7 @@ import { registerDictionaryRoutes } from './routes/dictionaries.js';
 import { registerBomRoutes } from './routes/boms.js';
 import { registerDrawingRoutes } from './routes/drawings.js';
 import { registerFileRoutes } from './routes/files.js';
+import { registerEmailTemplateImportRoutes } from './routes/email-template-import.js';
 import { registerImportRoutes } from './routes/import.js';
 import { registerMaterialBatchRoutes } from './routes/material-batches.js';
 import { registerOutboundReferenceRoutes } from './routes/outbound-reference.js';
@@ -122,6 +123,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     await registerImportRoutes(server, database, () => {
       createDatabaseBackup(database, paths.database, paths.backups, 'import');
     }, tasks);
+    await registerEmailTemplateImportRoutes(server, database);
     registerTaskRoutes(server, tasks);
     if (options.rendererDir) await server.register(fastifyStatic, { root: options.rendererDir });
     const address = await server.listen({ host, port: options.port ?? 4317 });

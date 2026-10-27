@@ -20,7 +20,8 @@ export function LayoutTable({tableId,columns,children,showLayoutTools=true,...pr
  useEffect(()=>{
   const container=ref.current?.parentElement;if(!container)return;
   const measure=()=>{
-   const style=getComputedStyle(container),tableStyle=getComputedStyle(ref.current!);
+   const table=ref.current;if(!table)return;
+   const style=getComputedStyle(container),tableStyle=getComputedStyle(table);
    const borderWidth=(side:'Left'|'Right')=>['none','hidden'].includes(tableStyle[`border${side}Style`])?0:parseFloat(tableStyle[`border${side}Width`])||0;
    // Collapsed borders contribute half their width outside the columns.
    const borders=borderWidth('Left')+borderWidth('Right');

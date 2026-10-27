@@ -130,7 +130,7 @@ export class OutboundBatchWorkflow {
       if (nearest.length === 1) baseline = nearest[0];
       else if (nearest.length > 1) warnings.push('上一完整批次顺序存在歧义，请手动选择对比基准；当前未完成历史差异对比');
     }
-    if (simplified && input.packageMode === 'change_only') {
+    if (simplified && (input.packageMode === 'change_only' || input.materialType === 'update')) {
       const group = (id:number) => {
         const files=read(id).filter(file=>file.conversionType==='outlined');
         const groups=new Set(files.map(file=>file.fullCode?codeScopeFromFullCode(file.fullCode):null));
@@ -210,16 +210,19 @@ export class OutboundBatchWorkflow {
       const linked = !!file.fullCode && !!file.projectItemId && file.matchStatus === 'matched';
       const drawingAvailable = this.drawingAvailable(file);
       const safeName = isSafeWindowsNameComponent(file.fileName) && file.fileName === win32.basename(file.relativePath) && file.fileName.length <= 255;
-      const needsConfirmation = isExtra || !belongs && !bomItem || !linked || conflict || differentCodeSameContent || unresolvedBaseline;
+      const unverifiedChange = input.materialType === 'update' && input.packageMode === 'change_only' && !baseline;
+      const needsConfirmation = unverifiedChange || isExtra || !belongs && !bomItem || !linked || conflict || differentCodeSameContent || unresolvedBaseline;
       const selectable = !!fact && file.isPresent && outlined && safeName && drawingAvailable && (!needsConfirmation || !!confirmation);
       const detail = !safeName ? '文件名与索引路径不一致或包含不安全字符' : !outlined ? '缺少转曲后文件'
         : inspections.get(file.id)?.problem ?? (!drawingAvailable ? '关联图号已删除或作废，须在文件中心重新确认'
           : conflict ? '同项目多版本或同图号内容不同' : differentCodeSameContent ? '不同图号但内容相同，请核查图号版本和业务关系'
             : unresolvedBaseline ? '对比基准文件缺失或存在多个版本，请人工核查'
+              : unverifiedChange ? '本次变更缺少可靠对比基准，请人工核对并确认'
               : isExtra ? '额外资料需明确确认其实际来源' : !belongs && !bomItem ? simplified ? '产品关联冲突，需人工核对' : '产品或外观归属需人工确认'
                 : !bomItem ? '未关联 BOM' : null);
       return {
         slotKey: slot(file), fullCode: file.fullCode, projectItemId: file.projectItemId, projectItemName: file.projectItemName ?? '项目待确认',
+        changeVerified: input.materialType !== 'update' || !!baseline || !!confirmation,
         pdfFileId: file.id, fileName: file.fileName, relativePath: file.relativePath,
         sourceBatchId: file.sourceBatchId ?? batch.id, sourceBatchName: batches.find(item => item.id === file.sourceBatchId)?.name ?? batch.name,
         presenceStatus: inspections.get(file.id)?.presenceStatus,
@@ -239,7 +242,7 @@ export class OutboundBatchWorkflow {
     if (missingFullCodes.length) warnings.push(`BOM 项目缺少对应有效文件：${missingFullCodes.join('、')}`);
     if (bom && extraPdfFileIds.length) warnings.push(`${extraPdfFileIds.length} 个批次文件未关联 BOM；可人工核对后正常外发`);
     const bomCheck = { status: !bom ? 'missing' as const : missingFullCodes.length || extraPdfFileIds.length ? 'partial' as const : 'matched' as const, missingFullCodes, extraPdfFileIds };
-    for (const file of previous.filter(file => !batchFiles.some(item => slot(item) === slot(file)))) {
+    for (const file of previous.filter(file => input.packageMode === 'change_only' && !batchFiles.some(item => slot(item) === slot(file)))) {
       items.push({ slotKey: slot(file), fullCode: file.fullCode, projectItemId: file.projectItemId, projectItemName: file.projectItemName ?? '项目待确认', pdfFileId: null,
         fileName: file.fileName, relativePath: file.relativePath, sourceBatchId: baseline!.id, sourceBatchName: baseline!.name,
         status: 'needs_confirmation', change: 'removed', selectable: false, conflictFullCodes: [], defaultSelected: false, source: 'baseline_removed', detail: '上一批有、当前批没有；不会自动补入' });
@@ -250,7 +253,9 @@ export class OutboundBatchWorkflow {
       selectedMaterialBatchId: input.selectedMaterialBatchId, materialType: input.materialType, packageMode: input.packageMode,
       baselineBatchId: input.baselineBatchId, baselineConfirmationReason: input.baselineConfirmationReason, extraPdfFileIds: extras, fileConfirmations: confirmations };
     const fingerprint = createHash('sha256').update(JSON.stringify({ input: requestFacts, items, facts, appearanceFacts })).digest('hex');
-    return { packageName, items, fingerprint, liveFiles, appearanceFacts, warnings, baselineBatchId: baseline?.id ?? null, bomCheck, batchCompleteness: batch.completeness };
+    const visibleItems = input.materialType === 'update' && input.packageMode === 'change_only'
+      ? items.filter(item => item.change !== 'copied' && item.change !== 'carried_forward') : items;
+    return { packageName, items: visibleItems, fingerprint, liveFiles, appearanceFacts, warnings, baselineBatchId: baseline?.id ?? null, bomCheck, batchCompleteness: batch.completeness };
   }
 
   private drawingAvailable(file: OutboundIndexedFile): boolean {

@@ -261,7 +261,8 @@ export interface OutboundPackagePreviewItemView {
 }
 export interface OutboundBatchScopeView {id:number;productId:number;name:string;originalName:string;relativePath:string;sequenceNumber:number|null;businessDate:string|null;appearanceVersionId:number|null;completeness:'pending'|'complete'|'partial';revision:number;baselineBatchId:number|null}
 export interface OutboundPackagePreviewView { warnings?:string[];baselineBatchId?:number|null;batchCompleteness?:'pending'|'complete'|'partial';bomCheck?:{status:'missing'|'matched'|'partial';missingFullCodes:string[];extraPdfFileIds:number[]};previewToken: string; packageName: string; items: OutboundPackagePreviewItemView[] }
-export interface CreatedOutboundPackageView { id: number; packageName: string; zipRelativePath: string; fileCount: number; createdAt: string;
+export interface CreatedOutboundPackageView {
+  mailFacts?: import('../../core/outbound/outbound-types').OutboundPackageMailFacts; id: number; packageName: string; zipRelativePath: string; fileCount: number; createdAt: string;
   parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number;fileCount?:number;contentSha256?:string;files?:Array<{fileName:string;contentSha256:string;pdfFileId:number}> }> }
 export interface OutboundHistoryFiltersView {
   brand?:string; model?:string; sku?:string; appearanceVersionId?:number; batchId?:number;
@@ -402,6 +403,8 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
   createOutboundPackage(input: OutboundPackageRequestView & { previewToken: string; selectedPdfFileIds: number[] }): Promise<CreatedOutboundPackageView>;
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
   confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
+  previewEmailTemplateImport?(file: File): Promise<{ previewId: string; report: import('../../core/import/email-template-import-types').EmailTemplateImportReport }>;
+  confirmEmailTemplateImport?(previewId: string, rows: import('../../core/import/email-template-import-types').EmailTemplateImportSelection[]): Promise<import('../../core/import/email-template-import-types').EmailTemplateImportResult>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
   confirmImport(auditId: string, selections: string[]): Promise<{ imported: number; skipped: number }>;
   previewPlan(input: { productId: number; appearanceId?: number; appearanceVersionId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
@@ -667,6 +670,11 @@ export const apiClient: PlannerApi = {
   listHistoricalProductCandidates: async () => (await request<{ items: HistoricalProductCandidateView[] }>(
     '/api/products/historical-candidates')).items,
   confirmHistoricalProductCandidate: (input) => request('/api/products/historical-candidates/confirm', json('POST', input)),
+  previewEmailTemplateImport: async (file) => {
+    const form = new FormData(); form.append('file', file);
+    return request('/api/import/email-templates/preview', { method: 'POST', body: form });
+  },
+  confirmEmailTemplateImport: (previewId, rows) => request('/api/import/email-templates/confirm', json('POST', { previewId, rows })),
   auditWorkbook: async (file) => {
     const form = new FormData(); form.append('file', file);
     return request('/api/import/excel/audit', { method: 'POST', body: form });

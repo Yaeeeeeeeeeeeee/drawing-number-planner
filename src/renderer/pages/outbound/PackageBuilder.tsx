@@ -23,6 +23,7 @@ const statusLabel = {
 } as const;
 
 export interface OutboundMailContext {
+  packageId?: number; createdAt?: string; manufacturer?: string; scenario?: string; packageMode?: OutboundPackageModeView;
   batchName?: string;
   appearanceVersionId?:number;
   appearanceLabel?:string;
@@ -31,7 +32,7 @@ export interface OutboundMailContext {
   packageName: string;
   product: ProductView;
   materialType: OutboundMaterialTypeView;
-  items: Array<{ projectItemName: string; fileName: string; sourceBatchName: string; pdfFileId: number; changeDetails?: string | null }>;
+  items: Array<{ changeVerified?: boolean; fullCode?: string | null; mainCategoryName?: string; change?: import('../../../core/outbound/outbound-types').OutboundMaterialChange; projectItemName: string; fileName: string; sourceBatchName: string; pdfFileId: number; changeDetails?: string | null }>;
 }
 
 interface PackageBuilderProps {
@@ -178,21 +179,18 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
       const value = await api.createOutboundPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: selected });
       if(!isCurrent())return;
       setCreated(value);
-      if (chosenProduct) {
+      if (chosenProduct && value.mailFacts) {
+        const facts = value.mailFacts;
         onPackage(value, {
-          bomVersionIds:[...new Set(preview.items.flatMap(item=>item.bomContext?.candidates.map(candidate=>candidate.bomVersionId)??[]))],
-          packageName: value.packageName,
-          batchName: batches.find(batch=>batch.id===Number(batchId))?.name,
-          packageFiles: value.parts?.map((part) => part.zipRelativePath) ?? [value.zipRelativePath],
-          product: chosenProduct,
-          materialType,
-          items: preview.items.flatMap((item) => (
-            item.pdfFileId && item.fileName && selected.includes(item.pdfFileId)
-              ? [{ projectItemName: item.projectItemName, fileName: item.fileName, sourceBatchName: item.sourceBatchName, pdfFileId: item.pdfFileId,
-                changeDetails: item.bomContext?.changeDetails ?? null }]
-              : []
-          )),
+          packageId: value.id, createdAt: facts.createdAt, packageMode: facts.packageMode,
+          bomVersionIds: [...new Set(preview.items.filter(item=>item.pdfFileId && facts.items.some(file=>file.pdfFileId===item.pdfFileId)).flatMap(item=>item.bomContext?.candidates.map(candidate=>candidate.bomVersionId)??[]))],
+          packageName: value.packageName, batchName: facts.batchName,
+          packageFiles: value.parts?.map(part=>part.zipRelativePath) ?? [value.zipRelativePath],
+          product: {...chosenProduct,...facts.product}, materialType: facts.materialType,
+          items: facts.items,
         });
+      } else {
+        setError('压缩包已生成，但服务未返回可核对的邮件清单，请更新本地服务后重新整理邮件。');
       }
     } catch (generateError) {
       if(isCurrent())setError(generateError instanceof Error ? generateError.message : '生成压缩包失败');

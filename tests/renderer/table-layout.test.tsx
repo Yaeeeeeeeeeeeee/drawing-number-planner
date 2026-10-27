@@ -120,3 +120,13 @@ describe('container-constrained shared table widths',()=>{
   expect(widths(screen.getByRole('table') as HTMLTableElement)).toEqual({select:48,name:160,batch:160,actions:532});
  });
 });
+
+it('ignores a queued size observation after a table is unmounted during workspace navigation',()=>{
+ let callback:ResizeObserverCallback|undefined;
+ vi.stubGlobal('ResizeObserver',class {constructor(fn:ResizeObserverCallback){callback=fn;}observe(){}unobserve(){}disconnect(){}});
+ try {
+  const view=render(<DataTable tableId="queued-unmount" columns={columns} items={[{id:1}]}/>);
+  expect(callback).toBeDefined();view.unmount();
+  expect(()=>callback!([],{} as ResizeObserver)).not.toThrow();
+ } finally {vi.unstubAllGlobals();}
+});

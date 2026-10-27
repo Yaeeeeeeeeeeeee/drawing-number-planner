@@ -8,6 +8,6 @@ test('browser preview opens outbound workspace while keeping desktop file action
   await page.getByText('编辑邮件草稿', { exact: true }).click();
   await expect(page.getByLabel('正文', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '邮件草稿' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '全部复制' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '复制邮件内容' })).toBeVisible();
   await expect(page.getByText(/Failed to fetch|请求失败/)).toHaveCount(0);
 });

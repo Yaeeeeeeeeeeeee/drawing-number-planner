@@ -11,7 +11,7 @@ const contactSchema = z.object({
   defaultRecipientType: z.enum(['to', 'cc']), notes: z.string().nullable().optional(),
 }).strict();
 const templateSchema = z.object({
-  key: z.string().trim().min(1), name: z.string().trim().min(1), materialType: z.enum(['initial', 'update']),
+  key: z.string().trim().optional(), name: z.string().trim().min(1), materialType: z.enum(['initial', 'update']),
   subjectTemplate: z.string().trim().min(1), bodyTemplate: z.string().trim().min(1),
   manufacturer: z.string().nullable().optional(), scenario: z.string().nullable().optional(),
 }).strict();
@@ -40,6 +40,7 @@ function sendReferenceError(error: unknown, reply: FastifyReply) {
       : ['DUPLICATE_EMAIL', 'DUPLICATE_KEY', 'DUPLICATE_BLOCK_KEY', 'REFERENCE_DATA_REFERENCED'].includes(error.code) ? 409 : 400;
     return reply.code(status).send({ error: { code: error.code, message: error.message,
       ...(error.referenceSummary ? { referenceSummary: error.referenceSummary } : {}),
+      ...(error.fieldErrors ? { fieldErrors: error.fieldErrors } : {}),
       ...(error.variableNames ? { variableNames: error.variableNames } : {}) } });
   }
   throw error;

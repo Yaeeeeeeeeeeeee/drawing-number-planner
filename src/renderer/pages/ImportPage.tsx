@@ -5,6 +5,7 @@ import { Fragment, useMemo, useState } from 'react';
 import type { ImportReportView, PlannerApi } from '../data/client';
 import { DataTable } from '../components/DataTable';
 import { isMigrationMock, MigrationMockPage } from './migration-mock';
+import { EmailTemplateImport } from './EmailTemplateImport';
 const dictionaryLabels: Record<string,string> = {brand:'品牌',product_size:'品类尺寸',appearance:'外观',color:'颜色',main_category:'主类别',project_item:'项目明细',layer_count:'兼容层数数据'};
 const issueLabels: Record<string,string> = {DUPLICATE_CODE:'工作簿重复编码',INCOMPLETE_ROW:'字段不完整',DATABASE_CONFLICT:'数据库编码冲突',AMBIGUOUS_PARENT:'主类别有歧义',MISSING_PARENT:'缺少主类别'};
 
@@ -12,6 +13,7 @@ export function ImportPage({ api }: { api: PlannerApi }) {
   return isMigrationMock() ? <MigrationMockPage/> : <ImportWorkspace api={api}/>;
 }
 function ImportWorkspace({ api }: { api: PlannerApi }) {
+  const [emailImportOpen, setEmailImportOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null); const [auditId, setAuditId] = useState('');
   const [report, setReport] = useState<ImportReportView | null>(null); const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState(''); const [error, setError] = useState('');
@@ -33,7 +35,8 @@ function ImportWorkspace({ api }: { api: PlannerApi }) {
   };
   const matches = (type:string,text:string) => (dictionaryFilter==='all'||dictionaryFilter===type)&&text.toLowerCase().includes(issueSearch.toLowerCase());
   const visibleCandidates = report?.candidates.filter(item => matches(item.type,`${item.code} ${item.name} ${item.sourceCell} ${item.parentName ?? ''}`) && (resultFilter==='all'||resultFilter==='eligible'&&!conflicted.has(item.id)||resultFilter==='blocked'&&conflicted.has(item.id))) ?? [];
-  return <section className="page-surface page-enter migration-integrated mm-page"><PageHeader title="迁移检查" description="核对导入候选与问题记录，确认范围后执行迁移。"></PageHeader>
+  return <section className="page-surface page-enter migration-integrated mm-page"><PageHeader title="迁移检查" description="核对导入候选与问题记录，确认范围后执行迁移。"><button type="button" className="secondary-button" onClick={() => setEmailImportOpen(true)}>导入邮件模板</button></PageHeader>
+    {emailImportOpen && <EmailTemplateImport api={api} onClose={() => setEmailImportOpen(false)}/>}
     <div className="mm-source"><label className="file-picker"><span>选择 Excel 文件</span><input aria-label="选择 Excel 文件" type="file" accept=".xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
       <strong>{file?.name ?? '尚未选择文件'}</strong><button className="primary-button" disabled={!file || busy} onClick={() => void audit()} type="button">{busy ? '检查中…' : '开始检查'}</button></div>
     <p className="mm-scope">检查范围：“新版图号”工作表的固定字典列与编码/父级关系。未检查历史图号、BOM、PDF 或跨批次复用；原文件不修改。</p>

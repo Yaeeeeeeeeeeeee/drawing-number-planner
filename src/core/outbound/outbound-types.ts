@@ -50,6 +50,7 @@ export interface OutboundPackageRequest {
 
 export interface OutboundPackagePreviewItem {
   presenceStatus?: import('../files/pdf-presence.js').PdfPresenceStatus;
+  changeVerified?: boolean;
   contentSha256?:string|null;sizeBytes?:number|null;defaultSelected?:boolean;source?:string;confirmationReason?:string|null;detail?:string|null;
   comparison?:{batchId:number;batchName:string;files:Array<{pdfFileId:number;fileName:string;relativePath:string;fullCode:string|null;contentSha256:string|null}>};
   conversionType?:'source'|'outlined';appearanceVersionId?:number;
@@ -82,7 +83,19 @@ export interface CreateOutboundPackageInput extends OutboundPackageRequest {
   selectedPdfFileIds: number[];
 }
 
+export interface OutboundPackageMailFacts {
+  product: { id: number; brandName: string; model: string; productCategory: string };
+  batchName: string;
+  materialType: OutboundPackageMaterialType;
+  packageMode: OutboundPackageMode;
+  createdAt: string;
+  items: Array<{ pdfFileId: number; projectItemName: string; mainCategoryName: string;
+    fullCode: string | null; fileName: string; sourceBatchName: string;
+    change: OutboundMaterialChange; changeVerified: boolean; changeDetails: string | null }>;
+}
+
 export interface CreatedOutboundPackage {
+  mailFacts?: OutboundPackageMailFacts;
   parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number; fileCount?:number;contentSha256?:string;files?:Array<{fileName:string;contentSha256:string;pdfFileId:number}> }>;
   id: number;
   packageName: string;

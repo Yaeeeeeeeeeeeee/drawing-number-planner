@@ -1,3 +1,4 @@
+import { parseDrawingCode } from '../drawings/drawing-code.js';
 import { verifyOutboundZip } from './verify-outbound-zip.js';
 import { OutboundBatchWorkflow } from './outbound-batch-workflow.js';
 import { BomService } from '../bom/bom-service.js';
@@ -273,6 +274,19 @@ export class OutboundPackageService {
         const indexed = preview.liveFiles.get(item.pdfFileId!)!.indexed;
         return { ...item, partNumber: part.partNumber, drawingId: indexed.drawingId, historicalDrawingId: indexed.historicalDrawingId };
       }));
+      const product = (preview.appearanceFacts as { product?: { id: number; brand: string; model: string; productCategory: string } } | undefined)?.product ?? this.repository.getProduct(input.productId)!;
+      const mailFacts: NonNullable<CreatedOutboundPackage['mailFacts']> = {
+        product: {id:product.id,brandName:product.brand,model:product.model,productCategory:product.productCategory},
+        batchName: (preview.appearanceFacts as { batch?: { name: string } } | undefined)?.batch?.name
+          ?? snapshots[0]?.sourceBatchName ?? '',
+        materialType: input.materialType, packageMode: input.packageMode, createdAt,
+        items: snapshots.map(item => {
+          const parts = item.fullCode ? parseDrawingCode(item.fullCode) : null;
+          const main = parts ? this.db.prepare("select name from dictionary_items where type='main_category' and code=? and parent_id is null").get(parts.mainCategoryCode) as {name:string}|undefined : undefined;
+          return {pdfFileId:item.pdfFileId!,projectItemName:item.projectItemName,mainCategoryName:main?.name??'未识别',
+            fullCode:item.fullCode,fileName:item.fileName!,sourceBatchName:item.sourceBatchName,change:item.change,changeVerified:item.changeVerified ?? input.materialType !== 'update',changeDetails:item.bomContext?.changeDetails??null};
+        }),
+      };
       const result = this.db.transaction(() => { const saved = this.repository.saveCompleted({ productId: input.productId, materialType: input.materialType,
         packageMode: input.packageMode, selectedMaterialBatchId: input.selectedMaterialBatchId,
         workflowVersion:input.workflowVersion, appearanceFacts:preview.appearanceFacts, packageName: preview.packageName, zipRelativePath: parts[0].zipRelativePath, createdAt,
@@ -280,8 +294,8 @@ export class OutboundPackageService {
       if(input.workflowVersion===2){
         const partFacts=parts.map(part=>({partNumber:part.partNumber,absolutePath:part.finalPath,zipRelativePath:part.zipRelativePath,sizeBytes:part.sizeBytes,contentSha256:createHash('sha256').update(readFileSync(part.finalPath)).digest('hex'),fileCount:part.group.length,files:part.group.map(({item})=>({pdfFileId:item.pdfFileId!,fileName:item.fileName!,contentSha256:item.contentSha256!}))}));
         this.db.prepare('insert into outbound_v2_snapshots(package_id,context_json,files_json,parts_json) values(?,?,?,?)').run(saved.id,JSON.stringify({...preview.appearanceFacts as object,request:input,createdAt}),JSON.stringify(snapshots),JSON.stringify(partFacts));
-        return {...saved,parts:partFacts};
-      }return saved;}).immediate();
+        return {...saved,parts:partFacts,mailFacts};
+      }return {...saved,mailFacts};}).immediate();
       this.tokens.delete(input.previewToken);
       return result;
     } catch (error) {

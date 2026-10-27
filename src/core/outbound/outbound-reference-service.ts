@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import type { PlannerDatabase } from '../../db/database.js';
 import { currentBuiltinEmailTemplate } from './builtin-email-template.js';
 import { OutboundReferenceRepository, type OutboundContact, type OutboundContactInput,
-  type OutboundEmailTemplate, type OutboundEmailTemplateInput, type OutboundMaterialType,
+  type OutboundEmailTemplate, type OutboundEmailTemplateInput as RepositoryTemplateInput, type OutboundMaterialType,
   type OutboundReferenceStatus, type OutboundSignature, type OutboundSignatureInput,
   type OutboundTemplateBlock, type OutboundTemplateBlockInput, type RecipientType,
   type UpdateOutboundTemplateBlockInput } from './outbound-reference-repository.js';
@@ -11,10 +12,13 @@ export type OutboundReferenceErrorCode = 'NOT_FOUND' | 'INVALID_INPUT' | 'DUPLIC
 
 export class OutboundReferenceError extends Error {
   constructor(public readonly code: OutboundReferenceErrorCode, message: string,
-    public readonly referenceSummary?: Record<string, number>, public readonly variableNames?: string[]) {
+    public readonly referenceSummary?: Record<string, number>, public readonly variableNames?: string[],
+    public readonly fieldErrors?: Record<string, string>) {
     super(message);
   }
 }
+
+export type OutboundEmailTemplateInput = Omit<RepositoryTemplateInput, 'key'> & { key?: string };
 
 export const outboundTemplateVariables = [
   'change_description', 'company_name', 'contact_salutation', 'file_list', 'model', 'optional_blocks',
@@ -78,8 +82,8 @@ export class OutboundReferenceService {
     catch (error) { return this.mapDatabaseError(error); }
   }
   updateTemplate(id: number, input: OutboundEmailTemplateInput): OutboundEmailTemplate {
-    this.getTemplate(id);
-    const normalized = this.normalizeTemplate(input);
+    const existing = this.getTemplate(id);
+    const normalized = this.normalizeTemplate(input, existing.key);
     try { return this.require(this.repository.updateTemplate(id, normalized), '邮件模板不存在'); }
     catch (error) { return this.mapDatabaseError(error); }
   }
@@ -100,13 +104,17 @@ export class OutboundReferenceService {
     const template = this.getTemplate(id);
     const suppliedUnknown = Object.keys(values).filter((name) => !allowedVariables.has(name)).sort();
     if (suppliedUnknown.length) this.unknownVariables(suppliedUnknown);
-    values = { brand: values.brand_name, category: values.product_category, brand_name: '', package_files: '',
-      change_files: [values.change_description, values.file_list].filter(Boolean).join('\n'), ...values };
+    values = { ...values,
+      brand: values.brand ?? values.brand_name, brand_name: values.brand_name ?? values.brand,
+      category: values.category ?? values.product_category, product_category: values.product_category ?? values.category,
+      change_files: values.change_files ?? (values.change_description != null || values.file_list != null
+        ? [values.change_description, values.file_list].filter(Boolean).join('\n') : undefined) };
     const subjectTemplate = template.subjectTemplate;
     const bodyTemplate = template.bodyTemplate.replace(/\{\{\s*optional_blocks\s*\}\}/gu, () => values.optional_blocks ?? '{{optional_blocks}}');
     this.assertKnownVariables(subjectTemplate, bodyTemplate);
     const required = variablesIn(subjectTemplate, bodyTemplate);
-    const missing = required.filter((name) => !Object.prototype.hasOwnProperty.call(values, name) || values[name as TemplateVariable] == null || (['brand', 'brand_name', 'model', 'category', 'product_category', 'date', 'batch', 'package_name', 'count'].includes(name) && !values[name as TemplateVariable]?.trim()));
+    const missing = required.filter((name) => values[name as TemplateVariable] == null
+      || (!['change_files', 'change_description', 'optional_blocks', 'signature', 'package_files'].includes(name) && !values[name as TemplateVariable]?.trim()));
     if (missing.length) {
       throw new OutboundReferenceError('MISSING_TEMPLATE_VARIABLE', `邮件模板缺少变量：${missing.join(', ')}`, undefined, missing);
     }
@@ -114,7 +122,11 @@ export class OutboundReferenceService {
     let body = render(bodyTemplate);
     const signature = values.signature?.trim();
     if (signature && !required.includes('signature') && !body.trimEnd().endsWith(signature)) body = `${body.trimEnd()}\n\n${signature}`;
-    return { subject: render(subjectTemplate), body };
+    const subject = render(subjectTemplate);
+    if ([subject, body].some(text => text.includes('{{') || text.includes('}}'))) {
+      throw new OutboundReferenceError('INVALID_INPUT', '邮件变量内容包含未替换的占位符，请核对实际外发数据');
+    }
+    return { subject, body };
   }
 
   listTemplateBlocks(templateId: number): OutboundTemplateBlock[] {
@@ -181,21 +193,30 @@ export class OutboundReferenceService {
     return { company, contactName, email, defaultRecipientType: input.defaultRecipientType, notes };
   }
 
-  private normalizeTemplate(input: OutboundEmailTemplateInput): OutboundEmailTemplateInput {
-    const key = input.key.trim().toLocaleLowerCase('en-US'); const name = input.name.trim();
-    const subjectTemplate = input.subjectTemplate.trim(); const bodyTemplate = input.bodyTemplate.trim();
-    const fields = { key, name, subjectTemplate, bodyTemplate };
-    const labels = { key: '模板编码', name: '模板名称', subjectTemplate: '主题模板', bodyTemplate: '正文模板' };
+  private normalizeTemplate(input: OutboundEmailTemplateInput, existingKey?: string): RepositoryTemplateInput {
+    const key = input.key?.trim().toLocaleLowerCase('en-US') || existingKey || `mail_${randomUUID().replaceAll('-', '')}`;
+    const name = input.name?.trim() ?? '';
+    const subjectTemplate = input.subjectTemplate?.trim() ?? ''; const bodyTemplate = input.bodyTemplate?.trim() ?? '';
+    const fields = { name, subjectTemplate, bodyTemplate };
+    const labels = { name: '模板名称', subjectTemplate: '主题模板', bodyTemplate: '正文模板' };
     for (const field of Object.keys(fields) as (keyof typeof fields)[]) {
-      if (!fields[field]) throw new OutboundReferenceError('INVALID_INPUT', `${labels[field]}不能为空`);
+      if (!fields[field]) {
+        const message = `${labels[field]}不能为空`;
+        throw new OutboundReferenceError('INVALID_INPUT', message, undefined, undefined, { [field]: message });
+      }
     }
     if (!(['initial', 'update'] as OutboundMaterialType[]).includes(input.materialType)) {
-      throw new OutboundReferenceError('INVALID_INPUT', '资料类型必须选择首批资料或更新资料');
+      const message = '资料类型必须选择首批资料或更新资料';
+      throw new OutboundReferenceError('INVALID_INPUT', message, undefined, undefined, { materialType: message });
     }
-    for (const [label, text] of [['主题模板', subjectTemplate], ['正文模板', bodyTemplate]]) {
+    for (const field of ['subjectTemplate', 'bodyTemplate'] as const) {
+      const text = fields[field]; const label = labels[field];
       try { this.assertKnownVariables(text); }
       catch (error) {
-        if (error instanceof OutboundReferenceError) throw new OutboundReferenceError(error.code, `${label}：${error.message}`, undefined, error.variableNames);
+        if (error instanceof OutboundReferenceError) {
+          const message = `${label}：${error.message}`;
+          throw new OutboundReferenceError(error.code, message, undefined, error.variableNames, { [field]: message });
+        }
         throw error;
       }
     }
@@ -274,6 +295,6 @@ export class OutboundReferenceService {
   }
 }
 
-export type { OutboundContact, OutboundContactInput, OutboundEmailTemplate, OutboundEmailTemplateInput,
+export type { OutboundContact, OutboundContactInput, OutboundEmailTemplate,
   OutboundMaterialType, OutboundReferenceStatus, OutboundSignature, OutboundSignatureInput,
   OutboundTemplateBlock, OutboundTemplateBlockInput, RecipientType, UpdateOutboundTemplateBlockInput };

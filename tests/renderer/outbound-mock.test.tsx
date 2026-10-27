@@ -36,6 +36,7 @@ describe('outbound isolated UI mock',()=>{
       fireEvent.click(screen.getByRole('button',{name:'预览文件'}));
       expect(screen.getAllByText('历史沿用').length).toBeGreaterThan(0);
       fireEvent.click(screen.getByRole('button',{name:'生成压缩包'}));
+      fireEvent.change(await screen.findByLabelText('适用厂家'), { target: { value: '__unscoped__' } });
       await waitFor(()=>expect((screen.getByLabelText('正文') as HTMLTextAreaElement).value).toContain('分包附件'));
       fireEvent.click(screen.getByRole('button',{name:'复制正文'}));await screen.findByText('已复制');expect(clipboard).toHaveBeenCalled();
       fireEvent.click(screen.getAllByRole('button',{name:'打开位置'})[0]);await screen.findByText('Mock：仅模拟打开位置，未调用桌面桥接。');
