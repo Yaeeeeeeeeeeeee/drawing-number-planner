@@ -23,9 +23,14 @@ it('real SQLite profile and delivery helper preserve old v15 rows, WAL backups, 
  expect(helper('audit-upgrade')).toContain('"passed":true');expect(await prepareProductionProfile({...input,chooseMode:()=>{throw Error('must not prompt on restart')}})).toBe(legacy);expect(readFileSync(join(legacy,'settings.json'))).toEqual(settings);
  }finally{rmSync(root,{recursive:true,force:true});}
 },20000);
-it('fresh creation never clears an existing default data directory',async()=>{
- const root=mkdtempSync(join(tmpdir(),'planner-fresh-refusal-'));try{const data=join(root,'DrawingNumberPlanner','data');mkdirSync(data,{recursive:true});writeFileSync(join(data,'planner.db'),'existing');let initialized=false;
- await expect(prepareProductionProfile({appData:root,chooseMode:async()=>'fresh',chooseDatabase:async()=>null,initializeDatabase(){initialized=true;}})).rejects.toThrow('不会覆盖');expect(initialized).toBe(false);expect(readFileSync(join(data,'planner.db'),'utf8')).toBe('existing');expect(existsSync(join(root,'DrawingNumberPlanner','profile.json'))).toBe(false);
+it('fresh creation preserves an existing default directory and initializes a separate empty database',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'planner-fresh-independent-'));
+ try{
+  const data=join(root,'DrawingNumberPlanner','data');mkdirSync(data,{recursive:true});
+  writeFileSync(join(data,'planner.db'),'existing');writeFileSync(join(data,'settings.json'),'existing settings');
+  const created=await prepareProductionProfile({appData:root,chooseMode:async()=>'fresh',chooseDatabase:async()=>{throw Error('fresh must not choose an existing file');},initializeDatabase(file:string){const db=openDatabase(file);try{migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});}finally{db.close();}}});
+  expect(created).not.toBe(data);expect(created).toMatch(/data-/);expect(readFileSync(join(data,'planner.db'),'utf8')).toBe('existing');expect(readFileSync(join(data,'settings.json'),'utf8')).toBe('existing settings');
+  const db=openDatabase(join(created,'planner.db'));try{expect(db.prepare('select count(*) as count from products').get()).toEqual({count:0});}finally{db.close();}
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 

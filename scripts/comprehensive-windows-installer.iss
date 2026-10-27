@@ -9,7 +9,7 @@
 [Setup]
 AppId={{69BB0C19-7394-4ADC-92D1-54A7D56B32EF}
 AppName=图号规划器
-AppVersion=1.1.0
+AppVersion=1.1.1
 AppPublisher=Drawing Number Planner
 DefaultDirName={localappdata}\Programs\DrawingNumberPlanner
 UsePreviousAppDir=no
@@ -38,6 +38,9 @@ Source: "{#PackageRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdir
 [Icons]
 Name: "{group}\图号规划器"; Filename: "{app}\图号规划器.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\图号规划器"; Filename: "{app}\图号规划器.exe"; WorkingDir: "{app}"
+
+[UninstallDelete]
+Type: files; Name: "{app}\installation.id"
 
 [Code]
 function NormalizeInstallDirectory(const Directory: String): String;
@@ -114,4 +117,18 @@ begin
     Result := ExistingSampleMessage()
   else
     Result := '';
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  InstallationId: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    { A successful installation gets its own identity, even for the same version.
+      This marker is application metadata; no business directory is touched. }
+    InstallationId := GetDateTimeString('yyyymmddhhnnsszzz', '-', ':');
+    if not SaveStringToFile(ExpandConstant('{app}\installation.id'), InstallationId, False) then
+      RaiseException('无法保存本次安装标识，请检查安装目录权限。');
+  end;
 end;

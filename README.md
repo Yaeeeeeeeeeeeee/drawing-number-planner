@@ -2,14 +2,15 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.1.0
+## 当前版本 v1.1.1
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.1.0/DrawingNumberPlanner-1.1.0-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.0)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.1.1/DrawingNumberPlanner-1.1.1-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.1)
 - [安装、升级和恢复说明](docs/install-and-upgrade.md)
 - [维护和发布方式](docs/maintenance.md)
-- [上一版 v1.0.0（升级前 Schema20 备份配套回退）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.0.0)
-- [V5 修改及验证说明](docs/v5-delivery-20261026.md)
+- [上一版 v1.1.0（Schema22）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.0)
+- [本次修复、原因和验证记录](docs/hotfix-1.1.1-20261027.md)
+- [V5 修改记录](docs/v5-delivery-20261026.md)
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
 
@@ -27,7 +28,7 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 | 数据来源 | 编码字典 | 维护实际编码名称及停用、受保护删除 |
 | 数据来源 | 迁移检查 | Excel 导入检查、预览和备份后的确认导入 |
 
-表格支持列宽调整、表头拖动换序及恢复默认布局；设置只保存在本机，不修改业务数据。产品、图号、PDF 和二维码长列表使用分块或虚拟滚动。
+表格总宽度跟随可用窗口，拖动在列间重新分配宽度；支持表头换序及恢复默认布局；设置只保存在本机，不修改业务数据。产品、图号、PDF 和二维码长列表使用分块或虚拟滚动。
 
 ## 核心业务规则
 
@@ -38,13 +39,13 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 - BOM 保留实际当前关系与历史快照。外发按明确选择的资料批次及打包范围核对文件，BOM 提供辅助依据；不隐式混入其他批次。
 - 二维码是独立记录，不参与正式图号占号。文件关联不会自动改变二维码启停状态。
 
-本版收紧包材扫描范围：产品目录中仅扫描 `02.未转曲源文件` 和 `03.量产后的变更文件`；源文件使用独立节点，不作为生产批次。二维码手动文件关联不受此目录限制。
+本版收紧包材扫描范围：产品目录中扫描 `02.未转曲源文件` 和已知生产变更目录，兼容 `03.量产后的变更文件（已量产的产品看最新日期）` 及历史“变更明细”名称；源文件使用独立节点，不作为生产批次。二维码手动文件关联不受此目录限制。
 
 详见 [项目 Skill](.agents/skills/drawing-number-planner/SKILL.md) 及其业务、安全和模型参考。
 
 ## 数据安全与升级
 
-升级前关闭旧程序并备份完整数据目录，启动新版继续选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema22：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
+每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema22：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
 
 移除 PDF 记录或删除内部空批次不会删除原始文件及磁盘文件夹。已用图号、BOM、产品归并及外发历史的引用继续受保护。普通取消占号继续执行原资格检查。新增的「强制取消占号并删除图号」是独立危险操作：显示真实影响后确认，释放当前占用但保留原身份、历史快照和审计；原 PDF 不删除，重扫旧同号文件不会自动关联到重新占用的号码。用户正式数据库及实际显示器 DPI 仍应在本地核对。
 
@@ -52,7 +53,7 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 
 ```sh
 git fetch --tags
-git switch --detach v1.1.0
+git switch --detach v1.1.1
 pnpm install
 pnpm typecheck
 pnpm test

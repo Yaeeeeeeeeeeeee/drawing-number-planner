@@ -67,9 +67,9 @@ try{
  if($Mode -eq 'inspect'){Save-Diagnostics;exit 0}
  if($Mode -ne 'qr'){
   Save-Stage 'waiting-for-mode-dialog'
-  $window=Wait-Window '图号规划器 · 首次启动'
+  $window=Wait-Window '图号规划器 · 选择数据库'
   $report.matchedWindow=@{name=$window.Current.Name;handle=$window.Current.NativeWindowHandle};Save-Stage 'mode-dialog-found'
-  $buttonName=if($Mode -eq 'existing'){'选择旧版数据库'}else{'创建空数据库'}
+  $buttonName=if($Mode -eq 'existing'){'使用旧数据库'}else{'创建新数据库'}
   $button=$window.FindFirst([System.Windows.Automation.TreeScope]::Descendants,(New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$buttonName)))
   if(!$button){throw "Native mode button not found: $buttonName"}
   $report.matchedControl=@{name=$button.Current.Name;id=$button.Current.AutomationId;handle=$button.Current.NativeWindowHandle};Save-Stage 'mode-button-found'

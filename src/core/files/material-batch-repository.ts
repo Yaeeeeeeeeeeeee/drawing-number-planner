@@ -1,3 +1,4 @@
+import { materialDirectoryScopeSql } from './material-directory-sql.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { MaterialBatchDeletionReference, ParsedMaterialBatch } from './material-batch-types.js';
 
@@ -60,7 +61,7 @@ export class MaterialBatchRepository {
   }
 
   markAllMissing(): void {
-    this.db.prepare('update material_batches set is_present = 0').run();
+    this.db.prepare(`update material_batches set is_present = 0 where ${materialDirectoryScopeSql("relative_path || char(92)",'production')}`).run();
   }
 
   upsert(batch: ParsedMaterialBatch, scannedAt: string, scanRunId: number): number {

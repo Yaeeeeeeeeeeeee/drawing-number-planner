@@ -63,11 +63,11 @@ if(JSON.stringify(beforeSeed)!==JSON.stringify(files(oldSeed)))throw Error('Orig
 const instructions=`图号规划器 Windows x64
 版本：${applicationVersion}\n源码：${revision}
 
-安装版为中文向导，允许自定义安装目录。首次启动时：
+安装版为中文向导，允许自定义安装目录。每次安装或升级后首次启动时：
 1. 升级用户先关闭旧版程序，选择旧数据目录中的 planner.db（可在旧版AppData数据目录找到）。
 2. 程序保留原 settings.json 与磁盘PDF路径，升级前在原数据目录 backups 中建立迁移备份。失败会回滚事务，不会清空数据库。
-3. 新用户选择创建空数据库；本安装包不含示例产品、图号、PDF、BOM或二维码。
-4. 后续版本使用稳定配置 AppData\\DrawingNumberPlanner\\profile.json，保留已选择目录，不按软件SHA创建新空库。
+3. 选择创建新数据库会自动建立独立空库，不要求选择文件；原库和资料保留。本包不含示例业务数据。
+4. 每次成功安装后询问一次使用旧库或新库；普通重启使用上次选择。稳定配置保留在 AppData\\DrawingNumberPlanner\\profile.json，不按软件SHA创建空库。
 5. 本版允许重复SKU/型号，以内部产品ID区分。产品默认外观仅用于新规划，不改旧图号。启动不归并产品；PDF可多选人工归纳并预览冲突，重扫保留确认。
 6. 不删除原始PDF。普通删除保留原占号保护；独立强制释放需先查看影响并明确确认，历史身份及快照保留。请核对历史BOM、二维码、外发快照，必要时关闭程序，用backups中的迁移前planner.db备份替换原库；旧程序不应打开已升级的新库。
 7. 安装目录仅存程序。卸载不会删除业务数据。

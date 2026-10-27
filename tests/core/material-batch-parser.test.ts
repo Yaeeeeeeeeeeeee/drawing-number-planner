@@ -55,7 +55,7 @@ describe('material batch parser', () => {
   });
 });
 
-it('excludes the legacy change-details directory from new batch parsing', () => {
+it('preserves real initial-batch recognition in the historical annotated production directory', () => {
   expect(parseMaterialBatch('吸尘器/AKVCH010JP-H10/03.量产后的变更明细（已量产的产品看最新日期）/00.首批大货/铭牌.pdf'))
-    .toBeNull();
+    .toMatchObject({name:'00.首批大货',sequenceNumber:0,recognitionStatus:'recognized'});
 });

@@ -36,7 +36,9 @@ function Install-AndCompare($requested,$expected,$logName) {
   }
   if ((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $desktopHash) { throw 'Desktop root file was overwritten' }
   if ((Get-FileHash -LiteralPath $personal -Algorithm SHA256).Hash -ne $personalHash) { throw 'Existing personal data was modified' }
-  return @{ requested=$requested; installed=$expected; verifiedFiles=$count }
+  $marker=Get-Content -LiteralPath (Join-Path $expected 'installation.id') -Raw
+  if (!$marker.Trim()) { throw 'Missing successful installation marker' }
+  return @{ requested=$requested; installed=$expected; verifiedFiles=$count; installationId=$marker.Trim() }
 }
 New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
 try {
@@ -44,6 +46,7 @@ try {
   # Case variations must still identify the physical root. The interactive
   # verifier also covers a trailing slash without command-line quote ambiguity.
   $rootResult=Install-AndCompare $desktop.ToUpperInvariant() $rootTarget 'desktop-root-install.txt'
+  if ($childResult.installationId -eq $rootResult.installationId) { throw 'Separate installations must have different markers' }
   @{ chineseChild=$childResult; desktopRoot=$rootResult; desktopFilePreserved=$true; personalDataPreserved=$true } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory 'windows-desktop-install.json')
 } finally {
   if ($createdSentinel) { Remove-Item -LiteralPath $sentinel }

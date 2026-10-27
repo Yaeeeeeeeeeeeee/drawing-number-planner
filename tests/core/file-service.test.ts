@@ -233,3 +233,29 @@ describe('FileService', () => {
     expect(db.prepare('select * from qr_code_files').all()).toEqual(oldQr);
     await service.scan();expect(db.prepare('select * from qr_code_files').all()).toEqual(oldQr);
   });});
+
+it('scans the reported ZU70SD source and annotated production paths into separate accurate navigation scopes',async()=>{
+ const dictionaries=new DictionaryService(db);
+ const brand=dictionaries.create({type:'brand',code:'02',name:'SAMKYO'});
+ const size=dictionaries.create({type:'product_size',code:'0305',name:'冰柜'});
+ const appearance=dictionaries.create({type:'appearance',code:'01',name:'一号外观'});
+ const product=new ProductService(db).create({sku:'SKDZU070JP',model:'ZU70SD',productCategory:'冰柜',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id});
+ const root=join(dataDir,'包材资料');
+ const source=['冰柜','SKDZU070JP-ZU70SD','02.未转曲源文件','02.0305.010.0201001-SAMKYO-ZU70SD白色-铭牌.pdf'];
+ const outlined=['冰柜','SKDZU070JP-ZU70SD','03.量产后的变更文件（已量产的产品看最新日期）','00.首批大货','02.0305.010.0201001-SAMKYO-ZU70SD白色-铭牌（转曲）.pdf'];
+ for(const parts of [source,outlined]){mkdirSync(join(root,...parts.slice(0,-1)),{recursive:true});writeFileSync(join(root,...parts),'%PDF-1.4\nreported path fixture\n%%EOF');}
+ settings.setWorkspaceRoot(root);const service=new FileService(repository,settings);
+ const first=await service.scan();expect(first).toMatchObject({total:2,source:1,outlined:1,missing:0});
+ const ids=db.prepare('select id,relative_path from pdf_files order by id').all();
+ expect(repository.search({productId:product.id,materialSource:true}).items).toEqual([expect.objectContaining({fileName:source.at(-1),conversionType:'source',materialBatchId:null,isPresent:true})]);
+ const batches=new (await import('../../src/core/files/material-batch-service')).MaterialBatchService(db).list({productId:product.id});
+ expect(batches).toEqual([expect.objectContaining({name:'00.首批大货',fileCount:1})]);
+ expect(repository.search({productId:product.id,materialBatchId:batches[0].id}).items).toEqual([expect.objectContaining({fileName:outlined.at(-1),conversionType:'outlined',isPresent:true})]);
+ expect(repository.navigation({})).toMatchObject({total:2,sources:[{productId:product.id,count:1}],batches:[{materialBatchId:batches[0].id,productId:product.id,count:1}]});
+ // Recover a prior false missing flag without replacing IDs or the original files.
+ db.prepare("update pdf_files set is_present=0 where conversion_type='outlined'").run();
+ expect(await service.scan()).toMatchObject({total:2,source:1,outlined:1,missing:0});
+ expect(db.prepare('select id,relative_path from pdf_files order by id').all()).toEqual(ids);
+ for(const parts of [source,outlined])expect(readFileSync(join(root,...parts),'utf8')).toBe('%PDF-1.4\nreported path fixture\n%%EOF');
+ expect(db.pragma('foreign_key_check')).toEqual([]);
+});

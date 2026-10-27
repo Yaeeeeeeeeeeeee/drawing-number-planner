@@ -1,16 +1,16 @@
-import {beforeEach,describe,expect,it} from 'vitest';
-import {fireEvent,render,screen,within} from '@testing-library/react';
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {act,fireEvent,render,screen,within} from '@testing-library/react';
 import {DataTable} from '../../src/renderer/components/DataTable';
 import {LayoutTable} from '../../src/renderer/components/LayoutTable';
-import {fillTrailingColumn,normalizeLayout} from '../../src/renderer/components/useTableLayout';
+import {fitColumnWidths,normalizeLayout} from '../../src/renderer/components/useTableLayout';
 const columns=[{key:'select',label:'选择',locked:'start' as const,width:48,minWidth:48,render:()=> 'check'},{key:'name',label:'名称',width:160,render:(x:{id:number})=>`Name ${x.id}`},{key:'batch',label:'批次',render:()=> 'Batch'},{key:'actions',label:'操作',locked:'end' as const,render:()=> 'Open'}];
 beforeEach(()=>localStorage.clear());
 describe('shared table layouts',()=>{
- it('fills only the current trailing column without changing stored requested widths',()=>{
+ it('fills the current trailing column by default and contracts to minima without changing preferences',()=>{
   const widths={name:160,batch:140};
-  expect(fillTrailingColumn([{key:'name'},{key:'batch'}],widths,600)).toEqual({name:160,batch:440});
-  expect(fillTrailingColumn([{key:'batch'},{key:'name'}],widths,600)).toEqual({name:460,batch:140});
-  expect(fillTrailingColumn([{key:'name'},{key:'batch'}],widths,200)).toEqual(widths);
+  expect(fitColumnWidths([{key:'name',label:'名称'},{key:'batch',label:'批次'}],widths,600)).toEqual({name:160,batch:440});
+  expect(fitColumnWidths([{key:'batch',label:'批次'},{key:'name',label:'名称'}],widths,600)).toEqual({name:460,batch:140});
+  expect(fitColumnWidths([{key:'name',label:'名称'},{key:'batch',label:'批次'}],widths,200)).toEqual({name:102.85714285714286,batch:97.14285714285714});
   expect(widths).toEqual({name:160,batch:140});
  });
  it('retains header dragging, edge resizing and reset without six-dot handles or instructional text',()=>{
@@ -52,4 +52,71 @@ describe('shared table layouts',()=>{
  it('keeps locked boundary columns fixed through keyboard attempts',()=>{render(<DataTable tableId="locked" columns={columns} items={[{id:1}]}/>);fireEvent.keyDown(screen.getByRole('columnheader',{name:'选择'}),{key:'ArrowRight',altKey:true});fireEvent.keyDown(screen.getByRole('columnheader',{name:'名称'}),{key:'ArrowLeft',altKey:true});fireEvent.keyDown(screen.getByRole('columnheader',{name:'操作'}),{key:'ArrowLeft',altKey:true});expect(screen.getAllByRole('columnheader').map(x=>x.getAttribute('data-column-key'))).toEqual(columns.map(c=>c.key));});
  it('does not turn row labels into resize handles',()=>{render(<LayoutTable tableId="row-label" columns={[{key:'label',label:'项目'},{key:'value',label:'值'}]}><tbody><tr><th scope="row">Row label</th><td>Value</td></tr></tbody></LayoutTable>);expect(screen.queryByRole('separator')).not.toBeInTheDocument();expect(screen.getByRole('rowheader')).not.toHaveAttribute('draggable');});
  it('ignores broken JSON and isolates reset by stable ID',()=>{localStorage.setItem('table-layout:v1:broken','{');render(<><DataTable tableId="broken" columns={columns} items={[]}/><DataTable tableId="other" columns={columns} items={[]}/></>);const handles=screen.getAllByRole('separator',{name:'调整名称列宽'});fireEvent.keyDown(handles[0],{key:'ArrowRight'});fireEvent.keyDown(handles[1],{key:'ArrowRight'});fireEvent.contextMenu(screen.getAllByRole('columnheader',{name:'名称'})[0]);expect(handles[0]).toHaveAttribute('aria-valuenow','160');expect(handles[1]).toHaveAttribute('aria-valuenow','170');});
+});
+
+
+describe('container-constrained shared table widths',()=>{
+ let available=900;
+ const widths=(table:HTMLTableElement)=>Object.fromEntries(Array.from(table.querySelectorAll('col')).map((col,index)=>[table.querySelectorAll('thead th')[index].getAttribute('data-column-key')!,parseFloat(col.style.width)]));
+ const total=(table:HTMLTableElement)=>Object.values(widths(table)).reduce((sum,width)=>sum+width,0);
+ const pointer=(separator:HTMLElement,type:string,x:number)=>{const event=new Event(type,{bubbles:true});Object.defineProperty(event,'clientX',{value:x});fireEvent(type==='pointerdown'?separator:window,event);};
+ beforeEach(()=>{available=900;vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockImplementation(function(this:HTMLElement){return this.classList.contains('table-wrap')?available:0;});});
+ afterEach(()=>vi.restoreAllMocks());
+ it('redistributes keyboard and pointer resizing within the measured container and clamps at the other column minima',()=>{
+  render(<DataTable tableId="contained" columns={columns} items={[{id:1}]}/>);
+  const table=screen.getByRole('table') as HTMLTableElement;
+  const separator=screen.getByRole('separator',{name:'调整名称列宽'});
+  const initial=widths(table);
+  fireEvent.keyDown(separator,{key:'ArrowRight'});
+  expect(total(table)).toBeCloseTo(available);expect(widths(table).name).toBe(initial.name+10);
+  expect(widths(table).actions).toBeLessThan(initial.actions);
+  pointer(separator,'pointerdown',100);pointer(separator,'pointermove',10000);pointer(separator,'pointerup',10000);
+  expect(total(table)).toBeCloseTo(available);expect(widths(table).name).toBe(692);
+  expect(widths(table)).toEqual({select:48,name:692,batch:80,actions:80});
+  expect(separator).toHaveAttribute('aria-valuenow','692');expect(separator).toHaveAttribute('aria-valuemax','692');
+ });
+ it('normalizes huge old saved widths to the container while preserving column order and preferences',()=>{
+  localStorage.setItem('table-layout:v1:old-wide',JSON.stringify({version:1,fixed:true,order:['select','batch','name','actions'],widths:{select:48,name:3000,batch:2000,actions:1000}}));
+  render(<DataTable tableId="old-wide" columns={columns} items={[{id:1}]}/>);
+  const table=screen.getByRole('table') as HTMLTableElement;
+  expect(total(table)).toBeCloseTo(available);expect(parseFloat(table.style.width)).toBeCloseTo(available);
+  expect(widths(table).name).toBeGreaterThan(widths(table).batch);expect(widths(table).batch).toBeGreaterThan(widths(table).actions);
+  expect(Array.from(table.querySelectorAll<HTMLElement>('thead th')).map(h=>h.dataset.columnKey)).toEqual(['select','batch','name','actions']);
+ });
+ it('allows only actual minimum-width overflow and adapts on window changes without rewriting saved preferences',()=>{
+  render(<DataTable tableId="responsive" columns={columns} items={[{id:1}]}/>);
+  const table=screen.getByRole('table') as HTMLTableElement;
+  fireEvent.keyDown(screen.getByRole('separator',{name:'调整名称列宽'}),{key:'ArrowRight'});
+  const original=widths(table),saved=localStorage.getItem('table-layout:v1:responsive');
+  available=1800;act(()=>window.dispatchEvent(new Event('resize')));
+  expect(total(table)).toBeCloseTo(1800);expect(widths(table).name).toBeGreaterThan(original.name);
+  available=240;act(()=>window.dispatchEvent(new Event('resize')));
+  expect(widths(table)).toEqual({select:48,name:80,batch:80,actions:80});expect(total(table)).toBe(288);
+  fireEvent.keyDown(screen.getByRole('separator',{name:'调整名称列宽'}),{key:'ArrowRight'});
+  expect(total(table)).toBe(288);expect(localStorage.getItem('table-layout:v1:responsive')).toBe(saved);
+  available=900;act(()=>window.dispatchEvent(new Event('resize')));
+  for(const key of Object.keys(original))expect(widths(table)[key]).toBeCloseTo(original[key]);
+  expect(localStorage.getItem('table-layout:v1:responsive')).toBe(saved);
+ });
+ it('persists a valid column wider than the old 3000px cap and constrains content fit to the available budget',()=>{
+  available=3840;
+  const view=render(<DataTable tableId="four-k" columns={columns} items={[{id:1}]}/>);
+  const separator=screen.getByRole('separator',{name:'调整名称列宽'});
+  Object.defineProperty(screen.getByText('Name 1'),'scrollWidth',{value:10000});
+  fireEvent.doubleClick(separator);
+  expect(widths(screen.getByRole('table') as HTMLTableElement)).toEqual({select:48,name:3632,batch:80,actions:80});
+  view.unmount();render(<DataTable tableId="four-k" columns={columns} items={[{id:2}]}/>);
+  expect(widths(screen.getByRole('table') as HTMLTableElement).name).toBe(3632);
+ });
+ it('keeps redistributed widths through reorder and remount, and restores the default fill on reset',()=>{
+  const view=render(<DataTable tableId="redistributed" columns={columns} items={[{id:1}]}/>);
+  fireEvent.keyDown(screen.getByRole('separator',{name:'调整名称列宽'}),{key:'ArrowRight'});
+  const before=widths(screen.getByRole('table') as HTMLTableElement);
+  fireEvent.keyDown(screen.getByRole('columnheader',{name:'名称'}),{key:'ArrowRight',altKey:true});
+  expect(widths(screen.getByRole('table') as HTMLTableElement)).toEqual(before);
+  view.unmount();render(<DataTable tableId="redistributed" columns={columns} items={[{id:2}]}/>);
+  expect(widths(screen.getByRole('table') as HTMLTableElement)).toEqual(before);
+  fireEvent.click(screen.getByRole('button',{name:'恢复默认表格布局'}));
+  expect(widths(screen.getByRole('table') as HTMLTableElement)).toEqual({select:48,name:160,batch:160,actions:532});
+ });
 });

@@ -1,4 +1,5 @@
 import { isSourcePdfPath } from './directory-policy.js';
+import { materialDirectoryScopeSql } from './material-directory-sql.js';
 import { pdfDirectoryProductSql } from './pdf-product-context.js';
 import { effectiveDrawingProductSql,canonicalProductSql } from '../drawings/drawing-product-evidence.js';
 import {drawingAppearanceRelationsSql} from '../drawings/drawing-appearance-scope.js';
@@ -39,12 +40,8 @@ export interface FileIndexClearResult {
 }
 
 const FINGERPRINT_LOOKUP_CHUNK_SIZE = 900;
-const normalizedFilePathSql = "replace(file.relative_path, '/', char(92))";
-const afterCategorySql = `substr(${normalizedFilePathSql}, instr(${normalizedFilePathSql}, char(92)) + 1)`;
-const afterProductSql = `substr(${afterCategorySql}, instr(${afterCategorySql}, char(92)) + 1)`;
-const directorySql = `substr(${afterProductSql}, 1, instr(${afterProductSql}, char(92)) - 1)`;
-const materialScopeSql = `${directorySql} in ('02.未转曲源文件', '03.量产后的变更文件')`;
-const sourceScopeSql = `${directorySql} = '02.未转曲源文件'`;
+const materialScopeSql = materialDirectoryScopeSql('file.relative_path');
+const sourceScopeSql = materialDirectoryScopeSql('file.relative_path','source');
 
 
 function toView(row: FileRow): PdfFileView {
@@ -166,7 +163,7 @@ export class FileRepository {
     return this.db.transaction(() => {
       const previous = this.db.prepare(`select id, relative_path as relativePath, path_key as pathKey, file_name as fileName,
         size_bytes as sizeBytes, modified_at as modifiedAt, content_sha256 as contentSha256, is_present as isPresent
-        from pdf_files where is_present = 1`).all() as StoredFileSnapshotRow[];
+        from pdf_files file where is_present = 1 and ${materialScopeSql}`).all() as StoredFileSnapshotRow[];
       const current = records.map((record) => ({ relativePath: record.relativePath, pathKey: record.pathKey!, fileName: record.fileName,
         sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, contentSha256: record.contentSha256 ?? null }));
       const differences = diffFileScan(previous.map((file) => ({ ...file, isPresent: file.isPresent === 1 })), current);
@@ -187,7 +184,8 @@ export class FileRepository {
         values (@scannedAt, @scannedAt, @totalCurrent, @added, @missing, @moved, @changed, @unchanged) returning id`).get({
         scannedAt, totalCurrent: records.length + (qrRecords?.length ?? 0), ...counts,
       }) as { id: number };
-      this.db.prepare('update pdf_files set is_present = 0').run();
+      // An excluded path was not observed; exclusion does not establish physical absence.
+      this.db.prepare(`update pdf_files as file set is_present = 0 where ${materialScopeSql}`).run();
       if (qrRecords !== undefined) this.db.prepare('update qr_code_files set is_present = 0').run();
       // Explicit legacy scan payloads may refresh indices, but never create or infer QR configurations.
       for (const record of qrRecords ?? []) {
@@ -399,7 +397,7 @@ export class FileRepository {
       for (const {id} of outside) {
         if (this.management().preview({ids:[id],action:'clear'},'').allowed === 1) this.db.prepare('delete from pdf_files where id=?').run(id);
       }
-      const { missing } = this.db.prepare('select count(*) as missing from pdf_files where is_present = 0').get() as { missing: number };
+      const { missing } = this.db.prepare(`select count(*) as missing from pdf_files file where is_present = 0 and ${materialScopeSql}`).get() as { missing: number };
       return { missing, historicalRegistered };
     }).immediate();
   }

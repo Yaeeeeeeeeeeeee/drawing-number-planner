@@ -594,3 +594,21 @@ it('excludes out-of-scope index records while retaining their drawing and busine
  expect(repository.search({materialSource:true,presence:'all'}).items).toHaveLength(1);
  expect(db.pragma('foreign_key_check')).toEqual([]);
 });
+
+it('does not report unobserved out-of-scope historical indices as physically missing',()=>{
+ const drawing=drawingFixture();
+ const protectedOutside={...records(drawing.id)[0],relativePath:'冰柜\\TEST-FILE-REPOSITORY-ZC100\\其他资料\\retained.pdf'};
+ const source={...records(drawing.id)[0],relativePath:'冰柜\\TEST-FILE-REPOSITORY-ZC100\\02.未转曲源文件\\source.pdf'};
+ // Simulate an older full scan before the package-directory scope was narrowed.
+ repository.replaceScan([protectedOutside,source],[],'2026-10-26T00:00:00Z');
+ const result=repository.replaceScan([source],[],'2026-10-27T00:00:00Z');
+ expect(repository.latestScan()).toMatchObject({currentTotal:1,missing:0,unchanged:1});
+ expect(result.missing).toBe(0);
+ expect(db.prepare('select is_present from pdf_files where relative_path=?').get(protectedOutside.relativePath)).toEqual({is_present:1});
+ expect(repository.search({presence:'present'}).items).toEqual([expect.objectContaining({relativePath:source.relativePath})]);
+ // Real absence inside the observed scope must continue to be detected.
+ expect(repository.replaceScan([],[],'2026-10-27T01:00:00Z').missing).toBe(1);
+ expect(repository.latestScan()).toMatchObject({missing:1});
+ expect(db.prepare('select id from drawing_numbers where id=?').get(drawing.id)).toBeTruthy();
+ expect(db.pragma('foreign_key_check')).toEqual([]);
+});
