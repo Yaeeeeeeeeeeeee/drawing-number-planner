@@ -426,3 +426,15 @@ it('renders one empty PDF list region without a second empty table',async()=>{
  render(<FilesPage api={api as never}/>);await screen.findByRole('heading',{name:'请先设置资料根目录'});
  expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
+
+it('places source-folder membership in the batch column and leaves business batch status empty',async()=>{
+ const api=apiFixture(true);
+ const source={...file,relativePath:'冰柜\\SKDZU070JP-ZU70SD\\02.未转曲源文件\\铭牌.pdf',fileName:'铭牌.pdf',materialBatchId:null,materialBatchName:null};
+ api.searchPdfFiles.mockResolvedValue({items:[source],total:1,page:1,pageSize:100});
+ render(<FilesPage api={api as never}/>);
+ const checkbox=await screen.findByRole('checkbox',{name:'选择 铭牌.pdf'});const row=checkbox.closest('tr')!;
+ expect(row.querySelector('[data-column-key=batch]')).toHaveTextContent('未转曲源文件');
+ expect(row.querySelector('[data-column-key=batch]')).not.toHaveTextContent('未归入批次');
+ expect(row.querySelector('[data-column-key=batchStatus]')).toHaveTextContent('—');
+ expect(within(row).queryByText('当前批次')).toBeNull();expect(within(row).queryByText('历史批次')).toBeNull();
+});

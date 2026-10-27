@@ -11,7 +11,7 @@ export function assertDesktopLayoutOnly(base: string, candidate: string): void {
 export function assertRendererIconDependencyOnly(basePackage: string, candidatePackage: string, baseLock: string, candidateLock: string): void {
   const normalize = (value: string) => value.replaceAll('\r\n', '\n');
   const base = JSON.parse(basePackage), candidate = JSON.parse(candidatePackage);
-  if (candidate.version !== base.version && !['1.0.0','1.1.0','1.1.1'].includes(candidate.version)) throw new Error('Unexpected application release version');
+  if (candidate.version !== base.version && !['1.0.0','1.1.0','1.1.1','1.1.2'].includes(candidate.version)) throw new Error('Unexpected application release version');
   candidate.version = base.version;
   if (candidate.dependencies?.['lucide-react'] !== '1.59.0') throw new Error('Unexpected icon dependency version');
   delete candidate.dependencies['lucide-react'];

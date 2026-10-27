@@ -2,14 +2,14 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.1.1
+## 当前版本 v1.1.2
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.1.1/DrawingNumberPlanner-1.1.1-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.1)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.1.2/DrawingNumberPlanner-1.1.2-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.2)
 - [安装、升级和恢复说明](docs/install-and-upgrade.md)
 - [维护和发布方式](docs/maintenance.md)
-- [上一版 v1.1.0（Schema22）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.0)
-- [本次修复、原因和验证记录](docs/hotfix-1.1.1-20261027.md)
+- [上一版 v1.1.1（Schema22）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.1)
+- [本次修复、原因和验证记录](docs/hotfix-1.1.2-20261027.md)
 - [V5 修改记录](docs/v5-delivery-20261026.md)
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
@@ -53,7 +53,7 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 
 ```sh
 git fetch --tags
-git switch --detach v1.1.1
+git switch --detach v1.1.2
 pnpm install
 pnpm typecheck
 pnpm test

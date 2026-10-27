@@ -48,7 +48,7 @@ function FilePath({ path, name, onClose }: { path: string; name: string; onClose
 function FileBatch({ item, batches }: { item: PdfFileView; batches: MaterialBatchView[] }) {
   const batch = batches.find(value => value.id === item.materialBatchId);
   const state=batch?.currentState;
-  if(isSourcePdfPath(item.relativePath)) return <span className="files-source-label">未转曲源文件</span>;
+  if(isSourcePdfPath(item.relativePath)) return <span className="muted-text">—</span>;
   return state==='current'||state==='historical'?<span className={`files-batch ${state}`}><small className="files-status">{state==='current'?'当前批次':'历史批次'}</small></span>:<span className="muted-text">—</span>;
 }
 
@@ -487,7 +487,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
           aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning || (!api.previewPdfManagement && !classificationAvailable && item.isPresent)}
           onChange={() => toggleSelection(item.id)} /> },
         { key: 'name', label: '文件名', width: 250, minWidth: 150, align: 'left', render: (item) => <span className="file-primary files-name-clamp" title={item.fileName}>{item.fileName.replace(/\.pdf$/i, '')}</span> },
-        { key: 'batch', label: '资料批次', width: 150, minWidth: 110, render: (item) => <span title={`${item.materialBatchName ?? '未归入批次'} · ID ${item.materialBatchId ?? '—'} · ${batches.find(batch => batch.id === item.materialBatchId)?.relativePath ?? item.relativePath}`} className="files-batch-code">{item.materialBatchName ? (batches.find(batch => batch.id === item.materialBatchId)?.displayName ?? materialBatchLabel(item.materialBatchName)) : '未归入批次'}</span> },
+        { key: 'batch', label: '资料批次', width: 150, minWidth: 110, render: (item) => isSourcePdfPath(item.relativePath) ? <span className="files-source-label">未转曲源文件</span> : <span title={`${item.materialBatchName ?? '未归入批次'} · ID ${item.materialBatchId ?? '—'} · ${batches.find(batch => batch.id === item.materialBatchId)?.relativePath ?? item.relativePath}`} className="files-batch-code">{item.materialBatchName ? (batches.find(batch => batch.id === item.materialBatchId)?.displayName ?? materialBatchLabel(item.materialBatchName)) : '未归入批次'}</span> },
         { key: 'batchStatus', label: '批次状态',width:86,minWidth:80,align:'center', render: (item) => <FileBatch item={item} batches={batches} /> },
         { key: 'product', label: '产品',width:130,minWidth:110,align:'center', render: (item) => item.productId ? <span className="file-product"><strong>{item.productCategory} · {item.model}</strong><small>SKU：{item.sku ?? '待补录'}</small></span> : <span className="muted-text">待关联</span> },
         { key: 'drawing', label: '匹配图号',width:190,minWidth:160,align:'left', render: (item) => item.fullCode ? <span className="file-match matched">
