@@ -8,16 +8,16 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: publish-stable-1.1.2
+  group: publish-stable-1.2.0
   cancel-in-progress: false
 env:
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
-  SOURCE_SHA: 2a0a406e9d1ccd06d1ef92032239e5efe64ec64b
-  VERIFIED_RUN: '40451075353'
-  SETUP_DIGEST: 'sha256:77abdd970f1362fe7a263f7900382a48ceeaafd04f404698af54e8808a914730'
-  REPORT_DIGEST: 'sha256:1927d99b58a5df97fa915ad66d4e338e7e4ec9e64d691dced9441e36a7515b1f'
-  RELEASE_TAG: v1.1.2
+  SOURCE_SHA: 33cbbe15f86bf5ff18bd6900ffe3f1f18ea34354
+  VERIFIED_RUN: '40527223187'
+  SETUP_DIGEST: 'sha256:c364cd55307543e1155c2548cf89b9c64000d39c4f74736cae1b6a0cdbf78014'
+  REPORT_DIGEST: 'sha256:1bdcf686ce0727cd10b8d0f3b968e1231f850c912930e6e0ccde98bfd3450027'
+  RELEASE_TAG: v1.2.0
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -43,7 +43,7 @@ jobs:
               assert len(selected)==1 and not selected[0]['expired'] and selected[0]['digest']==digest
               assert selected[0]['workflow_run']['head_sha']==os.environ['SOURCE_SHA']
           package=json.loads(subprocess.check_output(['git','show',os.environ['SOURCE_SHA']+':package.json']))
-          assert package['version']=='1.1.2'
+          assert package['version']=='1.2.0'
           PY
       - uses: actions/download-artifact@v4
         with:
@@ -83,25 +83,31 @@ jobs:
           assert native['installationChoice']['actualInstaller']
           choices=native['installationChoice']['sameVersionReinstallChoices']
           assert len(choices)==2 and all(row['promptedAfterReinstall'] and row['createdWithoutFileSelection'] and row['normalRestartReusesChoice'] and row['oldDataRetained'] for row in choices)
+          mail=native['v51']
+          assert mail['actualHttpAndDom'] and mail['realXlsx'] and mail['fixtureWorkbookOnly']
+          assert (mail['sheets'],mail['supportedSheets'],mail['recognizedTemplates'],mail['importedTemplates'],mail['contactsCreated'])==(3,2,3,1,2)
+          assert mail['exactSelectedZipFileCount']==1 and mail['changedNameplateOnly']
+          assert mail['reasonSynchronizes'] and mail['directBodyEditPreserved'] and mail['signatureOnce'] and mail['actualClipboardCopy']
+          assert mail['originalPdfHashesPreserved']==4 and mail['protectedRowsUnchanged'] and mail['zipAndSnapshotsUnchangedByDraft']
           desktop=json.loads((report/'windows-desktop-install.json').read_text(encoding='utf-8-sig'))
           assert desktop['desktopFilePreserved'] and desktop['personalDataPreserved']
           assert desktop['chineseChild']['verifiedFiles']>0 and desktop['desktopRoot']['verifiedFiles']>0
           wizard=json.loads((report/'windows-chinese-installer.json').read_text(encoding='utf-8-sig'))
           assert wizard['shellFolderPicker'] and wizard['advancedToReady'] and wizard['typedDesktopRootRedirected']
           installed=json.loads((report/'installed-version.json').read_text(encoding='utf-8-sig'))
-          assert installed['installedVersion']=='1.1.2' and installed['revision']==os.environ['SOURCE_SHA']
+          assert installed['installedVersion']=='1.2.0' and installed['revision']==os.environ['SOURCE_SHA']
           source=pathlib.Path('verified-installer/图号规划器-Windows-x64-安装包.exe')
           assert source.is_file() and source.read_bytes()[:2]==b'MZ'
-          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.1.2-Windows-x64-Setup.exe')
+          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.2.0-Windows-x64-Setup.exe')
           shutil.copyfile(source,target)
           assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest()
           shutil.copyfile('docs/install-and-upgrade.md','release-assets/INSTALL-UPGRADE.md')
-          notes=pathlib.Path('docs/release-1.1.2.md').read_text()
+          notes=pathlib.Path('docs/release-1.2.0.md').read_text()
           prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/docs/"
           notes=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',notes)
-          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.1.2`。\n\n本版完整自动化 **180 文件、1536 项通过；Chromium 端到端 8 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
-          pathlib.Path('release-assets/README-Windows-1.1.2.md').write_text(notes)
-          with zipfile.ZipFile('release-assets/Verification-Windows-1.1.2.zip','w',zipfile.ZIP_DEFLATED) as archive:
+          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.2.0`。\n\n本版完整自动化 **187 文件、1568 项通过；Chromium 端到端 9 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
+          pathlib.Path('release-assets/README-Windows-1.2.0.md').write_text(notes)
+          with zipfile.ZipFile('release-assets/Verification-Windows-1.2.0.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(report.rglob('*')):
                   if file.is_file(): archive.write(file,file.relative_to(report))
           files=sorted(pathlib.Path('release-assets').iterdir())
@@ -114,10 +120,10 @@ jobs:
           existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
           test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace another source tag'; exit 1; }
           if ! gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.1.2 · Windows 正式版' --notes-file release-assets/README-Windows-1.1.2.md --draft
+            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.2.0 · Windows 正式版' --notes-file release-assets/README-Windows-1.2.0.md --draft
           fi
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.1.2.md --draft=false --prerelease=false --latest
+          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.2.0.md --draft=false --prerelease=false --latest
       - name: Update repository homepage without merging application history
         shell: bash
         run: |
@@ -129,7 +135,7 @@ jobs:
           text=pathlib.Path('README.md').read_text()
           prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/"
           text=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',text)
-          body={'branch':'master','sha':old['sha'],'message':'docs: point homepage to verified v1.1.2 release and source tag','content':base64.b64encode(text.encode()).decode()}
+          body={'branch':'master','sha':old['sha'],'message':'docs: point homepage to verified v1.2.0 release and source tag','content':base64.b64encode(text.encode()).decode()}
           pathlib.Path('/tmp/update-homepage.json').write_text(json.dumps(body))
           PY
           gh api --method PUT "repos/$GH_REPO/contents/README.md" --input /tmp/update-homepage.json > /tmp/homepage-updated.json
