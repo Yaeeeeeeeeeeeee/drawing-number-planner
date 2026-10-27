@@ -54,7 +54,8 @@ module.exports=async function verifyV51({page,app,source,workspace,output,eviden
   const history=items(await get(`/api/outbound-packages?productId=${product.id}`));assert.equal(history.length,1);const frozen=await get(`/api/outbound-packages/${history[0].id}`);assert.equal(frozen.files.length,1);assert.equal(frozen.files[0].pdfFileId,label.pdfFileId);const zip=path.join(output,history[0].zipRelativePath);assert.ok(fs.existsSync(zip));const zipHash=createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
   await page.getByLabel('主题',{exact:true}).fill('最终人工主题');
   if(!app)await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:new URL(page.url()).origin});
-  const readClipboard=()=>app?app.evaluate(({clipboard})=>clipboard.readText()):page.evaluate(()=>navigator.clipboard.readText());
+  // Windows native clipboard uses CRLF; DOM textarea values use LF. Compare text with line endings normalized only.
+  const readClipboard=async()=>String(await(app?app.evaluate(({clipboard})=>clipboard.readText()):page.evaluate(()=>navigator.clipboard.readText()))).replace(/\r\n/g,'\n');
   await page.getByRole('button',{name:'复制正文',exact:true}).click();await page.getByRole('status').filter({hasText:'已复制'}).waitFor();await expect.poll(readClipboard).toBe(await page.getByLabel('正文',{exact:true}).inputValue());
   await page.getByRole('button',{name:'复制主题',exact:true}).click();await expect.poll(readClipboard).toBe('最终人工主题');
   await page.getByRole('button',{name:'复制邮件内容',exact:true}).click();await expect.poll(readClipboard).toContain('v51-edit@example.test');const fullMail=await readClipboard();assert.ok(fullMail.includes('v51-edit@example.test')&&fullMail.includes('最终人工主题')&&fullMail.includes('人工直接补充'));
