@@ -28,3 +28,7 @@ Schema versions and migration names are observations of the current implementati
 ## Current migration observation
 
 This checkout includes Schema20, replacing only the planned-drawing usage update trigger's prohibition on normal stop transitions. Complete code, ownership and deletion guards remain. Schema19 identity/PDF-assignment migration and all earlier compatibility migrations remain. See docs/v41-backend-verification-20261024.md and current tests for backup/rollback/preservation evidence; future schema registry entries supersede this observation.
+
+## Current V5 observation — 2026-10-26
+
+Current registry reaches Schema22. Schema21 adds append-only force-release identity/impact audit and PDF quarantine paths; original drawing rows remain archived FK identities. Schema22 adds nullable manufacturer/scenario to email_templates. Each upgrade backs up first, preserves original columns/rows, checks foreign keys, and rolls back on failure. Do not run real product merges or releases during startup. Earlier Schema20 notes are historical compatibility context.

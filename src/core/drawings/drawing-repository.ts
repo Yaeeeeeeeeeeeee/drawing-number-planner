@@ -366,7 +366,7 @@ export class DrawingRepository {
       const detectedCodes = Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
       if (!detectedCodes.includes(drawing.fullCode)) detectedCodes.push(drawing.fullCode);
       this.db.prepare(`update pdf_files set drawing_id = ?, historical_drawing_id = null,
-        match_status = 'matched', conversion_type = ?, detected_codes_json = ? where id = ? and is_present = 1 and management_state = 'included'`)
+        match_status = 'matched', conversion_type = ?, detected_codes_json = ?, classification_warning=case when classification_warning='drawing-force-released' then null else classification_warning end where id = ? and is_present = 1 and management_state = 'included'`)
         .run(drawingId, conversionType, JSON.stringify(detectedCodes), pdfIndexId);
       return true;
     }).immediate();

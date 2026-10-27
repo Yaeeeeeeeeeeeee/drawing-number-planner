@@ -84,6 +84,39 @@ describe('V5 independent force release', () => {
       expect(()=>new DrawingDeletionService(reopened).restore(plannedId)).toThrow(/强制/);
     }finally{reopened.close();}}finally{rmSync(dir,{recursive:true,force:true});}
   });
+  it.each(['item','snapshot'])('isolates old %s paths without an index, moved files and snapshot-only product owners',kind=>{
+    const refs=db.prepare('select * from drawing_numbers where id=?').get(plannedId) as any;
+    const other=Number(db.prepare("insert into products(sku,brand_id,product_size_id,default_appearance_id,model,product_category,created_at) select 'other-snapshot',brand_id,product_size_id,default_appearance_id,'OtherSnapshot','Other','now' from products where id=?").run(refs.product_id).lastInsertRowid);
+    const pkg=Number(db.prepare("insert into outbound_packages(product_id,material_type,package_mode,package_name,zip_relative_path,status,created_at) values(?,'initial','current_complete','old-only','old-only.zip','completed','now')").run(other).lastInsertRowid);
+    const oldPath='C/SKU-M/03.量产后的变更文件/首批大货/old-without-index.pdf';
+    if(kind==='item')db.prepare("insert into outbound_package_items(package_id,project_item_id,drawing_id,project_item_name_snapshot,drawing_code_snapshot,file_name_snapshot,relative_path_snapshot,source_batch_name_snapshot) values(?,?,?,'project',?,'old.pdf',?,'old batch')").run(pkg,refs.project_item_id,plannedId,plannedCode,oldPath);
+    else db.prepare("insert into outbound_v2_snapshots(package_id,context_json,files_json,parts_json) values(?,'{}',?,'[]')").run(pkg,JSON.stringify([{drawingId:plannedId,fullCode:plannedCode,relativePath:oldPath}]));
+    const force=new DrawingForceReleaseService(db),preview=force.preview(plannedId);
+    expect(preview.affectedProductIds).toContain(other);
+    force.confirm({signedId:plannedId,fingerprint:preview.fingerprint,confirmed:true});
+    expect(db.prepare('select relative_path from drawing_force_release_files where full_code=?').all(plannedCode)).toContainEqual({relative_path:oldPath});
+    new PlanningService(db).reserve({productId:refs.product_id,appearanceId:refs.appearance_id,rows:[{clientId:'new',colorId:refs.color_id,mainCategoryId:refs.main_category_id,projectItemId:refs.project_item_id,expectedFullCode:plannedCode}]});
+    const next=db.prepare('select id from drawing_numbers where full_code=?').get(plannedCode) as {id:number};
+    const repository=new FileRepository(db);
+    repository.replaceScan([{relativePath:oldPath.replace('old-without-index','moved-old-file'),fileName:'moved-old-file.pdf',drawingId:next.id,matchStatus:'matched',detectedCodes:[plannedCode],conversionType:'outlined',sizeBytes:10,modifiedAt:'now'}],[],'later');
+    expect(db.prepare('select drawing_id,historical_drawing_id,match_status from pdf_files').get()).toEqual({drawing_id:null,historical_drawing_id:null,match_status:'pending'});
+    expect(new DrawingQueryService(db).get(next.id).outlinedFiles).toEqual([]);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
+  it('preserves an explicit new-generation PDF association across rescans only while content is unchanged',()=>{
+    const refs=db.prepare('select * from drawing_numbers where id=?').get(plannedId) as any;
+    const force=new DrawingForceReleaseService(db);force.confirm({signedId:plannedId,fingerprint:force.preview(plannedId).fingerprint,confirmed:true});
+    new PlanningService(db).reserve({productId:refs.product_id,appearanceId:refs.appearance_id,rows:[{clientId:'new-manual',colorId:refs.color_id,mainCategoryId:refs.main_category_id,projectItemId:refs.project_item_id,expectedFullCode:plannedCode}]});
+    const next=db.prepare('select id from drawing_numbers where full_code=?').get(plannedCode) as {id:number};
+    const file={relativePath:'C/SKU-M/03.量产后的变更文件/首批大货/explicit-new.pdf',fileName:'explicit-new.pdf',drawingId:next.id,matchStatus:'matched' as const,detectedCodes:[plannedCode],conversionType:'outlined' as const,sizeBytes:10,modifiedAt:'now',contentSha256:'a'.repeat(64)};
+    const repository=new FileRepository(db);repository.replaceScan([{...file}],[],'first');
+    const pdf=db.prepare('select id from pdf_files').get() as {id:number};
+    new DrawingQueryService(db).associatePdf(next.id,pdf.id,'outlined');
+    repository.replaceScan([{...file}],[],'same-content');
+    expect(db.prepare('select drawing_id,match_status from pdf_files').get()).toEqual({drawing_id:next.id,match_status:'matched'});
+    repository.replaceScan([{...file,contentSha256:'b'.repeat(64)}],[],'changed-content');
+    expect(db.prepare('select drawing_id,match_status from pdf_files').get()).toEqual({drawing_id:null,match_status:'pending'});
+  });
   it('releases both occupying origins for an identical complete code in one confirmed transaction',()=>{
     db.prepare('update historical_drawing_numbers set full_code=? where id=?').run(plannedCode,historicalId);
     const force=new DrawingForceReleaseService(db),preview=force.preview(plannedId);

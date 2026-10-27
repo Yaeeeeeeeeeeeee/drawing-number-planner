@@ -55,7 +55,7 @@ fs.cpSync(path.join(source,'dist/renderer'),path.join(app,'dist/renderer'),{recu
 fs.copyFileSync(path.join(source,'dist/main/preload.cjs'),path.join(app,'dist/main/preload.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-entry.cjs'),path.join(app,'acceptance-entry.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-profile.cjs'),path.join(app,'production-profile.cjs'));
-fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,applicationVersion,schemaVersion:20,profile:'stable-user-selected',bundledSample:false},null,2));
+fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,applicationVersion,schemaVersion:22,profile:'stable-user-selected',bundledSample:false},null,2));
 fs.renameSync(path.join(output,'图号规划器验收版.exe'),path.join(output,'图号规划器.exe'));
 if(fs.existsSync(path.join(app,'acceptance-seed')))throw Error('Example data must not be included');
 for(const entry of files(output))if(/\.(db|sqlite|sqlite3|pdf)(-wal|-shm)?$/i.test(entry.path))throw Error('Database/PDF data must not be bundled: '+entry.path);
@@ -69,14 +69,14 @@ const instructions=`图号规划器 Windows x64
 3. 新用户选择创建空数据库；本安装包不含示例产品、图号、PDF、BOM或二维码。
 4. 后续版本使用稳定配置 AppData\\DrawingNumberPlanner\\profile.json，保留已选择目录，不按软件SHA创建新空库。
 5. 本版允许重复SKU/型号，以内部产品ID区分。产品默认外观仅用于新规划，不改旧图号。启动不归并产品；PDF可多选人工归纳并预览冲突，重扫保留确认。
-6. 不删除原始PDF，不改变历史占号。请核对历史BOM、二维码、外发快照，必要时关闭程序，用backups中的迁移前planner.db备份替换原库；旧程序不应打开已升级的新库。
+6. 不删除原始PDF。普通删除保留原占号保护；独立强制释放需先查看影响并明确确认，历史身份及快照保留。请核对历史BOM、二维码、外发快照，必要时关闭程序，用backups中的迁移前planner.db备份替换原库；旧程序不应打开已升级的新库。
 7. 安装目录仅存程序。卸载不会删除业务数据。
 
 免安装版：完整解压到新目录，双击图号规划器.exe，不能只移动EXE。
 `;
 fs.writeFileSync(path.join(output,'先看这里-验收说明.txt'),instructions);
 fs.writeFileSync(path.join(output,'验收说明.txt'),instructions);
-fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:20,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
+fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:22,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
 fs.writeFileSync(path.join(output,'delivery-manifest.json'),JSON.stringify({revision,platform:'win32-x64',baseRevision,files:files(output)},null,2));
 verifyManifest(output,JSON.parse(fs.readFileSync(path.join(output,'delivery-manifest.json'),'utf8')));
-console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:20,bundledSample:false}));
+console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:22,bundledSample:false}));

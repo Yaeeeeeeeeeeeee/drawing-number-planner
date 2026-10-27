@@ -24,7 +24,7 @@ function conversionFromPath(relativePath: string, fileName: string): {
 } {
   const segments = relativePath.split(/[\\/]+/);
   const inSourceDirectory = segments.includes('02.未转曲源文件');
-  const inOutlinedDirectory = segments.some(isProductionChangeDirectory);
+  const inOutlinedDirectory = segments.some(segment=>isProductionChangeDirectory(segment)||/^03[.．]量产后的变更明细(?:[（(].*)?$/.test(segment));
   const outlinedSuffix = fileName.includes('（转曲）');
   if (inSourceDirectory) {
     return { conversionType: 'source', warning: outlinedSuffix ? 'conversion-conflict: 源文件目录中的文件名包含（转曲）' : null };

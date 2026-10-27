@@ -209,7 +209,15 @@ export class FileRepository {
           where lower(replace(relative_path,'/',char(92))) = @path`);
         for (const record of records) {
           const codes = quarantine.all({path:toWorkspacePathKey(record.relativePath)}) as Array<{fullCode:string}>;
-          if (!codes.some(row=>record.detectedCodes.includes(row.fullCode))) continue;
+          // A code alone cannot distinguish a newly authored PDF from a moved old file.
+          // Reused released codes therefore never gain a new drawing identity by scanning.
+          const reused = record.detectedCodes.some(code=>this.db.prepare('select 1 from drawing_force_releases where full_code=?').get(code));
+          const previous=this.db.prepare('select drawing_id,content_sha256 from pdf_files where path_key=?').get(toWorkspacePathKey(record.relativePath)) as {drawing_id:number|null;content_sha256:string|null}|undefined;
+          // Scan cannot create this relationship after release; only the existing explicit
+          // association action can. Retain it only for the same identity and exact bytes.
+          const explicitlyConfirmed=reused&&record.drawingId!=null&&previous?.drawing_id===record.drawingId
+            && /^[a-f0-9]{64}$/i.test(previous.content_sha256??'')&&previous.content_sha256===record.contentSha256;
+          if (explicitlyConfirmed || (!reused && !codes.some(row=>record.detectedCodes.includes(row.fullCode)))) continue;
           record.drawingId=null;record.historicalFullCode=null;record.matchStatus='pending';
           record.classificationWarning='drawing-force-released';
         }
@@ -297,17 +305,17 @@ export class FileRepository {
           path_key = excluded.path_key,
           material_batch_id = case when @materialSource = 1 then null else coalesce((select material_batch_id from pdf_product_assignments where pdf_file_id=pdf_files.id),excluded.material_batch_id) end,
           file_name = excluded.file_name,
-          drawing_id = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+          drawing_id = case when excluded.match_status <> 'matched' and excluded.classification_warning is not 'drawing-force-released' and pdf_files.drawing_id is not null
             and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
             then pdf_files.drawing_id else excluded.drawing_id end,
-          historical_drawing_id = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+          historical_drawing_id = case when excluded.match_status <> 'matched' and excluded.classification_warning is not 'drawing-force-released' and pdf_files.drawing_id is not null
             and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
             then null else excluded.historical_drawing_id end,
-          match_status = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+          match_status = case when excluded.match_status <> 'matched' and excluded.classification_warning is not 'drawing-force-released' and pdf_files.drawing_id is not null
             and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
             then 'matched' else excluded.match_status end,
           detected_codes_json = excluded.detected_codes_json,
-          conversion_type = case when excluded.match_status <> 'matched' and pdf_files.drawing_id is not null
+          conversion_type = case when excluded.match_status <> 'matched' and excluded.classification_warning is not 'drawing-force-released' and pdf_files.drawing_id is not null
             and exists(select 1 from drawing_numbers drawing where drawing.id = pdf_files.drawing_id)
             then pdf_files.conversion_type else excluded.conversion_type end,
           classification_warning = excluded.classification_warning,

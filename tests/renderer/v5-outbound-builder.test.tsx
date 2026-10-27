@@ -8,7 +8,7 @@ it('filters brand/category/model by real IDs and renders every file without redu
  const api={listProducts:vi.fn().mockResolvedValue(products),listDictionaries:vi.fn().mockResolvedValue([{id:1,name:'品牌甲'},{id:2,name:'品牌乙'}]),listMaterialBatches:vi.fn().mockResolvedValue([{id:1,name:'20261026',isPresent:true,recognitionStatus:'recognized'}]),previewOutboundPackage:vi.fn().mockResolvedValue({packageName:'本次包',items,warnings:['不应常驻'],bomCheck:{status:'missing',missingFullCodes:[],extraPdfFileIds:[]}}),listOutboundPackages:vi.fn()};
  render(<PackageBuilder api={api as never} onPackage={()=>{}}/>);
  await within(screen.getByLabelText('品牌')).findByRole('option',{name:'品牌甲'});fireEvent.change(screen.getByLabelText('品牌'),{target:{value:'1'}});
- fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'10'}});
+ fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'类别甲'}});
  expect(within(screen.getByLabelText('产品型号')).getAllByRole('option').map(x=>x.getAttribute('value'))).toEqual(['','11','12']);
  fireEvent.change(screen.getByLabelText('产品型号'),{target:{value:'12'}});await waitFor(()=>expect(api.listMaterialBatches).toHaveBeenCalledWith({productId:12}));
  await within(screen.getByLabelText('资料批次')).findByRole('option',{name:'20261026'});fireEvent.change(screen.getByLabelText('资料批次'),{target:{value:'1'}});fireEvent.click(screen.getByRole('button',{name:'预览文件'}));
@@ -17,9 +17,19 @@ it('filters brand/category/model by real IDs and renders every file without redu
  for(const name of ['添加额外资料','上一页','下一页','只选本次变更'])expect(screen.queryByRole('button',{name})).not.toBeInTheDocument();
  expect(screen.queryByText('不应常驻')).not.toBeInTheDocument();expect(api.listOutboundPackages).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole('button',{name:'取消全选'}));expect(screen.getByRole('button',{name:'生成压缩包'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'全选可用文件'}));expect(screen.getByRole('button',{name:'生成压缩包'})).toBeEnabled();
- fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'20'}});expect(screen.getByLabelText('产品型号')).toHaveValue('');
+ fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'类别乙'}});expect(screen.getByLabelText('产品型号')).toHaveValue('');
 },30000);
 it('shows actual per-part counts and only part-level path/open controls',()=>{
  render(<PackageResult value={{id:1,fileCount:3,parts:[{partNumber:1,zipRelativePath:'a.zip',sizeBytes:123,fileCount:1},{partNumber:2,zipRelativePath:'b.zip',sizeBytes:456,fileCount:2}]} as never}/>);
  expect(screen.getByText('1 个')).toBeVisible();expect(screen.getByText('2 个')).toBeVisible();expect(screen.queryByText('压缩包已生成')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:/^打开位置$/})).not.toBeInTheDocument();
+});
+
+it('keeps independent product categories even when their size dictionary ID is shared',async()=>{
+ const products=[{id:11,brandId:1,productSizeId:10,productCategory:'类别甲',model:'M1'},{id:12,brandId:1,productSizeId:10,productCategory:'类别乙',model:'M2'}];
+ const api={listProducts:vi.fn().mockResolvedValue(products),listDictionaries:vi.fn().mockResolvedValue([{id:1,name:'品牌甲'}]),listMaterialBatches:vi.fn().mockResolvedValue([])};
+ render(<PackageBuilder api={api as never} onPackage={()=>{}}/>);
+ await within(screen.getByLabelText('品牌')).findByRole('option',{name:'品牌甲'});
+ expect(within(screen.getByLabelText('产品类别')).getAllByRole('option').map(x=>x.textContent)).toEqual(['请选择','类别甲','类别乙']);
+ fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'类别甲'}});
+ expect(within(screen.getByLabelText('产品型号')).getAllByRole('option').map(x=>x.getAttribute('value'))).toEqual(['','11']);
 });

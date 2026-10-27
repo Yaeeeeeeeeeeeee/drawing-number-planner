@@ -193,3 +193,7 @@ PDF has no right file detail panel; per-row path/open only and top bulk manageme
 ## Current: V4.1 / V4.2
 
 The current Skill defines exact status names, category/color layout, batch context-menu actions, one-row toolbar and visible shared-table reset/handles. It supersedes old uniform category badge colors, two-line project layout, historical-version drawing label and persistent batch pencils. Verify native installation folder browsing, Desktop child/root paths, installed app version, source revision and actual API/DOM mutations; a Linux unit result does not establish Windows interaction success. Preserve earlier safety evidence without treating dated UI acceptance as current approval.
+
+## Current V5 — 2026-10-26
+
+Newest requirements are docs/v5-system-requirements-20261026.md. Direct header dragging replaces six-dot handles; remove instructional captions, fill only the actual trailing column, center whole action groups, left-align identity text, freeze long-list headers. No page subtitle under titles. Collapsed navigation toggle shares the title row without indenting the page body. BOM original values use an on-demand read-only drawer; query comparisons show selected left/previous right, bounded labels and image thumbnails without resident filenames. Shared image viewer provides zoom/pan/fit/gallery/Esc. V5 allows independent force release with real impact and confirmation; old normal-release protections remain. Runtime evidence and limitations are in docs/v5-delivery-20261026.md.

@@ -1,4 +1,4 @@
-import { isSourcePdfPath } from '../../core/files/directory-policy';
+import { isSourcePdfPath } from '../../core/files/material-directory-policy';
 import type { AppearanceApi } from '../data/appearance-client';
 import { plannerQueryCache, queryKey } from '../data/query-cache';
 import type { MaterialBatchDeletionPreview, PdfManagementApi, PdfManagementPreview } from '../data/pdf-management-client';

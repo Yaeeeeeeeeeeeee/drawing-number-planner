@@ -5,7 +5,7 @@ const tokenHeaders = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'phas
 
 test('Phase 1 browser workflow uses the real local database', async ({ page, request }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /图号库/ }).click();
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '图号库', exact: true }).click();
   await expect(page.getByRole('heading', { name: '图号库', exact: true })).toBeVisible();
   await expect(page.getByText('图号库尚无记录')).toBeVisible();
 

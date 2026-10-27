@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import React from 'react';
+import { BomPage } from '../../src/renderer/pages/BomPage';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { BomAttachmentControl } from '../../src/renderer/pages/bom/BomAttachmentControl';
 import { BomEditComparison } from '../../src/renderer/pages/bom/BomEditComparison';
@@ -30,4 +32,17 @@ it('opens a BOM attachment gallery at the clicked asset and switches roles witho
  fireEvent.click(within(dialog).getByRole('button',{name:'上一张'}));expect(within(dialog).getByRole('img')).toHaveAttribute('src','/api/boms/assets/1/preview');
  expect(screen.queryByText('a.png')).toBeNull();expect(screen.queryByText('b.png')).toBeNull();
  fireEvent.keyDown(window,{key:'Escape'});expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('query reset clears hidden appearance scope',async()=>{
+ const products=[{id:1,brandId:1,brandName:'B',productSizeId:10,productCategory:'A',model:'M1'},{id:2,brandId:1,brandName:'B',productSizeId:20,productCategory:'B',model:'M2'}];
+ const record={id:20,productId:1,model:'M1',appearanceVersionId:102,versionNumber:1,previousVersionId:null,businessChangeDate:'2026-10-26',businessChangeDateLabel:'2026-10-26',notes:null,createdAt:'2026-10-26T00:00:00Z',items:[]};
+ const api={listProducts:vi.fn().mockResolvedValue(products),listDictionaries:vi.fn().mockResolvedValue([]),listMaterialBatches:vi.fn().mockResolvedValue([]),getBomVersion:vi.fn().mockResolvedValue(record),queryBomVersions:vi.fn().mockResolvedValue([]),listBomQrCandidates:vi.fn().mockResolvedValue([])};
+ render(React.createElement(BomPage,{api:api as never,target:{productId:1,appearanceVersionId:102,bomVersionId:20}}));
+ await screen.findByRole('region',{name:'所选 BOM 记录'});
+ fireEvent.click(screen.getByRole('button',{name:'重置'}));
+ fireEvent.change(screen.getByLabelText('查询 BOM 产品型号'),{target:{value:'2'}});
+ fireEvent.click(screen.getByRole('button',{name:'查询'}));
+ await waitFor(()=>expect(api.queryBomVersions).toHaveBeenCalled());
+ expect(api.queryBomVersions).toHaveBeenLastCalledWith({productId:2});
 });

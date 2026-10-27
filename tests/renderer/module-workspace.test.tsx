@@ -4,11 +4,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ModuleWorkspace } from '../../src/renderer/components/ModuleWorkspace';
 
 afterEach(() => vi.unstubAllGlobals());
-it('gives PDF navigation a 300px default and keyboard bounds of 260–420px',()=>{
+it('gives PDF navigation a 260px default and keyboard bounds of 220–320px',()=>{
   vi.stubGlobal('innerWidth',1920);
   render(<ModuleWorkspace resizable fileWorkspace navigation={<p>PDF导航</p>} detailLabel="文件详情" onCloseDetail={()=>{}}><p>文件列表</p></ModuleWorkspace>);
   const handle=screen.getByRole('separator',{name:'调整产品导航宽度'});
-  expect(handle).toHaveAttribute('aria-valuenow','300');expect(handle).toHaveAttribute('aria-valuemin','260');expect(handle).toHaveAttribute('aria-valuemax','420');
+  expect(handle).toHaveAttribute('aria-valuenow','260');expect(handle).toHaveAttribute('aria-valuemin','220');expect(handle).toHaveAttribute('aria-valuemax','320');
 });
 it('keeps narrow PDF navigation open for tree expansion and filters, closing only on explicit selection',()=>{
   vi.stubGlobal('innerWidth',720);

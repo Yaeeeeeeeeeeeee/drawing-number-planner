@@ -36,7 +36,7 @@ function apiFixture() {
 // an empty native select (which coerces the requested value back to "").
 async function selectLoadedProduct() {
   await within(screen.getByLabelText('产品类别')).findByRole('option',{name:product.productCategory});
-  fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'11'}});
+  fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:product.productCategory}});
   const control=await screen.findByLabelText('产品型号');
   await within(control).findByRole('option',{name:`${product.sku} · ${product.model} · ${product.productCategory}`});
   fireEvent.change(control,{target:{value:'3'}});
@@ -300,7 +300,7 @@ describe('OutboundPage', () => {
     await within(brand).findByRole('option',{name:'SAMKYO'});
     expect(brand.tagName).toBe('SELECT');
     fireEvent.change(brand, { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'11'}});
+    fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:product.productCategory}});
     expect(screen.getByRole('option', { name: 'SKU-F60 · F60 · 空气炸锅' })).toBeVisible();
     expect(api.listDictionaries).toHaveBeenCalledWith('brand', false);
   });
@@ -381,6 +381,7 @@ describe('OutboundPage', () => {
     fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('铭牌（转曲）.pdf');
+    await waitFor(()=>expect(screen.getByRole('button',{name:'生成压缩包'})).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
     fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
     await screen.findByRole('table',{name:'ZIP 分包结果'});

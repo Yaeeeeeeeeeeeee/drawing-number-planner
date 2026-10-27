@@ -30,7 +30,8 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   const reserved = await request.post('/api/planning/reserve', { headers, data: { ...planning, rows: [{ ...planning.rows[0], expectedFullCode: fullCode }] } }); expect(reserved.ok()).toBeTruthy();
 
   await page.goto('/'); await page.getByRole('button', { name: /BOM 管理/ }).click();
-  await page.getByLabel('BOM 产品型号').selectOption({ label: 'PHASE3 · ZC100' });
+  await page.getByLabel('BOM 产品类别').selectOption('冰柜');
+  await page.getByLabel('BOM 产品型号').selectOption(String(productId));
   await expect(page.getByLabel('业务变更日期')).toBeVisible(); await expect(page.getByLabel('BOM 颜色')).toHaveCount(0);
   await page.getByLabel('业务变更日期').fill('2026-09-02');
   await page.getByRole('button', { name: '添加 BOM 项目' }).click();
@@ -42,7 +43,10 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   await expect(page.getByText('当前 BOM 已保存')).toBeVisible();
 
   await page.getByRole('button', { name: '查询 BOM' }).click();
-  await page.getByLabel('查询 BOM 业务日期').fill('2026-09-02');
+  await page.getByLabel('查询 BOM 产品类别').selectOption('冰柜');
+  await page.getByLabel('查询 BOM 产品型号').selectOption(String(productId));
+  await page.getByLabel('查询 BOM 开始日期').fill('2026-09-02');
+  await page.getByLabel('查询 BOM 结束日期').fill('2026-09-02');
   const queryButton = page.getByRole('button', { name: '查询', exact: true });
   await expect(queryButton).toBeEnabled(); await queryButton.click();
   const bomRow = page.getByRole('row').filter({ hasText: '2026-09-02' }).filter({ hasText: 'ZC100' });

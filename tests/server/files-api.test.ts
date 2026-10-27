@@ -135,11 +135,11 @@ describe('PDF file API', () => {
     const scan = await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
     expect(scan.status).toBe(200);
     expect(await scan.json()).toMatchObject({ total: 3, matched: 1, pending: 1, historicalRegistered: 1,
-      unmatched: 1, conflict: 0, outlined: 1, missing: 0 });
-    const listed = await fetch(`${server.url}/api/files?keyword=${encodeURIComponent('转曲')}&matchStatus=unmatched&conversionType=outlined&presence=present&page=1&pageSize=20`);
+      unmatched: 1, conflict: 0, outlined: 0, missing: 0 });
+    const listed = await fetch(`${server.url}/api/files?keyword=${encodeURIComponent('转曲')}&matchStatus=unmatched&conversionType=source&presence=present&page=1&pageSize=20`);
     expect(listed.status).toBe(200);
     expect(await listed.json()).toMatchObject({ total: 1, items: [expect.objectContaining({
-      relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/unknown（转曲）.PDF', drawingId: null, conversionType: 'outlined', isPresent: true,
+      relativePath: '未分类/UNKNOWN-M/02.未转曲源文件/unknown（转曲）.PDF', drawingId: null, conversionType: 'source', isPresent: true,
     })] });
     const pending = await fetch(`${server.url}/api/files?matchStatus=pending`);
     expect(pending.status).toBe(200);

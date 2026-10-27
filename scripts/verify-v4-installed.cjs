@@ -14,7 +14,7 @@ module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapsh
  const duplicate=await request('/api/products',input);assert.notEqual(duplicate.id,original.id);
  await request('/api/products/5',input,'PUT');
  assert.deepEqual(snapshot(dbFile).historical_drawing_numbers,before.historical_drawing_numbers,'Default appearance must not rewrite historical codes');
- const files=Array.from({length:12},(_,i)=>{const code=`02.0209.${i<6?'010':'020'}.0401${String(i+40).padStart(3,'0')}`;const file=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更明细','00.首批大货',`${code}-V4原生-第${i+1}个很长文件名验证人工归纳不覆盖相邻资料批次（转曲）.pdf`);return{code,file,hash:writePdf(file,`Native V4 manual assignment ${i}`)};});
+ const files=Array.from({length:12},(_,i)=>{const code=`02.0209.${i<6?'010':'020'}.0401${String(i+40).padStart(3,'0')}`;const file=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更文件','00.首批大货',`${code}-V4原生-第${i+1}个很长文件名验证人工归纳不覆盖相邻资料批次（转曲）.pdf`);return{code,file,hash:writePdf(file,`Native V4 manual assignment ${i}`)};});
  await go(page,'PDF 文件中心');await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});
  const pending=(await get('/api/files?presence=present&pageSize=100')).items.filter(file=>file.fileName.includes('V4原生-'));assert.equal(pending.length,12);assert.ok(pending.every(file=>file.productId===null));
  const batchList=await get('/api/material-batches');const target=(batchList.items??batchList).find(batch=>batch.relativePath.includes('00.首批大货'));assert.ok(target);

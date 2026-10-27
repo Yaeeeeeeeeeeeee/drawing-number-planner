@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { openDatabase } from '../../src/db/database';
 import { migrateDatabase } from '../../src/db/migrations';
 import {createV15Fixture} from './v15-fixture';
-it('adds identity/version schema without seeded business data',()=>{const db=openDatabase(':memory:');try{expect(migrateDatabase(db,{databaseExists:false,createBackup(){throw Error('fresh backup')}})).toEqual({from:0,to:20});expect(db.prepare('select * from product_appearance_versions').all()).toEqual([]);expect(db.pragma('foreign_key_check')).toEqual([]);}finally{db.close();}});
+it('adds identity/version schema without seeded business data',()=>{const db=openDatabase(':memory:');try{expect(migrateDatabase(db,{databaseExists:false,createBackup(){throw Error('fresh backup')}})).toEqual({from:0,to:22});expect(db.prepare('select * from product_appearance_versions').all()).toEqual([]);expect(db.pragma('foreign_key_check')).toEqual([]);}finally{db.close();}});
 it.each([false,true])('v15 upgrade preserves old columns, IDs, occupancy and backup first; rollback=%s',fail=>{
  const db=createV15Fixture();try{
  db.exec(`insert into dictionary_items(id,type,code,name,created_at) values(1,'brand','02','品牌','2026-01-01'),(2,'product_size','0209','尺寸','2026-01-01'),(3,'appearance','01','外观','2026-01-01');
@@ -19,11 +19,11 @@ it.each([false,true])('v15 upgrade preserves old columns, IDs, occupancy and bac
  const before=tables.map(t=>({t,rows:db.prepare(`select * from "${t}" order by rowid`).all() as Record<string,unknown>[],cols:(db.pragma(`table_info(${t})`) as {name:string}[]).map(c=>c.name)}));
  if(fail)db.exec("create trigger fail_v16 before insert on schema_migrations when new.version=16 begin select raise(abort,'v16-failed'); end");
  const backup=vi.fn(()=>{expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:15});expect(db.prepare("select name from sqlite_master where name='product_appearance_versions'").get()).toBeUndefined();});
- const run=()=>migrateDatabase(db,{databaseExists:true,createBackup:backup});if(fail)expect(run).toThrow('v16-failed');else expect(run()).toEqual({from:15,to:20});
+ const run=()=>migrateDatabase(db,{databaseExists:true,createBackup:backup});if(fail)expect(run).toThrow('v16-failed');else expect(run()).toEqual({from:15,to:22});
  expect(backup).toHaveBeenCalledOnce();for(const {t,rows,cols} of before)expect(db.prepare(`select ${cols.map(c=>'"'+c+'"').join(',')} from "${t}" order by rowid`).all()).toEqual(rows);
- expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:fail?15:20});expect(db.pragma('foreign_key_check')).toEqual([]);
+ expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:fail?15:22});expect(db.pragma('foreign_key_check')).toEqual([]);
  if(!fail){expect(db.prepare('select appearance_version_id from bom_versions').get()).toEqual({appearance_version_id:null});expect(db.prepare('select * from drawing_appearance_bindings').all()).toEqual([]);expect(db.prepare('select product_id,status from product_appearance_versions').all()).toEqual([{product_id:5,status:'current'}]);}
- if(!fail){const noBackup=vi.fn();expect(migrateDatabase(db,{databaseExists:true,createBackup:noBackup})).toEqual({from:20,to:20});expect(noBackup).not.toHaveBeenCalled();for(const {t,rows,cols} of before)expect(db.prepare(`select ${cols.map(c=>'"'+c+'"').join(',')} from "${t}" order by rowid`).all()).toEqual(rows);}
+ if(!fail){const noBackup=vi.fn();expect(migrateDatabase(db,{databaseExists:true,createBackup:noBackup})).toEqual({from:22,to:22});expect(noBackup).not.toHaveBeenCalled();for(const {t,rows,cols} of before)expect(db.prepare(`select ${cols.map(c=>'"'+c+'"').join(',')} from "${t}" order by rowid`).all()).toEqual(rows);}
  }finally{db.close();}
 });
 it('v15 to v17 rolls back the complete upgrade when the final ledger write fails',()=>{

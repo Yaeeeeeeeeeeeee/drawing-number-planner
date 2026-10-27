@@ -31,7 +31,7 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   const logoId = await ensureDictionary(request, 'project_item', '41', 'Phase4 LOGO', mainId);
   const manualId = await ensureDictionary(request, 'project_item', '42', 'Phase4 说明书', mainId);
   const productResponse = await request.post('/api/products', { headers, data: {
-    sku: 'PHASE4-ZC400', brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC400', productCategory: '冰柜',
+    sku: 'PHASE4', brandId, productSizeId: sizeId, defaultAppearanceId: appearanceId, model: 'ZC400', productCategory: '冰柜',
   } });
   expect(productResponse.ok()).toBeTruthy();
   const productId = (await productResponse.json()).id as number;
@@ -49,15 +49,24 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   const logoCode = previewRows.find((row) => row.clientId === 'logo')!.fullCode;
   const manualCode = previewRows.find((row) => row.clientId === 'manual')!.fullCode;
 
-  const modelDir = join(workspaceRoot!, 'PHASE4', '冰柜', 'ZC400');
-  mkdirSync(modelDir, { recursive: true });
-  writeFileSync(join(modelDir, `${logoCode}-PHASE4-ZC400白色-LOGO.pdf`), '%PDF-1.4 source');
-  writeFileSync(join(modelDir, `${logoCode}-PHASE4-ZC400白色-LOGO（转曲）.pdf`), '%PDF-1.4 outlined');
-  writeFileSync(join(modelDir, '待整理资料.pdf'), '%PDF-1.4 unmatched');
-  writeFileSync(join(modelDir, `${logoCode}-${manualCode}-冲突.pdf`), '%PDF-1.4 conflict');
+  const modelDir = join(workspaceRoot!, '冰柜', 'PHASE4-ZC400');
+  const sourceDir = join(modelDir, '02.未转曲源文件');
+  const outlinedDir = join(modelDir, '03.量产后的变更文件', '00.首批大货');
+  mkdirSync(sourceDir, { recursive: true });
+  mkdirSync(outlinedDir, { recursive: true });
+  writeFileSync(join(sourceDir, `${logoCode}-PHASE4-ZC400白色-LOGO.pdf`), '%PDF-1.4 source');
+  writeFileSync(join(outlinedDir, `${logoCode}-PHASE4-ZC400白色-LOGO（转曲）.pdf`), '%PDF-1.4 outlined');
+  writeFileSync(join(sourceDir, '待整理资料.pdf'), '%PDF-1.4 unmatched');
+  writeFileSync(join(outlinedDir, `${logoCode}-${manualCode}-冲突.pdf`), '%PDF-1.4 conflict');
+
+  writeFileSync(join(modelDir, `${logoCode}-产品根目录排除.pdf`), '%PDF-1.4 excluded root');
+  const legacyDir = join(modelDir, '03.量产后的变更文件（旧目录）');
+  mkdirSync(legacyDir, {recursive:true});
+  writeFileSync(join(legacyDir, `${logoCode}-非字面目录排除.pdf`), '%PDF-1.4 excluded legacy');
 
   await page.goto('/');
   await page.getByRole('button', { name: /PDF 文件中心/ }).click();
+  await page.getByRole('button', { name: '详细信息', exact: true }).click();
   await page.getByRole('textbox', { name: '资料根目录', exact: true }).fill(workspaceRoot!);
   await page.getByRole('button', { name: '保存根目录' }).click();
   await expect(page.getByText('资料根目录已保存')).toBeVisible();
@@ -70,7 +79,7 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   const database = new Database(join(dataDir!, 'planner.db'), { readonly: true });
   try {
     const rows = (database.prepare('SELECT relative_path FROM pdf_files').all() as Array<{ relative_path: string }>)
-      .filter((row) => row.relative_path.startsWith('PHASE4\\冰柜\\ZC400\\'));
+      .filter((row) => row.relative_path.replaceAll('\\', '/').startsWith('冰柜/PHASE4-ZC400/'));
     expect(rows).toHaveLength(4);
     expect(rows.every((row) => !isAbsolute(row.relative_path) && !row.relative_path.includes(workspaceRoot!))).toBe(true);
   } finally {

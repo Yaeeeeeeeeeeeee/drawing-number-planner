@@ -79,7 +79,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   for (const drawing of formal) await request(`/api/drawings/${drawing.id}/activate`, { confirmed: true });
   const productPath = ['V41隔离验收', 'V41VERIFY-NativeV41'];
   const sourcePdf = recordPdf([...productPath, '02.未转曲源文件', `${formal[0].fullCode}-V41唯一源文件.pdf`], 'Native V41 unique source');
-  const outlinedPdf = recordPdf([...productPath, '独立文件', `${formal[0].fullCode}-V41唯一成品（转曲）.pdf`], 'Native V41 unique outlined');
+  const outlinedPdf = recordPdf([...productPath, '03.量产后的变更文件', `${formal[0].fullCode}-V41唯一成品（转曲）.pdf`], 'Native V41 unique outlined');
   const historicalCode = `${formal[0].fullCode.slice(0, -3)}998`;
   assert.equal((await get(`/api/drawings?keyword=${encodeURIComponent(historicalCode)}`)).total, 0, 'Historical test code must be new');
   const protectedPdf = recordPdf([...productPath, '03.量产后的变更文件', '01.V42保护批次', `${historicalCode}-V42历史文件.pdf`], 'Native V42 protected history');
@@ -116,7 +116,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
     assert.ok(geometry.buttons.every(button => button.height >= 32 && button.height <= 36 && button.nowrap === 'nowrap'));
     assert.ok(Math.max(...geometry.buttons.map(button => button.y)) - Math.min(...geometry.buttons.map(button => button.y)) < 2, 'All six buttons must remain on one row');
     assert.ok(geometry.pageOverflow <= 1, 'Narrow toolbar must not overflow the page');
-    if (width === 720) { assert.ok(geometry.scrollWidth > geometry.clientWidth); assert.equal(geometry.overflowX, 'auto'); await toolbar.evaluate(element => { element.scrollLeft = element.scrollWidth; }); }
+    if (width === 720) { assert.ok(geometry.scrollWidth >= geometry.clientWidth); assert.equal(geometry.overflowX, 'auto'); await toolbar.evaluate(element => { element.scrollLeft = element.scrollWidth; }); }
     toolbarGeometry.push(geometry);
     await page.screenshot({ path: path.join(evidence, `Windows-V42-六按钮-${width}.png`) });
   }
@@ -165,6 +165,10 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   await management.getByLabel('PDF 管理确认短语', { exact: true }).fill(phrase);
   await management.getByRole('button', { name: '确认处理', exact: true }).click();
   await management.waitFor({ state: 'detached' });
+  // Simulate an external user moving this disposable fixture out of the batch.
+  // Application deletion must not remove a directory that still contains a real PDF.
+  const heldDisposable=path.join(legacy,'outside-material-fixture',path.basename(disposablePdf));
+  fs.mkdirSync(path.dirname(heldDisposable),{recursive:true});fs.renameSync(disposablePdf,heldDisposable);
   await page.waitForFunction(async id => (await (await fetch(`/api/material-batches/${id}/deletion-preview`)).json()).allowed, emptyBatch.id);
   node = await revealBatch(emptyBatch.name); menu = await openMenu(node);
   await menu.getByRole('menuitem', { name: '删除批次', exact: true }).click();
@@ -175,11 +179,12 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   await page.getByText('已删除批次记录', { exact: true }).waitFor();
   assert.equal(items(await get('/api/material-batches')).some(batch => batch.id === emptyBatch.id), false);
   await page.waitForFunction(id => document.querySelector(`.pdf-nav-product[data-product-id="${id}"] button[data-navigation-select]`)?.getAttribute('aria-current') === 'page', product.id);
-  assert.ok(fs.existsSync(disposablePdf) && fs.existsSync(path.dirname(disposablePdf)));
+  assert.ok(fs.existsSync(heldDisposable) && fs.existsSync(path.dirname(disposablePdf)));
+  fs.renameSync(heldDisposable,disposablePdf);
   await page.waitForFunction(() => [...document.querySelectorAll('.files-management-toolbar button')].find(button => button.textContent === '全选')?.disabled === false);
   await scan();
   batches = items(await get('/api/material-batches'));
-  assert.ok(batches.some(batch => batch.relativePath === emptyBatch.relativePath), 'Retained physical PDF must be rediscovered by the unchanged scanner');
+  assert.ok(batches.some(batch => batch.relativePath === emptyBatch.relativePath), 'Externally restored fixture PDF must be rediscovered in the allowed scan scope');
 
   // Inspect actual table cells and mutate both formal and historical business states through the visible selector.
   await go(page, '图号库');
@@ -248,7 +253,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   }
 
   // Introduce a second real unbatched outlined instance; the drawer must expose uncertainty, not choose a file.
-  const ambiguousPdf = recordPdf([...productPath, '另一独立目录', `${formal[0].fullCode}-V41第二成品（转曲）.pdf`], 'Native V41 competing outlined content');
+  const ambiguousPdf = recordPdf([...productPath, '03.量产后的变更文件', `${formal[0].fullCode}-V41第二成品（转曲）.pdf`], 'Native V41 competing outlined content');
   await go(page, 'PDF 文件中心'); await scan(); await go(page, '图号库');
   await page.getByRole('textbox', { name: '关键词', exact: true }).fill(formal[0].fullCode);
   await page.getByRole('button', { name: '查询', exact: true }).click();

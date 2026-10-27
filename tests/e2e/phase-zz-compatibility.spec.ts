@@ -35,7 +35,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
 
   const sourceDir = join(workspaceRoot!, '01.洗碗机', 'SKDWT040JP-T40', '02.未转曲源文件');
   const outlinedDir = join(workspaceRoot!, '01.洗碗机', 'SKDWT040JP-T40',
-    '03.量产后的变更文件（已量产的产品看最新日期）', '01.20241210');
+    '03.量产后的变更文件', '01.20241210');
   mkdirSync(sourceDir, { recursive: true }); mkdirSync(outlinedDir, { recursive: true });
   const sourceFile = join(sourceDir, '02.0404.010.0401007-SAMKYO-T40-LOGO.pdf');
   const outlinedFile = join(outlinedDir, '02.0404.010.0401007-SAMKYO-T40-LOGO.pdf');
@@ -44,23 +44,29 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   const before = [sourceFile, outlinedFile, pendingFile].map((path) => ({ path, size: statSync(path).size, mtime: statSync(path).mtimeMs }));
 
   await page.goto('/'); await page.getByRole('button', { name: /PDF 文件中心/ }).click();
+  await page.getByRole('button', { name: '详细信息', exact: true }).click();
   await page.getByRole('textbox', { name: '资料根目录', exact: true }).fill(workspaceRoot!);
   await page.getByRole('button', { name: '保存根目录' }).click();
   await page.getByRole('button', { name: '扫描资料库' }).click();
   await expect(page.getByText('1 个历史图号已登记')).toBeVisible();
   await expect(page.getByText('1 待确认')).toBeVisible();
-  await expect(page.getByText(/待确认.*02\.0404\.010\.0401000.*invalid-format/)).toBeVisible();
+  const pendingResponse = await request.get('/api/files?keyword=02.0404.010.0401000');
+  expect((await pendingResponse.json()).items).toEqual([expect.objectContaining({matchStatus:'pending',classificationWarning:expect.stringContaining('invalid-format')})]);
   expect(before.map(({ path, size, mtime }) => ({ path, size: statSync(path).size, mtime: statSync(path).mtimeMs })))
     .toEqual(before);
 
-  await page.getByRole('button', { name: /图号库/ }).click();
-  await page.getByLabel('完整图号').fill('02.0404.010.0401007');
-  await page.getByRole('button', { name: '检索', exact: true }).click();
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '图号库', exact: true }).click();
+  await page.getByLabel('关键词', { exact: true }).fill('02.0404.010.0401007');
+  await page.getByRole('button', { name: '查询', exact: true }).click();
   const historicalResult = page.getByRole('row').filter({
     has: page.getByRole('button', { name: '02.0404.010.0401007', exact: true }),
   });
   await expect(historicalResult.getByRole('cell', { name: '历史扫描', exact: true })).toBeVisible();
-  await expect(page.getByText(/源文件已有.*转曲后已有/)).toBeVisible();
+  await historicalResult.getByRole('button', { name: '查看 / 管理', exact: true }).click();
+  const detail = page.getByRole('complementary', { name: '图号详情' });
+  await expect(detail.getByRole('button', { name: /打开转曲前文件.*的位置/ })).toBeEnabled();
+  await expect(detail.getByRole('button', { name: /打开转曲后文件.*的位置/ })).toBeEnabled();
+  await page.getByRole('button', { name: '关闭图号详情', exact: true }).click();
 
   await page.getByRole('button', { name: /图号规划/ }).click();
   await page.getByLabel('产品型号').selectOption(String(productId));
@@ -73,15 +79,18 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   unlinkSync(sourceFile); unlinkSync(outlinedFile);
   await page.getByRole('button', { name: /PDF 文件中心/ }).click();
   await page.getByRole('button', { name: '扫描资料库' }).click();
+  await page.getByText('文件筛选', { exact: true }).click();
   await page.getByLabel('文件关键词').fill('02.0404.010.0401007');
   await page.getByLabel('存在状态').selectOption('missing');
   await page.getByRole('button', { name: '筛选 PDF' }).click();
   await expect(page.locator('.file-primary').filter({ hasText: '02.0404.010.0401007' })).toHaveCount(2);
-  await page.getByRole('button', { name: /图号库/ }).click();
-  await page.getByLabel('完整图号').fill('02.0404.010.0401007');
-  await page.getByRole('button', { name: '检索', exact: true }).click();
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '图号库', exact: true }).click();
+  await page.getByLabel('关键词', { exact: true }).fill('02.0404.010.0401007');
+  await page.getByRole('button', { name: '查询', exact: true }).click();
   const historicalRow = page.getByRole('row').filter({ hasText: '02.0404.010.0401007' });
-  await expect(historicalRow.locator('.integrity-missing')).toHaveCount(2);
+  await historicalRow.getByRole('button', { name: '查看 / 管理', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: '图号详情' }).getByText('磁盘文件不存在', { exact: true })).toHaveCount(2);
+  await page.getByRole('button', { name: '关闭图号详情', exact: true }).click();
 
   await page.getByRole('button', { name: /图号规划/ }).click();
   await page.getByLabel('产品型号').selectOption(String(productId));

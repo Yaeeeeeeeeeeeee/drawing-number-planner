@@ -84,7 +84,7 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
     void Promise.all([api.listProducts({ status: 'active' }), api.listDictionaries('brand', false)])
       .then(([nextProducts, nextBrands]) => {
         setProducts(nextProducts);
-        if(target){const selected=nextProducts.find(item=>item.id===target.productId);if(selected){setBrandId(String(selected.brandId));setCategoryId(String(selected.productSizeId));}}
+        if(target){const selected=nextProducts.find(item=>item.id===target.productId);if(selected){setBrandId(String(selected.brandId));setCategoryId(selected.productCategory);}}
         setBrands(nextBrands);
         if (nextBrands.length === 1) setBrandId(String(nextBrands[0].id));
       })
@@ -107,8 +107,8 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
 
   const chosenProduct = products.find((item) => item.id === Number(productId));
   const brandProducts = products.filter(item=>item.brandId===Number(brandId));
-  const categories = [...new Map(brandProducts.map(item=>[item.productSizeId,{id:item.productSizeId,name:item.productCategory}])).values()];
-  const visibleProducts = categoryId ? brandProducts.filter(item=>item.productSizeId===Number(categoryId)) : [];
+  const categories = [...new Set(brandProducts.map(item=>item.productCategory))];
+  const visibleProducts = categoryId ? brandProducts.filter(item=>item.productCategory===categoryId) : [];
   const blockers = preview?.items.some((item) => item.pdfFileId && selected.includes(item.pdfFileId) && !item.selectable) ?? false;
   const selectableIds = useMemo(
     () => preview?.items.filter((item) => item.selectable && item.pdfFileId).map((item) => item.pdfFileId!) ?? [],
@@ -211,7 +211,7 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
             <option value="">请选择</option>{brands.map((brand) => <option value={brand.id} key={brand.id}>{brand.name}</option>)}
           </select>
         </label>
-        <label><span>产品类别</span><select aria-label="产品类别" value={categoryId} disabled={!brandId} onChange={event=>{setCategoryId(event.target.value);setProductId('');setBatchId('');}}><option value="">请选择</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+        <label><span>产品类别</span><select aria-label="产品类别" value={categoryId} disabled={!brandId} onChange={event=>{setCategoryId(event.target.value);setProductId('');setBatchId('');}}><option value="">请选择</option>{categories.map(category=><option key={category} value={category}>{category}</option>)}</select></label>
         <div className="outbound-product-field">
           <label htmlFor="outbound-product-select">产品型号</label>
           <select id="outbound-product-select" aria-label="产品型号" value={productId} disabled={!categoryId} onChange={(event) => setProductId(event.target.value)}>

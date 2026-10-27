@@ -59,7 +59,7 @@ it.each([false, true])('upgrades a disk-backed v13 copy safely with completion f
     backupPath = createDatabaseBackup(working, workingPath, join(directory, 'backups'), 'migration');
   } });
   if (fail) expect(upgrade).toThrow('copy-upgrade-failed');
-  else expect(upgrade()).toEqual({ from: 13, to: 20 });
+  else expect(upgrade()).toEqual({ from: 13, to:22 });
   const backup = openDatabase(backupPath); databases.push(backup);
   for (const database of [backup, working]) {
     expect(database.prepare('select * from historical_drawing_numbers').all()).toEqual(beforeHistory);
@@ -68,7 +68,7 @@ it.each([false, true])('upgrades a disk-backed v13 copy safely with completion f
     expect(database.pragma('foreign_key_check')).toEqual([]);
   }
   expect(backup.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 13 });
-  expect(working.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: fail ? 13 : 20 });
+  expect(working.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: fail ? 13 : 22 });
   expect(working.prepare("select name from sqlite_master where name='outbound_package_parts'").get())
     .toEqual(fail ? undefined : { name: 'outbound_package_parts' });
   expect(hash()).toBe(originalHash);
@@ -78,7 +78,7 @@ it('backs up v13 before additive v14 migration and preserves occupied history', 
   const backup = vi.fn(() => {
     expect(db.prepare('select max(version) as version from schema_migrations').get()).toEqual({ version: 13 });
   });
-  expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 13, to: 20 });
+  expect(migrateDatabase(db, { databaseExists: true, createBackup: backup })).toEqual({ from: 13, to:22 });
   expect(backup).toHaveBeenCalledOnce();
   expect(db.prepare('select * from historical_drawing_numbers').all()).toEqual(before);
   expect(db.prepare('select updated_at, edit_revision from bom_versions').all()).toEqual([]);

@@ -2,13 +2,14 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.0.0
+## 当前版本 v1.1.0
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.0.0/DrawingNumberPlanner-1.0.0-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.0.0)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.1.0/DrawingNumberPlanner-1.1.0-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.0)
 - [安装、升级和恢复说明](docs/install-and-upgrade.md)
 - [维护和发布方式](docs/maintenance.md)
-- [上一版回退基准](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/rollback-v4-20261023)
+- [上一版 v1.0.0（升级前 Schema20 备份配套回退）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.0.0)
+- [V5 修改及验证说明](docs/v5-delivery-20261026.md)
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
 
@@ -37,19 +38,21 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 - BOM 保留实际当前关系与历史快照。外发按明确选择的资料批次及打包范围核对文件，BOM 提供辅助依据；不隐式混入其他批次。
 - 二维码是独立记录，不参与正式图号占号。文件关联不会自动改变二维码启停状态。
 
+本版收紧包材扫描范围：产品目录中仅扫描 `02.未转曲源文件` 和 `03.量产后的变更文件`；源文件使用独立节点，不作为生产批次。二维码手动文件关联不受此目录限制。
+
 详见 [项目 Skill](.agents/skills/drawing-number-planner/SKILL.md) 及其业务、安全和模型参考。
 
 ## 数据安全与升级
 
-升级前关闭旧程序并备份完整数据目录，启动新版继续选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema20：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
+升级前关闭旧程序并备份完整数据目录，启动新版继续选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema22：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
 
-移除 PDF 记录或删除内部空批次不会删除原始文件及磁盘文件夹。已用图号、BOM、产品归并及外发历史的引用继续受保护。取消占号是单独的危险操作，必须通过资格检查和确认。用户正式数据库及实际显示器 DPI 仍应在本地核对。
+移除 PDF 记录或删除内部空批次不会删除原始文件及磁盘文件夹。已用图号、BOM、产品归并及外发历史的引用继续受保护。普通取消占号继续执行原资格检查。新增的「强制取消占号并删除图号」是独立危险操作：显示真实影响后确认，释放当前占用但保留原身份、历史快照和审计；原 PDF 不删除，重扫旧同号文件不会自动关联到重新占用的号码。用户正式数据库及实际显示器 DPI 仍应在本地核对。
 
 ## 开发与验证
 
 ```sh
 git fetch --tags
-git switch --detach v1.0.0
+git switch --detach v1.1.0
 pnpm install
 pnpm typecheck
 pnpm test

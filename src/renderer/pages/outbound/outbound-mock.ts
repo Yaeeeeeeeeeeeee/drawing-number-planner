@@ -29,6 +29,7 @@ export function createOutboundMockStore() {
       if(rows.some(row=>!row.selectable)) throw new Error('存在缺失、冲突或待确认资料，处理后才能打包。');
       const items=rows.filter(row=>selected.includes(row.id));
       if(!items.length) throw new Error('请选择至少一个可用文件。');
+      if(items.some(item=>item.sizeBytes>50_000_000))throw Error('单个文件超过50MB；开发示意不能确认真实压缩后大小');
       const groups=partitionOutboundFiles(items);
       const name=`${product.model}-包材资料-${Math.abs(id)}`;
       const value:MockPackage={id:id--,name,product:`${product.sku} · ${product.model}`,mode:mode==='change_only'?'本次变更资料':'当前完整包材资料',createdAt:new Date().toLocaleString('zh-CN'),items:copy(items),parts:groups.map((group,i)=>({name:`${name}-part${String(i+1).padStart(2,'0')}.zip`,path:`MOCK_ONLY/外发结果/${name}-part${String(i+1).padStart(2,'0')}.zip`,sizeBytes:group.reduce((sum,row)=>sum+row.sizeBytes,0),count:group.length}))};

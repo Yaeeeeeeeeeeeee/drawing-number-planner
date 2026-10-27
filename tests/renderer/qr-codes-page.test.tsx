@@ -57,8 +57,8 @@ describe('manual QR page',()=>{
   render(<QrCodesPage api={apiFor() as never}/>);const sub=await expand();
   expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.textContent)).toEqual(['SKU','型号','产品类别','说明书','售后卡','菜谱','操作']);
   expect(within(sub).getAllByRole('columnheader').map(h=>h.textContent)).toEqual(['用途','关联文件','网址','业务状态','操作']);
-  expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.style.textAlign)).toEqual(['left',...Array(6).fill('center')]);
-  expect(within(sub).getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(['center','left','center','center','center']);
+  expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.style.textAlign)).toEqual(['left','left',...Array(5).fill('center')]);
+  expect(within(sub).getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(['center','center','center','center','center']);
   expect(screen.queryByText('待人工确认')).not.toBeInTheDocument();expect(screen.queryByText('扫描匹配状态')).not.toBeInTheDocument();expect(within(sub).getByText('未配置')).toBeVisible();expect(screen.queryByLabelText('二维码每页数量')).not.toBeInTheDocument();expect(screen.queryByText('下一页')).not.toBeInTheDocument();
  });
  it('windows the scrollable product list without rendering thousands of rows or a pager',async()=>{

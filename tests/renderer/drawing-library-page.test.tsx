@@ -13,6 +13,18 @@ it('requests enough initial drawing records for a tall workspace without truncat
 });
 
 describe('DrawingLibraryPage', () => {
+  it('refreshes catalog metadata as well as list counts after independently confirmed force release',async()=>{
+    let released=false;
+    const row={id:7,origin:'planned',fullCode:'02.0209.010.0401001',model:'M1',status:'active',sourceFiles:[],outlinedFiles:[],currentBomUsage:[]};
+    const api={listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValue([]),getDrawingNavigation:vi.fn().mockResolvedValue({batches:[],mainCategories:[]}),getDrawingNavigationCounts:vi.fn().mockImplementation(()=>Promise.resolve({total:released?0:1,products:[],categories:[],batches:[],unassociated:0})),searchDrawings:vi.fn().mockImplementation(()=>Promise.resolve({items:released?[]:[row],total:released?0:1})),getDrawing:vi.fn().mockResolvedValue(row),getDrawingForceReleasePreview:vi.fn().mockResolvedValue({fullCode:row.fullCode,fingerprint:'impact',references:{drawingRecords:1},affectedProductIds:[]}),forceReleaseDrawing:vi.fn().mockImplementation(()=>{released=true;return Promise.resolve({occupied:false});})};
+    render(<DrawingLibraryPage api={api as never}/>);
+    fireEvent.click(await screen.findByRole('button',{name:'查看 / 管理'}));
+    await waitFor(()=>expect(api.getDrawingNavigation).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button',{name:'强制取消占号并删除图号'}));
+    fireEvent.click(await screen.findByRole('button',{name:'确认强制释放并删除'}));
+    await waitFor(()=>expect(api.getDrawingNavigation.mock.calls.length).toBeGreaterThan(1));
+    expect(api.forceReleaseDrawing).toHaveBeenCalledOnce();
+  });
   it('refreshes product catalog metadata after classification even when no new binding was needed',async()=>{
     const product={id:9,sku:'SKU-ZU70SD',model:'ZU70SD',productCategory:'冰柜',status:'active'};
     const api={searchDrawings:vi.fn().mockResolvedValue({items:[],total:733}),listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValueOnce([]).mockResolvedValue([product]),getDrawingNavigationCounts:vi.fn().mockResolvedValue({total:733,unassociated:0,recycle:0,categories:[{name:'冰柜',count:733}],products:[{productId:9,count:733}],batches:[]}),classifyDrawingAssociations:vi.fn().mockResolvedValue({updated:0,before:{historicalAssociated:733,historicalTotal:757,plannedAssociated:0,plannedTotal:0},after:{historicalAssociated:733,historicalTotal:757,plannedAssociated:0,plannedTotal:0},issues:[]})};
@@ -222,7 +234,7 @@ describe('DrawingLibraryPage', () => {
     expect(screen.queryByText('查看历史文件')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('查看资料批次'),{target:{value:'2'}});
     if(isPresent)expect(screen.getByText('current.pdf')).toBeVisible();
-    else expect(screen.getByText('暂无转曲后文件')).toBeVisible();
+    else expect(screen.getByText('磁盘文件不存在')).toBeVisible();
     fireEvent.change(screen.getByLabelText('查看资料批次'),{target:{value:'1'}});
     expect(screen.getByText('old.pdf')).toBeVisible();
   });
@@ -382,7 +394,7 @@ describe('DrawingLibraryPage', () => {
     expect(within(panel).getByRole('combobox',{name:'图号业务状态'})).toHaveValue('inactive');
     expect(within(panel).getByText('source.pdf')).toBeVisible();
     expect(within(panel).getByText('存在')).toBeVisible();
-    expect(within(panel).getByText('暂无转曲后文件')).toBeVisible();
+    expect(within(panel).getByText('未找到对应文件索引')).toBeVisible();
     expect(panel).not.toHaveTextContent('SKU/source.pdf');
     expect(panel).toHaveTextContent('首次 BOM');
     expect(panel).toHaveTextContent('未进入 BOM');
@@ -872,7 +884,7 @@ it.each(['active','inactive'])('shows four compact groups and an actionable rele
  for(const name of ['01 基础信息','02 文件信息','03 业务关联','04 状态与操作'])expect(within(panel).getByRole('heading',{name})).toBeInTheDocument();
  expect(within(panel).queryByText('关联维护')).not.toBeInTheDocument();expect(within(panel).queryByText('查看路径')).not.toBeInTheDocument();
  expect(within(panel).getByText('very-long-file.pdf')).toHaveAttribute('title','very-long-file.pdf');
- expect(within(panel).getByText('暂无转曲后文件')).toBeInTheDocument();
+ expect(within(panel).getByText('未找到对应文件索引')).toBeInTheDocument();
  expect(within(panel).getByText('首批大货')).toBeInTheDocument();expect(within(panel).getByText('未进入 BOM')).toBeInTheDocument();
  fireEvent.click(within(panel).getByRole('button',{name:'取消占号并删除'}));
  expect(await within(panel).findByText(/该图号存在历史扫描占用记录/)).toBeInTheDocument();

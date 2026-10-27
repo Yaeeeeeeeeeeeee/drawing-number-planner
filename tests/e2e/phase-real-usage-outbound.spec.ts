@@ -4,6 +4,13 @@ import { join } from 'node:path';
 
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import Database from 'better-sqlite3';
+import { QrManualService } from '../../src/core/qr/qr-manual-service';
+
+function writePdfFixture(file:string,text:string) {
+ const stream=`BT /F1 12 Tf 20 100 Td (${text}) Tj ET`;
+ const objects=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
+ let pdf='%PDF-1.4\n';const offsets=[0];for(const [index,object]of objects.entries()){offsets.push(Buffer.byteLength(pdf));pdf+=`${index+1} 0 obj\n${object}\nendobj\n`;}const xref=Buffer.byteLength(pdf);pdf+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`+offsets.slice(1).map(offset=>String(offset).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;writeFileSync(file,pdf);
+}
 
 const headers = { origin: 'http://127.0.0.1:5173', 'x-planner-token': 'phase-one-development' };
 
@@ -105,8 +112,8 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   const purposeId = (await purpose.json()).id as number;
 
   const modelRoot = join(workspaceRoot!, '17.验收产品', 'ACCEPT17-MODEL17');
-  const firstBatch = join(modelRoot, '03.量产后的变更文件（已量产的产品看最新日期）', '00.首批大货');
-  const updateBatch = join(modelRoot, '03.量产后的变更文件（已量产的产品看最新日期）', '01.20260917');
+  const firstBatch = join(modelRoot, '03.量产后的变更文件', '00.首批大货');
+  const updateBatch = join(modelRoot, '03.量产后的变更文件', '01.20260917');
   const sourceRoot = join(modelRoot, '02.未转曲源文件');
   mkdirSync(firstBatch, { recursive: true });
   mkdirSync(updateBatch, { recursive: true });
@@ -114,24 +121,39 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   const firstManualPath = join(firstBatch, `${manualDrawings[0].fullCode}-验收说明书（转曲）.pdf`);
   const labelPath = join(firstBatch, `${labelDrawing.fullCode}-验收标签（转曲）.pdf`);
   const updateManualPath = join(updateBatch, `${manualDrawings[1].fullCode}-验收说明书更新（转曲）.pdf`);
-  writeFileSync(firstManualPath, '%PDF acceptance manual v1');
-  writeFileSync(labelPath, '%PDF acceptance label');
-  writeFileSync(updateManualPath, '%PDF acceptance manual v2');
+  writePdfFixture(firstManualPath, 'acceptance manual v1');
+  writePdfFixture(labelPath, 'acceptance label');
+  writePdfFixture(updateManualPath, 'acceptance manual v2');
   const historicalCode = '17.1717.170.1703099';
   writeFileSync(join(sourceRoot, `${historicalCode}-历史说明.pdf`), '%PDF historical source');
-  writeFileSync(join(modelRoot, 'MODEL17-Acceptance Guide（accept17）.pdf'), '%PDF qr matched');
+  const qrPath = join(modelRoot, 'MODEL17-Acceptance Guide（acpt017）.pdf');
+  writeFileSync(qrPath, '%PDF-1.4 qr matched');
   writeFileSync(join(modelRoot, 'MODEL17-Unknown Purpose（pending17）.pdf'), '%PDF qr pending');
 
   await page.goto('/');
   await page.getByRole('button', { name: /PDF 文件中心/ }).click();
+  await page.getByRole('button', { name: '详细信息', exact: true }).click();
   await page.getByRole('textbox', { name: '资料根目录', exact: true }).fill(workspaceRoot!);
   await page.getByRole('button', { name: '保存根目录' }).click();
   await page.getByRole('button', { name: '扫描资料库' }).click();
   await expect(page.getByText('资料库扫描完成')).toBeVisible();
 
+  // Package scans do not register QR files. Exercise the actual trusted desktop
+  // service against this same isolated database; no renderer bridge is mocked.
+  const qrDatabase = new Database(join(dataDir!, 'planner.db'));
+  qrDatabase.pragma('foreign_keys = ON');
+  try {
+    const manual = new QrManualService(qrDatabase);
+    const selection = manual.selectTrustedFile(qrPath);
+    const preview = manual.preview({token:selection.token,productId,purposeId,name:'验收指南',targetUrl:'https://example.test/acpt017'});
+    expect(preview.issues).toEqual(['文件名须为 型号-英文用途(7位网址尾码).pdf']);
+    const linked = manual.commit(preview.previewId,{confirmed:true,reason:'验收自定义用途文件已人工核对'});
+    expect(manual.history(linked.id).items).toHaveLength(1);
+  } finally { qrDatabase.close(); }
+
   const qrList = await request.get(`/api/qr-codes?productId=${productId}&purposeId=${purposeId}`);
   const qrCode = (await qrList.json()).items[0] as { id: number; status: string; files: Array<{ detectedIdentifier: string }> };
-  expect(qrCode.files).toEqual([expect.objectContaining({ detectedIdentifier: 'accept17' })]);
+  expect(qrCode.files).toEqual([expect.objectContaining({fileName:'MODEL17-Acceptance Guide（acpt017）.pdf',isPresent:true,matchStatus:'matched'})]);
   const qrUpdated = await request.put(`/api/qr-codes/${qrCode.id}`, { headers,
     data: { name: '验收二维码', targetUrl: 'https://example.test/acceptance' } });
   expect(await qrUpdated.json()).toMatchObject({ name: '验收二维码', targetUrl: 'https://example.test/acceptance' });
@@ -143,8 +165,9 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   const database = new Database(join(dataDir!, 'planner.db'));
   const historical = database.prepare('select id from historical_drawing_numbers where full_code = ?')
     .get(historicalCode) as { id: number };
-  expect(database.prepare('select match_status as matchStatus, detected_identifier as detectedIdentifier from qr_code_files where file_name = ?')
-    .get('MODEL17-Unknown Purpose（pending17）.pdf')).toEqual({ matchStatus: 'pending', detectedIdentifier: 'pending17' });
+  expect(database.prepare('select count(*) as count from qr_code_files').get()).toEqual({count:0});
+  expect(database.prepare('select count(*) as count from qr_manual_files where file_name=?').get('MODEL17-Unknown Purpose（pending17）.pdf')).toEqual({count:0});
+  expect(readFileSync(join(modelRoot,'MODEL17-Unknown Purpose（pending17）.pdf'),'utf8')).toBe('%PDF qr pending');
   // Product attribution is a separate explicit confirmation workflow. This fixture records that completed decision
   // so the acceptance flow can exercise historical BOM selection without creating a duplicate product archive.
   database.prepare('update historical_drawing_numbers set product_id = ? where id = ?').run(productId, historical.id);
@@ -175,34 +198,36 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   const firstBatchId = batches.items.find((item) => item.name === '00.首批大货')!.id;
   const updateBatchId = batches.items.find((item) => item.name === '01.20260917')!.id;
   const previewInitial = await request.post('/api/outbound-packages/preview', { headers, data: {
-    productId, selectedMaterialBatchId: firstBatchId, materialType: 'initial', packageMode: 'current_complete',
+    workflowVersion:2, productId, selectedMaterialBatchId: firstBatchId, materialType: 'initial', packageMode: 'current_complete',
   } });
   expect(previewInitial.ok()).toBeTruthy();
-  expect((await previewInitial.json()).items).toHaveLength(2);
+  const initialBody = await previewInitial.json();
+  expect(initialBody.items).toHaveLength(2);
+  expect(initialBody.items.every((item:{selectable:boolean})=>item.selectable),JSON.stringify(initialBody.items)).toBe(true);
   const previewChange = await request.post('/api/outbound-packages/preview', { headers, data: {
-    productId, selectedMaterialBatchId: updateBatchId, materialType: 'update', packageMode: 'change_only',
+    workflowVersion:2, productId, selectedMaterialBatchId: updateBatchId, materialType: 'update', packageMode: 'change_only',
   } });
   expect(previewChange.ok()).toBeTruthy();
   const changeBody = await previewChange.json();
-  expect(changeBody.items).toEqual([expect.objectContaining({ fullCode: manualDrawings[1].fullCode, sourceBatchName: '01.20260917' })]);
+  expect(changeBody.items.filter((item:{selectable:boolean})=>item.selectable)).toEqual([expect.objectContaining({ fullCode: manualDrawings[1].fullCode, sourceBatchName: '01.20260917' })]);
+  expect(changeBody.items).toContainEqual(expect.objectContaining({fullCode:labelDrawing.fullCode,source:'baseline_removed',selectable:false,pdfFileId:null}));
   const previewCurrent = await request.post('/api/outbound-packages/preview', { headers, data: {
-    productId, selectedMaterialBatchId: updateBatchId, materialType: 'update', packageMode: 'current_complete',
+    workflowVersion:2, productId, selectedMaterialBatchId: updateBatchId, materialType: 'update', packageMode: 'current_complete',
   } });
   expect(previewCurrent.ok()).toBeTruthy();
   const currentBody = await previewCurrent.json();
-  expect(currentBody.items).toEqual(expect.arrayContaining([
-    expect.objectContaining({ fullCode: manualDrawings[1].fullCode, sourceBatchName: '01.20260917' }),
-    expect.objectContaining({ fullCode: labelDrawing.fullCode, sourceBatchName: '00.首批大货', status: 'carried_forward' }),
-  ]));
+  expect(currentBody.items).toEqual([expect.objectContaining({ fullCode: manualDrawings[1].fullCode, sourceBatchName: '01.20260917',selectable:true })]);
+  // A complete selected-batch package never silently imports the older label.
+  expect(currentBody.items.some((item:{fullCode:string})=>item.fullCode===labelDrawing.fullCode)).toBe(false);
 
   const outputRoot = join(dataDir!, 'task-17-exports');
   mkdirSync(outputRoot, { recursive: true });
   writeFileSync(join(dataDir!, 'settings.json'), `${JSON.stringify({ workspaceRoot, outboundOutputRoot: outputRoot }, null, 2)}\n`);
-  const selectedPdfFileIds = currentBody.items.map((item: { pdfFileId: number }) => item.pdfFileId);
-  const selectedSources = [updateManualPath, labelPath].map((path) => ({ path, bytes: readFileSync(path), mtimeMs: statSync(path).mtimeMs }));
+  const selectedPdfFileIds = initialBody.items.map((item: { pdfFileId: number }) => item.pdfFileId);
+  const selectedSources = [firstManualPath, labelPath].map((path) => ({ path, bytes: readFileSync(path), mtimeMs: statSync(path).mtimeMs }));
   const packageTask = await request.post('/api/tasks/outbound_package', { headers, data: {
-    productId, selectedMaterialBatchId: updateBatchId, materialType: 'update', packageMode: 'current_complete',
-    previewToken: currentBody.previewToken, selectedPdfFileIds,
+    workflowVersion:2, productId, selectedMaterialBatchId: firstBatchId, materialType: 'initial', packageMode: 'current_complete',
+    previewToken: initialBody.previewToken, selectedPdfFileIds,
   } });
   expect(packageTask.status()).toBe(202);
   const taskId = (await packageTask.json()).id as string;
@@ -214,7 +239,7 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   expect(task).toMatchObject({ status: 'completed', result: { fileCount: 2 } });
   const zipPath = join(outputRoot, task.result!.zipRelativePath);
   expect(readFileSync(zipPath).length).toBeGreaterThan(0);
-  const zipEntries = execFileSync('tar.exe', ['-tf', zipPath]).toString('latin1').split(/\r?\n/).filter(Boolean);
+  const zipEntries = execFileSync(process.platform === 'win32' ? 'tar.exe' : 'unzip', process.platform === 'win32' ? ['-tf', zipPath] : ['-Z1', zipPath]).toString('latin1').split(/\r?\n/).filter(Boolean);
   expect(zipEntries).toHaveLength(2);
   expect(new Set(zipEntries).size).toBe(2);
   const packageDatabase = new Database(join(dataDir!, 'planner.db'), { readonly: true, fileMustExist: true });
@@ -230,7 +255,7 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
     .toEqual([...selectedPdfFileIds].sort((left, right) => left - right));
   expect(packageItems.every((item) => item.conversionType === 'outlined')).toBe(true);
   expect(new Set(packageItems.map((item) => item.fileName.toLocaleLowerCase('en-US'))).size).toBe(2);
-  expect(new Set(packageItems.map((item) => item.sourceBatch))).toEqual(new Set(['00.首批大货', '01.20260917']));
+  expect(new Set(packageItems.map((item) => item.sourceBatch))).toEqual(new Set(['00.首批大货']));
   for (const source of selectedSources) {
     expect(readFileSync(source.path)).toEqual(source.bytes);
     expect(statSync(source.path).mtimeMs).toBe(source.mtimeMs);
@@ -242,27 +267,33 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   expect(contact.status()).toBe(201);
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:5173' });
 
-  await page.getByRole('button', { name: /图号库/ }).click();
-  await page.getByLabel('每页条数').selectOption('20');
-  await expect(page.getByRole('navigation', { name: '图号分页' })).toContainText(/共 \d+ 条/);
-  await page.getByRole('button', { name: '下一页' }).click();
-  await expect(page.getByRole('navigation', { name: '图号分页' })).toContainText('第 2');
-  await page.getByRole('button', { name: '按资料批次' }).click();
-  await page.getByLabel('搜索型号或批次').fill('MODEL17');
-  await page.getByRole('button', { name: '查询资料批次' }).click();
-  await expect(page.getByText('20260917', { exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '图号库', exact: true }).click();
+  await page.getByLabel('关键词', { exact: true }).fill('MODEL17');
+  await page.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(page.getByText('24 个图号', { exact: true })).toBeVisible();
+  const drawingList = page.locator('.drawing-library-page .table-wrap');
+  await drawingList.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect(page.getByRole('button', { name: manualDrawings[21].fullCode, exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '图号分页' })).toHaveCount(0);
+  await page.getByRole('button', { name: /PDF 文件中心/ }).click();
+  const catalog = page.getByRole('navigation', { name: '资料导航' });
+  await catalog.getByLabel('搜索产品 SKU 或型号').fill('MODEL17');
+  await catalog.getByRole('button', { name: '批次 20260917', exact: true }).click();
+  await expect(page.getByText(`${manualDrawings[1].fullCode}-验收说明书更新（转曲）`, { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /二维码管理/ }).click();
   await page.getByRole('button', { name: '展开 MODEL17 的二维码用途' }).click();
-  await expect(page.getByText('验收二维码', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看 验收二维码', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /BOM 管理/ }).click();
   await page.getByRole('button', { name: '查询 BOM' }).click();
-  await page.getByLabel('查询 BOM 型号').fill('MODEL17');
+  await page.getByLabel('查询 BOM 产品类别').selectOption('17.验收产品');
+  await page.getByLabel('查询 BOM 产品型号').selectOption(String(productId));
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await expect(page.getByRole('cell', { name: '2026-09-17', exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /外发资料/ }).click();
   await expect(page.getByRole('heading', { name: '邮件草稿', exact: true })).toBeVisible();
+  await page.getByText('编辑邮件草稿', { exact: true }).click();
   await page.getByLabel('收件人 验收联系人').check();
   await page.getByRole('button', { name: '复制收件人' }).click();
   await expect(page.getByText('已复制', { exact: true })).toBeVisible();

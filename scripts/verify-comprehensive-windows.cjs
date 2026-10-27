@@ -22,14 +22,14 @@ function writePdf(file,text){
 }
 function assertPreservedRows(before,after){for(const [table,rows]of Object.entries(before))for(const row of rows)assert.ok(after[table].some(candidate=>Object.keys(row).every(key=>candidate[key]===row[key])),`Historical row changed in ${table}`);}
 function qrState(file,name){const all=snapshot(file),code=all.product_qr_codes.find(row=>row.name===name);assert.ok(code,'Committed QR must exist in actual SQLite');const links=all.qr_manual_links.filter(row=>row.qr_code_id===code.id);return{code,links,files:links.map(link=>all.qr_manual_files.find(row=>row.id===link.file_id)),audit:all.qr_manual_audit.filter(row=>row.qr_code_id===code.id)};}
-async function go(page,label){const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();await page.getByRole('heading',{name:label,exact:true}).waitFor();}
+async function go(page,label){const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();await page.getByRole('heading',{name:label==='图号规划 / 更新包材'?'图号规划':label,exact:true}).waitFor();}
 async function assertQrListLayout(page,label){
  const table=page.locator('.qr-main-table > .table-wrap > table');await table.waitFor();
  const expected=['SKU','型号','产品类别','说明书','售后卡','菜谱','操作'];
  assert.deepEqual((await table.locator(':scope > thead > tr > th').allTextContents()).map(text=>text.trim()),expected);
  assert.equal(await page.getByLabel('二维码每页数量',{exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'下一页',exact:true}).count(),0);
  const layout=await table.evaluate(element=>({alignments:[...element.querySelectorAll(':scope > thead > tr > th')].map(cell=>getComputedStyle(cell).textAlign),viewportRegion:element.parentElement.classList.contains('viewport-region'),visiblePrimaryRows:[...element.querySelectorAll(':scope > tbody > tr')].filter(row=>!row.classList.contains('expanded-table-row')&&!row.classList.contains('virtual-table-spacer')).length}));
- assert.deepEqual(layout.alignments,['left','center','center','center','center','center','center']);assert.equal(layout.viewportRegion,true);
+ assert.deepEqual(layout.alignments,['left','left','center','center','center','center','center']);assert.equal(layout.viewportRegion,true);
  // Only real migrated fixture records are used here. Large-list DOM bounds are separately tested with 1000 product fixtures in Vitest.
  (report.qrListLayouts??=[]).push({label,columns:expected,traditionalPagination:false,...layout,longListStress:false});
 }
@@ -61,7 +61,7 @@ async function launch(){
 async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow(app,dialog);await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});return page;}catch(error){await captureFailure(app,app.__verificationLabel,error);throw error;}}
 (async()=>{
  fs.mkdirSync(evidence,{recursive:true});assert.equal(fs.existsSync(profileHome),false,'Refuse to touch any pre-existing runner/user production profile');
- const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,20);assert.equal(version.applicationVersion,'1.0.0');assert.equal(JSON.parse(fs.readFileSync(path.join(appRoot,'package.json'),'utf8')).version,version.applicationVersion);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
+ const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,22);assert.equal(version.applicationVersion,'1.1.0');assert.equal(JSON.parse(fs.readFileSync(path.join(appRoot,'package.json'),'utf8')).version,version.applicationVersion);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
  const legacy=path.join(temporary,'旧版原始数据目录');database('prepare',legacy);database('rollback-and-wal',legacy);const settingsBefore=fs.readFileSync(path.join(legacy,'settings.json'));
  const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));let app;
  try{app=await launch();const page=await ready(app,dialog);
@@ -96,7 +96,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  }finally{dialog.child.kill();if(app)await app.close();}
  database('audit-upgrade',legacy);report.oldV15Upgrade={originalDirectoryRetained:true,settingsBytesPreserved:true,oldRowsAndSnapshotsPreserved:true,realMigrationBackupValidated:true,walAndRollback:JSON.parse(fs.readFileSync(path.join(legacy,'native-rollback-and-wal.json'),'utf8'))};
  // Exercise the reported zero-count failure through a real installed scan and navigation.
- const directoryRoot=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更明细（已量产的产品看最新日期）','00.首批大货');
+ const directoryRoot=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更文件','00.首批大货');
  const directoryPdf=path.join(directoryRoot,'02.0209.010.0401002-M1-铭牌及安装注意事项多语言生产定稿（转曲）.pdf'),unmatchedPdf=path.join(directoryRoot,'M1-补充资料（转曲）.pdf');
  const directoryHashes=[writePdf(directoryPdf,'Directory context matched drawing'),writePdf(unmatchedPdf,'Directory context unmatched drawing')];
  const bindingsBeforeScan=snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings;
@@ -198,7 +198,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.equal(createHash('sha256').update(fs.readFileSync(firstPdf)).digest('hex'),firstHash);assert.equal(createHash('sha256').update(fs.readFileSync(replacementPdf)).digest('hex'),replacementHash);
   report.nativeQrPdfPicker={actualNativeDialog:true,rendererSelectionPreviewCommit:true,fullWidthFilename:false,asciiParentheses:true,sevenColumnProductList:true,noIndependentAppearancePicker:true,newRecordProductScoped:true,lowercasePurposeAndParenthesisSpaceValidated:true,firstFileHash:firstHash,replacementFileHash:replacementHash,restartPreservesLinkAndMetadata:true,replacementPreservesMetadataAndHistory:true,unlinkPreservesFilesAndAudit:true,oldV15RowsPreserved:true,qrCodeId:linkedState.code.id};
  }finally{await app.close();}
- app=await launch();try{const page=await ready(app);report.v4=await require('./verify-v4-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v41v42=await require('./verify-v41-v42-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});}catch(error){await captureFailure(app,'v4',error);throw error;}finally{await app.close();}
+ app=await launch();try{const page=await ready(app);report.v4=await require('./verify-v4-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v41v42=await require('./verify-v41-v42-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v5=await require('./verify-v5-installed.cjs')({page,app,legacy,evidence,snapshot,go,previous:report.v41v42});}catch(error){await captureFailure(app,'v4',error);throw error;}finally{await app.close();}
  const beforeRestart=snapshot(path.join(legacy,'planner.db'));app=await launch();try{const page=await ready(app);assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeRestart);assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('table-layout:v1:pdf-files'))),report.v4.tableLayout);report.v4.layoutSurvivesRestart=true;}finally{await app.close();}report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
  // New-user path uses the real native first-start choice; the old selected DB remains intact.
  fs.unlinkSync(config);fs.rmdirSync(profileHome);const freshDialog=nativeDialog('fresh');app=undefined;

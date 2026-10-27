@@ -56,7 +56,16 @@ export class DrawingForceReleaseService {
       usage:all('select * from drawing_appearance_usage_audit where origin=? and record_id=? order by id',origin,id),
       deletion:all('select * from drawing_deletion_events where origin=? and record_id=? order by id',origin,id),
       merge:jsonRows('product_merge_events',['before_json','after_json'])};
-    const products=[...new Set([drawing.product_id,...bom.map(row=>row.reference_product_id),...outbound.map(row=>row.reference_product_id),...usages.map(row=>row.product_id),...bindings.map(row=>row.product_id)].filter((id):id is number=>typeof id==='number'))].sort((a,b)=>a-b);
+    const snapshotOwners=[
+      ...bomSnapshots.map(row=>this.db.prepare('select product_id from bom_versions where id=?').get(row.bom_version_id) as {product_id:number}|undefined),
+      ...outboundSnapshots.map(row=>this.db.prepare('select product_id from outbound_packages where id=?').get(row.package_id) as {product_id:number}|undefined),
+    ].flatMap(row=>row?[row.product_id]:[]);
+    const archivedPaths=new Set<string>();
+    const rememberPath=(value:unknown)=>{if(typeof value==='string'&&value&&!/^(?:[A-Za-z]:|[\\/])/.test(value)&&!value.split(/[\\/]+/).includes('..'))archivedPaths.add(value);};
+    for(const item of outbound)rememberPath(item.relative_path_snapshot);
+    const visitPaths=(value:unknown)=>{if(!value||typeof value!=='object')return;if(Array.isArray(value)){value.forEach(visitPaths);return;}const row=value as Row;if(referencesIdentity(row,origin,id,code)){rememberPath(row.relativePath);rememberPath(row.relative_path);rememberPath(row.relativePathSnapshot);rememberPath(row.relative_path_snapshot);}Object.values(row).forEach(visitPaths);};
+    for(const row of outboundSnapshots)visitPaths(JSON.parse(row.files_json));
+    const products=[...new Set([drawing.product_id,...snapshotOwners,...bom.map(row=>row.reference_product_id),...outbound.map(row=>row.reference_product_id),...usages.map(row=>row.product_id),...bindings.map(row=>row.product_id)].filter((id):id is number=>typeof id==='number'))].sort((a,b)=>a-b);
     const references:DrawingForceReleaseReferences={drawingRecords:1,pdf:pdf.length,presentPdf:pdf.filter(row=>row.is_present).length,missingPdf:pdf.filter(row=>!row.is_present).length,
       currentBom:bom.filter(row=>row.is_current&&!row.deleted_at&&!row.version_deleted_at).length,
       historicalBom:bom.filter(row=>!row.is_current&&!row.deleted_at&&!row.version_deleted_at).length,
@@ -64,7 +73,7 @@ export class DrawingForceReleaseService {
       outboundItems:outbound.length,outboundSnapshots:outboundSnapshots.length,emailDrafts:email.length,
       appearanceUsages:usages.length,bindings:bindings.length,lineage:lineage.length,
       audits:Object.values(audits).reduce((sum,rows)=>sum+rows.length,0),products:products.length};
-    const snapshot={drawing,pdf,bom,bomSnapshots,outbound,outboundSnapshots,email,usages,bindings,lineage,audits};
+    const snapshot={drawing,pdf,bom,bomSnapshots,outbound,outboundSnapshots,email,usages,bindings,lineage,audits,snapshotOwners,archivedPaths:[...archivedPaths].sort()};
     const fingerprint=createHash('sha256').update(JSON.stringify({origin,id,snapshot})).digest('hex');
     return {preview:{signedId,origin,fullCode:code,fingerprint,references,affectedProductIds:products,affectedIdentities:[{signedId,origin}]} satisfies DrawingForceReleasePreview,snapshot,table,id,column};
   }
@@ -102,8 +111,8 @@ export class DrawingForceReleaseService {
           .run(member.preview.origin,id,preview.fullCode,preview.fingerprint,JSON.stringify(snapshot),JSON.stringify(preview.references),input.reason?.trim()||null,now);
         const releaseId=Number(result.lastInsertRowid);releaseIds.push(releaseId);
         // Paths outlive PDF index IDs: removing/recreating an index must not remove isolation.
-        for(const file of snapshot.pdf)this.db.prepare('insert or ignore into drawing_force_release_files(release_id,relative_path,path_key,full_code) values(?,?,?,?)')
-          .run(releaseId,file.relative_path,toWorkspacePathKey(file.relative_path),preview.fullCode);
+        for(const relativePath of new Set([...snapshot.pdf.map(file=>String(file.relative_path)),...snapshot.archivedPaths]))this.db.prepare('insert or ignore into drawing_force_release_files(release_id,relative_path,path_key,full_code) values(?,?,?,?)')
+          .run(releaseId,relativePath,toWorkspacePathKey(relativePath),preview.fullCode);
         this.db.prepare(`update pdf_files set drawing_id=null,historical_drawing_id=null,match_status='pending',classification_warning='drawing-force-released' where id in (select value from json_each(?))`)
           .run(JSON.stringify(snapshot.pdf.map(file=>file.id)));
         this.db.prepare(`update ${table} set full_code=?,deleted_full_code=?,deleted_at=?,deletion_mode='release',deleted_previous_status=status,deleted_reason=?,scan_resolution='ignore' where id=?`)
