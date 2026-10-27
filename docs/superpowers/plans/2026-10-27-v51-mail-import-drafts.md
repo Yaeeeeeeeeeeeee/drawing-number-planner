@@ -51,7 +51,7 @@ Interfaces: consumes Task3 actual context and Task2 render API; no writes to bus
 
 ### Task 5: Integration and delivery
 Files: start-server.ts; E2E/native verification scripts; version/docs/progress.
-- [ ] Run integrated suite, typecheck/build/E2E; fresh independent review covering Review Focus; fix confirmed significant findings with RED/GREEN.
+- [x] Run integrated suite, typecheck/build/E2E; fresh independent review covering Review Focus; fix confirmed significant findings with RED/GREEN.
 - [ ] Windows build/installed actual checks; preserve old Schema migration evidence and data safety. Record unavailable actual workbook/localDB.
 - [ ] Commit and authorized GitHub/package release with exact source and verified digest; update usage/install notes without overwriting prior tags.
 
@@ -60,3 +60,5 @@ Baseline 090d372, existing isolated development branch codex/v3-business-ui-2026
 2026-10-27: Read complete request and actual mail/config/manifest/comparison paths. Three disjoint agents own import, configuration, composer; parent owns snapshots/comparison/integration/delivery. No migrations planned.
 
 2026-10-27 integration: new full XLSX→SQLite→actual ZIP→draft browser flow passed; native helper shares the same HTTP/DOM assertions. Required integration fixes: modal Portal/focus (RED/GREEN), queued table resize callback after unmount (RED/GREEN), current-complete list keeps older removed candidates excluded (existing E2E RED then fixed). First full run caught obsolete cached modal module and progress status prefix; both focused regressions now green, final suite in progress. Reference workbook unavailable; no actual user-data operations.
+
+2026-10-27 final tests: 187 files/1568 pass, E2E9 pass, type/build pass. Native40487728441 revealed verifier race: old disabled row becomes enabled and default checked before .check() click. Use explicit enabled-state assertion then setChecked(true); real E2E green. No application workaround or timeout increase. Rerun native before release.
