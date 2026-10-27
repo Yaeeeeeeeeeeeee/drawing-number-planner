@@ -105,11 +105,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
-            existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
-            test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace another source tag'; exit 1; }
-          else
-            gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" --title '图号规划器 v1.1.0 · Windows 正式版' --notes-file release-assets/README-Windows-1.1.0.md --draft
+          existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
+          test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace another source tag'; exit 1; }
+          if ! gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.1.0 · Windows 正式版' --notes-file release-assets/README-Windows-1.1.0.md --draft
           fi
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
           gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.1.0.md --draft=false --prerelease=false --latest
