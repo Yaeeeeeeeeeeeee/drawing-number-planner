@@ -1,28 +1,21 @@
-import type {DrawingFileView,DrawingBatchUsageView} from '../data/client';
-type FileUsage=Pick<DrawingBatchUsageView,'occurrences'|'effectiveCurrentFileIds'>;
-export interface DrawingFileSelection {state:'present'|'missing'|'ambiguous'|'unavailable'|'unlinked';files:DrawingFileView[];message?:string}
-/** File availability and current-business usage are different facts. Never choose by date alone. */
-export function selectDrawingFiles(files:DrawingFileView[],usage:Partial<FileUsage>|undefined,context:{batchId?:number;productId?:number;directory?:string}):DrawingFileSelection{
- const occurrences=usage?.occurrences??[];
- let candidates=files;
- if(context.batchId!=null){
-  const ids=new Set(occurrences.filter(o=>o.batchId===context.batchId).flatMap(o=>o.files.map(f=>f.pdfIndexId)));
-  candidates=files.filter(f=>f.materialBatchId===context.batchId||ids.has(f.pdfIndexId));
- }else if(context.directory){
-  const ids=new Set(occurrences.filter(o=>o.productDirectory===context.directory).flatMap(o=>o.files.map(f=>f.pdfIndexId)));
-  candidates=files.filter(f=>ids.has(f.pdfIndexId));
- }
- const present=candidates.filter(f=>f.isPresent);
- if(present.length===1)return{state:'present',files:present,...(present[0].presenceStatus==='index-stale'?{message:'存在，索引待更新'}:{})};
- if(present.length>1){
-  const trusted=new Set((usage?.effectiveCurrentFileIds??occurrences.filter(o=>o.usageState==='current').flatMap(o=>o.files.map(f=>f.pdfIndexId))).filter(id=>context.productId==null||occurrences.some(o=>o.files.some(f=>f.pdfIndexId===id)&&(o.productId==null||o.productId===context.productId))));
-  const resolved=present.filter(f=>trusted.has(f.pdfIndexId));
-  if(context.batchId==null&&!context.directory&&resolved.length===1)return{state:'present',files:resolved};
-  return{state:'ambiguous',files:[],message:`找到 ${present.length} 个存在的文件，尚未唯一确认。`};
- }
- if(candidates.length===0&&files.some(f=>f.isPresent))return{state:'ambiguous',files:[],message:'其他资料批次存在文件，当前范围尚未确认。'};
- const unavailable=candidates.filter(file=>file.presenceStatus&& !['missing','present','index-stale'].includes(file.presenceStatus));
- if(unavailable.length)return{state:'unavailable',files:[],message:[...new Set(unavailable.map(file=>file.presenceMessage??'文件状态无法核验'))].join('；')};
- if(!candidates.length)return{state:'unlinked',files:[],message:'未找到对应文件索引'};
- return{state:'missing',files:[],message:'磁盘文件不存在'};
+import type {DrawingFileView} from '../data/client';
+import type {DrawingDetailView} from '../data/client';
+import type {DrawingFileObservation,DrawingObservedSection,DrawingObservedEntry} from '../../core/files/drawing-file-observation';
+/** Older API/mock payloads retain their indexed facts; the current API always supplies an actual observation. */
+export function groupDrawingFileSections(detail:Pick<DrawingDetailView,'sourceFiles'|'outlinedFiles'|'batchUsage'|'fileObservation'>):DrawingFileObservation {
+ if(detail.fileObservation)return detail.fileObservation;
+ const project=(files:DrawingFileView[],role:'source'|'outlined'):DrawingObservedSection=>{
+  const groups=new Map<string,DrawingObservedEntry>();
+  for(const file of files){
+   const occurrence=detail.batchUsage?.occurrences.find(value=>value.batchId===file.materialBatchId||value.files.some(item=>item.pdfIndexId===file.pdfIndexId));
+   const key=occurrence?`batch:${occurrence.batchId}`:file.materialBatchId!=null?`batch:${file.materialBatchId}`:file.relativePath.split(/[\\/]/).slice(0,-1).join('/')||role;
+   let entry=groups.get(key);if(!entry){entry={key,batchId:occurrence?.batchId??file.materialBatchId??null,batchName:occurrence?.batchName??(role==='source'?'未转曲源文件':'资料批次未记录'),businessDate:null,usageState:occurrence?.usageState==='current'?'current':occurrence?.usageState==='historical'?'historical':'indeterminate',state:'present',files:[]};groups.set(key,entry);}
+   entry.files.push({pdfIndexId:file.pdfIndexId,fileName:file.fileName,relativePath:file.relativePath,isPresent:file.isPresent,indexed:true});
+   if(!file.isPresent){entry.state='unavailable';entry.message=file.presenceMessage??(file.presenceStatus==='missing'?'磁盘文件不存在':'文件状态尚未核验');}
+   if(entry.files.length>1){entry.state='conflict';entry.message=`同一批次有 ${entry.files.length} 个文件，内容尚未唯一核验`;}
+  }
+  const entries=[...groups.values()];
+  return{state:entries.some(entry=>entry.state==='present')?'present':entries.length?'unavailable':'unindexed',message:!entries.length?'未找到对应文件索引，尚未核验磁盘':entries.some(entry=>entry.state==='present')?'文件存在':'文件状态尚未核验',entries};
+ };
+ return{source:project(detail.sourceFiles??[],'source'),outlined:project(detail.outlinedFiles??[],'outlined')};
 }

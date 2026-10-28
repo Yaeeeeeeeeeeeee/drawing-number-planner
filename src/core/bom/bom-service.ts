@@ -226,7 +226,8 @@ export class BomService {
       this.validateProduct(input.productId);
       if (input.appearanceVersionId !== undefined && previous.appearanceVersionId !== input.appearanceVersionId) throw new BomError('DRAWING_WRONG_PRODUCT', '不能改变 BOM 外观版本');
       if (previous.editRevision !== expectedRevision) throw new BomError('BOM_STALE', '该记录已被修改，请重新加载后编辑');
-      if (input.businessChangeDate !== undefined && input.businessChangeDate !== previous.businessChangeDate) throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '编辑已有 BOM 不能更改原业务变更日期');
+      if (input.businessChangeDate !== undefined && !validBusinessDate(input.businessChangeDate)) throw new BomError('INVALID_BUSINESS_CHANGE_DATE', '业务变更日期必须是有效的 ISO 日期');
+      const businessChangeDate = input.businessChangeDate ?? previous.businessChangeDate;
       if (!input.items.length) throw new BomError('INVALID_BOM_ITEM_COUNT', 'BOM 至少需要一个项目');
       const projects = new Set<number>();
       const validated = input.items.map((item) => {
@@ -250,7 +251,7 @@ export class BomService {
       });
       const now = new Date().toISOString();
       this.db.prepare(`update bom_versions set updated_at = ?, edit_revision = edit_revision + 1,
-        notes = ? where id = ?`).run(now, input.notes === undefined ? previous.notes : normalizedNotes(input.notes), id);
+        business_change_date = ?, notes = ? where id = ?`).run(now, businessChangeDate, input.notes === undefined ? previous.notes : normalizedNotes(input.notes), id);
       this.db.prepare('update bom_items set deleted_at = ? where bom_version_id = ?').run(now, id);
       validated.forEach((item, index) => {
         const existing = this.db.prepare('select id from bom_items where bom_version_id = ? and project_item_id = ?')
@@ -275,25 +276,22 @@ export class BomService {
         this.db.prepare('delete from bom_item_qr_codes where bom_item_id=?').run(row.id);
         this.saveItemQrCodes(row.id,input.productId,item.qrCodeIds);
       }
-      // A legacy NULL date is immutable: retain managed associations without inventing a dated archive.
-      if (previous.businessChangeDate !== null) archive(id);
-      else if (this.workspaceRoot) {
-        // Unchanged legacy links may be missing, but explicit new associations still require original integrity checks.
-        for (const item of this.getVersion(id).items) {
-          const original = previous.items.find(old => old.projectItemId === item.projectItemId);
-          for (const asset of item.assets) if (!original?.assets.some(old => old.role === asset.role && old.assetId === asset.assetId)) this.previewAsset(asset.assetId);
-        }
-      }
+      // Date corrections leave all unchanged links and original files in place.
+      const changedAssets = this.getVersion(id).items.flatMap(item => item.assets.filter(asset =>
+        !previous.items.find(old => old.projectItemId === item.projectItemId)?.assets.some(old => old.role === asset.role && old.assetId === asset.assetId)));
+      if (businessChangeDate !== null) archive(id, changedAssets.map(asset => asset.id));
+      else if (this.workspaceRoot) for (const asset of changedAssets) this.previewAsset(asset.assetId);
       const version = this.getVersion(id);
       this.db.prepare(`insert into bom_revision_snapshots(bom_version_id,edit_revision,before_snapshot_json,after_snapshot_json,created_at) values(?,?,?,?,?)`).run(id,version.editRevision,JSON.stringify(previous),JSON.stringify(version),now);
       return { version, diff: buildDiff(previous, version) };
     });
   }
 
-  private withArchiveTransaction<T>(work: (archive: (versionId: number) => void) => T): T {
+  private withArchiveTransaction<T>(work: (archive: (versionId: number, linkIds?: number[]) => void) => T): T {
     const root = this.workspaceRoot?.(); const created: ManagedBomAsset[] = [];
     try {
-      return this.db.transaction(() => work((versionId) => {
+      return this.db.transaction(() => work((versionId, linkIds) => {
+        if (linkIds?.length === 0) return;
         if (!root) {
           // Domain-only callers omit the workspace adapter; the running application must
           // not report a successful archive when its configured root is unavailable.
@@ -305,7 +303,7 @@ export class BomService {
           return;
         }
         const archive = new BomAssetArchiveService(this.db, root);
-        for (const item of archive.preview().filter((candidate) => candidate.versionId === versionId)) {
+        for (const item of archive.preview().filter((candidate) => candidate.versionId === versionId && (linkIds === undefined || linkIds.includes(candidate.linkId)))) {
           const asset = archive.migrate(item.linkId); if (asset) created.push(asset);
         }
       })).immediate();
@@ -318,30 +316,35 @@ export class BomService {
   private replaceEditedAssets(itemId: number, projectId: number, previousVersionId: number | null,
     assets: NonNullable<BomItemInput['assets']>): void {
     const existing = this.repository.listItemAssets(itemId);
-    const unchanged = existing.length === assets.length && assets.every((asset) =>
-      existing.some((old) => old.role === asset.role && (asset.reusePrevious || old.assetId === asset.assetId)));
-    if (unchanged) return;
-    // Historical consumers hold their own asset IDs; preserve their origin before changing this source link.
-    for (const old of existing) {
+    const roles = new Set<string>();
+    const resolved = assets.map(asset => {
+      if (roles.has(asset.role)) throw new BomError('DUPLICATE_ASSET_ROLE', '同一 BOM 项目每种附件角色只能有一个');
+      roles.add(asset.role);
+      if (asset.reusePrevious) {
+        if (asset.assetId !== undefined || previousVersionId === null) throw new BomError('ASSET_REUSE_NOT_FOUND', '上一版对应项目没有可沿用的附件');
+        const source = this.repository.previousItemAsset(previousVersionId, projectId, asset.role);
+        if (!source) throw new BomError('ASSET_REUSE_NOT_FOUND', '上一版对应项目没有可沿用的附件');
+        if (this.workspaceRoot) this.previewAsset(source.assetId);
+        return { role: asset.role, assetId: source.assetId, sourceId: source.id };
+      }
+      if (asset.assetId === undefined || !Number.isInteger(asset.assetId) || !this.repository.assetExists(asset.assetId)) throw new BomError('ASSET_NOT_FOUND', 'BOM 附件不存在');
+      return { role: asset.role, assetId: asset.assetId, sourceId: null };
+    });
+    const changed = (old: typeof existing[number]) => {
+      const next = resolved.find(asset => asset.role === old.role);
+      return !next || next.assetId !== old.assetId || (next.sourceId !== null && next.sourceId !== old.inheritedFromBomItemAssetId);
+    };
+    if (existing.length === resolved.length && existing.every(old => !changed(old))) return;
+    // Consumers retain their original asset facts when this particular source link changes.
+    for (const old of existing.filter(changed)) {
       this.db.prepare(`update bom_item_assets set inheritance_snapshot_json = ?, inherited_from_bom_item_asset_id = null
         where inherited_from_bom_item_asset_id = ?`).run(JSON.stringify({ sourceLinkId: old.id, sourceBomItemId: itemId,
           assetId: old.assetId, fileName: old.originalFileName, relativePath: old.relativePath }), old.id);
     }
-    const roles = new Set<string>();
-    for (const asset of assets) {
-      if (roles.has(asset.role)) throw new BomError('DUPLICATE_ASSET_ROLE', '同一 BOM 项目每种附件角色只能有一个');
-      roles.add(asset.role);
-      const old = existing.find((link) => link.role === asset.role);
-      if (!old) { this.saveItemAssets(itemId, projectId, previousVersionId, [asset]); continue; }
-      if (asset.reusePrevious) {
-        if (asset.assetId !== undefined) throw new BomError('ASSET_REUSE_NOT_FOUND', '沿用附件不能同时指定新附件');
-        continue;
-      }
-      if (asset.assetId === undefined || !Number.isInteger(asset.assetId) || !this.repository.assetExists(asset.assetId)) {
-        throw new BomError('ASSET_NOT_FOUND', 'BOM 附件不存在');
-      }
-      this.db.prepare(`update bom_item_assets set asset_id = ?, inherited_from_bom_item_asset_id = null,
-        inheritance_snapshot_json = null where id = ?`).run(asset.assetId, old.id);
+    for (const asset of resolved) {
+      const old = existing.find(link => link.role === asset.role);
+      if (old && !changed(old)) continue;
+      this.repository.insertItemAsset(itemId, asset.assetId, asset.role, asset.sourceId);
     }
     for (const old of existing) if (!roles.has(old.role)) {
       this.db.prepare('update bom_item_assets set deleted_at = ? where id = ?').run(new Date().toISOString(), old.id);

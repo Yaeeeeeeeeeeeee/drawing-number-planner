@@ -1,3 +1,5 @@
+import type { DrawingObservedFileRequest } from '../core/files/drawing-file-observation';
+
 export interface DesktopFileResult {
   ok: boolean;
   error?: { code: string; message: string };
@@ -5,7 +7,7 @@ export interface DesktopFileResult {
 
 declare global {
   interface PlannerDesktop {
-    showFileInFolder(pdfFileId: number): Promise<DesktopFileResult>;
+    showFileInFolder(pdfFileId: number | DrawingObservedFileRequest): Promise<DesktopFileResult>;
     showBomAssetInFolder?(assetId: number): Promise<DesktopFileResult>;
     chooseOutboundDirectory?(): Promise<DesktopFileResult & { cancelled?: boolean; path?: string }>;
     showOutboundPackageInFolder?(packageId: number, partNumber?: number): Promise<DesktopFileResult>;
@@ -51,6 +53,18 @@ export async function openIndexedPdfLocation(pdfFileId: number): Promise<Desktop
     return { ok: false, error: { code: 'DESKTOP_ONLY', message: '请在 Windows 桌面版打开文件位置' } };
   }
   try { return await window.plannerDesktop.showFileInFolder(pdfFileId); }
+  catch (error) {
+    return { ok: false, error: { code: 'OPEN_FILE_LOCATION_FAILED',
+      message: error instanceof Error ? error.message : '打开文件位置失败' } };
+  }
+}
+
+/** The service re-observes the exact drawing and path before invoking Explorer. */
+export async function openDrawingFileLocation(request: DrawingObservedFileRequest): Promise<DesktopFileResult> {
+  if (!window.plannerDesktop) {
+    return { ok: false, error: { code: 'DESKTOP_ONLY', message: '请在 Windows 桌面版打开文件位置' } };
+  }
+  try { return await window.plannerDesktop.showFileInFolder(request); }
   catch (error) {
     return { ok: false, error: { code: 'OPEN_FILE_LOCATION_FAILED',
       message: error instanceof Error ? error.message : '打开文件位置失败' } };

@@ -158,3 +158,11 @@
 .drawing-force-release{padding:10px 0;border-top:1px solid var(--border-color,#e2e8f0)}
 .drawing-force-release h4{margin:0 0 8px}
 .drawing-force-release .deletion-reference-list{margin:8px 0}
+
+.drawing-library-page .drawing-detail-group .drawing-batch-file-row {height:auto;min-height:62px;}
+.drawing-library-page .drawing-file-batch {display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:#536478;font-size:12px;}
+.drawing-library-page .drawing-batch-usage {font-size:11px;border:1px solid #d4dce4;border-radius:4px;padding:1px 5px;white-space:nowrap;}
+.drawing-library-page .drawing-batch-usage.current {color:#245e43;background:#e9f4ec;border-color:#bad7c3;}
+.drawing-library-page .drawing-batch-usage.historical {color:#6b7480;background:#f3f5f7;}
+.drawing-library-page .drawing-file-conflict {display:block;color:#8a5b16;font-size:12px;overflow-wrap:anywhere;}
+.drawing-library-page .drawing-index-note {display:block;color:#657286;font-size:11px;}

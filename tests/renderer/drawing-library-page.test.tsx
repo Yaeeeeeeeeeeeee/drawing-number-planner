@@ -179,7 +179,7 @@ describe('DrawingLibraryPage', () => {
     expect(await screen.findByLabelText('输入完整图号确认释放')).toBeVisible();
     expect(screen.getByText('释放后，该号码未来可能被重新规划使用。')).toBeVisible();
   });
-  it('requires a directory choice when one product has current files in multiple directories', async () => {
+  it('shows files from each known directory without a directory choice', async () => {
     const files = ['A', 'B'].map((directory, index) => ({ pdfIndexId: index + 1, fileName: `${directory}.pdf`,
       relativePath: `${directory}/00/${directory}.pdf`, isPresent: true, conversionType: 'outlined' }));
     const row = { id: 1, productId: 10, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active',
@@ -190,14 +190,14 @@ describe('DrawingLibraryPage', () => {
       listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row) };
     render(<DrawingLibraryPage api={api as never} />);
     fireEvent.click(await screen.findByText(row.fullCode));
-    const directory = await screen.findByLabelText('当前文件所属资料目录');
-    expect(screen.queryByText('A.pdf')).not.toBeInTheDocument();
-    expect(screen.queryByText('B.pdf')).not.toBeInTheDocument();
-    fireEvent.change(directory, { target: { value: 'A' } });
-    expect(screen.getByText('A.pdf')).toBeVisible();
-    expect(screen.queryByText('B.pdf')).not.toBeInTheDocument();
+    const panel = await screen.findByRole('complementary', {name: '图号详情'});
+    expect(within(panel).queryByLabelText('当前文件所属资料目录')).toBeNull();
+    expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();
+    expect(within(panel).getByText('A.pdf')).toBeVisible();
+    expect(within(panel).getByText('B.pdf')).toBeVisible();
+    expect(within(panel).getAllByText('当前批次')).toHaveLength(2);
   });
-  it('does not present another product current file as the selected product current material', async () => {
+  it('retains each directory business state without promoting a historical file', async () => {
     const own = { pdfIndexId: 1, fileName: 'own-old.pdf', relativePath: 'A/00/own-old.pdf', isPresent: true, conversionType: 'outlined' };
     const other = { ...own, pdfIndexId: 2, fileName: 'other-current.pdf', relativePath: 'B/01/other-current.pdf' };
     const row = { id: 1, productId: 10, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active',
@@ -210,13 +210,12 @@ describe('DrawingLibraryPage', () => {
       listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row) };
     render(<DrawingLibraryPage api={api as never} />);
     fireEvent.click(await screen.findByText(row.fullCode));
-    expect(await screen.findByText(/找到 2 个存在的文件/)).toBeVisible();
-    expect(screen.queryByText('other-current.pdf')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('查看资料批次'),{target:{value:'1'}});
-    expect(screen.getByText('own-old.pdf')).toBeVisible();
-    expect(screen.queryByText('other-current.pdf')).not.toBeInTheDocument();
+    const panel = await screen.findByRole('complementary', {name: '图号详情'});
+    expect(within(panel).getByText('own-old.pdf').closest('li')).toHaveAttribute('data-usage-state','historical');
+    expect(within(panel).getByText('other-current.pdf').closest('li')).toHaveAttribute('data-usage-state','current');
+    expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();
   });
-  it.each([true, false])('shows only the current batch outlined file (present=%s) until history is expanded', async (isPresent) => {
+  it.each([true, false])('shows current and historical batches together and preserves unavailable current state (present=%s)', async (isPresent) => {
     const oldFile = { pdfIndexId: 1, fileName: 'old.pdf', relativePath: '00/old.pdf', isPresent: true, conversionType: 'outlined' };
     const currentFile = { ...oldFile, pdfIndexId: 2, fileName: 'current.pdf', relativePath: '06/current.pdf', isPresent };
     const row = { id: 1, fullCode: '02.0209.010.0501001', origin: 'planned', status: 'active',
@@ -230,15 +229,18 @@ describe('DrawingLibraryPage', () => {
       listDictionaries: vi.fn().mockResolvedValue([]), getDrawing: vi.fn().mockResolvedValue(row) };
     render(<DrawingLibraryPage api={api as never} />);
     fireEvent.click(await screen.findByText(row.fullCode));
-    expect(await screen.findByText(isPresent?'current.pdf':'old.pdf')).toBeVisible();
-    expect(screen.queryByText('查看历史文件')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('查看资料批次'),{target:{value:'2'}});
-    if(isPresent)expect(screen.getByText('current.pdf')).toBeVisible();
-    else expect(screen.getByText('磁盘文件不存在')).toBeVisible();
-    fireEvent.change(screen.getByLabelText('查看资料批次'),{target:{value:'1'}});
-    expect(screen.getByText('old.pdf')).toBeVisible();
+    const panel = await screen.findByRole('complementary', {name: '图号详情'});
+    expect(within(panel).getByText('old.pdf')).toBeVisible();
+    expect(within(panel).getByText('历史批次')).toBeVisible();
+    expect(within(panel).getByText('当前批次')).toBeVisible();
+    if(isPresent)expect(within(panel).getByText('current.pdf')).toBeVisible();
+    else {
+      expect(within(panel).getByText('文件状态尚未核验')).toBeVisible();
+      expect(within(panel).queryByRole('button',{name:'打开转曲后文件 current.pdf 的位置'})).toBeNull();
+    }
+    expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();
   });
-  it('aggregates one logical drawing and expands all of its material batch occurrences', async () => {
+  it('keeps one logical drawing and does not invent files from batch membership alone', async () => {
     const occurrences = Array.from({ length: 7 }, (_, index) => ({
       batchId: index + 1,
       productDirectory: '01.洗碗机\\SKU-T40',
@@ -268,8 +270,10 @@ describe('DrawingLibraryPage', () => {
     expect(await screen.findAllByText(row.fullCode)).toHaveLength(1);
     expect(screen.queryByText('资料使用')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText(row.fullCode));
-    expect(await screen.findByLabelText('查看资料批次')).toBeVisible();
-    expect(within(screen.getByLabelText('查看资料批次')).getAllByRole('option')).toHaveLength(8);
+    const panel = await screen.findByRole('complementary', {name:'图号详情'});
+    expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();
+    expect(within(panel).getAllByText('未找到对应文件索引，尚未核验磁盘')).toHaveLength(2);
+    expect(within(panel).queryByRole('button',{name:/打开.*的位置/})).toBeNull();
     expect(screen.queryByText('PDF 出现位置（7）')).not.toBeInTheDocument();
   });
 
@@ -281,8 +285,8 @@ describe('DrawingLibraryPage', () => {
     const detail = { ...row, readOnly: false, readOnlyMessage: null,
       sourceFiles: [{ pdfIndexId: 21, fileName: 'source.pdf', relativePath: 'SKU/source.pdf', isPresent: true, conversionType: 'source' }],
       outlinedFiles: [
-        { pdfIndexId: 22, fileName: 'outlined.pdf', relativePath: 'SKU/outlined.pdf', isPresent: true, conversionType: 'outlined' },
-        { pdfIndexId: 23, fileName: 'missing.pdf', relativePath: 'SKU/missing.pdf', isPresent: false, conversionType: 'outlined' },
+        { pdfIndexId: 22, fileName: 'outlined.pdf', relativePath: 'SKU/new/outlined.pdf', isPresent: true, conversionType: 'outlined' },
+        { pdfIndexId: 23, fileName: 'missing.pdf', relativePath: 'SKU/old/missing.pdf', isPresent: false, conversionType: 'outlined' },
       ], currentBomUsage: [] } as const;
     const showFileInFolder = vi.fn().mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false,
       error: { code: 'PDF_FILE_UNAVAILABLE', message: '文件已不存在，请重新扫描资料库' } });
@@ -394,7 +398,7 @@ describe('DrawingLibraryPage', () => {
     expect(within(panel).getByRole('combobox',{name:'图号业务状态'})).toHaveValue('inactive');
     expect(within(panel).getByText('source.pdf')).toBeVisible();
     expect(within(panel).getByText('存在')).toBeVisible();
-    expect(within(panel).getByText('未找到对应文件索引')).toBeVisible();
+    expect(within(panel).getByText('未找到对应文件索引，尚未核验磁盘')).toBeVisible();
     expect(panel).not.toHaveTextContent('SKU/source.pdf');
     expect(panel).toHaveTextContent('首次 BOM');
     expect(panel).toHaveTextContent('未进入 BOM');
@@ -641,17 +645,17 @@ it('closes a hidden detail modal and ignores an outstanding detail request', asy
   expect(document.querySelector('[inert]')).toBeNull();
 });
 
-it('shows selected historical batch files and folds files from other batches', async () => {
+it('shows all batch files even when the list was opened in a historical batch context', async () => {
   const old={pdfIndexId:1,fileName:'old.pdf',relativePath:'old/old.pdf',isPresent:true,conversionType:'outlined'};
   const current={...old,pdfIndexId:2,fileName:'current.pdf'};
   const row={id:1,productId:5,fullCode:'CODE',origin:'planned',status:'active',sourceFiles:[],outlinedFiles:[old,current],currentBomUsage:[],batchUsage:{effectiveCurrentFileIds:[2],occurrences:[{batchId:7,productId:5,productDirectory:'T40',batchName:'旧批次',files:[old]},{batchId:8,productId:5,productDirectory:'T40',batchName:'新批次',files:[current]}]}};
   const api={searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1}),listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValue([{id:5,model:'T40',productCategory:'冰柜'}]),listMaterialBatches:vi.fn().mockResolvedValue([]),getDrawingNavigation:vi.fn().mockResolvedValue({batches:[{id:7,productId:5,name:'旧批次',usageProducts:[{productId:5,state:'historical'}]}]}),getDrawing:vi.fn().mockResolvedValue(row)};
   render(<DrawingLibraryPage api={api as never}/>);
   fireEvent.click(await screen.findByRole('button',{name:'CODE'}));
-  await screen.findByLabelText('查看资料批次');
-  fireEvent.change(screen.getByLabelText('查看资料批次'),{target:{value:'7'}});
-  expect(await screen.findByText('old.pdf')).toBeVisible();
-  expect(screen.queryByText('current.pdf')).not.toBeInTheDocument();
+  const panel=await screen.findByRole('complementary',{name:'图号详情'});
+  expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();
+  expect(within(panel).getByText('old.pdf')).toBeVisible();
+  expect(within(panel).getByText('current.pdf')).toBeVisible();
 });
 
 it('reports partial association saves and retries failed associations while guarding busy Escape', async () => {
@@ -702,7 +706,7 @@ it('ignores scope and record changes during a save, then allows navigation after
   await waitFor(()=>expect(api.getDrawing).toHaveBeenLastCalledWith(2));
 });
 
-it('keeps another product source and unbatched source out of the selected product current files', async () => {
+it('does not hide concrete file facts when the selected product context changes', async () => {
   const sourceA={pdfIndexId:1,fileName:'source-A.pdf',relativePath:'A/source.pdf',isPresent:true,conversionType:'source'};
   const unbatchedA={...sourceA,pdfIndexId:3,fileName:'unbatched-A.pdf'};
   const outlinedB={...sourceA,pdfIndexId:2,fileName:'outlined-B.pdf',relativePath:'B/outlined.pdf',conversionType:'outlined'};
@@ -713,12 +717,11 @@ it('keeps another product source and unbatched source out of the selected produc
   fireEvent.click(screen.getByRole('button',{name:'产品 ModelB'}));
   fireEvent.click(await screen.findByRole('button',{name:'CODE'}));
   expect(await screen.findByText('outlined-B.pdf')).toBeVisible();
-  expect(screen.queryByText('source-A.pdf')).not.toBeInTheDocument();
-  expect(screen.queryByText('unbatched-A.pdf')).not.toBeInTheDocument();
-  expect(screen.getByText(/找到 2 个存在的文件/)).toBeVisible();
-  fireEvent.change(screen.getByLabelText('查看资料批次'),{target:{value:'7'}});
   expect(screen.getByText('source-A.pdf')).toBeVisible();
-  expect(screen.queryByText('unbatched-A.pdf')).not.toBeInTheDocument();
+  expect(screen.getByText('unbatched-A.pdf')).toBeVisible();
+  expect(screen.queryByLabelText('查看资料批次')).toBeNull();
+  expect(screen.getByText('source-A.pdf').closest('li')).toHaveAttribute('data-usage-state','current');
+
 });
 
 it('clears manual drawing filters while retaining the selected category and refreshes navigation counts', async () => {
@@ -835,7 +838,7 @@ it('uses four compact groups and corrects product ownership without independent 
   render(<DrawingLibraryPage api={api as never}/>);
   fireEvent.click(await screen.findByRole('button',{name:record.fullCode}));
   const panel = await screen.findByRole('complementary',{name:'图号详情'});
-  for(const name of ['01 基础信息','02 文件信息','03 业务关联','04 状态与操作']) expect(within(panel).getByRole('heading',{name})).toBeInTheDocument();
+  for(const name of ['01 基础信息','02 文件信息','03 BOM关联','04 状态与操作']) expect(within(panel).getByRole('heading',{name})).toBeInTheDocument();
   expect(within(panel).queryByText(/关联修正记录/)).not.toBeInTheDocument();
   expect(within(panel).queryByText('外观版本')).not.toBeInTheDocument();
   fireEvent.click(within(panel).getByRole('button',{name:'改变产品所属'}));
@@ -881,11 +884,11 @@ it.each(['active','inactive'])('shows four compact groups and an actionable rele
  const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[record],total:1}),getDrawing:vi.fn().mockResolvedValue(record),getDrawingDeletionPreview:vi.fn().mockResolvedValue({origin:'historical',fullCode:record.fullCode,deletable:true,blockers:[],references:{},releaseEligible:false,releaseBlockers:[{kind:'historical_occupation',message:'该图号存在历史扫描占用记录，无法释放号码'}]})};
  render(<DrawingLibraryPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:record.fullCode}));
  const panel=await screen.findByRole('complementary',{name:'图号详情'});
- for(const name of ['01 基础信息','02 文件信息','03 业务关联','04 状态与操作'])expect(within(panel).getByRole('heading',{name})).toBeInTheDocument();
+ for(const name of ['01 基础信息','02 文件信息','03 BOM关联','04 状态与操作'])expect(within(panel).getByRole('heading',{name})).toBeInTheDocument();
  expect(within(panel).queryByText('关联维护')).not.toBeInTheDocument();expect(within(panel).queryByText('查看路径')).not.toBeInTheDocument();
  expect(within(panel).getByText('very-long-file.pdf')).toHaveAttribute('title','very-long-file.pdf');
- expect(within(panel).getByText('未找到对应文件索引')).toBeInTheDocument();
- expect(within(panel).getByText('首批大货')).toBeInTheDocument();expect(within(panel).getByText('未进入 BOM')).toBeInTheDocument();
+ expect(within(panel).getByText('未找到对应文件索引，尚未核验磁盘')).toBeInTheDocument();
+ expect(within(panel).queryByText('出现批次')).toBeNull();expect(within(panel).queryByText('首批大货')).toBeNull();expect(within(panel).getByText('未进入 BOM')).toBeInTheDocument();
  fireEvent.click(within(panel).getByRole('button',{name:'取消占号并删除'}));
  expect(await within(panel).findByText(/该图号存在历史扫描占用记录/)).toBeInTheDocument();
  expect(api.getDrawingDeletionPreview).toHaveBeenCalledWith(-7);
@@ -926,4 +929,46 @@ it('refreshes saved classification counts even when the open detail reload fails
  await waitFor(()=>expect(within(screen.getByRole('button',{name:'产品 T40'})).getByLabelText('1 个图号')).toBeInTheDocument());
  expect(screen.getByRole('status')).toHaveTextContent('已更新 1 条关联');
  expect(await screen.findByText('详情刷新失败')).toBeInTheDocument();
+});
+
+
+it('shows all observed batches without scope choices and links only the exact first BOM',async()=>{
+ const file=(name:string,path:string)=>({pdfIndexId:null,fileName:name,relativePath:path,isPresent:true,indexed:false});
+ const section=(entries:unknown[])=>({state:'present',message:'文件存在',entries});
+ const record={id:7,fullCode:'02.0209.010.0401001',origin:'planned',status:'active',productId:99,sourceFiles:[],outlinedFiles:[],currentBomUsage:[],firstBom:{id:12,productId:3,model:'原始型号',versionNumber:1,businessDate:'2026-01-02'},fileObservation:{source:section([{key:'source',batchId:null,batchName:'未转曲源文件',businessDate:null,usageState:'indeterminate',state:'present',files:[file('source.pdf','source.pdf')]}]),outlined:section([{key:'new',batchId:2,batchName:'02.20260301',businessDate:'2026-03-01',usageState:'historical',state:'present',files:[file('new.pdf','new.pdf')]},{key:'old',batchId:1,batchName:'01.20260101',businessDate:'2026-01-01',usageState:'historical',state:'present',files:[file('old.pdf','old.pdf')]}])}};
+ const onNavigateBom=vi.fn();const showFileInFolder=vi.fn().mockResolvedValue({ok:true});window.plannerDesktop={showFileInFolder};
+ const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[record],total:1}),getDrawing:vi.fn().mockResolvedValue(record)};
+ render(<DrawingLibraryPage api={api as never} onNavigateBom={onNavigateBom}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'查看 / 管理'}));
+ const panel=await screen.findByRole('complementary',{name:'图号详情'});
+ expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();expect(within(panel).queryByLabelText('当前文件所属资料目录')).toBeNull();
+ expect(within(panel).getByText('new.pdf')).toBeVisible();expect(within(panel).getByText('old.pdf')).toBeVisible();
+ expect(within(panel).getAllByText('历史批次')).toHaveLength(2);expect(within(panel).queryByText('当前批次')).toBeNull();
+ expect(within(panel).getByRole('heading',{name:'03 BOM关联'})).toBeVisible();expect(within(panel).queryByText('出现批次')).toBeNull();
+ fireEvent.click(within(panel).getByRole('button',{name:/原始型号.*2026-01-02/}));expect(onNavigateBom).toHaveBeenCalledWith({productId:3,bomVersionId:12});
+ fireEvent.click(within(panel).getByRole('button',{name:'打开转曲前文件 source.pdf 的位置'}));
+ await waitFor(()=>expect(showFileInFolder).toHaveBeenCalledWith({kind:'drawing-file',origin:'planned',recordId:7,relativePath:'source.pdf'}));
+ delete window.plannerDesktop;
+});
+
+it.each(['missing','unindexed','unconfigured','unavailable'] as const)('keeps confirmed source absence distinct from %s observation status',async state=>{
+ const section={state,message:`source-state-${state}`,entries:[]};
+ const row={id:7,fullCode:'STATE-CODE',origin:'planned',status:'active',sourceFiles:[],outlinedFiles:[],currentBomUsage:[],fileObservation:{source:section,outlined:{state:'unindexed',message:'未核验',entries:[]}}};
+ const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1}),getDrawing:vi.fn().mockResolvedValue(row)};
+ render(<DrawingLibraryPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:row.fullCode}));
+ const panel=await screen.findByRole('complementary',{name:'图号详情'});
+ expect(within(panel).getByText(`source-state-${state}`)).toBeVisible();
+ expect(Boolean(within(panel).queryByText('已缺失'))).toBe(state==='missing');
+ expect(within(panel).queryByRole('button',{name:/打开.*的位置/})).toBeNull();
+});
+it('renders a conflicting batch once and never offers an arbitrary file instance to open',async()=>{
+ const files=[1,2].map(id=>({pdfIndexId:id,fileName:`conflict-${id}.pdf`,relativePath:`batch/${id}.pdf`,indexed:true,isPresent:true}));
+ const row={id:7,fullCode:'CONFLICT-CODE',origin:'planned',status:'active',sourceFiles:[],outlinedFiles:[],currentBomUsage:[],fileObservation:{source:{state:'unindexed',message:'未核验',entries:[]},outlined:{state:'present',message:'文件存在',entries:[{key:'one-batch',batchId:3,batchName:'03.20260301',businessDate:'2026-03-01',usageState:'historical',state:'conflict',message:'同一批次有 2 个内容不同的文件，未选择任何实例',files}]}}};
+ const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1}),getDrawing:vi.fn().mockResolvedValue(row)};
+ render(<DrawingLibraryPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:row.fullCode}));
+ const panel=await screen.findByRole('complementary',{name:'图号详情'});
+ expect(within(panel).getAllByText('20260301')).toHaveLength(1);
+ expect(within(panel).getByText('同一批次有 2 个内容不同的文件，未选择任何实例')).toBeVisible();
+ expect(within(panel).queryByRole('button',{name:/打开.*的位置/})).toBeNull();
+ expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();
 });

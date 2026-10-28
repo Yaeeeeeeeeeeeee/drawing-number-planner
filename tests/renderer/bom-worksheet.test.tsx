@@ -114,9 +114,9 @@ it('groups upload and reuse with each independent attachment role', async () => 
   const diagram = screen.getByRole('group', { name: '第 1 行位置示意图附件' });
   expect(within(image).getByLabelText('第 1 行图片')).toBeDisabled();
   expect(within(image).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
-  expect(within(diagram).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
+  expect(within(diagram).getByRole('radio',{name:'使用上一版位置示意图'})).toBeChecked();
   expect(within(image).getByRole('radio',{name:'更换图片'})).not.toBeChecked();
-  expect(within(diagram).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
+  expect(within(diagram).getByRole('radio',{name:'使用上一版位置示意图'})).toBeChecked();
 });
 it('summarizes known exceptions but does not classify legal empty attachments as errors', async () => {
   await preview('references');

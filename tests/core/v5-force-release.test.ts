@@ -1,5 +1,7 @@
+import {createHash} from 'node:crypto';
+const requireHash=(value:string)=>createHash('sha256').update(value).digest('hex');
 import {FileRepository} from '../../src/core/files/file-repository';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -188,4 +190,31 @@ describe('V5 independent force release', () => {
     expect(db.prepare('select count(*) n from drawing_force_releases').get()).toEqual({n:0});
     expect(db.prepare('select count(*) n from drawing_force_release_files').get()).toEqual({n:0});
   });
+});
+
+
+it('never rediscovers released old bytes as a new drawing generation through read-only detail fallback',()=>{
+ const root=mkdtempSync(join(tmpdir(),'v52-force-observation-'));
+ try{
+  const original=db.prepare('select * from drawing_numbers where id=?').get(plannedId) as any;
+  const relativePath=`冰柜/SKU-DELETE-T40/02.未转曲源文件/${plannedCode}.pdf`;
+  mkdirSync(join(root,relativePath,'..'),{recursive:true});writeFileSync(join(root,relativePath),'old bytes');
+  new FileRepository(db).replaceScan([{relativePath,fileName:`${plannedCode}.pdf`,drawingId:plannedId,matchStatus:'matched',detectedCodes:[plannedCode],conversionType:'source',sizeBytes:9,modifiedAt:'now'}],[],'now');
+  const force=new DrawingForceReleaseService(db);force.confirm({signedId:plannedId,fingerprint:force.preview(plannedId).fingerprint,confirmed:true});
+  new PlanningService(db).reserve({productId:original.product_id,appearanceId:original.appearance_id,rows:[{clientId:'replacement',colorId:original.color_id,mainCategoryId:original.main_category_id,projectItemId:original.project_item_id,expectedFullCode:plannedCode}]});
+  const current=db.prepare('select id from drawing_numbers where full_code=?').get(plannedCode) as {id:number};
+  const query=new DrawingQueryService(db,()=>root);
+  expect(query.get(current.id).fileObservation?.source.entries).toEqual([]);
+  expect(()=>query.resolveObservedFile({kind:'drawing-file',origin:'planned',recordId:current.id,relativePath})).toThrow();
+  const newPath=relativePath.replace('.pdf','-new.pdf');writeFileSync(join(root,newPath),'new bytes');
+  // A code-only match at a moved/new path is still not a confirmed generation link.
+  expect(query.get(current.id).fileObservation?.source.entries).toEqual([]);
+  const crypto=requireHash('new bytes');
+  const pdfId=Number(db.prepare(`insert into pdf_files(relative_path,file_name,match_status,detected_codes_json,conversion_type,size_bytes,modified_at,scanned_at,is_present,content_sha256)values(?,?,'pending','[]','source',9,'now','now',1,?)`).run(newPath,`${plannedCode}-new.pdf`,crypto).lastInsertRowid);
+  query.associatePdf(current.id,pdfId,'source');
+  expect(query.get(current.id).fileObservation?.source.entries[0].files[0].pdfIndexId).toBe(pdfId);
+  writeFileSync(join(root,newPath),'changed bytes');
+  expect(query.get(current.id).fileObservation?.source.entries).toEqual([]);
+  expect(()=>query.resolveObservedFile({kind:'drawing-file',origin:'planned',recordId:current.id,relativePath:newPath})).toThrow();
+ }finally{rmSync(root,{recursive:true,force:true});}
 });

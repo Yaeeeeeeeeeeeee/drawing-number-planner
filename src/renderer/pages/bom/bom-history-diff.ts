@@ -29,10 +29,7 @@ export function compareAttachments(previous: BomItemAssetView[], selected: BomIt
   const a = previous[0], b = selected[0], oldHash = digest(a.contentSha256), newHash = digest(b.contentSha256);
   if (oldHash && newHash && oldHash === newHash) return { kind: 'unchanged', changed: false, uncertain: false, label: '内容摘要一致' };
   if (oldHash && newHash && oldHash !== newHash) return { kind: 'replaced', changed: true, uncertain: false, label: '记录内容摘要不同 · 替换' };
-  const identity = (asset: BomItemAssetView) => [asset.assetId, asset.role, asset.relativePath, asset.originalFileName, asset.mimeType, asset.sizeBytes];
-  if (JSON.stringify(identity(a)) !== JSON.stringify(identity(b))) return { kind: 'association', changed: true, uncertain: !oldHash || !newHash, label: oldHash && newHash ? '关联变更 · 记录内容摘要一致' : '关联变更 · 内容待核对' };
-  if (!oldHash || !newHash) return { kind: 'unknown', changed: false, uncertain: true, label: '内容摘要不足，不能确认内容一致' };
-  return { kind: 'unchanged', changed: false, uncertain: false, label: '记录内容摘要一致' };
+  return { kind: 'unknown', changed: false, uncertain: true, label: '内容摘要不足，不能确认内容一致' };
 }
 
 export type HistoryKind = 'added' | 'removed' | 'modified' | 'unchanged' | 'pending' | 'first';

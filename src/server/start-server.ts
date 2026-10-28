@@ -110,7 +110,8 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     const qrManual = new QrManualService(database);
     registerAppearanceRoutes(server, new AppearanceService(database));
     registerQrCodeRoutes(server, new QrService(database), qrManual);
-    registerDrawingRoutes(server, new DrawingQueryService(database, () => workspaceSettings.get().workspaceRoot));
+    const drawingQueryService = new DrawingQueryService(database, () => workspaceSettings.get().workspaceRoot);
+    registerDrawingRoutes(server, drawingQueryService);
     registerFileRoutes(server, new FileService(fileRepository, workspaceSettings), tasks);
     registerMaterialBatchRoutes(server, new MaterialBatchService(database, () => workspaceSettings.get().workspaceRoot));
     registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));
@@ -153,7 +154,8 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       },
       url: address,
       token,
-      resolvePdfFilePath: (id) => indexedPdfResolver.resolve(id),
+      resolvePdfFilePath: (id) => typeof id === 'object' && id !== null && 'kind' in id && id.kind === 'drawing-file'
+        ? drawingQueryService.resolveObservedFile(id) : indexedPdfResolver.resolve(id),
       resolveBomAssetPath: (id) => {
         if (!Number.isInteger(id) || Number(id) <= 0) throw qrFileError('INVALID_BOM_ASSET_ID', 'BOM 附件索引无效');
         const indexed = database.prepare('select relative_path as relativePath from bom_assets where id = ?')

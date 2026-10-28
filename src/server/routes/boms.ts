@@ -51,7 +51,7 @@ const saveFields = z.object({
 }).strict();
 const uniqueProjects = (value: { items: Array<{ projectItemId: number }> }) => new Set(value.items.map(item => item.projectItemId)).size === value.items.length;
 const saveSchema = saveFields.refine(uniqueProjects);
-// Update may omit the immutable original date, including legacy NULL dates.
+// Omitted business dates retain the selected record value, including legacy NULL dates.
 const updateSchema = saveFields.extend({ businessChangeDate: z.string().trim().optional() }).refine(uniqueProjects);
 const versionParams = z.object({ id: z.coerce.number().int().positive() }).strict();
 const deleteVersionSchema = z.object({ confirmed: z.boolean() }).strict();

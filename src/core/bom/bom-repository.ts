@@ -15,6 +15,7 @@ export interface BomHistoricalDrawing {
 }
 
 interface VersionRow {
+  project_item_names_json: string;
   appearance_version_id: number | null; updated_at: string | null; edit_revision: number;
   id: number; product_id: number; model: string; version_number: number; previous_version_id: number | null;
   business_change_date: string | null; legacy_color_id: number | null; legacy_color_name: string | null;
@@ -37,6 +38,7 @@ interface ItemRow {
 }
 
 const mapSummary = (row: VersionRow): BomVersionSummary => ({
+  projectItemNames: JSON.parse(row.project_item_names_json),
   appearanceVersionId: row.appearance_version_id, updatedAt: row.updated_at ?? row.created_at, editRevision: row.edit_revision,
   id: row.id, productId: row.product_id, model: row.model, versionNumber: row.version_number,
   previousVersionId: row.previous_version_id, businessChangeDate: row.business_change_date,
@@ -57,6 +59,10 @@ const mapItem = (row: ItemRow): BomItemRecord => ({
 });
 
 const versionSelect = `select version.appearance_version_id, version.id, version.product_id, product.model, version.version_number,
+  (select json_group_array(name) from (select project.name from bom_items summary_item
+    join dictionary_items project on project.id=summary_item.project_item_id
+    where summary_item.bom_version_id=version.id and summary_item.deleted_at is null
+    order by summary_item.project_item_id)) as project_item_names_json,
   version.previous_version_id, version.business_change_date, version.legacy_color_id,
   legacy_color.name as legacy_color_name, version.notes, version.created_at, version.updated_at, version.edit_revision
   from bom_versions version
@@ -311,8 +317,9 @@ export class BomRepository {
   previousItemAsset(previousVersionId: number, projectItemId: number, role: BomAssetRole): { id: number; assetId: number } | undefined {
     return this.db.prepare(`select link.id, link.asset_id as assetId from bom_item_assets link
       join bom_items item on item.id = link.bom_item_id
+      join bom_versions version on version.id = item.bom_version_id
       where item.bom_version_id = ? and item.project_item_id = ? and link.role = ?
-        and item.deleted_at is null and link.deleted_at is null`).get(previousVersionId, projectItemId, role) as {
+        and version.deleted_at is null and item.deleted_at is null and link.deleted_at is null`).get(previousVersionId, projectItemId, role) as {
         id: number; assetId: number;
       } | undefined;
   }

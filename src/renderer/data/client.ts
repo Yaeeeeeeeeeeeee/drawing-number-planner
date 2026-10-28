@@ -60,7 +60,8 @@ export interface DrawingBomUsageView {
 }
 export interface DrawingDetailView extends DrawingView {
   firstOccurrenceBatch?:{id:number;name:string}|null;firstBatchAmbiguous?:boolean;
-  firstBom?:{id:number;versionNumber:number;businessDate:string|null;model:string}|null;
+  firstBom?:{id:number;productId:number;versionNumber:number;businessDate:string|null;model:string}|null;
+  fileObservation?: import('../../core/files/drawing-file-observation.js').DrawingFileObservation;
   associationHistory?: unknown[];
   sourceFiles: DrawingFileView[]; outlinedFiles: DrawingFileView[]; currentBomUsage: DrawingBomUsageView[];
   businessUsage?: DrawingBusinessUsageView[];
@@ -151,6 +152,7 @@ export type BomItemView = BomDrawingReferenceView & {
   changeDetails: string | null; assets: BomItemAssetView[]; qrCodes: BomQrCodeView[];
 };
 export interface BomVersionSummaryView {
+  projectItemNames?: string[];
   appearanceVersionId?: number | null;
   id: number; productId: number; model: string; versionNumber: number; previousVersionId: number | null;
   businessChangeDate: string | null; businessChangeDateLabel: string; notes: string | null; createdAt: string;

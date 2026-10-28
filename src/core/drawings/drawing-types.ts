@@ -103,7 +103,8 @@ export interface DrawingNavigationBatch extends MaterialBatchView {
 export interface DrawingDetailRecord extends DrawingRecord {
   firstOccurrenceBatch?: {id:number;name:string}|null;
   firstBatchAmbiguous?: boolean;
-  firstBom?: {id:number;versionNumber:number;businessDate:string|null;model:string}|null;
+  firstBom?: {id:number;productId:number;versionNumber:number;businessDate:string|null;model:string}|null;
+  fileObservation?: import('../files/drawing-file-observation.js').DrawingFileObservation;
   associationHistory?: unknown[];
   sourceFiles: DrawingFileRecord[];
   outlinedFiles: DrawingFileRecord[];

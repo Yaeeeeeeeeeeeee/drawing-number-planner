@@ -5,13 +5,13 @@ import { expect, it, vi } from 'vitest';
 import { BomAttachmentControl } from '../../src/renderer/pages/bom/BomAttachmentControl';
 import { BomEditComparison } from '../../src/renderer/pages/bom/BomEditComparison';
 
-it('shows exclusive attachment sources and cancels reuse when a replacement is chosen',()=>{
+it('keeps attachment selection unchanged until its upload handler succeeds',()=>{
  const onReuse=vi.fn(),onUpload=vi.fn();
  render(<BomAttachmentControl index={1} role="image" asset={null} canReuse reuse disabled={false} previewOnly={false} onReuse={onReuse} onUpload={onUpload} onPreviewChange={()=>{}}/>);
  expect(screen.queryByRole('checkbox')).toBeNull();
  expect(screen.getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
  fireEvent.change(screen.getByLabelText('第 1 行图片'),{target:{files:[new File(['image'],'new.png',{type:'image/png'})]}});
- expect(onReuse).toHaveBeenCalledWith(false);expect(onUpload).toHaveBeenCalledTimes(1);
+ expect(onReuse).not.toHaveBeenCalled();expect(onUpload).toHaveBeenCalledTimes(1);
 });
 it('keeps original values in a closed readonly drawer independent of editable values',()=>{
  const original={bomItemId:1,projectItemId:7,projectItemName:'LOGO',origin:'planned',drawingId:1,fullCode:'001',assets:[],material:'原纸',dimensions:null,position:null,notes:null,changeDetails:null,effectiveBatchName:null} as any;

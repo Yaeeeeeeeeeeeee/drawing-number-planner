@@ -1,4 +1,4 @@
-import type { BomCandidateView, BomDiffView, BomItemAssetView, BomItemView, BomQrCandidateView, BomQrCodeView, BomVersionView, DictionaryItemView, MaterialBatchView } from '../../data/client';
+import type { BomCandidateView, BomItemAssetView, BomItemView, BomQrCandidateView, BomQrCodeView, BomVersionView, DictionaryItemView, MaterialBatchView } from '../../data/client';
 import { useBomPreviewFailures } from './BomAssetPreview';
 import { BomAttachmentControl } from './BomAttachmentControl';
 import { BomRecordNotices } from './BomRecordNotices';
@@ -19,10 +19,6 @@ export interface DraftRow {
   candidates: DraftCandidate[]; candidatesLoaded: boolean;
 }
 
-const describeDiff = (item: BomDiffView) => item.type === 'added' ? `${item.projectItemName}：新增 ${item.fullCode}`
-  : item.type === 'removed' ? `${item.projectItemName}：移除 ${item.previousFullCode}`
-    : item.type === 'replaced' ? `${item.projectItemName}：${item.previousFullCode} → ${item.fullCode}` : `${item.projectItemName}：未变化`;
-
 export const candidateKey = (candidate: DraftCandidate) => candidate.origin === 'planned'
   ? `planned:${candidate.drawingId}` : `historical:${candidate.historicalDrawingId}`;
 const candidateLabel = (candidate: DraftCandidate) => candidate.origin === 'historical'
@@ -30,11 +26,11 @@ const candidateLabel = (candidate: DraftCandidate) => candidate.origin === 'hist
   : candidate.status === 'reserved' ? '正式规划 · 已占号'
     : candidate.status === 'voided' ? '正式规划 · 作废，需替换' : '正式规划 · 正式使用';
 
-export function BomEditor({ base, rows, mainCategories, projects, batches, qrCandidates, busy, complete, needsRefresh, savedMessage, diff, editing = false,
+export function BomEditor({ base, reuseSource = base, rows, mainCategories, projects, batches, qrCandidates, busy, complete, needsRefresh, savedMessage, editing = false,
   previewOnly = false, simulateConflict = false, blockers = [],
   onAdd, onDelete, onMainCategory, onProject, onWhite, onDrawing, onChange, onUpload, onQr, onSave, onRefresh }: {
-  base: BomVersionView | null; rows: DraftRow[]; mainCategories: DictionaryItemView[]; projects: DictionaryItemView[]; batches: MaterialBatchView[]; qrCandidates: BomQrCandidateView[];
-  busy: boolean; complete: boolean; needsRefresh: boolean; savedMessage: string; diff: BomDiffView[]; editing?: boolean; previewOnly?: boolean; simulateConflict?: boolean; blockers?: string[];
+  base: BomVersionView | null; reuseSource?: BomVersionView | null; rows: DraftRow[]; mainCategories: DictionaryItemView[]; projects: DictionaryItemView[]; batches: MaterialBatchView[]; qrCandidates: BomQrCandidateView[];
+  busy: boolean; complete: boolean; needsRefresh: boolean; savedMessage: string; editing?: boolean; previewOnly?: boolean; simulateConflict?: boolean; blockers?: string[];
   onAdd(): void; onDelete(clientId: string): void; onMainCategory(row: DraftRow, value: string): void;
   onProject(row: DraftRow, value: string): void; onWhite(row: DraftRow, value: boolean): void;
   onDrawing(row: DraftRow, value: string): void; onChange(row: DraftRow, field: keyof DraftRow, value: string | boolean): void;
@@ -71,9 +67,9 @@ export function BomEditor({ base, rows, mainCategories, projects, batches, qrCan
           <label><span>生效批次（可选）</span><select aria-label={`第 ${index + 1} 行生效资料批次`} disabled={busy} value={row.effectiveMaterialBatchId} onChange={(e) => onChange(row, 'effectiveMaterialBatchId', e.target.value)}><option value="">未选择</option>{batches.filter((batch) => batch.isPresent || String(batch.id) === row.effectiveMaterialBatchId).map((batch) => <option key={batch.id} value={batch.id}>{materialBatchLabel(batch.name)}{!batch.isPresent ? '（已缺失，保留原记录）' : ''}</option>)}</select>{row.effectiveMaterialBatchId && batches.some((batch) => String(batch.id) === row.effectiveMaterialBatchId && !batch.isPresent) && <small className="bom-candidate-empty">批次缺失 · 保留原记录</small>}</label>
           <label><span>材质</span><textarea rows={2} aria-label={`第 ${index + 1} 行材质`} disabled={busy} value={row.material} onChange={(e) => onChange(row, 'material', e.target.value)} /></label>
           <label><span>尺寸</span><textarea rows={2} aria-label={`第 ${index + 1} 行尺寸`} disabled={busy} value={row.dimensions} onChange={(e) => onChange(row, 'dimensions', e.target.value)} /></label>
-          <BomAttachmentControl index={index + 1} role="image" asset={row.imageAsset} gallery={[row.imageAsset,row.diagramAsset].filter((asset): asset is BomItemAssetView=>Boolean(asset))} canReuse={Boolean(base?.items.find(item=>item.projectItemId===Number(row.projectItemId))?.assets.some(asset=>asset.role==='image'))} reuse={row.reuseImage} disabled={busy} previewOnly={previewOnly} onReuse={(value) => onChange(row, 'reuseImage', value)} onUpload={(file) => { void onUpload(row, 'image', file); }} onPreviewChange={onPreviewChange} />
+          <BomAttachmentControl index={index + 1} role="image" asset={row.imageAsset} gallery={[row.imageAsset,row.diagramAsset].filter((asset): asset is BomItemAssetView=>Boolean(asset))} canReuse={Boolean(reuseSource?.items.find(item=>item.projectItemId===Number(row.projectItemId))?.assets.some(asset=>asset.role==='image' && !failures[asset.assetId]))} reuse={row.reuseImage} disabled={busy} previewOnly={previewOnly} onReuse={(value) => onChange(row, 'reuseImage', value)} onUpload={(file) => { void onUpload(row, 'image', file); }} onPreviewChange={onPreviewChange} />
           <label className="bom-position-field"><span>位置</span><textarea rows={2} aria-label={`第 ${index + 1} 行位置`} disabled={busy} value={row.position} onChange={(e) => onChange(row, 'position', e.target.value)} /></label>
-          <BomAttachmentControl index={index + 1} role="diagram" asset={row.diagramAsset} gallery={[row.imageAsset,row.diagramAsset].filter((asset): asset is BomItemAssetView=>Boolean(asset))} canReuse={Boolean(base?.items.find(item=>item.projectItemId===Number(row.projectItemId))?.assets.some(asset=>asset.role==='diagram'))} reuse={row.reuseDiagram} disabled={busy} previewOnly={previewOnly} onReuse={(value) => onChange(row, 'reuseDiagram', value)} onUpload={(file) => { void onUpload(row, 'diagram', file); }} onPreviewChange={onPreviewChange} />
+          <BomAttachmentControl index={index + 1} role="diagram" asset={row.diagramAsset} gallery={[row.imageAsset,row.diagramAsset].filter((asset): asset is BomItemAssetView=>Boolean(asset))} canReuse={Boolean(reuseSource?.items.find(item=>item.projectItemId===Number(row.projectItemId))?.assets.some(asset=>asset.role==='diagram' && !failures[asset.assetId]))} reuse={row.reuseDiagram} disabled={busy} previewOnly={previewOnly} onReuse={(value) => onChange(row, 'reuseDiagram', value)} onUpload={(file) => { void onUpload(row, 'diagram', file); }} onPreviewChange={onPreviewChange} />
           <label className="bom-change-field"><span>修改明细</span><textarea rows={3} aria-label={`第 ${index + 1} 行修改明细`} disabled={busy} value={row.changeDetails} onChange={(e) => onChange(row, 'changeDetails', e.target.value)} /></label>
           <label className="bom-notes-field"><span>备注</span><textarea rows={2} aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes} onChange={(e) => onChange(row, 'notes', e.target.value)} /></label>
         </BomEditComparison>
@@ -85,6 +81,6 @@ export function BomEditor({ base, rows, mainCategories, projects, batches, qrCan
       <div className="bom-actions"><button className="primary-button" type="button" disabled={busy || !complete || (previewOnly && !simulateConflict)} onClick={() => void onSave()}>{busy ? '保存中…' : simulateConflict ? '模拟保存冲突' : editing ? '保存修改' : '保存当前 BOM'}</button>{needsRefresh && <button className="secondary-button" type="button" disabled={busy} onClick={onRefresh}>刷新当前 BOM</button>}</div>
     </div>
     {savedMessage && <p className="success-banner"><strong>{savedMessage}</strong></p>}
-    {diff.length > 0 && <section className="bom-diff"><h2>本次变更</h2><div className="bom-diff-list">{diff.filter((item) => item.type !== 'unchanged').map((item) => <span className={`bom-diff-${item.type}`} key={item.projectItemId}>{describeDiff(item)}</span>)}</div></section>}
+
   </section>;
 }

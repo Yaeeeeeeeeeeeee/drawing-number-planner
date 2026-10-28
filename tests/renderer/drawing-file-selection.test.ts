@@ -1,17 +1,46 @@
 import {describe,expect,it} from 'vitest';
-import {selectDrawingFiles} from '../../src/renderer/pages/drawing-file-selection';
+import {groupDrawingFileSections} from '../../src/renderer/pages/drawing-file-selection';
 const file=(id:number,batch:number|null=null,present=true)=>({pdfIndexId:id,fileName:`${id}.pdf`,relativePath:`${id}.pdf`,isPresent:present,conversionType:'outlined' as const,materialBatchId:batch});
 const occurrence=(batchId:number,files:ReturnType<typeof file>[],productId=1)=>({batchId,productId,batchName:`批次${batchId}`,productDirectory:'产品目录',sequenceNumber:batchId,recognitionStatus:'recognized' as const,usageState:'historical' as const,files});
-describe('drawing file availability selection',()=>{
- it('distinguishes unreadable files and unlinked indices from physical absence',()=>{
-  expect(selectDrawingFiles([],undefined,{}).state).toBe('unlinked');
-  expect(selectDrawingFiles([{...file(1,null,false),presenceStatus:'read-failed',presenceMessage:'文件读取失败'}],undefined,{})).toMatchObject({state:'unavailable',message:'文件读取失败'});
-  expect(selectDrawingFiles([{...file(2,null,false),presenceStatus:'missing'}],undefined,{}).state).toBe('missing');
+const project=(files:ReturnType<typeof file>[],occurrences:ReturnType<typeof occurrence>[] = [])=>groupDrawingFileSections({sourceFiles:[],outlinedFiles:files,batchUsage:{occurrences}} as never).outlined;
+describe('drawing file groups',()=>{
+ it('keeps missing indices distinct from physical absence',()=>{
+  expect(project([])).toMatchObject({state:'unindexed',entries:[],message:'未找到对应文件索引，尚未核验磁盘'});
  });
- it('shows an existing unbatched file even without current batch membership',()=>{const files=[file(1)];expect(selectDrawingFiles(files,undefined,{})).toMatchObject({state:'present',files});});
- it('shows the unique actual file even when old batch attribution disagrees with current product',()=>{const files=[file(1,3)];const usage={effectiveCurrentFileIds:[],occurrences:[occurrence(3,files,8)]};expect(selectDrawingFiles(files,usage,{productId:1})).toMatchObject({state:'present',files});});
- it('keeps multiple unresolved existing files ambiguous instead of picking the latest or marking missing',()=>{const files=[file(1,1),file(2,2)];expect(selectDrawingFiles(files,{occurrences:[occurrence(1,[files[0]]),occurrence(2,[files[1]])]},{})).toMatchObject({state:'ambiguous',files:[]});});
- it('uses a unique explicitly resolved current instance without duplicating older cards',()=>{const files=[file(1,1),file(2,2)];expect(selectDrawingFiles(files,{effectiveCurrentFileIds:[2],occurrences:[occurrence(1,[files[0]]),occurrence(2,[files[1]])]},{productId:1})).toMatchObject({state:'present',files:[files[1]]});});
- it('honors an explicit batch including missing indices without substituting another batch',()=>{const files=[file(1,1),file(2,2,false)];expect(selectDrawingFiles(files,{occurrences:[occurrence(1,[files[0]])]},{batchId:2})).toMatchObject({state:'missing',files:[]});});
- it('allows an explicit batch to resolve ambiguity and keeps the original file array intact',()=>{const files=[file(1,1),file(2,2)];expect(selectDrawingFiles(files,undefined,{batchId:2})).toMatchObject({state:'present',files:[files[1]]});expect(files).toHaveLength(2);});
+ it('keeps unreadable and confirmed missing file messages without offering an instance',()=>{
+  const unavailable={...file(1,null,false),presenceStatus:'read-failed',presenceMessage:'文件读取失败'};
+  expect(project([unavailable])).toMatchObject({state:'unavailable',entries:[{state:'unavailable',message:'文件读取失败'}]});
+  const absent={...file(2,null,false),presenceStatus:'missing'};
+  expect(project([absent])).toMatchObject({entries:[{state:'unavailable',message:'磁盘文件不存在'}]});
+ });
+ it('shows an existing unbatched file without inferring current business membership',()=>{
+  expect(project([file(1)])).toMatchObject({state:'present',entries:[{batchId:null,usageState:'indeterminate',files:[{pdfIndexId:1}]}]});
+ });
+ it('keeps independent batch identity despite equal displayed labels',()=>{
+  const files=[file(1,1),file(2,2)];
+  const result=project(files,[{...occurrence(1,[files[0]]),batchName:'同名'},{...occurrence(2,[files[1]]),batchName:'同名'}]);
+  expect(result.entries).toHaveLength(2);
+  expect(result.entries.map(entry=>entry.batchId)).toEqual([1,2]);
+ });
+ it('keeps competing files in one batch in a single conflict row without choosing a file',()=>{
+  const files=[file(1,1),file(2,1)];
+  expect(project(files,[occurrence(1,files)])).toMatchObject({entries:[{state:'conflict',files:[{pdfIndexId:1},{pdfIndexId:2}]}]});
+ });
+ it('does not replace an unavailable current batch with an older available file',()=>{
+  const files=[file(1,1),file(2,2,false)];
+  const result=project(files,[occurrence(1,[files[0]]),{...occurrence(2,[files[1]]),usageState:'current'}] as never);
+  expect(result.entries).toMatchObject([{usageState:'historical',state:'present'},{usageState:'current',state:'unavailable'}]);
+  expect(files).toHaveLength(2);
+ });
+ it('uses the service observation unchanged, including verified dates and scope',()=>{
+  const observed={source:{state:'missing',message:'verified',entries:[]},outlined:{state:'present',message:'verified',entries:[{key:'new',businessDate:'2026-03-01',usageState:'historical',files:[]}]}};
+  expect(groupDrawingFileSections({fileObservation:observed,sourceFiles:[file(99)],outlinedFiles:[]} as never)).toBe(observed);
+ });
+});
+
+it('projects every batch without promoting an older found file to current',()=>{
+ const files=[file(1,1),file(2,2)];
+ const result=groupDrawingFileSections({sourceFiles:[],outlinedFiles:files,batchUsage:{occurrences:[{...occurrence(1,[files[0]]),usageState:'historical'},{...occurrence(2,[files[1]]),usageState:'historical'}]}} as never);
+ expect(result.outlined.entries).toHaveLength(2);
+ expect(result.outlined.entries.map(entry=>entry.usageState)).toEqual(['historical','historical']);
 });

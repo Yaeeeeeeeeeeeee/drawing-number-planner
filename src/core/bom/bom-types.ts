@@ -84,6 +84,7 @@ interface BomItemRecordFields {
 export type BomItemRecord = BomItemRecordFields & BomDrawingReference;
 
 export interface BomVersionSummary {
+  projectItemNames: string[];
   appearanceVersionId: number | null;
   updatedAt: string;
   editRevision: number;

@@ -37,7 +37,11 @@ export class BomAssetArchiveService {
         this.db.prepare(`update bom_item_assets set inheritance_snapshot_json = ?, inherited_from_bom_item_asset_id = null
           where inherited_from_bom_item_asset_id = ?`).run(JSON.stringify({ sourceLinkId: linkId,
             assetId: item.assetId, relativePath: item.relativePath }), linkId);
-        this.db.prepare('update bom_item_assets set asset_id = ? where id = ?').run(created.id, linkId);
+        const source = this.db.prepare('select inherited_from_bom_item_asset_id as id from bom_item_assets where id=?').get(linkId) as { id: number | null };
+        // The verified copy has its own asset identity; preserve inheritance as frozen facts.
+        this.db.prepare(`update bom_item_assets set asset_id = ?, inherited_from_bom_item_asset_id = null,
+          inheritance_snapshot_json = case when inherited_from_bom_item_asset_id is not null then ? else inheritance_snapshot_json end where id = ?`)
+          .run(created.id, JSON.stringify({ sourceLinkId: source.id, assetId: item.assetId, relativePath: item.relativePath }), linkId);
         this.db.prepare(`insert into bom_asset_archive_mappings
           (source_asset_id, archived_asset_id, bom_item_asset_id, created_at) values (?, ?, ?, ?)`)
           .run(item.assetId, created.id, linkId, new Date().toISOString());

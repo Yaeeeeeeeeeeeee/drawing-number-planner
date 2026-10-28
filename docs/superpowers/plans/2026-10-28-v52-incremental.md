@@ -37,10 +37,10 @@ Interface: shared two-directory scope; explicit traversal coverage/failure must 
 ### Phase 3 — Drawing files and BOM
 Files: drawing query/detail selection/BOM targets; BomPage/service/assets/comparison and tests.
 Interfaces: additive drawing file groups/provenance/existence states, firstBom productId/id/date, exact AppShell→BomPage bomVersionId.
-- [ ] RED all-batch scoped display, no dropdown, exact firstBOM jump/missing-state, per-batch conflict handling.
-- [ ] Implement source and all-outline groups with reliable current labels; read-only physical check for unindexed files, no autonomous numbering/index rebuild.
-- [ ] RED/implement BOM date edit exactrow+snapshot preservation, reset, query3dropdowns+projectcolumn, correct previous-asset vsreplacement, content comparison.
-- [ ] GREEN relevant core/API/renderer and force-release/repeated-drawing/history guards before Phase4.
+- [x] RED all-batch scoped display, no dropdown, exact firstBOM jump/missing-state, per-batch conflict handling.
+- [x] Implement source and all-outline groups with reliable current labels; read-only physical check for unindexed files, no autonomous numbering/index rebuild.
+- [x] RED/implement BOM date edit exactrow+snapshot preservation, reset, query3dropdowns+projectcolumn, correct previous-asset vsreplacement, content comparison.
+- [x] GREEN relevant core/API/renderer and force-release/repeated-drawing/history guards before Phase4.
 
 ### Phase 4 — Internal folders and shared UI
 Files: MaterialBatchService/nav/contextmenu; shared table layout/CSS/workspace/virtual rows; pages columns/frozen operations/image labels.
@@ -64,3 +64,7 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 2026-10-28: Stage1 gates met, scan/BOM/UI faults reproduced; original workbook privately inspected, local-path/internal-only deletion user clarification recorded. No source changes yet. Begin Phase2 only; other implementers wait.
 
 2026-10-28 Phase2 complete: /tmp/v52-phase2-final.log 30files/402pass; typecheck/diffclean. All-or-nothing scannercoverage promise, excludedrows preservedincludingmanagementstatus, filenameconversion andinternalempty checks. NoSchema/config/diskmutations. Phase3 drawing/BOM ownership dispatched onlyafterthisgate.
+
+2026-10-28 Phase3 IPC: existing show-file-in-folder now accepts exact drawing identity+safe relative path for readonly unindexed discovery; service re-observes scope/existence/quarantine. No raw absolute path/synthetic index/new IPC. RED 3 new failures then GREEN bridge3files32tests including running application with no pdf_files writes. Remaining BOM and drawing domain/renderer gates still active.
+
+2026-10-28 Phase3 complete: drawing24files276pass, BOM23files318pass, IPC/application3files32pass (overlap, not additive); tsc clean. Fixed readonly all-batch discovery/exact BOM navigation and date/reuse/copy-snapshot/reset/query/hash behavior. NoSchema migration, original files untouched, force-release quarantine regression preserved. BeginPhase4.

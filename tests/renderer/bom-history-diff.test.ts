@@ -66,3 +66,8 @@ it('excludes independent QR associations from BOM history change counts without 
  const before=item(1,{qrCodes:[{id:5,name:'A',purposeDisplayName:'说明书',status:'active'}]}),after=item(1,{qrCodes:[{id:9,name:'B',purposeDisplayName:'售后卡',status:'active'}]});
  const result=compareBomItems([after],[before]);expect(result.counts.modified).toBe(0);expect(result.counts.unchanged).toBe(1);expect(after.qrCodes[0].id).toBe(9);expect(before.qrCodes[0].id).toBe(5);
 });
+
+it('keeps missing-digest metadata differences pending without proving an image change',()=>{
+ const result=compareBomItems([item(1,{assets:[asset('unknown',2)]})],[item(1,{assets:[asset('unknown',1)]})]);
+ expect(result.counts).toMatchObject({modified:0,pending:1});expect(result.rows[0].attachments.image.changed).toBe(false);
+});

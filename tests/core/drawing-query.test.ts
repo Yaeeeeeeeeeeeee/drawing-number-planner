@@ -1,9 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {ensureProductAppearance} from '../../src/core/products/appearance-identity';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MaterialBatchService } from '../../src/core/files/material-batch-service';
 
 import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
 import { DrawingQueryService } from '../../src/core/drawings/drawing-query-service';
@@ -678,4 +679,64 @@ describe('V4.1 drawing business state and legacy index compatibility', () => {
       expect(() => drawings.associatePdf(-history,1,'source')).toThrowError(expect.objectContaining({code:'HISTORICAL_READ_ONLY'}));
     } finally { db.close(); db = openDatabase(':memory:'); rmSync(directory, { recursive: true, force: true }); }
   });
+});
+
+
+describe('V5.2 read-only drawing file observation',()=>{
+ const code='02.0209.010.0401001',production='03.量产后的变更文件（已量产的产品看最新日期）';
+ it('only observes known product directories and computes batch usage inside that scope',()=>{
+  const root=mkdtempSync(join(tmpdir(),'v52-query-scope-'));
+  const directory='冰柜/TEST-DRAWING-QUERY-ZC220',other='冰柜/UNRELATED-ZC220';
+  const owner=drawings.get(ids.first).productId;
+  const insert=db.prepare(`insert into material_batches(relative_path,product_directory,product_id,name,sequence_number,business_date,recognition_status,is_present,first_seen_at,last_seen_at)values(?,?,?,'01.20260101',1,'2026-01-01','recognized',1,'now','now')`);
+  insert.run(`${directory}/${production}/01.20260101`,directory,owner);
+  insert.run(`${other}/${production}/01.20260101`,other,null);
+  mkdirSync(join(root,other,'02.未转曲源文件'),{recursive:true});
+  writeFileSync(join(root,other,'02.未转曲源文件',`${code}.pdf`),'unrelated');
+  mkdirSync(join(root,directory),{recursive:true});
+  const selections=vi.spyOn(MaterialBatchService.prototype,'getCurrentBatchSelection');
+  try{
+   const result=new DrawingQueryService(db,()=>root).get(ids.first).fileObservation!;
+   expect(result.source).toMatchObject({state:'missing',entries:[]});
+   expect(selections.mock.calls.map(call=>call[0])).toEqual([directory]);
+  }finally{selections.mockRestore();rmSync(root,{recursive:true,force:true});}
+ });
+ it('keeps the original first BOM identity and date even after it is deleted and later records exist',()=>{
+  const insert=db.prepare(`insert into bom_versions(product_id,version_number,business_change_date,created_at) select product_id,?,?,? from drawing_numbers where id=?`);
+  const first=Number(insert.run(1,'2026-03-01','2026-01-01T00:00:00Z',ids.first).lastInsertRowid);
+  const later=Number(insert.run(2,'2026-01-01','2026-02-01T00:00:00Z',ids.first).lastInsertRowid);
+  const item=db.prepare(`insert into bom_items(bom_version_id,project_item_id,drawing_id,quantity,uses_white_material) values(?,?,?,1,0)`);
+  item.run(first,ids.logo,ids.first);item.run(later,ids.logo,ids.first);
+  db.prepare(`update bom_versions set deleted_at='2026-04-01' where id=?`).run(first);
+  expect(drawings.get(ids.first).firstBom).toMatchObject({id:first,productId:drawings.get(ids.first).productId,businessDate:'2026-03-01'});
+ });
+ it('discovers files in the known product directory without adding indices, occupancy or associations',()=>{
+  const root=mkdtempSync(join(tmpdir(),'v52-query-'));const source=`冰柜/TEST-DRAWING-QUERY-ZC220/02.未转曲源文件/${code}.pdf`;
+  try{
+   mkdirSync(join(root,source,'..'),{recursive:true});writeFileSync(join(root,source),'source');
+   const before=db.prepare('select total_changes() as count').get();const service=new DrawingQueryService(db,()=>root);
+   const result=service.get(ids.first);
+   expect(result.fileObservation?.source).toMatchObject({state:'present',entries:[{files:[{pdfIndexId:null,relativePath:source}]}]});
+   expect(db.prepare('select total_changes() as count').get()).toEqual(before);
+   expect(service.resolveObservedFile({kind:'drawing-file',origin:'planned',recordId:ids.first,relativePath:source})).toBe(join(root,source));
+   expect(()=>service.resolveObservedFile({kind:'drawing-file',origin:'planned',recordId:ids.second,relativePath:source})).toThrow();
+   expect(()=>service.resolveObservedFile({kind:'drawing-file',origin:'planned',recordId:ids.first,relativePath:'../outside.pdf'})).toThrow();
+   expect(()=>service.resolveObservedFile({kind:'drawing-file',origin:'planned',recordId:ids.first,relativePath:source.replace('02.未转曲源文件','03.量产后的变更文件')})).toThrow();
+   rmSync(join(root,source));expect(()=>service.resolveObservedFile({kind:'drawing-file',origin:'planned',recordId:ids.first,relativePath:source})).toThrow();
+  }finally{rmSync(root,{recursive:true,force:true});}
+ });
+ it('keeps found batches historical when the actual current batch has no such drawing',()=>{
+  const root=mkdtempSync(join(tmpdir(),'v52-query-batches-'));const directory='冰柜/TEST-DRAWING-QUERY-ZC220';
+  try{
+   const insert=db.prepare(`insert into material_batches(relative_path,product_directory,product_id,name,sequence_number,business_date,recognition_status,is_present,first_seen_at,last_seen_at)values(?,?,?,?,?,?,'recognized',1,'now','now')`);
+   for(const [sequence,date] of [[1,'2026-01-01'],[2,'2026-02-01'],[3,'2026-03-01']] as const){
+    const batchPath=`${directory}/${production}/0${sequence}.${date.replaceAll('-','')}`;
+    insert.run(batchPath,directory,drawings.get(ids.first).productId,`0${sequence}.${date.replaceAll('-','')}`,sequence,date);
+    mkdirSync(join(root,batchPath),{recursive:true});if(sequence<3)writeFileSync(join(root,batchPath,`${code}（转曲）.pdf`),'old');
+   }
+   const result=new DrawingQueryService(db,()=>root).get(ids.first).fileObservation!;
+   expect(result.outlined.entries.map(entry=>entry.businessDate)).toEqual(['2026-02-01','2026-01-01']);
+   expect(result.outlined.entries.map(entry=>entry.usageState)).toEqual(['historical','historical']);
+  }finally{rmSync(root,{recursive:true,force:true});}
+ });
 });

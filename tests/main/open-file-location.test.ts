@@ -3,6 +3,35 @@ import { describe, expect, it, vi } from 'vitest';
 import { createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from '../../src/main/open-file-location';
 
 describe('desktop open-file handler', () => {
+  const observed = { kind: 'drawing-file', origin: 'historical', recordId: 3,
+    relativePath: '冰柜/SKD-ZU70SD/02.未转曲源文件/02.0305.010.0201001-铭牌.pdf' };
+  it('reveals an unindexed drawing file only after the service revalidates its exact identity', async () => {
+    const resolvePdfFilePath = vi.fn().mockReturnValue('C:\\library\\validated.pdf');
+    const showItemInFolder = vi.fn();
+    await expect(createShowFileInFolderHandler({ resolvePdfFilePath, showItemInFolder })({}, observed)).resolves.toEqual({ ok: true });
+    expect(resolvePdfFilePath).toHaveBeenCalledWith(observed);
+    expect(showItemInFolder).toHaveBeenCalledWith('C:\\library\\validated.pdf');
+  });
+  it('does not reveal a drawing file rejected by fresh observation', async () => {
+    const showItemInFolder = vi.fn();
+    const handler = createShowFileInFolderHandler({ resolvePdfFilePath: () => {
+      throw Object.assign(new Error('文件不再可用'), { code: 'PDF_FILE_UNAVAILABLE' });
+    }, showItemInFolder });
+    await expect(handler({}, observed)).resolves.toEqual({ ok: false, error: { code: 'PDF_FILE_UNAVAILABLE', message: '文件不再可用' } });
+    expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+  it.each([
+    { ...observed, origin: 'other' }, { ...observed, recordId: 0 },
+    { ...observed, relativePath: '../outside.pdf' },
+    { ...observed, relativePath: 'C:\\outside.pdf' },
+    { ...observed, relativePath: '/outside.pdf' },
+    { ...observed, relativePath: '' },
+  ])('rejects malformed drawing requests before service or shell: %j', async (request) => {
+    const resolvePdfFilePath = vi.fn(), showItemInFolder = vi.fn();
+    const result = await createShowFileInFolderHandler({ resolvePdfFilePath, showItemInFolder })({}, request);
+    expect(result.ok).toBe(false);
+    expect(resolvePdfFilePath).not.toHaveBeenCalled(); expect(showItemInFolder).not.toHaveBeenCalled();
+  });
   it('reveals a validated BOM asset without accepting a renderer-supplied path', async () => {
     const resolveBomAssetPath = vi.fn().mockReturnValue('C:\\library\\_图号规划器\\BOM附件\\image.png');
     const showItemInFolder = vi.fn();

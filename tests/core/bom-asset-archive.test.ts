@@ -76,13 +76,18 @@ it('archives attachments during BOM save when a workspace is configured', () => 
   expect(f.bom.getVersion(f.version.id).items[0].assets[0].assetId).toBe(f.asset.id);
   expect(readFileSync(join(root, f.asset.relativePath))).toEqual(f.content);
 });
-it('rejects editing the original business date without creating a new dated attachment or changing history', () => {
+it('corrects a date without rearchiving unchanged attachments or changing later inherited links', () => {
   const f = fixture(); const service = new BomService(db, () => root);
   const first = service.saveVersion({ ...f.input, expectedCurrentVersionId: f.version.id }).version;
   const old = first.items[0].assets[0];
-  expect(() => service.updateVersion(first.id, { ...f.input, businessChangeDate: '2026-09-24',
-    items: [{ ...f.input.items[0], assets: [{ assetId: old.assetId, role: 'image' }] }] }, 0)).toThrow(/不能更改.*业务变更日期/);
-  expect(service.getVersion(first.id)).toEqual(first);
+  const later=service.saveVersion({...f.input,businessChangeDate:'2026-09-25',expectedCurrentVersionId:first.id,items:[{...f.input.items[0],assets:[{role:'image',reusePrevious:true}]}]}).version;
+  const links=db.prepare('select * from bom_item_assets where bom_item_id<>?').all(first.items[0].bomItemId);
+  const mappings=db.prepare('select * from bom_asset_archive_mappings').all();
+  const edited=service.updateVersion(first.id, { ...f.input, businessChangeDate: '2026-09-24',
+    items: [{ ...f.input.items[0], assets: [{ assetId: old.assetId, role: 'image' }] }] }, 0).version;
+  expect(edited.businessChangeDate).toBe('2026-09-24');expect(edited.items[0].assets).toEqual(first.items[0].assets);
+  expect(service.getVersion(later.id)).toEqual(later);expect(db.prepare('select * from bom_item_assets where bom_item_id<>?').all(first.items[0].bomItemId)).toEqual(links);
+  expect(db.prepare('select * from bom_asset_archive_mappings').all()).toEqual(mappings);
   expect(readFileSync(join(root, old.relativePath))).toEqual(f.content);
   expect(existsSync(join(root, 'BOM附件', 'M', '20260924', '铭牌-20260924.png'))).toBe(false);
 });
@@ -107,6 +112,7 @@ it('edits a legacy NULL-date record with real attachments without inventing a da
  const edited=service.updateVersion(before.id,{...f.input,businessChangeDate:undefined,items:[{...f.input.items[0],material:'历史文字修订'}]},before.editRevision).version;
  expect(edited.businessChangeDate).toBeNull();expect(edited.createdAt).toBe(before.createdAt);expect(edited.items[0].material).toBe('历史文字修订');
  expect(edited.items[0].assets).toEqual(before.items[0].assets);expect(readFileSync(join(root,f.asset.relativePath))).toEqual(f.content);expect(service.listVersions(f.input.productId)).toHaveLength(1);
+ const dated=service.updateVersion(before.id,{...f.input,businessChangeDate:'2026-10-28'},edited.editRevision).version;expect(dated.businessChangeDate).toBe('2026-10-28');expect(dated.items[0].assets).toEqual(before.items[0].assets);expect(dated.createdAt).toBe(before.createdAt);
 });
 it('still verifies an explicitly replaced attachment on a NULL-date history and rolls back corrupted bytes',()=>{
  const f=fixture();db.prepare('update bom_versions set business_change_date=null where id=?').run(f.version.id);const service=new BomService(db,()=>root);const before=service.getVersion(f.version.id);

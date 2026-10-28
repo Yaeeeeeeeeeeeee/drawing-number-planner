@@ -1,8 +1,13 @@
+import {observeDrawingFiles,resolveObservedPath,type DrawingFileObservation,type ObservationIndex,type ObservedBatch} from '../files/drawing-file-observation.js';
+import {buildProductDirectory} from '../files/directory-policy.js';
+import {codeScopeFromFullCode} from '../files/batch-business-order.js';
+import {FileError} from '../files/file-errors.js';
+import {toWorkspacePathKey} from '../files/workspace-paths.js';
 import { inspectIndexedPdfPresence } from '../files/pdf-presence.js';
 import { DrawingForceReleaseService } from './drawing-force-release-service.js';
 import {DrawingReuseService} from './drawing-reuse-service.js';
 import type { PlannerDatabase } from '../../db/database.js';
-import { resolveCanonicalProductId } from '../products/appearance-identity.js';
+import { resolveCanonicalProductId, listRawProductIds } from '../products/appearance-identity.js';
 import { DrawingAssociationService } from './drawing-association-service.js';
 import { MaterialBatchService } from '../files/material-batch-service.js';
 import { DrawingDeletionService } from './drawing-deletion-service.js';
@@ -69,7 +74,49 @@ export class DrawingQueryService {
     const drawing = this.repository.getDetail(id);
     if (!drawing) throw new DrawingQueryError('NOT_FOUND', '图号记录不存在');
     const observe=(files:typeof drawing.sourceFiles)=>this.workspaceRoot?files.map(file=>{const fact=inspectIndexedPdfPresence(this.workspaceRoot!(),file);return{...file,indexedIsPresent:file.isPresent,isPresent:fact.status==='present'||fact.status==='index-stale',presenceStatus:fact.status,presenceMessage:fact.message};}):files;
-    return { ...drawing,sourceFiles:observe(drawing.sourceFiles),outlinedFiles:observe(drawing.outlinedFiles), ...this.firstBusinessReferences(id), associationEvidence: this.associations.preview(undefined,[id]).records[0]?.evidence ?? [], associationHistory: this.associations.history(id), batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
+    return { ...drawing,fileObservation:this.observeFiles(drawing),sourceFiles:observe(drawing.sourceFiles),outlinedFiles:observe(drawing.outlinedFiles), ...this.firstBusinessReferences(id), associationEvidence: this.associations.preview(undefined,[id]).records[0]?.evidence ?? [], associationHistory: this.associations.history(id), batchUsage: this.batches.getDrawingUsage(drawing.fullCode, drawing.status) };
+  }
+
+  private observeFiles(drawing: ReturnType<DrawingRepository['getDetail']> & {}): DrawingFileObservation {
+    const root=this.workspaceRoot?.()??null;
+    if(!root)return observeDrawingFiles({root,fullCode:drawing.fullCode,directories:[],indexedFiles:[],batches:[]});
+    const files=[...drawing.sourceFiles,...drawing.outlinedFiles];
+    const productIds=new Set([drawing.productId,...(drawing.businessUsage??[]).map(usage=>usage.productId)].filter((id):id is number=>id!=null).flatMap(id=>listRawProductIds(this.database,id)));
+    const directories=new Set<string>();
+    for(const productId of productIds){
+      const product=this.database.prepare('select product_category as productCategory,sku,model from products where id=?').get(productId) as {productCategory:string;sku:string;model:string}|undefined;
+      if(product)directories.add(buildProductDirectory(product));
+    }
+    for(const file of files){const segments=file.relativePath.split(/[\\/]+/);if(segments.length>=4)directories.add(segments.slice(0,2).join('/'));}
+    const batchScope:string[]=[],batchParameters:Array<string|number>=[];
+    if(productIds.size){batchScope.push(`product_id in (${[...productIds].map(()=>'?').join(',')})`);batchParameters.push(...productIds);}
+    if(directories.size){batchScope.push(`lower(replace(product_directory,char(47),char(92))) in (${[...directories].map(()=>'?').join(',')})`);batchParameters.push(...[...directories].map(toWorkspacePathKey));}
+    const rawBatches=batchScope.length?this.database.prepare(`select id,relative_path as relativePath,product_directory as productDirectory,product_id as productId,coalesce(display_name,name) as name,business_date as businessDate from material_batches where ${batchScope.join(' or ')}`).all(...batchParameters) as Array<ObservedBatch&{productDirectory:string;productId:number|null}>:[];
+    for(const batch of rawBatches){if(batch.productId!=null&&productIds.has(batch.productId))directories.add(batch.productDirectory);}
+    const selections=new Map<string,ReturnType<MaterialBatchService['getCurrentBatchSelection']>>();
+    const batches:ObservedBatch[]=rawBatches.map(batch=>{
+      let selection=selections.get(batch.productDirectory);
+      if(!selection){selection=this.batches.getCurrentBatchSelection(batch.productDirectory,codeScopeFromFullCode(drawing.fullCode)??undefined);selections.set(batch.productDirectory,selection);}
+      return {...batch,usageState:selection.status==='selected'?selection.batchId===batch.id?'current':'historical':'indeterminate'};
+    });
+    const column=drawing.origin==='planned'?'drawing_id':'historical_drawing_id';
+    const indexedFiles=this.database.prepare(`select id as pdfIndexId,relative_path as relativePath,content_sha256 as contentSha256 from pdf_files where ${column}=?`).all(Math.abs(drawing.id)) as ObservationIndex[];
+    const released=Boolean(this.database.prepare('select 1 from drawing_force_releases where full_code=?').get(drawing.fullCode));
+    const blockedPaths=(this.database.prepare('select relative_path as path from drawing_force_release_files where full_code=?').all(drawing.fullCode) as Array<{path:string}>).map(row=>row.path);
+    return observeDrawingFiles({root,fullCode:drawing.fullCode,directories:[...directories],indexedFiles:released?indexedFiles:files.map(file=>({pdfIndexId:file.pdfIndexId,relativePath:file.relativePath})),batches,requireHashBoundIndex:released,blockedPaths});
+  }
+
+  resolveObservedFile(input: unknown): string {
+    if(!input||typeof input!=='object')throw new FileError('INVALID_PDF_FILE_ID','图号文件参数无效');
+    const request=input as Record<string,unknown>;
+    if(request.kind!=='drawing-file'||!['planned','historical'].includes(String(request.origin))||!Number.isSafeInteger(request.recordId)||Number(request.recordId)<=0||typeof request.relativePath!=='string')throw new FileError('INVALID_PDF_FILE_ID','图号文件参数无效');
+    const signedId=request.origin==='historical'?-Number(request.recordId):Number(request.recordId),drawing=this.repository.getDetail(signedId);
+    if(!drawing)throw new FileError('PDF_FILE_NOT_FOUND','图号记录不存在');
+    const key=toWorkspacePathKey(request.relativePath),observation=this.observeFiles(drawing);
+    const found=[...observation.source.entries,...observation.outlined.entries].some(entry=>entry.state==='present'&&entry.files.some(file=>toWorkspacePathKey(file.relativePath)===key&&file.isPresent));
+    const root=this.workspaceRoot?.();
+    if(!found||!root)throw new FileError('PDF_FILE_UNAVAILABLE','此图号的文件未通过当前实际核验，请刷新详情');
+    return resolveObservedPath(root,request.relativePath);
   }
 
   private firstBusinessReferences(signedId:number) {
@@ -86,9 +133,9 @@ export class DrawingQueryService {
     const comparable=bySequence||byDate;
     const order=(batch:typeof batches[number])=>bySequence?batch.sequenceNumber!:Date.parse(batch.businessDate!);
     const earliest=comparable&&batches.length?batches.filter(batch=>order(batch)===Math.min(...batches.map(order))):[];
-    const firstBom=this.database.prepare(`select version.id,version.version_number as versionNumber,version.business_change_date as businessDate,product.model
+    const firstBom=this.database.prepare(`select version.id,version.product_id as productId,version.version_number as versionNumber,version.business_change_date as businessDate,product.model
       from bom_versions version join bom_items item on item.bom_version_id=version.id join products product on product.id=version.product_id
-      where item.${column}=? order by version.created_at,version.id limit 1`).get(id) as {id:number;versionNumber:number;businessDate:string|null;model:string}|undefined;
+      where item.${column}=? order by version.created_at,version.id limit 1`).get(id) as {id:number;productId:number;versionNumber:number;businessDate:string|null;model:string}|undefined;
     return {firstOccurrenceBatch:earliest.length===1?{id:earliest[0].id,name:earliest[0].name}:null,firstBatchAmbiguous:batches.length>0&&earliest.length!==1,firstBom:firstBom??null};
   }
 

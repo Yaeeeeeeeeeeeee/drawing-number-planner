@@ -5,12 +5,49 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { DictionaryService } from '../../src/core/dictionaries/dictionary-service';
+import { ProductService } from '../../src/core/products/product-service';
+
 import { startServer } from '../../src/server/start-server';
 import { resolveAppPaths } from '../../src/core/config/app-paths';
 import { expectedOutboundClaimFileName } from '../../src/core/outbound/outbound-artifact-ownership';
 import { openDatabase } from '../../src/db/database';
 
 describe('real application API', () => {
+  it('resolves an unindexed drawing file through the installed-service bridge without index writes', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'v52-drawing-bridge-'));
+    const dataDir = join(root, 'data'), workspaceRoot = join(root, 'workspace');
+    const relativePath = '冰柜/SKU-M/02.未转曲源文件/02.0209.010.0401001-铭牌.pdf';
+    mkdirSync(join(workspaceRoot, '冰柜/SKU-M/02.未转曲源文件'), { recursive: true });
+    writeFileSync(join(workspaceRoot, relativePath), '%PDF-1.4');
+    const server = await startServer({ port: 0, dataDir });
+    const paths = resolveAppPaths(dataDir);
+    writeFileSync(paths.settings, JSON.stringify({ workspaceRoot }));
+    const database = openDatabase(paths.database);
+    try {
+      const dictionary = new DictionaryService(database);
+      const brand = dictionary.create({ type: 'brand', code: '02', name: 'Brand' });
+      const size = dictionary.create({ type: 'product_size', code: '0209', name: 'Size' });
+      const appearance = dictionary.create({ type: 'appearance', code: '01', name: 'Appearance' });
+      const color = dictionary.create({ type: 'color', code: '0', name: 'White' });
+      const main = dictionary.create({ type: 'main_category', code: '04', name: 'Main' });
+      const project = dictionary.create({ type: 'project_item', code: '01', name: 'Logo', parentId: main.id });
+      const product = new ProductService(database).create({ sku: 'SKU', model: 'M', productCategory: '冰柜',
+        brandId: brand.id, productSizeId: size.id, defaultAppearanceId: appearance.id });
+      const id = Number(database.prepare(`insert into drawing_numbers (full_code, display_name, product_id,
+        appearance_id, color_id, main_category_id, project_item_id, brand_code, product_size_code,
+        appearance_code, color_code, main_category_code, project_item_code, sequence, status, created_at)
+        values ('02.0209.010.0401001', 'Drawing', ?, ?, ?, ?, ?, '02', '0209', '01', '0', '04', '01', 1, 'reserved', '2026-10-28')`)
+        .run(product.id, appearance.id, color.id, main.id, project.id).lastInsertRowid);
+      const request = { kind: 'drawing-file', origin: 'planned', recordId: id, relativePath };
+      expect(server.resolvePdfFilePath(request)).toBe(join(workspaceRoot, relativePath));
+      expect(() => server.resolvePdfFilePath({ ...request, relativePath: '../outside.pdf' })).toThrow();
+      expect(() => server.resolvePdfFilePath({ ...request, recordId: 999 })).toThrow();
+      expect(database.prepare('select count(*) as count from pdf_files').get()).toEqual({ count: 0 });
+      expect(database.prepare('select status from drawing_numbers where id=?').get(id)).toEqual({ status: 'reserved' });
+    } finally { database.close(); await server.close(); }
+  });
+
   it('persists dictionary writes across server restarts', async () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'drawing-planner-server-'));
     const first = await startServer({ port: 0, dataDir, token: 'restart-test-token', allowedOrigins: ['http://127.0.0.1:5173'] });

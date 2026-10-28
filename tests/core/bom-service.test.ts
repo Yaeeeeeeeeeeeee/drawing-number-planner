@@ -418,6 +418,55 @@ it('preserves all three record identities, dates, submission times and neighbors
  const changed=service.updateVersion(two.id,{productId:r.product.id,expectedCurrentVersionId:three.id,items:[{...item,material:'修订材质'}]},two.editRevision).version;
  expect(service.listVersions(r.product.id)).toHaveLength(3);expect(changed).toMatchObject({id:two.id,createdAt:two.createdAt,businessChangeDate:two.businessChangeDate,previousVersionId:one.id,versionNumber:two.versionNumber,editRevision:two.editRevision+1});
  expect(changed.items[0].material).toBe('修订材质');expect(service.getVersion(one.id)).toEqual(one);expect(service.getVersion(three.id)).toEqual(three);expect(service.getCurrent(r.product.id)?.id).toBe(three.id);
- expect(()=>service.updateVersion(two.id,{productId:r.product.id,businessChangeDate:'2030-01-01',expectedCurrentVersionId:three.id,items:[item]},changed.editRevision)).toThrow(/不能更改.*业务变更日期/);
+ expect(()=>service.updateVersion(two.id,{productId:r.product.id,businessChangeDate:'2030-02-30',expectedCurrentVersionId:three.id,items:[item]},changed.editRevision)).toThrow(/有效.*日期/);
  expect(service.getVersion(two.id)).toEqual(changed);expect(service.listVersions(r.product.id)).toHaveLength(3);
+});
+
+it('corrects only the exact record date, preserving identity, other dates, current pointer and frozen snapshots', () => {
+ const r=setup(),drawing=r.draw(r.product.id,r.white.id,r.logo.id);
+ const input={productId:r.product.id,items:[{projectItemId:r.logo.id,drawingId:drawing.id,usesWhiteMaterial:false}]};
+ const first=service.saveVersion({...input,businessChangeDate:'2026-09-01',expectedCurrentVersionId:null}).version;
+ const second=service.saveVersion({...input,businessChangeDate:'2026-09-02',expectedCurrentVersionId:first.id}).version;
+ service.updateVersion(first.id,{...input,expectedCurrentVersionId:second.id,notes:'原纠错'},0);
+ const oldSnapshot=db.prepare('select * from bom_revision_snapshots where bom_version_id=?').all(first.id);
+ const packageId=Number(db.prepare("insert into outbound_packages(product_id,material_type,package_mode,package_name,zip_relative_path,status,created_at) values(?,'update','change_only','已发','outbound/frozen.zip','completed','2026-09-02')").run(r.product.id).lastInsertRowid);
+ db.prepare("insert into outbound_v2_snapshots(package_id,context_json,files_json,parts_json) values(?,?,?,'[]')").run(packageId,JSON.stringify({bomVersionId:first.id,businessChangeDate:first.businessChangeDate}),JSON.stringify(first.items));
+ const outbound=db.prepare('select * from outbound_v2_snapshots').all();
+ const edited=service.updateVersion(first.id,{...input,businessChangeDate:'2024-02-29',expectedCurrentVersionId:second.id},1).version;
+ expect(edited).toMatchObject({id:first.id,createdAt:first.createdAt,previousVersionId:first.previousVersionId,versionNumber:first.versionNumber,businessChangeDate:'2024-02-29',editRevision:2});
+ expect(service.getVersion(second.id)).toEqual(second);expect(service.getCurrent(r.product.id)?.id).toBe(second.id);expect(service.listVersions(r.product.id)).toHaveLength(2);
+ expect(db.prepare('select * from bom_revision_snapshots where bom_version_id=? and edit_revision=1').all(first.id)).toEqual(oldSnapshot);
+ expect(db.prepare('select * from outbound_v2_snapshots').all()).toEqual(outbound);
+ expect(()=>service.updateVersion(first.id,{...input,businessChangeDate:'2025-02-29',expectedCurrentVersionId:second.id},2)).toThrow(/有效.*日期/);
+ expect(()=>service.updateVersion(first.id,{...input,businessChangeDate:'2026-10-01',expectedCurrentVersionId:second.id},1)).toThrow(/重新加载/);
+ expect(service.getVersion(first.id)).toEqual(edited);expect(db.pragma('foreign_key_check')).toEqual([]);
+});
+it('resolves explicit edit reuse from the actual predecessor by project and role while ordinary edits retain selected assets',()=>{
+ const r=setup(),drawing=r.draw(r.product.id,r.white.id,r.logo.id),a=insertAsset('prior.png'),b=insertAsset('selected.png'),diagram=insertAsset('diagram.png');
+ const item={projectItemId:r.logo.id,drawingId:drawing.id,usesWhiteMaterial:false};
+ const first=service.saveVersion({productId:r.product.id,businessChangeDate:'2026-09-01',expectedCurrentVersionId:null,items:[{...item,assets:[{role:'image',assetId:a}]}]}).version;
+ const second=service.saveVersion({productId:r.product.id,businessChangeDate:'2026-09-02',expectedCurrentVersionId:first.id,items:[{...item,assets:[{role:'image',assetId:b},{role:'diagram',assetId:diagram}]}]}).version;
+ const ordinary=service.updateVersion(second.id,{productId:r.product.id,expectedCurrentVersionId:second.id,items:[{...item,notes:'普通编辑'}]},0).version;
+ expect(ordinary.items[0].assets.map(x=>x.assetId)).toEqual(second.items[0].assets.map(x=>x.assetId));
+ const reused=service.updateVersion(second.id,{productId:r.product.id,expectedCurrentVersionId:second.id,items:[{...item,assets:[{role:'image',reusePrevious:true},{role:'diagram',assetId:diagram}]}]},1).version;
+ expect(reused.items[0].assets.find(x=>x.role==='image')).toMatchObject({assetId:a,inheritedFromBomItemAssetId:first.items[0].assets[0].id});
+ expect(reused.items[0].assets.find(x=>x.role==='diagram')?.assetId).toBe(diagram);expect(service.getVersion(first.id)).toEqual(first);
+ expect(()=>service.updateVersion(first.id,{productId:r.product.id,expectedCurrentVersionId:second.id,items:[{...item,assets:[{role:'image',reusePrevious:true}]}]},0)).toThrow(/上一版/);
+ expect(()=>service.updateVersion(second.id,{productId:r.product.id,expectedCurrentVersionId:second.id,items:[{...item,assets:[{role:'diagram',reusePrevious:true}]}]},2)).toThrow(/上一版/);
+});
+it('returns all active project names for each exact BOM summary even when filtering one project',()=>{
+ const r=setup(),logo=r.draw(r.product.id,r.white.id,r.logo.id),manual=r.draw(r.product.id,r.white.id,r.manual.id);
+ const input={productId:r.product.id,businessChangeDate:'2026-10-28',expectedCurrentVersionId:null,items:[{projectItemId:r.logo.id,drawingId:logo.id,usesWhiteMaterial:false},{projectItemId:r.manual.id,drawingId:manual.id,usesWhiteMaterial:false}]};
+ const saved=service.saveVersion(input).version;expect(service.queryVersions({projectItemId:r.logo.id})[0]).toMatchObject({id:saved.id,projectItemNames:['LOGO','说明书']});
+ service.updateVersion(saved.id,{...input,items:[input.items[1]]},0);
+ expect(service.queryVersions({})[0]).toMatchObject({id:saved.id,projectItemNames:['说明书']});
+});
+it('refuses explicit reuse from a deleted predecessor even if its asset rows remain protected',()=>{
+ const r=setup(),drawing=r.draw(r.product.id,r.white.id,r.logo.id),a=insertAsset('deleted-prior.png'),b=insertAsset('kept.png');
+ const item={projectItemId:r.logo.id,drawingId:drawing.id,usesWhiteMaterial:false};
+ const first=service.saveVersion({productId:r.product.id,businessChangeDate:'2026-09-01',expectedCurrentVersionId:null,items:[{...item,assets:[{role:'image',assetId:a}]}]}).version;
+ const selected=service.saveVersion({productId:r.product.id,businessChangeDate:'2026-09-02',expectedCurrentVersionId:first.id,items:[{...item,assets:[{role:'image',assetId:b}]}]}).version;
+ service.deleteBomVersion(first.id,true);
+ expect(()=>service.updateVersion(selected.id,{productId:r.product.id,expectedCurrentVersionId:selected.id,items:[{...item,assets:[{role:'image',reusePrevious:true}]}]},0)).toThrow(/上一版/);
+ expect(service.getVersion(selected.id)).toEqual(selected);
 });

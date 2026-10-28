@@ -72,3 +72,7 @@ SKU and model are not unique identities; actual product IDs distinguish all reco
 ## Current: V4.1 / V4.2 and stable delivery
 
 Use the current SKILL.md rules for drawing colors, single-line category/project, reversible 使用中/已停用, concrete PDF-instance availability, PDF batch context menus and empty-only protected deletion, toolbar labels and shared layout controls. Earlier 历史版本 drawing labels and version-column presentation are Deprecated; reserved remains an internal unactivated placeholder. Product merge history protects table-tagged material batch IDs even without live PDF rows. Desktop child installation preserves the chosen path; Desktop root installs in a dedicated application subfolder. No file/occupation/history cleanup follows from these presentation changes.
+
+## Current V5.2 BOM correction (2026-10-28)
+
+The latest explicit user request supersedes ordinary-edit business-date immutability above. Correct the exact selected record to a valid business date; omitted input preserves the existing value including NULL. Preserve record ID, createdAt, version/predecessor/current pointer, other records and all immutable snapshots. Date-only corrections preserve unchanged attachment identities and disk paths. Explicit reuse takes the actual previousVersionId and same project/role; retaining the current attachment is a separate operation. No new date-based current-pointer inference or same-drawing-across-BOM restriction follows.

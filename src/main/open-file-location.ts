@@ -15,7 +15,17 @@ interface BomAssetDependencies {
 
 export function createShowFileInFolderHandler(dependencies: Dependencies) {
   return async (_event: unknown, pdfFileId: unknown): Promise<DesktopFileResult> => {
-    if (!Number.isInteger(pdfFileId) || Number(pdfFileId) <= 0) {
+    const observed = typeof pdfFileId === 'object' && pdfFileId !== null
+      ? pdfFileId as Record<string, unknown> : null;
+    let validObserved = Boolean(observed && observed.kind === 'drawing-file'
+      && ['planned', 'historical'].includes(String(observed.origin))
+      && Number.isInteger(observed.recordId) && Number(observed.recordId) > 0
+      && typeof observed.relativePath === 'string');
+    if (validObserved) {
+      try { validateWorkspaceRelativePath(observed!.relativePath as string); }
+      catch { validObserved = false; }
+    }
+    if ((!Number.isInteger(pdfFileId) || Number(pdfFileId) <= 0) && !validObserved) {
       return { ok: false, error: { code: 'INVALID_PDF_FILE_ID', message: 'PDF 文件索引无效' } };
     }
     try {

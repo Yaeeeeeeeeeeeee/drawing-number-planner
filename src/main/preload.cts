@@ -2,7 +2,13 @@ const { contextBridge, ipcRenderer } = require('electron') as typeof import('ele
 
 contextBridge.exposeInMainWorld('plannerDesktop', {
   showFileInFolder(pdfFileId: unknown) {
-    if (!Number.isInteger(pdfFileId) || Number(pdfFileId) <= 0) {
+    const observed = typeof pdfFileId === 'object' && pdfFileId !== null
+      ? pdfFileId as Record<string, unknown> : null;
+    const validObserved = observed?.kind === 'drawing-file'
+      && ['planned', 'historical'].includes(String(observed.origin))
+      && Number.isInteger(observed.recordId) && Number(observed.recordId) > 0
+      && typeof observed.relativePath === 'string' && Boolean(observed.relativePath);
+    if ((!Number.isInteger(pdfFileId) || Number(pdfFileId) <= 0) && !validObserved) {
       return Promise.resolve({ ok: false, error: { code: 'INVALID_PDF_FILE_ID', message: 'PDF 文件索引无效' } });
     }
     return ipcRenderer.invoke('planner:show-file-in-folder', pdfFileId);
