@@ -51,9 +51,9 @@ Files: MaterialBatchService/nav/contextmenu; shared table layout/CSS/workspace/v
 ### Phase 5 — Existing mail importer correction only
 Files: core/import/email-template-import* and worksheet helper; EmailTemplateImport preview/routes/client types; focused tests.
 Interfaces: per-cell source/case identity, raw reference, independent signature result, typed reusable-vs-historical review; existing confirm transaction/backup/fingerprint.
-- [ ] RED original exact-layout anonymized fixture against current parser and run actual uploaded workbook locally.
-- [ ] Implement supplier-row/block/scenario boundaries, true recipients/CC+signature split, safe dynamic/static/history separation and clear source preview without rebuilding mail system.
-- [ ] GREEN actual workbook25 separate candidates and all mail/import/contact/signature/draft compatibility regressions before Phase6.
+- [x] RED original exact-layout anonymized fixture against current parser and run actual uploaded workbook locally.
+- [x] Implement supplier-row/block/scenario boundaries, true recipients/CC+signature split, safe dynamic/static/history separation and clear source preview without rebuilding mail system.
+- [x] GREEN actual workbook25 separate candidates and all mail/import/contact/signature/draft compatibility regressions before Phase6.
 
 ### Phase 6 — Full regression and delivery
 - [ ] Run complete suite, type/build, actual workbook acceptance, browser end-to-end and independent significant-issue review.
@@ -70,3 +70,5 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 2026-10-28 Phase3 complete: drawing24files276pass, BOM23files318pass, IPC/application3files32pass (overlap, not additive); tsc clean. Fixed readonly all-batch discovery/exact BOM navigation and date/reuse/copy-snapshot/reset/query/hash behavior. NoSchema migration, original files untouched, force-release quarantine regression preserved. BeginPhase4.
 
 2026-10-28 Phase4 complete: shared9files82pass, PDF/batch6files88pass, HTTP28pass, browser1pass across720/1366/1920/2560/3840 with actual temporary indexed files/rows, rightmost transfer and outer-scroll pinned controls at1920x320; tsc/diffclean. Initial browser resize assertion read stale viewport geometry; wait for measured table-wrap width, not fixed sleeps. Existing batchcontextmenu/safety reused, physical empty directory preserved. BeginPhase5; Schema23 minimal links+explicit-empty marker proposal in spec before implementation.
+
+2026-10-28 Phase5 complete: final mail+all-DB30files178pass, tsc/diffclean; earlier importer12/98 and links24/158 compatibility runs also green. Original uploaded workbook actually saved/reopened:25templates/25sourcecases,14sharedcontacts/135rolelinks/1nondefaultsignature; all25same-source repeat skipped, originalworkbook/PDFs/preexistingrows preserved. Actual old compiled Schema22 fixture upgraded23 with51originalbusiness tables compared byoldcolumns, actualreadableSchema22backup,2PDFhashes preserved andidempotentreopen. Source provenance gap closed in existing template JSONhistory+defaultcollapsedreference ratherthan transientpreview. BeginPhase6.

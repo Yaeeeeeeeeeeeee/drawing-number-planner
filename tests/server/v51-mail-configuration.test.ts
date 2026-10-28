@@ -23,3 +23,18 @@ it('returns field errors for invalid variables and missing fields', async () => 
     expect(result.json().error.fieldErrors[field]).toBeTruthy();
   }
 });
+it('returns reviewed template roles through list/detail and discloses linked template counts on contact deletion', async () => {
+ const service=new OutboundReferenceService(db);
+ const contact=service.createContact({company:'共享公司',contactName:'联系人',email:'shared@example.test',defaultRecipientType:'cc'});
+ const template=service.createTemplate({...payload,materialType:'initial'});
+ const links=[{contactId:contact.id,recipientType:'to' as const,displayOrder:0},{contactId:contact.id,recipientType:'cc' as const,displayOrder:1}];
+ service.replaceTemplateContactLinks(template.id,links);
+ const detail=await app.inject({method:'GET',url:`/api/outbound-reference/templates/${template.id}`});
+ expect(detail.json()).toMatchObject({contactLinksConfigured:true,contactLinks:links});
+ const list=await app.inject({method:'GET',url:'/api/outbound-reference/templates'});
+ expect(list.json().items.find((item:{id:number})=>item.id===template.id)).toEqual(detail.json());
+ const removed=await app.inject({method:'DELETE',url:`/api/outbound-reference/contacts/${contact.id}`});
+ expect(removed.statusCode).toBe(409);expect(removed.json()).toMatchObject({error:{code:'REFERENCE_DATA_REFERENCED',referenceSummary:{templates:1}}});
+ const deletedTemplate=await app.inject({method:'DELETE',url:`/api/outbound-reference/templates/${template.id}`});expect(deletedTemplate.statusCode).toBe(200);
+ expect((await app.inject({method:'GET',url:`/api/outbound-reference/contacts/${contact.id}`})).statusCode).toBe(200);
+});

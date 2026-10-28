@@ -79,7 +79,7 @@ it('rolls back all templates and contacts on later invalid data and rejects cont
     expect(db.prepare('select count(*) n from outbound_email_templates where manufacturer is not null').get()).toEqual({ n: 0 });
     db.prepare("insert into outbound_contacts (company, contact_name, email, default_recipient_type, status, created_at, updated_at) values ('别家', '别名', 'chen@example.com', 'cc', 'active', 'old', 'old')").run();
     const conflicted = previewEmailTemplates(await parseEmailTemplateWorkbook(await mailWorkbook()), db);
-    expect(conflicted.candidates[0].contacts[0].conflict).toContain('别家');
+    expect(conflicted.candidates[0].contacts[0]).toMatchObject({ resolution: 'reuse', existingId: expect.any(Number) });
     expect(() => confirmEmailTemplates(conflicted, [rows[0]], db)).toThrow(/关联冲突/);
     const excluded = { ...rows[0], contacts: rows[0].contacts.map(contact => ({ ...contact, resolution: 'skip' as const })) };
     expect(confirmEmailTemplates(conflicted, [excluded], db)).toMatchObject({ created: 1, contactsCreated: 0 });

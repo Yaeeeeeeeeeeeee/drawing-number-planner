@@ -225,6 +225,9 @@ export interface OutboundTemplateBlockView {
   status: OutboundReferenceStatusView; createdAt: string; updatedAt: string;
 }
 export interface OutboundEmailTemplateView {
+  contactLinksConfigured?: boolean;
+  importSources?: import('../../core/outbound/outbound-reference-repository').OutboundTemplateImportSource[];
+  contactLinks?: { contactId: number; recipientType: 'to' | 'cc'; displayOrder: number }[];
   manufacturer?: string | null; scenario?: string | null;
   id: number; key: string; name: string; materialType: OutboundMaterialTypeView;
   subjectTemplate: string; bodyTemplate: string; status: OutboundReferenceStatusView;
@@ -406,7 +409,7 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
   listHistoricalProductCandidates(): Promise<HistoricalProductCandidateView[]>;
   confirmHistoricalProductCandidate(input: ConfirmHistoricalProductCandidateView): Promise<{ product: ProductView; linkedHistoricalCount: number }>;
   previewEmailTemplateImport?(file: File): Promise<{ previewId: string; report: import('../../core/import/email-template-import-types').EmailTemplateImportReport }>;
-  confirmEmailTemplateImport?(previewId: string, rows: import('../../core/import/email-template-import-types').EmailTemplateImportSelection[]): Promise<import('../../core/import/email-template-import-types').EmailTemplateImportResult>;
+  confirmEmailTemplateImport?(previewId: string, rows: import('../../core/import/email-template-import-types').EmailTemplateImportSelection[], signatures?: import('../../core/import/email-template-import-types').EmailImportSignatureChoice[]): Promise<import('../../core/import/email-template-import-types').EmailTemplateImportResult>;
   auditWorkbook(file: File): Promise<{ auditId: string; report: ImportReportView }>;
   confirmImport(auditId: string, selections: string[]): Promise<{ imported: number; skipped: number }>;
   previewPlan(input: { productId: number; appearanceId?: number; appearanceVersionId?: number; rows: PlanningRowInputView[] }): Promise<PlanningPreviewView>;
@@ -676,7 +679,7 @@ export const apiClient: PlannerApi = {
     const form = new FormData(); form.append('file', file);
     return request('/api/import/email-templates/preview', { method: 'POST', body: form });
   },
-  confirmEmailTemplateImport: (previewId, rows) => request('/api/import/email-templates/confirm', json('POST', { previewId, rows })),
+  confirmEmailTemplateImport: (previewId, rows, signatures) => request('/api/import/email-templates/confirm', json('POST', { previewId, rows, signatures })),
   auditWorkbook: async (file) => {
     const form = new FormData(); form.append('file', file);
     return request('/api/import/excel/audit', { method: 'POST', body: form });

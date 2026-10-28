@@ -11,8 +11,9 @@ const rowSchema = z.object({ id: text, action: z.enum(['create', 'update', 'skip
   contactsConfirmed: z.boolean(), historyReviewed: z.boolean(), manufacturer: text, materialType: z.enum(['initial', 'update']),
   scenario: text, name: text, subjectTemplate: text, bodyTemplate: text, expectedFingerprint: z.string().optional(),
   contacts: z.array(z.object({ company: text, contactName: text, email: text, defaultRecipientType: z.enum(['to', 'cc']),
-    resolution: z.enum(['import', 'skip']).optional() })).max(200) });
-const confirmSchema = z.object({ previewId: z.string().uuid(), rows: z.array(rowSchema).max(1000) });
+    resolution: z.enum(['import', 'reuse', 'skip']).optional(), existingId: z.number().int().positive().optional(), expectedFingerprint: z.string().optional() })).max(200) });
+const signatureSchema = z.object({ id: text, action: z.enum(['reuse', 'create', 'skip']), confirmed: z.boolean(), existingId: z.number().int().positive().optional(), expectedFingerprint: z.string().optional(), name: text.optional(), content: text.optional() });
+const confirmSchema = z.object({ previewId: z.string().uuid(), rows: z.array(rowSchema).max(1000), signatures: z.array(signatureSchema).max(100).optional() });
 
 export async function registerEmailTemplateImportRoutes(app: FastifyInstance, database: PlannerDatabase): Promise<void> {
   ensureMultipart(app);
@@ -48,7 +49,7 @@ export async function registerEmailTemplateImportRoutes(app: FastifyInstance, da
     }
     try {
       const selections = parsed.data.rows.map(row => ({ ...preview.report.candidates.find(item => item.id === row.id), ...row })) as EmailTemplateImportSelection[];
-      const result = confirmEmailTemplates(preview.report, selections, database);
+      const result = confirmEmailTemplates(preview.report, selections, database, parsed.data.signatures);
       previews.delete(parsed.data.previewId); return result;
     } catch (error) { return sendError(error, reply); }
   });

@@ -18,7 +18,20 @@ export interface OutboundTemplateBlock {
   status: OutboundReferenceStatus; createdAt: string; updatedAt: string;
 }
 
+export interface OutboundTemplateContactLink {
+  contactId: number; recipientType: RecipientType; displayOrder: number;
+}
+
+export interface OutboundTemplateImportSource {
+  candidateId: string; sheet: string; source: string; manufacturer: string;
+  materialType: OutboundMaterialType; scenario: string;
+  sourceCoordinates?: { supplier: string; subject: string[]; to: string[]; cc: string[]; body: string };
+  rawReference: string; contentHash: string; importedAt: string;
+}
+
 export interface OutboundEmailTemplate {
+  contactLinksConfigured?: boolean; contactLinks?: OutboundTemplateContactLink[];
+  importSources?: OutboundTemplateImportSource[];
   id: number; key: string; name: string; materialType: OutboundMaterialType; subjectTemplate: string; bodyTemplate: string; manufacturer?: string | null; scenario?: string | null;
   status: OutboundReferenceStatus; createdAt: string; updatedAt: string; blocks: OutboundTemplateBlock[];
 }
@@ -47,6 +60,8 @@ interface ContactRow {
   status: OutboundReferenceStatus; notes: string | null; created_at: string; updated_at: string;
 }
 interface TemplateRow {
+  contacts_configured: number;
+  import_sources_json: string;
   id: number; key: string; name: string; material_type: OutboundMaterialType; subject_template: string; body_template: string; manufacturer: string | null; scenario: string | null;
   status: OutboundReferenceStatus; created_at: string; updated_at: string;
 }
@@ -106,6 +121,10 @@ export class OutboundReferenceRepository {
     return changed ? this.getContact(id) : null;
   }
 
+  contactReferences(id: number): { templates: number } {
+    return { templates: this.count('select count(distinct template_id) as count from outbound_template_contact_links where contact_id = ?', id) };
+  }
+
   deleteContact(id: number): boolean {
     return this.db.prepare('delete from outbound_contacts where id = ?').run(id).changes === 1;
   }
@@ -143,6 +162,28 @@ export class OutboundReferenceRepository {
     const changed = this.db.prepare('update outbound_email_templates set status = ?, updated_at = ? where id = ?')
       .run(status, new Date().toISOString(), id).changes;
     return changed ? this.getTemplate(id) : null;
+  }
+
+  listTemplateContactLinks(templateId: number): OutboundTemplateContactLink[] {
+    return (this.db.prepare(`select contact_id as contactId, recipient_type as recipientType,
+      display_order as displayOrder from outbound_template_contact_links where template_id = ?
+      order by case recipient_type when 'to' then 0 else 1 end, display_order, contact_id`).all(templateId) as OutboundTemplateContactLink[]);
+  }
+
+  replaceTemplateContactLinks(templateId: number, links: OutboundTemplateContactLink[]): void {
+    this.db.prepare('delete from outbound_template_contact_links where template_id = ?').run(templateId);
+    const insert = this.db.prepare(`insert into outbound_template_contact_links
+      (template_id, contact_id, recipient_type, display_order) values (?, ?, ?, ?)`);
+    for (const link of links) insert.run(templateId, link.contactId, link.recipientType, link.displayOrder);
+    this.db.prepare('update outbound_email_templates set contacts_configured = 1 where id = ?').run(templateId);
+  }
+
+  /** The importer supplies original server-held source facts inside its confirmation transaction. */
+  appendTemplateImportSource(templateId: number, source: OutboundTemplateImportSource): void {
+    const sources = this.getTemplate(templateId)!.importSources!;
+    if (sources.some(item => item.contentHash === source.contentHash)) return;
+    this.db.prepare('update outbound_email_templates set import_sources_json = ? where id = ?')
+      .run(JSON.stringify([...sources, source]), templateId);
   }
 
   templateReferences(id: number): { drafts: number; blocks: number } {
@@ -242,6 +283,8 @@ export class OutboundReferenceRepository {
 
   private toTemplate(row: TemplateRow): OutboundEmailTemplate {
     return { id: row.id, key: row.key, name: row.name, materialType: row.material_type,
+      contactLinksConfigured: row.contacts_configured === 1, contactLinks: this.listTemplateContactLinks(row.id),
+      importSources: JSON.parse(row.import_sources_json) as OutboundTemplateImportSource[],
       manufacturer: row.manufacturer, scenario: row.scenario, subjectTemplate: row.subject_template, bodyTemplate: row.body_template, status: row.status,
       createdAt: row.created_at, updatedAt: row.updated_at, blocks: this.listBlocks(row.id) };
   }

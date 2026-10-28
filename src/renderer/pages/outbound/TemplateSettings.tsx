@@ -42,6 +42,7 @@ export function TemplateSettings({ api, fieldHelper = true, mode, registerLeaveG
   const [editTemplate, setEditTemplate] = useState<OutboundEmailTemplateInputView & { id?: number } | null>(null);
   const [blockEditor, setBlockEditor] = useState<{ templateId: number; id?: number; form: OutboundTemplateBlockInputView } | null>(null);
   const [editSignature, setEditSignature] = useState<OutboundSignatureInputView & { id?: number } | null>(null);
+  const editTemplateSources = templates.find(item => item.id === editTemplate?.id)?.importSources ?? [];
 
   const editorValue = editTemplate ? { template: editTemplate } : blockEditor ? { block: blockEditor } : editSignature ? { signature: editSignature } : null;
   const guard = useConfigurationEditor(editorValue, registerLeaveGuard);
@@ -124,6 +125,15 @@ export function TemplateSettings({ api, fieldHelper = true, mode, registerLeaveG
       <label><span>邮件场景</span><input aria-label="邮件场景" list="mail-scenarios" value={value.scenario ?? ''} onChange={event => setEditTemplate({ ...value, scenario: event.target.value })} /><datalist id="mail-scenarios">{['首批资料', '铭牌待更新', '补充铭牌', '正式铭牌', '完整资料交付', '更新资料'].map(name => <option key={name} value={name} />)}</datalist></label>
       <label><span>主题模板</span>{fieldError('主题模板')}<input aria-label="主题模板" required value={value.subjectTemplate} onChange={(event) => setEditTemplate({ ...value, subjectTemplate: event.target.value })} /></label>
       <label><span>正文模板</span>{fieldError('正文模板')}<textarea aria-label="正文模板" rows={6} required value={value.bodyTemplate} onChange={(event) => setEditTemplate({ ...value, bodyTemplate: event.target.value })} /></label>
+      {editTemplateSources.length > 0 && <details className="ob-template-preview">
+        <summary>导入来源与历史案例（{editTemplateSources.length}）</summary>
+        <div className="ob-template-preview-content">{editTemplateSources.map(source => <article key={source.contentHash}>
+          <strong>{source.sheet} · {source.manufacturer} · {source.scenario}</strong>
+          <p>{source.source}</p>
+          <pre>{source.rawReference}</pre>
+          <small>导入时间：{source.importedAt}<br />内容指纹：{source.contentHash}</small>
+        </article>)}</div>
+      </details>}
       {(fieldHelper || mode === 'templates') && <div className="ob-template-helper">
         <button className="text-button" type="button" aria-expanded={variablePickerOpen} onClick={() => setVariablePickerOpen(open => !open)}>插入变量</button>
         {variablePickerOpen && <div className="ob-template-insert">

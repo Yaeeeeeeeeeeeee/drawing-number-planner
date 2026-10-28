@@ -24,5 +24,20 @@ it('opens import from migration checks, edits preview and requires selected/cont
   fireEvent.click(screen.getByLabelText('已核对固定话术、动态信息及历史示例 1'));
   fireEvent.click(screen.getByRole('button', { name: '确认导入所选模板' }));
   expect(await screen.findByText('新增 1 条，更新 0 条，跳过 0 条；新增联系人 0 条')).toBeVisible();
-  expect(api.confirmEmailTemplateImport).toHaveBeenCalledWith('p1', [expect.objectContaining({ subjectTemplate: '{{model}}资料', bodyTemplate: '请查收。', historyReviewed: true })]);
+  expect(api.confirmEmailTemplateImport).toHaveBeenCalledWith('p1', [expect.objectContaining({ subjectTemplate: '{{model}}资料', bodyTemplate: '请查收。', historyReviewed: true })], undefined);
+});
+
+it('shows a separate source signature and requires explicit choice and review without changing defaults', async () => {
+  const { EmailTemplateImport } = await import('../../src/renderer/pages/EmailTemplateImport');
+  const api={previewEmailTemplateImport:vi.fn().mockResolvedValue({previewId:'p-signature',report:{sheets:[],candidates:[],signatures:[{id:'sig',content:'Example signature',contentHash:'hash',sources:['首批包材资料!B11'],matches:[]}]}}),confirmEmailTemplateImport:vi.fn().mockResolvedValue({created:0,updated:0,skipped:0,contactsCreated:0,signaturesCreated:1})};
+  render(<EmailTemplateImport api={api as never} onClose={()=>undefined}/>);
+  fireEvent.change(screen.getByLabelText('邮件模板 Excel'),{target:{files:[new File(['xlsx'],'mail.xlsx')]}});fireEvent.click(screen.getByRole('button',{name:'识别并预览'}));
+  expect(await screen.findByText('来源签名（独立保存，不设为默认）')).toBeVisible();
+  expect(screen.getByLabelText('签名处理 1')).toHaveValue('skip');
+  fireEvent.change(screen.getByLabelText('签名处理 1'),{target:{value:'create'}});
+  expect(screen.getByRole('button',{name:'确认导入所选模板'})).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('签名名称 1'),{target:{value:'Reviewed'}});fireEvent.click(screen.getByLabelText('已确认签名 1'));
+  fireEvent.click(screen.getByRole('button',{name:'确认导入所选模板'}));
+  expect(await screen.findByText(/新增签名 1 条/)).toBeVisible();
+  expect(api.confirmEmailTemplateImport).toHaveBeenCalledWith('p-signature',[],[expect.objectContaining({id:'sig',action:'create',confirmed:true,name:'Reviewed'})]);
 });

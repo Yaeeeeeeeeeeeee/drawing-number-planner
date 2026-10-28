@@ -31,8 +31,7 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
   const [templateId, setTemplateId] = useState('');
   const [signatureId, setSignatureId] = useState('');
   const loadedChoices = useRef(false);
-  const contactManufacturer = useRef('');
-  const recipientSelectionEdited = useRef(false);
+  const recipientSelectionEdited = useRef({ to: false, cc: false });
   const [blocks, setBlocks] = useState<number[]>([]);
   const [subject, setSubject] = useState(mailContext?.packageName ?? '');
   const [body, setBody] = useState('');
@@ -70,6 +69,7 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
     void Promise.all([api.listOutboundContacts('active'), api.listOutboundTemplates('active'), api.listOutboundSignatures('active')])
       .then(([nextContacts, nextTemplates, nextSignatures]) => {
         if (!current) return;
+        nextContacts = nextContacts.filter(item => item.status !== 'inactive');
         setContacts(nextContacts); setTemplates(nextTemplates); setSignatures(nextSignatures);
         setTo(value => value.filter(id => nextContacts.some(item => item.id === id)));
         setCc(value => value.filter(id => nextContacts.some(item => item.id === id)));
@@ -95,25 +95,28 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
     setTemplateId(previous => matchingTemplates.some(item => String(item.id) === previous) ? previous : matchingTemplates.length === 1 ? String(matchingTemplates[0].id) : '');
     setBlocks([]);
   }, [manufacturer, scenario, materialType, templates]);
-  useEffect(() => {
-    const manufacturerChanged = contactManufacturer.current !== manufacturer;
-    contactManufacturer.current = manufacturer;
-    if (manufacturerChanged) {
-      recipientSelectionEdited.current = false;
-      setToOverride(null); setCcOverride(null);
-    }
-    if (manufacturerChanged || !recipientSelectionEdited.current) {
-      const matching = manufacturer && manufacturer !== UNSCOPED ? contacts.filter(item => item.company.trim() === manufacturer) : [];
-      setTo(matching.filter(item => item.defaultRecipientType === 'to').map(item => item.id));
-      setCc(matching.filter(item => item.defaultRecipientType === 'cc').map(item => item.id));
-    }
-  }, [manufacturer, contacts]);
-
   const template = matchingTemplates.find(item => item.id === Number(templateId));
+  const defaultRecipientIds = (kind: 'to' | 'cc') => {
+    const companyContacts = manufacturer && manufacturer !== UNSCOPED ? contacts.filter(item => item.company.trim() === manufacturer) : [];
+    return template?.contactLinksConfigured
+      ? (template.contactLinks ?? []).filter(link => link.recipientType === kind)
+        .sort((a, b) => a.displayOrder - b.displayOrder || a.contactId - b.contactId)
+        .map(link => link.contactId).filter(id => contacts.some(contact => contact.id === id))
+      : companyContacts.filter(item => item.defaultRecipientType === kind).map(item => item.id);
+  };
+  useEffect(() => {
+    for (const kind of ['to', 'cc'] as const) {
+      if (!recipientSelectionEdited.current[kind]) (kind === 'to' ? setTo : setCc)(defaultRecipientIds(kind));
+    }
+  }, [manufacturer, contacts, template]);
+
   const signature = signatures.find(item => item.id === Number(signatureId));
-  const recipientContacts = manufacturer && manufacturer !== UNSCOPED ? contacts.filter(item => item.company.trim() === manufacturer) : contacts;
-  const toText = toOverride ?? contacts.filter(item => to.includes(item.id)).map(item => item.email).join('; ');
-  const ccText = ccOverride ?? contacts.filter(item => cc.includes(item.id)).map(item => item.email).join('; ');
+  const linkedIds = new Set((template?.contactLinks ?? []).map(link => link.contactId));
+  const recipientContacts = manufacturer && manufacturer !== UNSCOPED
+    ? contacts.filter(item => item.company.trim() === manufacturer || linkedIds.has(item.id)) : contacts;
+  const recipientText = (ids: number[]) => ids.map(id => contacts.find(item => item.id === id)?.email).filter(Boolean).join('; ');
+  const toText = toOverride ?? recipientText(to);
+  const ccText = ccOverride ?? recipientText(cc);
   const optionalText = template?.blocks.filter(item => blocks.includes(item.id)).map(item => item.bodyTemplate).join('\n') ?? '';
   const fileList = useMemo(() => {
     const files = mailContext?.items.map(item => `  ${fileBaseName(item.fileName)}`).join('\n') ?? '';
@@ -126,7 +129,8 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
     if (manuallyEdited && (automatic || !window.confirm('重新生成将替换您已修改的主题和正文，是否继续？'))) return;
     const revision = ++generationRevision.current; setMessage('');
     renderedChanges.current = changeText;
-    const primary = contacts.find(item => to.includes(item.id));
+    const primaryIds = recipientSelectionEdited.current.to ? to : defaultRecipientIds('to');
+    const primary = contacts.find(item => item.id === primaryIds[0]);
     try {
       const rendered = await api.renderOutboundTemplate(template.id, {
         package_name: mailContext?.packageName ?? subject,
@@ -163,7 +167,7 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
     if (mailContext && template && autoGeneratedContext.current === mailContext && !manuallyEdited && renderedChanges.current !== changeText) void generate(true);
   }, [changeText]);
   const updateChanges = (next: DraftChange[]) => { setChanges(next); setChangeEdited(true); };
-  const toggle = (list: number[], id: number, setter: (value: number[]) => void, clear: (value: string | null) => void) => { recipientSelectionEdited.current = true; setter(list.includes(id) ? list.filter(value => value !== id) : [...list, id]); clear(null); };
+  const toggle = (kind: 'to' | 'cc', list: number[], id: number, setter: (value: number[]) => void, clear: (value: string | null) => void) => { recipientSelectionEdited.current[kind] = true; setter(list.includes(id) ? list.filter(value => value !== id) : [...list, id]); clear(null); };
   const copyField = async (key: string, text: string) => {
     if (unresolvedVariables(text)) { setMessage('邮件中存在未替换变量，请补充后再复制。'); return; }
     try { await navigator.clipboard.writeText(text); setCopyFeedback(previous => ({ ...previous, [key]: '已复制' })); if (!filterRecipients || key === 'all') setMessage('已复制'); }
@@ -189,7 +193,7 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
       {mailContext?.packageFiles?.length ? <p className="muted-text mail-zip-info">本次 ZIP：{mailContext.packageFiles.map(fileBaseName).join('、')}</p> : null}
       {(['to', 'cc'] as const).map(kind => {
         const label = kind === 'to' ? '收件人' : '抄送'; const selected = kind === 'to' ? to : cc; const setter = kind === 'to' ? setTo : setCc; const clear = kind === 'to' ? setToOverride : setCcOverride; const text = kind === 'to' ? toText : ccText;
-        return <section className="ob-recipient-group" key={kind}><h4>{label}</h4>{filterRecipients ? <RecipientPicker label={label} contacts={recipientContacts} selected={selected} onChange={ids => { recipientSelectionEdited.current = true; setter(ids); clear(null); }} /> : <fieldset><legend>{label}</legend>{recipientContacts.map(item => <label key={item.id}><input type="checkbox" aria-label={`${label} ${item.contactName}`} checked={selected.includes(item.id)} onChange={() => toggle(selected, item.id, setter, clear)} />{item.company} · {item.contactName} · {item.email}</label>)}</fieldset>}<label><span>{label}地址</span><input aria-label={`${label}文本`} value={text} onChange={event => clear(event.target.value)} /></label>{copyButton(`${kind}Text`, `复制${label}`, text)}</section>;
+        return <section className="ob-recipient-group" key={kind}><h4>{label}</h4>{filterRecipients ? <RecipientPicker label={label} contacts={recipientContacts} selected={selected} onChange={ids => { recipientSelectionEdited.current[kind] = true; setter(ids); clear(null); }} /> : <fieldset><legend>{label}</legend>{recipientContacts.map(item => <label key={item.id}><input type="checkbox" aria-label={`${label} ${item.contactName}`} checked={selected.includes(item.id)} onChange={() => toggle(kind, selected, item.id, setter, clear)} />{item.company} · {item.contactName} · {item.email}</label>)}</fieldset>}<label><span>{label}地址</span><input aria-label={`${label}文本`} value={text} onChange={event => { recipientSelectionEdited.current[kind] = true; clear(event.target.value); }} /></label>{copyButton(`${kind}Text`, `复制${label}`, text)}</section>;
       })}
       {template?.blocks.length ? <fieldset><legend>可选附加段落</legend>{template.blocks.filter(item => item.status === 'active').map(item => <label key={item.id}><input type="checkbox" aria-label={`附加段落 ${item.name}`} checked={blocks.includes(item.id)} onChange={() => setBlocks(value => value.includes(item.id) ? value.filter(id => id !== item.id) : [...value, item.id])} />{item.name}</label>)}</fieldset> : null}
       <button className="secondary-button" type="button" disabled={!template || uncertainChanges} onClick={() => void generate()}>生成邮件内容</button>

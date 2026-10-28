@@ -17,10 +17,10 @@ it.each([false,true])('preserves every old row, custom objects, IDs and high wat
  const schema=db.prepare('select type,name,sql from sqlite_master order by type,name').all();
  const backup=vi.fn(()=>expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:18}));
  if(fail){expect(()=>migrateDatabase(db,{databaseExists:true,createBackup:backup})).toThrow('rollback19');expect(db.prepare('select type,name,sql from sqlite_master order by type,name').all()).toEqual(schema);}
- else{expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:18,to:22});
+ else{expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:18,to:23});
  expect(db.prepare("select name from sqlite_master where name in ('custom_product_index','custom_product_trigger')").all()).toHaveLength(2);
  const result=db.prepare("insert into products(sku,brand_id,product_size_id,model,product_category,created_at) values('SKU',1,2,'ZC100','Freezer','new')").run();expect(Number(result.lastInsertRowid)).toBe(100);db.prepare('delete from products where id=100').run();}
- for(const table of tables)if(table!=='schema_migrations'||fail)expect(table==='outbound_email_templates'?(db.prepare(`select * from "${table}" order by rowid`).all() as Record<string,unknown>[]).map(({manufacturer,scenario,...original})=>original):db.prepare(`select * from "${table}" order by rowid`).all()).toEqual(before[table]);
+ for(const table of tables)if(table!=='schema_migrations'||fail)expect(table==='outbound_email_templates'?(db.prepare(`select * from "${table}" order by rowid`).all() as Record<string,unknown>[]).map(({manufacturer,scenario,contacts_configured,import_sources_json,...original})=>original):db.prepare(`select * from "${table}" order by rowid`).all()).toEqual(before[table]);
  expect(db.pragma('foreign_key_check')).toEqual([]);expect(db.pragma('foreign_keys',{simple:true})).toBe(1);expect(backup).toHaveBeenCalledOnce();
  }finally{db.close();}
 });

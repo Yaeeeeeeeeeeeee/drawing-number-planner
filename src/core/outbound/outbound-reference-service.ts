@@ -4,8 +4,10 @@ import { currentBuiltinEmailTemplate } from './builtin-email-template.js';
 import { OutboundReferenceRepository, type OutboundContact, type OutboundContactInput,
   type OutboundEmailTemplate, type OutboundEmailTemplateInput as RepositoryTemplateInput, type OutboundMaterialType,
   type OutboundReferenceStatus, type OutboundSignature, type OutboundSignatureInput,
-  type OutboundTemplateBlock, type OutboundTemplateBlockInput, type RecipientType,
+  type OutboundTemplateBlock, type OutboundTemplateBlockInput, type RecipientType, type OutboundTemplateContactLink,
   type UpdateOutboundTemplateBlockInput } from './outbound-reference-repository.js';
+
+export type { OutboundTemplateContactLink } from './outbound-reference-repository.js';
 
 export type OutboundReferenceErrorCode = 'NOT_FOUND' | 'INVALID_INPUT' | 'DUPLICATE_EMAIL' | 'DUPLICATE_KEY'
   | 'DUPLICATE_BLOCK_KEY' | 'UNKNOWN_TEMPLATE_VARIABLE' | 'MISSING_TEMPLATE_VARIABLE' | 'REFERENCE_DATA_REFERENCED';
@@ -65,6 +67,8 @@ export class OutboundReferenceService {
   deleteContact(id: number): { deleted: true } {
     return this.database.transaction(() => {
       this.getContact(id);
+      const references = this.repository.contactReferences(id);
+      if (references.templates > 0) throw new OutboundReferenceError('REFERENCE_DATA_REFERENCED', '联系人仍被邮件模板引用，不能删除', references);
       if (!this.repository.deleteContact(id)) throw this.notFound('外发联系人不存在');
       return { deleted: true } as const;
     }).immediate();
@@ -86,6 +90,27 @@ export class OutboundReferenceService {
     const normalized = this.normalizeTemplate(input, existing.key);
     try { return this.require(this.repository.updateTemplate(id, normalized), '邮件模板不存在'); }
     catch (error) { return this.mapDatabaseError(error); }
+  }
+  replaceTemplateContactLinks(templateId: number, links: OutboundTemplateContactLink[]): OutboundEmailTemplate {
+    return this.database.transaction(() => {
+      if (!Number.isSafeInteger(templateId) || templateId <= 0) throw new OutboundReferenceError('INVALID_INPUT', '邮件模板编号无效');
+      this.getTemplate(templateId);
+      if (!Array.isArray(links)) throw new OutboundReferenceError('INVALID_INPUT', '模板联系人列表无效');
+      const keys = new Set<string>();
+      for (const link of links) {
+        if (!link || !Number.isSafeInteger(link.contactId) || link.contactId <= 0
+          || !['to', 'cc'].includes(link.recipientType)
+          || !Number.isSafeInteger(link.displayOrder) || link.displayOrder < 0) {
+          throw new OutboundReferenceError('INVALID_INPUT', '模板联系人编号、角色或顺序无效');
+        }
+        const key = `${link.contactId}:${link.recipientType}`;
+        if (keys.has(key)) throw new OutboundReferenceError('INVALID_INPUT', '同一模板联系人角色不能重复');
+        keys.add(key);
+        if (this.getContact(link.contactId).status !== 'active') throw new OutboundReferenceError('INVALID_INPUT', '模板联系人已停用，请先启用或移除关联');
+      }
+      this.repository.replaceTemplateContactLinks(templateId, links);
+      return this.getTemplate(templateId);
+    }).immediate();
   }
   activateTemplate(id: number): OutboundEmailTemplate { return this.setTemplateStatus(id, 'active'); }
   deactivateTemplate(id: number): OutboundEmailTemplate { return this.setTemplateStatus(id, 'inactive'); }
