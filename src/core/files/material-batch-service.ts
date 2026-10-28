@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { lstatSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveWorkspacePath } from './workspace-paths.js';
 import { PdfManagementRepository } from './pdf-management.js';
@@ -46,11 +46,16 @@ export class MaterialBatchService {
     const root = this.workspaceRoot?.();
     if (!root) return 'unavailable';
     try {
-      const walk = (path: string): boolean => readdirSync(path, {withFileTypes:true}).some(entry => {
-        if (entry.isSymbolicLink()) return true; // Never treat unobserved linked content as empty.
-        return entry.isDirectory() ? walk(join(path,entry.name)) : entry.isFile() && /\.pdf$/i.test(entry.name);
-      });
-      return walk(resolveWorkspacePath(root,relativePath)) ? 'nonempty' : 'empty';
+      const resolved = resolveWorkspacePath(root,relativePath);
+      let directory = root;
+      // The batch itself and every ancestor inside the root must be observed
+      // directories; resolving an in-root link does not prove empty coverage.
+      for (const segment of ['', ...relativePath.split(/[\\/]+/)]) {
+        if (segment) directory = join(directory,segment);
+        const stat = lstatSync(directory);
+        if (stat.isSymbolicLink() || !stat.isDirectory()) return 'unavailable';
+      }
+      return readdirSync(resolved).length ? 'nonempty' : 'empty';
     } catch { return 'unavailable'; }
   }
 
@@ -79,7 +84,7 @@ export class MaterialBatchService {
     const indices = observation === 'empty' ? this.staleBatchIndices(id) : [];
     const references = new MaterialBatchRepository(this.db).deletionReferences(id,String(row.relative_path))
       .filter(reference => !(reference.source === 'pdf_files.material_batch_id' && observation === 'empty' && indices.every(entry=>entry.allowed)));
-    if (this.workspaceRoot && observation !== 'empty') references.push({source:'disk.observation',label:observation==='nonempty'?'目录仍有 PDF':'目录无法访问或扫描失败',count:1});
+    if (this.workspaceRoot && observation !== 'empty') references.push({source:'disk.observation',label:observation==='nonempty'?'目录仍有文件或子目录':'目录无法访问或扫描失败',count:1});
     const reason = references.length ? `批次仍被引用：${references.map(ref=>`${ref.label} ${ref.count} 条`).join('；')}` : null;
     return {id, name:String(row.display_name ?? row.name), relativePath:String(row.relative_path), allowed:!references.length, reason, references,
       fingerprint:createHash('sha256').update(JSON.stringify({row,references,observation,indices})).digest('hex')};

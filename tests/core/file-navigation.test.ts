@@ -39,7 +39,7 @@ function record(relativePath: string, fullCode?: string): FileScanRecord {
 function seed() {
   const known = parseDrawingCode('02.0404.010.0401001')!;
   const orphan = parseDrawingCode('02.0404.010.0401002')!;
-  const root = '01.洗碗机\\SKU-T40\\03.量产后的变更文件';
+  const root = '01.洗碗机\\SKU-T40\\03.量产后的变更文件（已量产的产品看最新日期）';
   const rows = [record(`${root}\\00.首批大货\\same.pdf`, known.fullCode),
     record(`${root}\\01.20241210\\same.pdf`, known.fullCode), record('unbatched.pdf', known.fullCode),
     record(`${root}\\01.20241210\\unknown.pdf`), record('orphan.pdf', orphan.fullCode), record('missing.pdf')];
@@ -95,7 +95,7 @@ describe('PDF navigation statistics', () => {
   it('refreshes directory classification after product creation while leaving drawing match status independent', () => {
     const fullCode = parseDrawingCode('02.0404.010.0401007')!;
     const context = { productCategory: '冰柜', sku: 'NEW-SKU', model: 'Z40' };
-    const root = '03.冰柜\\NEW-SKU-Z40\\03.量产后的变更文件';
+    const root = '03.冰柜\\NEW-SKU-Z40\\03.量产后的变更文件（已量产的产品看最新日期）';
     repository.replaceScan([
       record(`${root}\\00.首批大货\\same.pdf`, fullCode.fullCode),
       record(`${root}\\01.20241210\\same.pdf`, fullCode.fullCode),
@@ -177,7 +177,7 @@ describe('PDF navigation statistics', () => {
 it('groups PDFs by an exact existing product directory without requiring a confirmed drawing owner',async()=>{
  const code=parseDrawingCode('02.0404.010.0401011')!;
  const root='01.洗碗机\\SKU-T40';
- repository.replaceScan([record(`${root}\\03.量产后的变更文件\\00.首批大货\\matched.pdf`,code.fullCode),record(`${root}\\03.量产后的变更文件\\00.首批大货\\unknown.pdf`),record(`${root}\\02.未转曲源文件\\source.pdf`,code.fullCode),record('loose.pdf')],[{...code,directoryContext:{sku:'SKU',model:'T40',productCategory:'洗碗机'}}],timestamp);
+ repository.replaceScan([record(`${root}\\03.量产后的变更文件（已量产的产品看最新日期）\\00.首批大货\\matched.pdf`,code.fullCode),record(`${root}\\03.量产后的变更文件（已量产的产品看最新日期）\\00.首批大货\\unknown.pdf`),record(`${root}\\02.未转曲源文件\\source.pdf`,code.fullCode),record('loose.pdf')],[{...code,directoryContext:{sku:'SKU',model:'T40',productCategory:'洗碗机'}}],timestamp);
  const before=db.serialize();
  const stats=repository.navigation({presence:'all'});
  expect(stats.products).toEqual([{productId,count:3}]);expect(stats.unassociatedProducts).toBe(1);
@@ -192,7 +192,7 @@ it('groups PDFs by an exact existing product directory without requiring a confi
 it('keeps separate PDF directory usage for a shared historical code across two SKUs',async()=>{
  const template=new ProductService(db).get(productId);const other=new ProductService(db).create({sku:'OTHER',model:'T50',productCategory:'洗碗机',brandId:template.brandId,productSizeId:template.productSizeId,defaultAppearanceId:template.defaultAppearanceId});
  const code=parseDrawingCode('02.0404.010.0401012')!;
- repository.replaceScan([record('01.洗碗机\\SKU-T40\\03.量产后的变更文件\\00.首批大货\\a.pdf',code.fullCode),record('01.洗碗机\\OTHER-T50\\03.量产后的变更文件\\00.首批大货\\b.pdf',code.fullCode)],[{...code,directoryContext:null}],timestamp);
+ repository.replaceScan([record('01.洗碗机\\SKU-T40\\03.量产后的变更文件（已量产的产品看最新日期）\\00.首批大货\\a.pdf',code.fullCode),record('01.洗碗机\\OTHER-T50\\03.量产后的变更文件（已量产的产品看最新日期）\\00.首批大货\\b.pdf',code.fullCode)],[{...code,directoryContext:null}],timestamp);
  const before=db.serialize();
  expect(repository.navigation({presence:'all'}).products).toEqual([{productId,count:1},{productId:other.id,count:1}]);
  expect(repository.search({productId,presence:'all'}).items.map(file=>file.fileName)).toEqual(['a.pdf']);expect(repository.search({productId:other.id,presence:'all'}).items.map(file=>file.fileName)).toEqual(['b.pdf']);
@@ -209,7 +209,7 @@ it('does not choose between ambiguous SKU-model directory combinations or guess 
 
 it('repairs existing unbatched H10 scan indexes on rescan without changing file IDs or drawing history',()=>{
  db.prepare("update products set sku='AKVCH010JP',model='H10',product_category='吸尘器' where id=?").run(productId);
- const path='吸尘器\\AKVCH010JP-H10\\03.量产后的变更文件\\00.首批大货\\铭牌.pdf';
+ const path='吸尘器\\AKVCH010JP-H10\\03.量产后的变更文件（已量产的产品看最新日期）\\00.首批大货\\铭牌.pdf';
  const old=record(path);old.materialBatch=null;
  repository.replaceScan([old],[],timestamp);
  const original=(db.prepare('select id from pdf_files').get() as {id:number}).id;

@@ -28,6 +28,6 @@ describe('PDF workspace scanner', () => {
       throw error;
     }
 
-    expect(await scanPdfWorkspace(root)).toEqual([]);
+    await expect(scanPdfWorkspace(root)).rejects.toThrow(/扫描不完整/);
   });
 });

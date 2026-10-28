@@ -391,12 +391,10 @@ export class FileRepository {
       }
       if (workspaceKey !== undefined) {
         this.management().reconcileMoves(workspaceKey, previous.map(file => ({...file,isPresent:file.isPresent===1})), current, differences, scannedAt);
-        this.management().reconcile(workspaceKey);
+        this.management().reconcile(workspaceKey, scanRun.id);
       }
-      const outside = this.db.prepare(`select file.id from pdf_files file where not (${materialScopeSql})`).all() as Array<{id:number}>;
-      for (const {id} of outside) {
-        if (this.management().preview({ids:[id],action:'clear'},'').allowed === 1) this.db.prepare('delete from pdf_files where id=?').run(id);
-      }
+      // Scope changes do not authorize index cleanup. Unobserved legacy paths
+      // retain their IDs, presence and historical/manual relationships.
       const { missing } = this.db.prepare(`select count(*) as missing from pdf_files file where is_present = 0 and ${materialScopeSql}`).get() as { missing: number };
       return { missing, historicalRegistered };
     }).immediate();

@@ -148,7 +148,7 @@ describe('PDF file API', () => {
       detectedCodes: ['02.0404.010.0401000'],
     })] });
 
-    const batchRoot = join(workspace, '01.洗碗机', 'SKU-T40', '03.量产后的变更文件', '01.20241210');
+    const batchRoot = join(workspace, '01.洗碗机', 'SKU-T40', '03.量产后的变更文件（已量产的产品看最新日期）', '01.20241210');
     mkdirSync(batchRoot, { recursive: true });
     writeFileSync(join(batchRoot, 'batch.pdf'), '%PDF-1.4');
     await fetch(`${server.url}/api/files/scan`, { method: 'POST', headers: actionHeaders });
@@ -238,7 +238,7 @@ describe('PDF file API', () => {
 
 function fixturePdfPath(root:string,...segments:string[]):string {
  const parts=segments.flatMap(part=>part.split(/[\\/]+/));
- const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件'].includes(parts[2]);
+ const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件（已量产的产品看最新日期）'].includes(parts[2]);
  const target=join(root,...(scoped?parts:['未分类','UNKNOWN-M','02.未转曲源文件',...parts]));
  mkdirSync(dirname(target),{recursive:true});return target;
 }

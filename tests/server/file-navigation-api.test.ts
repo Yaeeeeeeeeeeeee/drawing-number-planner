@@ -43,7 +43,7 @@ describe('read-only PDF navigation endpoint', () => {
   it('returns every null-product indexed file with the same manual filters as its pending-product count', async () => {
     const { app, repository } = await fixture();
     const code = parseDrawingCode('02.0404.010.0401007')!;
-    const root = '03.冰柜\\UNKNOWN-Z40\\03.量产后的变更文件';
+    const root = '03.冰柜\\UNKNOWN-Z40\\03.量产后的变更文件（已量产的产品看最新日期）';
     const records: FileScanRecord[] = [
       ...['00.首批大货', '01.20241210'].map(batch => ({
         relativePath: `${root}\\${batch}\\same.pdf`, fileName: 'same.pdf', drawingId: null,

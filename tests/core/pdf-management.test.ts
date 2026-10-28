@@ -52,7 +52,7 @@ it('keeps historical drawing identity and QR indices unchanged by PDF clear or s
  expect(service.search({managementState:'ignored'}).total).toBe(1);
 });
 it('renames only batch display metadata, scanner preserves it and duplicate display names remain separate IDs',async()=>{
- const base=join(dir,'01.洗碗机','SKU-T40','03.量产后的变更文件');
+ const base=join(dir,'01.洗碗机','SKU-T40','03.量产后的变更文件（已量产的产品看最新日期）');
  for(const name of ['00.首批大货','01.20241210']){mkdirSync(join(base,name),{recursive:true});writeFileSync(join(base,name,'plain.pdf'),'%PDF');}
  await service.scan();const batches=new MaterialBatchService(db);const old=batches.list();expect(old).toHaveLength(2);
  for(const b of old)batches.rename(b.id,'统一显示名称',0);
@@ -138,7 +138,7 @@ it('uses explicit confirmed drawing attribution for PDF product/version filters 
 it('keeps a real directory-matched scan unconfirmed in the drawing library until manual attribution',async()=>{
  const dict=new DictionaryService(db);const brand=dict.create({type:'brand',code:'02',name:'Brand'});const size=dict.create({type:'product_size',code:'0404',name:'Size'});const appearance=dict.create({type:'appearance',code:'01',name:'Appearance'});dict.create({type:'color',code:'0',name:'White'});
  const product=new ProductService(db).create({sku:'SCAN',model:'MODEL',productCategory:'分类',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id});
- const path=join(dir,'01.分类','SCAN-MODEL','03.量产后的变更文件','00.首批大货');mkdirSync(path,{recursive:true});writeFileSync(join(path,'02.0404.010.0401001.pdf'),'%PDF scanned evidence');await service.scan();
+ const path=join(dir,'01.分类','SCAN-MODEL','03.量产后的变更文件（已量产的产品看最新日期）','00.首批大货');mkdirSync(path,{recursive:true});writeFileSync(join(path,'02.0404.010.0401001.pdf'),'%PDF scanned evidence');await service.scan();
  const raw=db.prepare('select id,product_id,detected_sku,detected_model from historical_drawing_numbers').get() as {id:number;product_id:number;detected_sku:string;detected_model:string};
  expect(raw).toMatchObject({product_id:product.id,detected_sku:'SCAN',detected_model:'MODEL'});
  const {DrawingQueryService}=await import('../../src/core/drawings/drawing-query-service');const library=new DrawingQueryService(db);
@@ -152,7 +152,7 @@ it('keeps a real directory-matched scan unconfirmed in the drawing library until
 
 function fixturePdfPath(root:string,...segments:string[]):string {
  const parts=segments.flatMap(part=>part.split(/[\\/]+/));
- const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件'].includes(parts[2]);
+ const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件（已量产的产品看最新日期）'].includes(parts[2]);
  const target=join(root,...(scoped?parts:['未分类','UNKNOWN-M','02.未转曲源文件',...parts]));
  mkdirSync(dirname(target),{recursive:true});return target;
 }

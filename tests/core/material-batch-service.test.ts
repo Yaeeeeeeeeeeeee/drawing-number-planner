@@ -19,7 +19,7 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 function insertBatch(productDirectory: string, batchName: string): number {
-  const relativeFilePath = `${productDirectory}\\03.量产后的变更文件\\${batchName}\\fixture.pdf`;
+  const relativeFilePath = `${productDirectory}\\03.量产后的变更文件（已量产的产品看最新日期）\\${batchName}\\fixture.pdf`;
   const batch = parseMaterialBatch(relativeFilePath);
   if (!batch) throw new Error(`Expected a material batch for ${relativeFilePath}`);
 
@@ -193,8 +193,8 @@ describe('MaterialBatchService', () => {
       (relative_path, path_key, material_batch_id, file_name, match_status, detected_codes_json,
        conversion_type, size_bytes, modified_at, scanned_at, is_present)
       values (?, lower(?), ?, ?, 'pending', '["02.0209.010.0401001"]', 'outlined', 1, ?, ?, 1)`)
-      .run('01.洗碗机\\SKU-T40\\03.量产后的变更文件\\06.20260309\\unrecognized.pdf',
-        '01.洗碗机\\SKU-T40\\03.量产后的变更文件\\06.20260309\\unrecognized.pdf', selected,
+      .run('01.洗碗机\\SKU-T40\\03.量产后的变更文件（已量产的产品看最新日期）\\06.20260309\\unrecognized.pdf',
+        '01.洗碗机\\SKU-T40\\03.量产后的变更文件（已量产的产品看最新日期）\\06.20260309\\unrecognized.pdf', selected,
         'unrecognized.pdf', now, now);
 
     expect(service.getLogicalMaterials(selected)).toEqual([expect.objectContaining({

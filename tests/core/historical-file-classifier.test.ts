@@ -39,7 +39,7 @@ describe('historical PDF classification', () => {
       .toMatchObject({ matchStatus: 'unmatched', historicalCode: null, detectedCodes: [] });
   });
 
-  it('uses historical directory semantics before the filename suffix', () => {
+  it('keeps the source directory role but classifies production by the filename marker', () => {
     const source = classifyHistoricalPdf({
       relativePath: join('01.洗碗机', 'SKDWT040JP-T40', '02.未转曲源文件', '02.0404.010.0401007（转曲）.pdf'),
       fileName: '02.0404.010.0401007（转曲）.pdf', drawings: [],
@@ -47,17 +47,17 @@ describe('historical PDF classification', () => {
     expect(source).toMatchObject({ conversionType: 'source', classificationWarning: expect.stringContaining('conversion-conflict') });
 
     const outlined = classifyHistoricalPdf({
-      relativePath: join('01.洗碗机', 'SKDWT040JP-T40', '03.量产后的变更文件', '01.20241210', '02.0404.010.0401007.pdf'),
+      relativePath: join('01.洗碗机', 'SKDWT040JP-T40', '03.量产后的变更文件（已量产的产品看最新日期）', '01.20241210', '02.0404.010.0401007.pdf'),
       fileName: '02.0404.010.0401007.pdf', drawings: [],
     });
-    expect(outlined).toMatchObject({ conversionType: 'outlined', classificationWarning: null });
+    expect(outlined).toMatchObject({ conversionType: 'source', classificationWarning: null });
 
     expect(classifyHistoricalPdf({ relativePath: 'other\\02.0404.010.0401007（转曲）.pdf',
       fileName: '02.0404.010.0401007（转曲）.pdf', drawings: [] }).conversionType).toBe('outlined');
   });
 });
 
-it('treats H10 change-details PDFs as outlined even without a filename suffix', () => {
+it('does not infer conversion from excluded historical change-details directories', () => {
   expect(classifyHistoricalPdf({relativePath:'吸尘器/AKVCH010JP-H10/03.量产后的变更明细（已量产的产品看最新日期）/00.首批大货/铭牌.pdf',fileName:'铭牌.pdf',drawings:[]}))
-    .toMatchObject({conversionType:'outlined',matchStatus:'unmatched'});
+    .toMatchObject({conversionType:'source',matchStatus:'unmatched'});
 });

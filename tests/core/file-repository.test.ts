@@ -62,7 +62,7 @@ describe('FileRepository', () => {
 
   it('keeps legal cross-batch file instances while reusing one historical drawing', () => {
     const historical = parseDrawingCode('02.0404.010.0501001')!;
-    const root = '03.量产后的变更文件';
+    const root = '03.量产后的变更文件（已量产的产品看最新日期）';
     const makeRecord = (batch: string): FileScanRecord => {
       const relativePath = `03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\${root}\\${batch}\\${historical.fullCode}-大外箱.pdf`;
       return {
@@ -115,7 +115,7 @@ describe('FileRepository', () => {
     repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
     db.exec(`create trigger reject_material_batch before insert on material_batches
       begin select raise(abort, 'batch rejected'); end`);
-    const relativePath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件\\01.20241210\\x.pdf';
+    const relativePath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20241210\\x.pdf';
     const failing = { ...records(0)[1], relativePath, materialBatch: parseMaterialBatch(relativePath)! };
 
     expect(() => repository.replaceScan([failing], [], '2026-08-26T04:00:00.000Z')).toThrow('batch rejected');
@@ -424,7 +424,7 @@ describe('FileRepository', () => {
   it('blocks all-index clearing with established drawing history and retains every business/index row', () => {
     const drawing = drawingFixture();
     const historical = parseDrawingCode('02.0404.010.0401002')!;
-    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
+    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20241210';
     const indexed = { ...records(0)[1], relativePath: `${batchPath}\\${historical.fullCode}-LOGO.pdf`,
       fileName: `${historical.fullCode}-LOGO.pdf`, matchStatus: 'matched' as const, historicalFullCode: historical.fullCode,
       detectedCodes: [historical.fullCode], materialBatch: parseMaterialBatch(`${batchPath}\\${historical.fullCode}-LOGO.pdf`)! };
@@ -463,7 +463,7 @@ describe('FileRepository', () => {
 
   it('blocks clearing live indices referenced by outbound history and retains exact foreign keys and snapshots', () => {
     const drawing = drawingFixture();
-    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
+    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20241210';
     const relativePath = `${batchPath}\\${drawing.fullCode}-LOGO.pdf`;
     repository.replaceScan([{ ...records(drawing.id)[0], relativePath,
       fileName: `${drawing.fullCode}-LOGO.pdf`, conversionType: 'outlined', materialBatch: parseMaterialBatch(relativePath)! }],
@@ -509,7 +509,7 @@ describe('FileRepository', () => {
 
   it('blocks cleaning missing PDF referenced by outbound history and retains its exact identity', () => {
     const drawing = drawingFixture();
-    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件\\01.20241210';
+    const batchPath = '03.冰柜\\TEST-FILE-REPOSITORY-ZC100\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20241210';
     const relativePath = `${batchPath}\\missing-outbound.pdf`;
     const missing = { ...records(drawing.id)[0], relativePath, fileName: 'missing-outbound.pdf',
       materialBatch: parseMaterialBatch(relativePath)! };
@@ -539,7 +539,7 @@ describe('FileRepository', () => {
   });
 
   it('clears disposable PDFs while retaining stable batches and scan traces', () => {
-    const batchPath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件\\01.20241210';
+    const batchPath = '03.冰柜\\SKU-ZC100\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20241210';
     const path = `${batchPath}\\kept.pdf`;
     const indexed = { ...records(0)[1], relativePath: path, fileName: 'kept.pdf', materialBatch: parseMaterialBatch(path)! };
     repository.replaceScan([indexed], [], '2026-08-25T04:00:00.000Z');
@@ -589,7 +589,7 @@ it('excludes out-of-scope index records while retaining their drawing and busine
  expect(repository.search({presence:'all'}).items.map(file=>file.relativePath)).toEqual([source.relativePath]);
  expect(db.prepare('select relative_path from pdf_files where drawing_id=?').all(drawing.id)).toEqual(expect.arrayContaining([{relative_path:retained.relativePath},{relative_path:source.relativePath}]));
  expect(db.prepare('select id from drawing_numbers where id=?').get(drawing.id)).toBeTruthy();
- expect(db.prepare('select id from pdf_files where relative_path=?').get(disposable.relativePath)).toBeUndefined();
+ expect(db.prepare('select is_present from pdf_files where relative_path=?').get(disposable.relativePath)).toEqual({is_present:1});
  expect(repository.navigation({presence:'all'})).toMatchObject({total:1,sources:[{productId:(db.prepare('select product_id from drawing_numbers where id=?').get(drawing.id) as {product_id:number}).product_id,count:1}]});
  expect(repository.search({materialSource:true,presence:'all'}).items).toHaveLength(1);
  expect(db.pragma('foreign_key_check')).toEqual([]);

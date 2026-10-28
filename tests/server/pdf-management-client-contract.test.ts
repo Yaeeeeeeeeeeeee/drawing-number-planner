@@ -52,7 +52,7 @@ it('preflights and confirms empty batch deletion over real HTTP, keeps physical 
  const db=openDatabase(':memory:');const app=Fastify();const root=mkdtempSync(join(tmpdir(),'batch-delete-http-'));const nativeFetch=globalThis.fetch;
  try{
   migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});
-  const directory=join(root,'01.洗碗机','SKU-T40','03.量产后的变更文件','01.20260101');mkdirSync(directory,{recursive:true});const original=join(directory,'plain.pdf');writeFileSync(original,'%PDF-1.4 retained');
+  const directory=join(root,'01.洗碗机','SKU-T40','03.量产后的变更文件（已量产的产品看最新日期）','01.20260101');mkdirSync(directory,{recursive:true});const original=join(directory,'plain.pdf');writeFileSync(original,'%PDF-1.4 retained');
   const service=new FileService(new FileRepository(db),new WorkspaceSettingsStore(join(root,'settings.json')));service.updateSettings({workspaceRoot:root});await service.scan();
   const batches=new MaterialBatchService(db);const batch=batches.list()[0];expect(batch).toBeTruthy();
   app.post('/api/session',async()=>({token:'isolated-batch-delete-test'}));registerFileRoutes(app,service);registerMaterialBatchRoutes(app,batches);
@@ -71,7 +71,7 @@ it('preflights and confirms empty batch deletion over real HTTP, keeps physical 
 
 function fixturePdfPath(root:string,...segments:string[]):string {
  const parts=segments.flatMap(part=>part.split(/[\\/]+/));
- const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件'].includes(parts[2]);
+ const scoped=parts.length>=3 && ['02.未转曲源文件','03.量产后的变更文件（已量产的产品看最新日期）'].includes(parts[2]);
  const target=join(root,...(scoped?parts:['未分类','UNKNOWN-M','02.未转曲源文件',...parts]));
  mkdirSync(dirname(target),{recursive:true});return target;
 }

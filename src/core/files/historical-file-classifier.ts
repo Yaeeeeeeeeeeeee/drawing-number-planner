@@ -1,5 +1,5 @@
 import { inspectDrawingCodesInFilename, type ParsedDrawingCode } from '../drawings/drawing-code.js';
-import { isProductionChangeDirectory, parseProductDirectory, type DirectoryProductContext } from './directory-policy.js';
+import { isSourcePdfPath, parseProductDirectory, type DirectoryProductContext } from './directory-policy.js';
 import type { ConversionType, DrawingCodeReference, FileMatchStatus } from './file-types.js';
 
 export interface HistoricalPdfInput {
@@ -22,14 +22,11 @@ function conversionFromPath(relativePath: string, fileName: string): {
   conversionType: ConversionType;
   warning: string | null;
 } {
-  const segments = relativePath.split(/[\\/]+/);
-  const inSourceDirectory = segments.includes('02.未转曲源文件');
-  const inOutlinedDirectory = segments.some(segment=>isProductionChangeDirectory(segment)||/^03[.．]量产后的变更明细(?:[（(].*)?$/.test(segment));
+  const inSourceDirectory = isSourcePdfPath(relativePath);
   const outlinedSuffix = fileName.includes('（转曲）');
   if (inSourceDirectory) {
     return { conversionType: 'source', warning: outlinedSuffix ? 'conversion-conflict: 源文件目录中的文件名包含（转曲）' : null };
   }
-  if (inOutlinedDirectory) return { conversionType: 'outlined', warning: null };
   return { conversionType: outlinedSuffix ? 'outlined' : 'source', warning: null };
 }
 

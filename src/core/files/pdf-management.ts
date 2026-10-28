@@ -117,7 +117,7 @@ export class PdfManagementRepository {
     }
   }
 
-  reconcile(workspaceKey: string): void {
+  reconcile(workspaceKey: string, scanRunId: number): void {
     // A changed file at the same path requires review. Same-hash copies at other paths are independent.
     this.db.prepare(`update pdf_files set management_state = case
       when exists(select 1 from pdf_file_decisions d where d.workspace_key = @workspaceKey
@@ -128,6 +128,7 @@ export class PdfManagementRepository {
         and d.path_key = pdf_files.path_key and d.decision = 'needs_review') then 'needs_review'
       when exists(select 1 from pdf_file_decisions d where d.workspace_key = @workspaceKey
         and d.path_key = pdf_files.path_key and d.decision = 'ignore') then 'needs_review'
-      else 'included' end`).run({ workspaceKey });
+      else 'included' end
+      where last_seen_scan_run_id = @scanRunId`).run({ workspaceKey, scanRunId });
   }
 }

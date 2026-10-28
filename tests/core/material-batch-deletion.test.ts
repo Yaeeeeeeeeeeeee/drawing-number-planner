@@ -9,7 +9,7 @@ import {PlanningService} from '../../src/core/planning/planning-service';
 import {MaterialBatchService} from '../../src/core/files/material-batch-service';
 let db:PlannerDatabase,service:MaterialBatchService;
 let batch:number,other:number,product:number,project:number,drawing:number,historical:number,pdf:number,bom:number,outbound:number;
-const path='目录\\产品\\03.量产后的变更文件\\01.20260101';
+const path='目录\\产品\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20260101';
 beforeEach(()=>{
  db=openDatabase(':memory:');migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});service=new MaterialBatchService(db);
  const dict=new DictionaryService(db);const brand=dict.create({type:'brand',code:'02',name:'brand'}),size=dict.create({type:'product_size',code:'0305',name:'size'}),appearance=dict.create({type:'appearance',code:'01',name:'appearance'}),color=dict.create({type:'color',code:'0',name:'white'}),main=dict.create({type:'main_category',code:'02',name:'main'});

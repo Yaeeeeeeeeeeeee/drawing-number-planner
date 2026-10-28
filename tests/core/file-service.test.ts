@@ -79,7 +79,7 @@ describe('FileService', () => {
   it('scans real files, matches drawings, and marks absent files missing on the next complete scan', async () => {
     const drawing = createDrawing(); const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true});
     writeFileSync(join(material, `${drawing.fullCode}-LOGO.pdf`), '%PDF source');
-    mkdirSync(join(workspace,'测试','SKU-M','03.量产后的变更文件'),{recursive:true}); writeFileSync(join(workspace,'测试','SKU-M','03.量产后的变更文件', `${drawing.fullCode}-LOGO（转曲）.PDF`), '%PDF outlined');
+    mkdirSync(join(workspace,'测试','SKU-M','03.量产后的变更文件（已量产的产品看最新日期）'),{recursive:true}); writeFileSync(join(workspace,'测试','SKU-M','03.量产后的变更文件（已量产的产品看最新日期）', `${drawing.fullCode}-LOGO（转曲）.PDF`), '%PDF outlined');
     const service = new FileService(repository, settings); service.updateSettings({ workspaceRoot: workspace });
 
     expect(await service.scan()).toMatchObject({ total: 2, matched: 2, unmatched: 0, conflict: 0, source: 1, outlined: 1, missing: 0 });
@@ -103,8 +103,8 @@ describe('FileService', () => {
   });
 
   it('treats case-only batch path variants as the same Windows batch', () => {
-    const firstPath = '01.洗碗机\\SKU-T40\\03.量产后的变更文件\\01.20241210';
-    const secondPath = '01.洗碗机\\sku-t40\\03.量产后的变更文件\\01.20241210';
+    const firstPath = '01.洗碗机\\SKU-T40\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20241210';
+    const secondPath = '01.洗碗机\\sku-t40\\03.量产后的变更文件（已量产的产品看最新日期）\\01.20241210';
     const record = (relativePath: string, batchPath: string) => ({
       relativePath, fileName: 'same.pdf', drawingId: null, matchStatus: 'unmatched' as const,
       detectedCodes: [], conversionType: 'outlined' as const, sizeBytes: 1, modifiedAt: '2026-08-25T00:00:00.000Z',

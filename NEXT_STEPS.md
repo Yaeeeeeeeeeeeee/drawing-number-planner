@@ -1,3 +1,11 @@
+# V5.2 当前执行
+
+- 计划：docs/superpowers/plans/2026-10-28-v52-incremental.md。
+- 第一/二阶段已完成：原Excel复现，阶段2扫描30文件402项通过；当前阶段3图号详情/BOM实施。
+- 保留当前本地路径；只删除系统内无效空批次，不动真实目录/PDF/图片。
+- 原Excel和原始邮箱/签名只留work/v52，不提交GitHub；后续按真实结构做匿名回归。
+- 按阶段测试门推进，不复开发V5.1邮件系统，不将旧看板100%等同本轮完成。
+
 # V5.1 当前执行
 
 - 计划：docs/superpowers/plans/2026-10-27-v51-mail-import-drafts.md。
