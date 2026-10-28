@@ -109,7 +109,7 @@ it('also protects table-tagged batch IDs when present in a merge after snapshot'
 });
 
 it('cleans stale unprotected indices only after successful empty directory observation',async()=>{
- const {mkdtempSync,mkdirSync,rmSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const {mkdtempSync,mkdirSync,rmSync,existsSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
  const root=mkdtempSync(join(tmpdir(),'v5-empty-batch-'));const directory=join(root,...path.split('\\'));mkdirSync(directory,{recursive:true});
  try {
   const observed=new MaterialBatchService(db,()=>root);
@@ -117,6 +117,7 @@ it('cleans stale unprotected indices only after successful empty directory obser
   expect(observed.list().find(item=>item.id===batch)?.fileCount).toBe(0);
   const preview=observed.previewDeletion(batch)!;expect(preview.allowed).toBe(true);
   expect(observed.delete(batch,{fingerprint:preview.fingerprint,confirmation:'删除批次'})).toEqual({deleted:batch});
+  expect(existsSync(directory)).toBe(true); // Internal node cleanup never removes the real folder.
   expect(db.prepare('select id from pdf_files where id=?').get(pdf)).toBeUndefined();
   expect(db.prepare('select id from material_batches where id=?').get(other)).toBeTruthy();
   expect(db.pragma('foreign_key_check')).toEqual([]);

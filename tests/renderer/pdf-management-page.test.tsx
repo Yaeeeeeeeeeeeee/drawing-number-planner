@@ -72,8 +72,9 @@ it('keeps the six management actions in two groups and applies each state-specif
  render(<FilesPage api={api as never}/>);await screen.findByText('normal',{selector:'.file-primary'});
  const toolbar=screen.getByRole('region',{name:'PDF 索引管理'});
  const groups=within(toolbar).getAllByRole('group');expect(groups).toHaveLength(2);
- expect(within(groups[0]).getAllByRole('button').map(button=>button.textContent)).toEqual(['全选','取消选择','人工归纳']);
- expect(within(groups[1]).getAllByRole('button').map(button=>button.textContent)).toEqual(['排除所选文件','恢复所选文件','移除文件记录']);
+ for(const button of within(toolbar).getAllByRole('button')){expect(button.querySelector('svg')).not.toBeNull();expect(button.textContent).toBe('');expect(button).toHaveAttribute('title',button.getAttribute('aria-label'));}
+ expect(within(groups[0]).getAllByRole('button').map(button=>button.getAttribute('aria-label'))).toEqual(['全选','取消选择','人工归纳']);
+ expect(within(groups[1]).getAllByRole('button').map(button=>button.getAttribute('aria-label'))).toEqual(['排除所选文件','恢复所选文件','移除文件记录']);
  expect(screen.getByRole('button',{name:'排除所选文件'})).toBeDisabled();expect(screen.getByRole('button',{name:'恢复所选文件'})).toBeDisabled();
  fireEvent.click(screen.getByRole('checkbox',{name:'选择 excluded.pdf'}));expect(screen.getByRole('button',{name:'排除所选文件'})).toBeDisabled();
  fireEvent.click(screen.getByRole('button',{name:'恢复所选文件'}));await waitFor(()=>expect(api.previewPdfManagement).toHaveBeenCalledWith({ids:[2],action:'restore'}));

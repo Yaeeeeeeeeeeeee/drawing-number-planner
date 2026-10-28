@@ -6,6 +6,7 @@ describe('shared image viewer',()=>{
  it('opens actual images, zooms, pans, fits and switches without mutating sources',()=>{
   render(<ImagePreviewDialog images={images} onClose={()=>{}}/>);
   const image=screen.getByRole('img',{name:'原图一'});
+  expect(image).not.toHaveAttribute('title');
   fireEvent.click(screen.getByRole('button',{name:'放大'}));expect(image.style.transform).toContain('scale(1.25)');
   const surface=screen.getByLabelText('图片拖动区域');
   const pointer=(type:string,x:number,y:number)=>{const event=new Event(type,{bubbles:true});Object.defineProperties(event,{button:{value:0},clientX:{value:x},clientY:{value:y},pointerId:{value:1}});fireEvent(surface,event);};

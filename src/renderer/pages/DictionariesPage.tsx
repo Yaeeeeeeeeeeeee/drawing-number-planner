@@ -162,7 +162,7 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
   </div> : null;
   const dictionaryTable = (source: DictionaryItemView[], options?: { selectMain?: boolean }) => <DataTable tableId={`dictionaries.${type === 'main_category' ? 'project-items' : type}`} fillViewport items={source} columns={[
     { key: 'code', label: '编码', render: (item) => <strong className="mono">{item.code}</strong> },
-    { key: 'name', label: '名称', render: (item) => item.name }, { key: 'status', label: '状态', render: statusCell },
+    { key: 'name', label: '名称', align:'center', render: (item) => item.name }, { key: 'status', label: '状态', render: statusCell },
     ...(options?.selectMain ? [{ key: 'detail', label: '项目明细', render: (item: DictionaryItemView) => <button className="text-button" aria-label={`查看 ${item.name} 的项目明细`} aria-pressed={selectedMainId === item.id} onClick={() => { setSelectedMainId(item.id); setCreatingProject(false); }} type="button">查看</button> }] : []),
     { key: 'action', label: '操作', render: itemActions },
   ]} renderExpandedRow={dictionaryEditor} />;

@@ -21,7 +21,6 @@
 .layout-table>thead>tr>th{position:sticky;top:0;z-index:4;background:var(--ws-panel,#f7f7f7);box-shadow:inset 0 -1px var(--ws-line,#e5e5e5);}
 .layout-table>thead>tr>th[data-column-key=actions]{z-index:6;}
 .layout-table .table-cell-actions{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;max-width:100%;}
-.layout-table td[data-column-key=model],.layout-table th[data-column-key=model],.layout-table td[data-column-key=brand],.layout-table th[data-column-key=brand],.layout-table td[data-column-key=name],.layout-table th[data-column-key=name]{text-align:left;}
 
 /* Action groups must stay usable when the user lends their spare width to another column. */
 .layout-table .table-cell-actions{flex-wrap:wrap;}

@@ -1,3 +1,4 @@
+import { ListChecks, Square, FolderInput, CircleOff, RotateCcw, Trash2 } from 'lucide-react';
 import { isSourcePdfPath } from '../../core/files/material-directory-policy';
 import type { AppearanceApi } from '../data/appearance-client';
 import { plannerQueryCache, queryKey } from '../data/query-cache';
@@ -360,9 +361,9 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
     </form>} />;
   return <section className="page-surface page-enter files-page">
-    <PageHeader title="PDF 文件中心" description="按产品与资料批次管理 PDF 文件。">
+    <div className="page-sticky-controls"><PageHeader title="PDF 文件中心" description="按产品与资料批次管理 PDF 文件。">
       <span className="record-count">{total} 个索引文件</span></PageHeader>
-    <div className="files-scan-toolbar"><span className="files-root-path" title={settings.workspaceRoot??''}>{settings.workspaceRoot??'尚未设置资料根目录'}</span><span>PDF {navigationCounts?.total??total}</span><span>未匹配 {unmatchedCount??'—'}</span><button className="text-button" type="button" aria-expanded={showScanDetails} onClick={()=>setShowScanDetails(!showScanDetails)}>详细信息</button><button className="text-button" type="button" onClick={()=>{resetTableLayouts('pdf-files');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button><button className="primary-button" type="button" disabled={saving||scanning||!settings.configured||!settings.available} onClick={()=>void scan()}>{scanning?'扫描中…':'扫描资料库'}</button></div>
+    <div className="files-scan-toolbar"><span className="files-root-path" title={settings.workspaceRoot??''}>{settings.workspaceRoot??'尚未设置资料根目录'}</span><span>PDF {navigationCounts?.total??total}</span><span>未匹配 {unmatchedCount??'—'}</span><button className="text-button" type="button" aria-expanded={showScanDetails} onClick={()=>setShowScanDetails(!showScanDetails)}>详细信息</button><button className="text-button" type="button" onClick={()=>{resetTableLayouts('pdf-files');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button><button className="primary-button" type="button" disabled={saving||scanning||!settings.configured||!settings.available} onClick={()=>void scan()}>{scanning?'扫描中…':'扫描资料库'}</button></div></div>
     <details className="files-scan-details" open={showScanDetails}>
     <section className="workspace-strip" aria-label="资料根目录设置">
       <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
@@ -396,15 +397,15 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     <ModuleWorkspace fileWorkspace resizable hideLayoutReset navigation={navigation} detailLabel="" onCloseDetail={() => {}}>
     {(api.previewPdfManagement || classificationAvailable) && <section className="file-cleanup-toolbar files-management-toolbar" aria-label="PDF 索引管理">
       <div className="files-selection-actions" role="group" aria-label="文件选择与归纳">
-        <button className="secondary-button" disabled={managementBusy || !files.length} onClick={() => setSelectedIds(files.map(file => file.id))}>全选</button>
-        <button className="secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => setSelectedIds([])}>取消选择</button>
-        <button className="secondary-button" disabled={!classificationAvailable || managementBusy || !selectedIds.length} onClick={()=>setClassifying(true)}>人工归纳</button>
+        <button aria-label="全选" title="全选" className="files-management-icon secondary-button" disabled={managementBusy || !files.length} onClick={() => setSelectedIds(files.map(file => file.id))}><ListChecks size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="取消选择" title="取消选择" className="files-management-icon secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => setSelectedIds([])}><Square size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="人工归纳" title="人工归纳" className="files-management-icon secondary-button" disabled={!classificationAvailable || managementBusy || !selectedIds.length} onClick={()=>setClassifying(true)}><FolderInput size={18} strokeWidth={1.8} aria-hidden="true" /></button>
         <span className="files-selection-count">已选 {selectedIds.length} 条</span>
       </div>
       <div className="files-record-actions" role="group" aria-label="文件纳入与记录">
-        <button className="secondary-button" disabled={!api.previewPdfManagement || managementBusy || !excludableIds.length} onClick={()=>void previewManagement(excludableIds,'ignore')}>排除所选文件</button>
-        <button className="secondary-button" disabled={!api.previewPdfManagement || managementBusy || !restorableIds.length} onClick={()=>void previewManagement(restorableIds,'restore')}>恢复所选文件</button>
-        <button className="secondary-button files-remove-record" disabled={!api.previewPdfManagement || managementBusy || !selectedIds.length} onClick={()=>void previewManagement(selectedIds,'clear')}>移除文件记录</button>
+        <button aria-label="排除所选文件" title="排除所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !excludableIds.length} onClick={()=>void previewManagement(excludableIds,'ignore')}><CircleOff size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="恢复所选文件" title="恢复所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !restorableIds.length} onClick={()=>void previewManagement(restorableIds,'restore')}><RotateCcw size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="移除文件记录" title="移除文件记录" className="files-management-icon secondary-button files-remove-record" disabled={!api.previewPdfManagement || managementBusy || !selectedIds.length} onClick={()=>void previewManagement(selectedIds,'clear')}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
       </div>
     </section>}
     {classifying && <PdfClassificationDialog api={{previewPdfClassification:input=>api.previewPdfClassification!(input),applyPdfClassification:input=>locally(()=>api.applyPdfClassification!(input))}} ids={selectedIds} products={products} batches={batches} onClose={()=>setClassifying(false)} onSaved={async (updated,conflictCount=0)=>{
@@ -486,11 +487,11 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
         { key: 'select', label: '选择', width: 48, minWidth: 48, locked: 'start', render: (item) => <input type="checkbox"
           aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning || (!api.previewPdfManagement && !classificationAvailable && item.isPresent)}
           onChange={() => toggleSelection(item.id)} /> },
-        { key: 'name', label: '文件名', width: 250, minWidth: 150, align: 'left', render: (item) => <span className="file-primary files-name-clamp" title={item.fileName}>{item.fileName.replace(/\.pdf$/i, '')}</span> },
-        { key: 'batch', label: '资料批次', width: 150, minWidth: 110, render: (item) => isSourcePdfPath(item.relativePath) ? <span className="files-source-label">未转曲源文件</span> : <span title={`${item.materialBatchName ?? '未归入批次'} · ID ${item.materialBatchId ?? '—'} · ${batches.find(batch => batch.id === item.materialBatchId)?.relativePath ?? item.relativePath}`} className="files-batch-code">{item.materialBatchName ? (batches.find(batch => batch.id === item.materialBatchId)?.displayName ?? materialBatchLabel(item.materialBatchName)) : '未归入批次'}</span> },
+        { key: 'name', label: '文件名', width: 250, minWidth: 150, align: 'center', render: (item) => <span className="file-primary files-name-clamp" title={item.fileName}>{item.fileName.replace(/\.pdf$/i, '')}</span> },
+        { key: 'batch', label: '资料批次', width: 150, minWidth: 110, align:'center', render: (item) => isSourcePdfPath(item.relativePath) ? <span className="files-source-label">未转曲源文件</span> : <span title={`${item.materialBatchName ?? '未归入批次'} · ID ${item.materialBatchId ?? '—'} · ${batches.find(batch => batch.id === item.materialBatchId)?.relativePath ?? item.relativePath}`} className="files-batch-code">{item.materialBatchName ? (batches.find(batch => batch.id === item.materialBatchId)?.displayName ?? materialBatchLabel(item.materialBatchName)) : '未归入批次'}</span> },
         { key: 'batchStatus', label: '批次状态',width:86,minWidth:80,align:'center', render: (item) => <FileBatch item={item} batches={batches} /> },
         { key: 'product', label: '产品',width:130,minWidth:110,align:'center', render: (item) => item.productId ? <span className="file-product"><strong>{item.productCategory} · {item.model}</strong><small>SKU：{item.sku ?? '待补录'}</small></span> : <span className="muted-text">待关联</span> },
-        { key: 'drawing', label: '匹配图号',width:190,minWidth:160,align:'left', render: (item) => item.fullCode ? <span className="file-match matched">
+        { key: 'drawing', label: '匹配图号',width:190,minWidth:160,align:'center', render: (item) => item.fullCode ? <span className="file-match matched">
           <span className="code-cell" title={item.fullCode}>{item.fullCode}</span>
           {item.classificationWarning && <span className="file-warning">{item.classificationWarning === 'conversion-conflict'
             ? '目录与文件名的转曲标记冲突' : item.classificationWarning}</span>}

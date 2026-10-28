@@ -31,8 +31,9 @@ describe('ProductsPage', () => {
     expect(within(normalCells[7]).getByRole('button', {name:'菜谱 · 未配置'})).toHaveClass('product-purpose-unconfigured');
     expect(within(normalCells[6]).getByRole('button', { name: '售后卡 · 已停用' })).toBeVisible();
     expect(normalCells[7]).toHaveTextContent('未配置');
+    expect(screen.getByRole('heading',{name:'产品档案'}).closest('.page-sticky-controls')).toContainElement(screen.getByRole('button',{name:'筛选'}));
     expect(headers).toEqual(['SKU','型号','品牌','产品类别','状态','说明书','售后卡','菜谱','操作']);
-    expect(screen.getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(['left','left','left',...Array(6).fill('center')]);
+    expect(screen.getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(Array(9).fill('center'));
     expect(screen.queryByRole('button',{name:/详情 /})).toBeNull();
     expect(screen.queryByRole('button',{name:/停用 /})).toBeNull();
 

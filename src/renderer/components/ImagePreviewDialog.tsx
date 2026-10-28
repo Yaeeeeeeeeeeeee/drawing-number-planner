@@ -44,7 +44,7 @@ export function ImagePreviewDialog({ images, initialIndex = 0, onClose }: { imag
         onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture?.(event.pointerId); drag.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }; }}
         onPointerMove={event => { if (!drag.current) return; setPan({ x: drag.current.panX + event.clientX - drag.current.x, y: drag.current.panY + event.clientY - drag.current.y }); }}
         onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
-        {failed ? <p role="alert">图片无法读取，请检查文件或重新加载。</p> : <img src={image.src} alt={image.name ?? '图片'} title={image.name} draggable={false} onError={() => setFailed(true)} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}/>}
+        {failed ? <p role="alert">图片无法读取，请检查文件或重新加载。</p> : <img src={image.src} alt={image.name ?? '图片'} draggable={false} onError={() => setFailed(true)} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}/>}
       </div>
     </section>
   </div>, document.body);

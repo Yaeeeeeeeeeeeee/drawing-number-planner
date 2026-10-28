@@ -13,3 +13,8 @@
 .files-page .files-management-toolbar .files-selection-count {white-space:nowrap;margin-left:4px;}
 .files-page .files-management-toolbar .files-remove-record {color:#a34d4d;border-color:#dbbebe;}
 .files-page .files-management-toolbar .files-remove-record:disabled {color:#8a7474;border-color:#dce0e4;}
+
+/* Keep PDF identities centered inside their actual column, including clamped text. */
+.files-page .files-name-clamp,.files-page .files-batch-code {text-align:center;}
+.files-page .files-management-toolbar .files-management-icon {display:inline-flex;align-items:center;justify-content:center;width:34px;min-width:34px;padding:7px;}
+.files-page .files-management-toolbar .files-management-icon svg {flex:none;}

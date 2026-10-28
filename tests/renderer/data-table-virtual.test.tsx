@@ -53,3 +53,15 @@ describe('bounded scrolling data table',()=>{
  });
 
 });
+
+it('retains row ResizeObservers when expanded content has a fresh ReactNode identity',()=>{
+ const disconnected=vi.fn();const observed:Element[]=[];
+ vi.stubGlobal('ResizeObserver',class{constructor(_callback:ResizeObserverCallback){} observe(element:Element){observed.push(element);}disconnect(){disconnected();}});
+ try{
+  const columns=[{key:'name',label:'产品',render:(item:typeof items[number])=>item.name}];
+  const view=render(<DataTable virtualize items={items.slice(0,2)} columns={columns} renderExpandedRow={item=>item.id===0?<div>用途</div>:null}/>);
+  expect(observed.some(node=>node.tagName==='TR')).toBe(true);disconnected.mockClear();
+  view.rerender(<DataTable virtualize items={items.slice(0,2)} columns={columns} renderExpandedRow={item=>item.id===0?<div>更新的用途</div>:null}/>);
+  expect(screen.getByText('更新的用途')).toBeVisible();expect(disconnected).not.toHaveBeenCalled();
+ }finally{vi.unstubAllGlobals();}
+});

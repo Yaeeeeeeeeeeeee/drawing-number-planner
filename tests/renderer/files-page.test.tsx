@@ -45,6 +45,18 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('centers filename, batch and matched-code headers and body cells without changing row identities', async () => {
+    const view = render(<FilesPage api={apiFixture(true) as never} />);
+    await screen.findByText('02.0404.010.0401001-LOGO',{selector:'.file-primary'});
+    for (const key of ['name','batch','drawing']) {
+      expect(view.container.querySelector(`th[data-column-key="${key}"]`)).toHaveStyle({textAlign:'center'});
+      const cells=view.container.querySelectorAll(`tbody td[data-column-key="${key}"]`);
+      expect(cells.length).toBeGreaterThan(0);
+      for(const cell of cells) expect(cell).toHaveStyle({textAlign:'center'});
+    }
+    expect(screen.getByRole('checkbox',{name:'选择 02.0404.010.0401001-LOGO.pdf'})).toBeVisible();
+  });
+
   beforeEach(() => { Object.defineProperty(window, 'innerWidth', {configurable:true,value:1600}); });
   it('keeps manual file filters when all files clears only navigation scope', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);

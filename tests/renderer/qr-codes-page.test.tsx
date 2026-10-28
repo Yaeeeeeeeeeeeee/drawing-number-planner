@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {StrictMode} from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QrCodesPage } from '../../src/renderer/pages/QrCodesPage';
 const purpose={id:1,key:'user_manual',englishName:'User Manual',displayName:'说明书',status:'active',defaultForAll:true,productCategories:[]};
@@ -57,8 +58,8 @@ describe('manual QR page',()=>{
   render(<QrCodesPage api={apiFor() as never}/>);const sub=await expand();
   expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.textContent)).toEqual(['SKU','型号','产品类别','说明书','售后卡','菜谱','操作']);
   expect(within(sub).getAllByRole('columnheader').map(h=>h.textContent)).toEqual(['用途','关联文件','网址','业务状态','操作']);
-  expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.style.textAlign)).toEqual(['left','left',...Array(5).fill('center')]);
-  expect(within(sub).getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(['center','center','center','center','center']);
+  expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.style.textAlign)).toEqual(Array(7).fill('center'));
+  expect(within(sub).getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(['center','left','center','center','center']);
   expect(screen.queryByText('待人工确认')).not.toBeInTheDocument();expect(screen.queryByText('扫描匹配状态')).not.toBeInTheDocument();expect(within(sub).getByText('未配置')).toBeVisible();expect(screen.queryByLabelText('二维码每页数量')).not.toBeInTheDocument();expect(screen.queryByText('下一页')).not.toBeInTheDocument();
  });
  it('windows the scrollable product list without rendering thousands of rows or a pager',async()=>{
@@ -88,4 +89,50 @@ describe('manual QR page',()=>{
  it('retains table header and expanded row while refresh is pending without a pager',async()=>{
   const api=apiFor();render(<QrCodesPage api={api as never}/>);await expand();let resolve!:(value:unknown)=>void;api.listQrCodes.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));const header=screen.getByRole('columnheader',{name:'SKU'}),sub=document.querySelector('.qr-manual-subtable');fireEvent.click(screen.getByRole('button',{name:'筛选'}));expect(screen.getByRole('columnheader',{name:'SKU'})).toBe(header);expect(document.querySelector('.qr-manual-subtable')).toBe(sub);resolve({items:[manual]});await waitFor(()=>expect(screen.getByRole('button',{name:'筛选'})).not.toBeDisabled());expect(screen.queryByLabelText('二维码每页数量')).not.toBeInTheDocument();
  });
+});
+
+it('keeps expansion while hidden and avoids hidden focus requests, then refreshes the list once on return',async()=>{
+ const api=apiFor();const view=render(<QrCodesPage api={api as never} active/>);await expand();
+ view.rerender(<QrCodesPage api={api as never} active={false}/>);fireEvent.focus(window);
+ expect(api.listQrCodes).toHaveBeenCalledTimes(1);
+ view.rerender(<QrCodesPage api={api as never} active/>);
+ await waitFor(()=>expect(api.listQrCodes).toHaveBeenCalledTimes(2));
+ expect(screen.getByRole('button',{name:'收起 ZU70SD 的二维码用途'})).toBeVisible();
+ expect(api.listProducts).toHaveBeenCalledTimes(2);expect(api.listQrPurposes).toHaveBeenCalledTimes(2);
+});
+it('does not repeat reference reads when navigating between product scopes and rejects an old detail response',async()=>{
+ const api=apiFor();let resolve!:(value:typeof manual)=>void;api.getQrCode.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
+ const view=render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'查看 ZU70SD 使用说明'}));
+ view.rerender(<QrCodesPage api={api as never} productTarget={{productId:9,purposeKey:'recipe'} as never}/>);
+ resolve(manual);await waitFor(()=>expect(api.listQrCodes).toHaveBeenCalledTimes(2));
+ expect(screen.getByRole('heading',{name:'二维码管理'})).toBeVisible();expect(screen.queryByLabelText('二维码名称')).toBeNull();
+ expect(api.listProducts).toHaveBeenCalledTimes(1);expect(api.listQrPurposes).toHaveBeenCalledTimes(1);
+});
+
+it('coalesces consecutive focus events while the same list refresh is pending',async()=>{
+ const api=apiFor();render(<QrCodesPage api={api as never}/>);await expand();
+ let finish!:(result:{items:typeof manual[]})=>void;api.listQrCodes.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ act(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('focus'));});
+ expect(api.listQrCodes).toHaveBeenCalledTimes(2);
+ await act(async()=>{finish({items:[manual]});});
+});
+it('ignores a pending focus detail result after the user returns to the list',async()=>{
+ const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'查看 ZU70SD 使用说明'}));
+ await screen.findByLabelText('二维码名称');let finish!:(code:typeof manual)=>void;api.getQrCode.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ fireEvent.focus(window);fireEvent.click(screen.getByRole('button',{name:'返回列表'}));await act(async()=>{finish(manual);});
+ expect(screen.getByRole('heading',{name:'二维码管理'})).toBeVisible();
+});
+
+it('completes its initial list load when development StrictMode repeats effect setup',async()=>{
+ const api=apiFor();render(<StrictMode><QrCodesPage api={api as never}/></StrictMode>);const sub=await expand();
+ expect(await within(sub).findByRole('button',{name:'ZU70SD-User Manual'})).toBeVisible();expect(screen.getByRole('button',{name:'筛选'})).toBeEnabled();
+});
+
+it('refreshes file history when links change without a QR metadata timestamp change',async()=>{
+ const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'查看 ZU70SD 使用说明'}));
+ await waitFor(()=>expect(api.qrManualHistory).toHaveBeenCalledTimes(1));
+ fireEvent.focus(window);await waitFor(()=>expect(api.getQrCode).toHaveBeenCalledTimes(2));expect(api.qrManualHistory).toHaveBeenCalledTimes(1);
+ await waitFor(()=>expect(screen.getByRole('button',{name:'保存二维码信息'})).toBeEnabled());
+ api.getQrCode.mockResolvedValueOnce({...manual,files:[]});fireEvent.focus(window);
+ await waitFor(()=>expect(api.qrManualHistory).toHaveBeenCalledTimes(2));
 });

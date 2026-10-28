@@ -12,3 +12,12 @@ describe('BOM image preview', () => {
     expect(screen.getByText('预览失败，正在核验文件状态…')).toBeVisible();
   });
 });
+
+it('opens the zoom viewer without displaying filename tooltips or file-location actions',()=>{
+ render(<BomAssetPreview assetId={31} name="private-original-name.png"/>);
+ const thumbnail=screen.getByRole('button',{name:'放大图片'});
+ expect(thumbnail).not.toHaveAttribute('title','private-original-name.png');
+ fireEvent.click(thumbnail);expect(screen.getByRole('dialog',{name:'图片预览'})).toBeVisible();
+ expect(document.querySelector('[title="private-original-name.png"]')).toBeNull();
+ expect(screen.queryByText('private-original-name.png')).toBeNull();expect(screen.queryByRole('button',{name:'打开所在位置'})).toBeNull();
+});

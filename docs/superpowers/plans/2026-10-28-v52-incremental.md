@@ -44,9 +44,9 @@ Interfaces: additive drawing file groups/provenance/existence states, firstBom p
 
 ### Phase 4 — Internal folders and shared UI
 Files: MaterialBatchService/nav/contextmenu; shared table layout/CSS/workspace/virtual rows; pages columns/frozen operations/image labels.
-- [ ] RED internal empty-node cleanup safety, explicit align/rightmost-space receiving, stable observers/loading/list state; preserve productID values and supported interactions.
-- [ ] Implement only actual gaps from audit, same-line icon toolbar, specified centering/widths, frozen top/actions, title/category alignment, brand·model labels, existing image zoom/no extraneous actions.
-- [ ] GREEN cross-page layouts/data/cache + browser geometry at supported widths before Phase5.
+- [x] RED internal empty-node cleanup safety, explicit align/rightmost-space receiving, stable observers/loading/list state; preserve productID values and supported interactions.
+- [x] Implement only actual gaps from audit, same-line icon toolbar, specified centering/widths, frozen top/actions, title/category alignment, brand·model labels, existing image zoom/no extraneous actions.
+- [x] GREEN cross-page layouts/data/cache + browser geometry at supported widths before Phase5.
 
 ### Phase 5 — Existing mail importer correction only
 Files: core/import/email-template-import* and worksheet helper; EmailTemplateImport preview/routes/client types; focused tests.
@@ -68,3 +68,5 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 2026-10-28 Phase3 IPC: existing show-file-in-folder now accepts exact drawing identity+safe relative path for readonly unindexed discovery; service re-observes scope/existence/quarantine. No raw absolute path/synthetic index/new IPC. RED 3 new failures then GREEN bridge3files32tests including running application with no pdf_files writes. Remaining BOM and drawing domain/renderer gates still active.
 
 2026-10-28 Phase3 complete: drawing24files276pass, BOM23files318pass, IPC/application3files32pass (overlap, not additive); tsc clean. Fixed readonly all-batch discovery/exact BOM navigation and date/reuse/copy-snapshot/reset/query/hash behavior. NoSchema migration, original files untouched, force-release quarantine regression preserved. BeginPhase4.
+
+2026-10-28 Phase4 complete: shared9files82pass, PDF/batch6files88pass, HTTP28pass, browser1pass across720/1366/1920/2560/3840 with actual temporary indexed files/rows, rightmost transfer and outer-scroll pinned controls at1920x320; tsc/diffclean. Initial browser resize assertion read stale viewport geometry; wait for measured table-wrap width, not fixed sleeps. Existing batchcontextmenu/safety reused, physical empty directory preserved. BeginPhase5; Schema23 minimal links+explicit-empty marker proposal in spec before implementation.

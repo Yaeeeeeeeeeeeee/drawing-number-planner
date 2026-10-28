@@ -23,13 +23,28 @@ export function useWorkspaceExtent(ref: RefObject<HTMLElement | null>, enabled =
       const next = { width: box.width || window.innerWidth, height: Math.max(240, Math.floor(height)) };
       setExtent(previous => previous.width === next.width && previous.height === next.height ? previous : next);
     };
+    let frame = 0;
+    let disposed = false;
+    const schedule = () => {
+      if (!frame && !disposed) frame = requestAnimationFrame(() => { frame = 0; if (!disposed) measure(); });
+    };
     measure();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     for (const node of [root, workspace, page]) if (node) observer?.observe(node);
-    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(measure);
-    mutations?.observe(page ?? root, { childList: true, subtree: true });
-    window.addEventListener('resize', measure);
-    return () => { observer?.disconnect(); mutations?.disconnect(); window.removeEventListener('resize', measure); };
+    // Only preceding layout siblings can move this region. Virtual rows inside it cannot.
+    const observeControls = () => {
+      for (let node: HTMLElement | null = root; node && node !== workspace; node = node.parentElement) {
+        for (let sibling = node.previousElementSibling; sibling; sibling = sibling.previousElementSibling) observer?.observe(sibling);
+      }
+    };
+    observeControls();
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => { observeControls(); schedule(); });
+    for (let node = root.parentElement; node; node = node.parentElement) {
+      mutations?.observe(node, { childList: true });
+      if (node === page || node === workspace) break;
+    }
+    window.addEventListener('resize', schedule);
+    return () => { disposed = true; cancelAnimationFrame(frame); observer?.disconnect(); mutations?.disconnect(); window.removeEventListener('resize', schedule); };
   }, [ref, enabled]);
   return extent;
 }

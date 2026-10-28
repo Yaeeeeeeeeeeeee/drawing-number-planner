@@ -4,6 +4,7 @@ import { AppShell } from '../../src/renderer/layout/AppShell';
 import type { PlannerApi } from '../../src/renderer/data/client';
 
 vi.mock('../../src/renderer/pages/PlanningPage', () => ({ PlanningPage: () => <label>规划输入<input aria-label="规划输入" /></label> }));
+vi.mock('../../src/renderer/pages/QrCodesPage', () => ({ QrCodesPage: ({active}:{active:boolean}) => <input aria-label="保留二维码状态" data-active={String(active)}/> }));
 vi.mock('../../src/renderer/pages/DictionariesPage', () => ({ DictionariesPage: () => <h1>字典内容</h1> }));
 vi.mock('../../src/renderer/components/SafeRecovery', () => ({ SafeRecovery: () => <button>安全恢复</button> }));
 
@@ -119,5 +120,15 @@ it('groups the nine workflows into daily work, product details and data sources 
   expected.forEach((group,index)=>expect(Array.from(groups[index].querySelectorAll('button')).map(button=>button.textContent)).toEqual(group.slice(1)));
   const icons=Array.from(container.querySelectorAll('nav[aria-label="主导航"] button svg'));
   expect(icons).toHaveLength(9);expect(new Set(icons.map(icon=>icon.innerHTML)).size).toBe(9);
+ }finally{vi.unstubAllGlobals();}
+});
+
+it('retains the QR page DOM and marks it inactive between module visits',()=>{
+ viewport(false);
+ try{
+  render(<AppShell api={{} as PlannerApi}/>);fireEvent.click(screen.getByRole('button',{name:'二维码管理'}));
+  const input=screen.getByLabelText('保留二维码状态');fireEvent.change(input,{target:{value:'保留展开和筛选'}});
+  fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材'}));expect(input).not.toBeVisible();expect(input).toHaveAttribute('data-active','false');
+  fireEvent.click(screen.getByRole('button',{name:'二维码管理'}));expect(screen.getByLabelText('保留二维码状态')).toBe(input);expect(input).toHaveValue('保留展开和筛选');expect(input).toHaveAttribute('data-active','true');
  }finally{vi.unstubAllGlobals();}
 });

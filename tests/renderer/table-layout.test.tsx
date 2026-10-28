@@ -2,7 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {act,fireEvent,render,screen,within} from '@testing-library/react';
 import {DataTable} from '../../src/renderer/components/DataTable';
 import {LayoutTable} from '../../src/renderer/components/LayoutTable';
-import {fitColumnWidths,normalizeLayout} from '../../src/renderer/components/useTableLayout';
+import {columnAlignment,redistributeColumnWidths,fitColumnWidths,normalizeLayout} from '../../src/renderer/components/useTableLayout';
 const columns=[{key:'select',label:'选择',locked:'start' as const,width:48,minWidth:48,render:()=> 'check'},{key:'name',label:'名称',width:160,render:(x:{id:number})=>`Name ${x.id}`},{key:'batch',label:'批次',render:()=> 'Batch'},{key:'actions',label:'操作',locked:'end' as const,render:()=> 'Open'}];
 beforeEach(()=>localStorage.clear());
 describe('shared table layouts',()=>{
@@ -129,4 +129,26 @@ it('ignores a queued size observation after a table is unmounted during workspac
   expect(callback).toBeDefined();view.unmount();
   expect(()=>callback!([],{} as ResizeObserver)).not.toThrow();
  } finally {vi.unstubAllGlobals();}
+});
+
+
+describe('V5.2 explicit alignment and rightmost resize receiver',()=>{
+ it('honors explicit alignment for identity and status columns in ordinary, virtual and raw tables',()=>{
+  expect(columnAlignment({key:'status',label:'状态',align:'right'})).toBe('right');
+  const associated=render(<LayoutTable tableId="explicit-file" columns={[{key:'fileName',label:'关联文件',align:'left'}]}><thead><tr><th>关联文件</th></tr></thead><tbody><tr><td>PDF</td></tr></tbody></LayoutTable>);
+  expect(screen.getByRole('columnheader')).toHaveStyle({textAlign:'left'});associated.unmount();
+  for(const virtualize of [false,true]){
+   const view=render(<DataTable tableId={`align-${virtualize}`} virtualize={virtualize} columns={[{key:'model',label:'型号',align:'center',render:()=> 'M1'}]} items={[{id:1}]}/>);
+   expect(screen.getByRole('columnheader',{name:'型号'})).toHaveStyle({textAlign:'center'});expect(screen.getByRole('cell')).toHaveStyle({textAlign:'center'});view.unmount();
+  }
+  render(<LayoutTable tableId="raw-center" columns={[{key:'name',label:'名称',align:'center'}]}><thead><tr><th>名称</th></tr></thead><tbody><tr><td>字典</td></tr></tbody></LayoutTable>);
+  expect(screen.getByRole('columnheader')).toHaveStyle({textAlign:'center'});expect(screen.getByRole('cell')).toHaveStyle({textAlign:'center'});
+ });
+ it('returns released width exclusively to the rightmost displayed stretchable peer',()=>{
+  const widths={select:48,name:200,batch:200,actions:252};
+  expect(redistributeColumnWidths(columns,widths,'name',150,700)).toEqual({select:48,name:150,batch:200,actions:302});
+  const reordered=[columns[0],columns[1],columns[3],columns[2]];
+  expect(redistributeColumnWidths(reordered,widths,'name',150,700)).toEqual({select:48,name:150,batch:250,actions:252});
+  expect(redistributeColumnWidths(reordered,widths,'batch',150,700)).toEqual({select:48,name:200,batch:150,actions:302});
+ });
 });

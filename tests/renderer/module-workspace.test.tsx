@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ModuleWorkspace } from '../../src/renderer/components/ModuleWorkspace';
 
@@ -19,7 +19,7 @@ it('keeps narrow PDF navigation open for tree expansion and filters, closing onl
   fireEvent.click(screen.getByRole('button',{name:'选择产品'}));
   expect(screen.queryByRole('dialog',{name:'产品／批次导航'})).toBeNull();
 });
-it('supports keyboard panel sizing and reset without changing the detail input', () => {
+it('supports keyboard panel sizing and reset without changing the detail input', async () => {
   vi.stubGlobal('innerWidth', 1920);
   render(<ModuleWorkspace resizable fileWorkspace navigation={<button>产品A</button>} detail={<input aria-label="详情输入" defaultValue="保留输入" />} detailLabel="文件详情" detailIdentity={1} onCloseDetail={() => {}}><p>列表</p></ModuleWorkspace>);
   const handle = screen.getByRole('separator', { name: '调整产品导航宽度' });
@@ -30,7 +30,7 @@ it('supports keyboard panel sizing and reset without changing the detail input',
   fireEvent.click(screen.getByRole('button', { name: '恢复默认宽度' }));
   expect(Number(handle.getAttribute('aria-valuenow'))).toBe(before);
   act(() => { vi.stubGlobal('innerWidth', 720); window.dispatchEvent(new Event('resize')); });
-  expect(screen.getByRole('dialog', { name: '文件详情窗口' })).toBeVisible();
+  expect(await screen.findByRole('dialog', { name: '文件详情窗口' })).toBeVisible();
   expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   expect(screen.getByLabelText('详情输入')).toHaveValue('保留输入');
 });
@@ -49,20 +49,19 @@ it('allocates wide PDF detail to its own track and allows folding the product na
   expect(container.querySelector('.module-navigation')).toBeVisible();
   expect(screen.getByLabelText('文件详情草稿')).toHaveValue('保留');
 });
-it('recomputes available height without replacing the list or detail inputs', () => {
+it('recomputes available height without replacing the list or detail inputs', async () => {
   vi.stubGlobal('innerWidth', 1920); vi.stubGlobal('innerHeight', 2160);
   const { container } = render(<ModuleWorkspace resizable detail={<input aria-label="详情内容" defaultValue="不清空" />} detailLabel="图号详情" onCloseDetail={() => {}}><input aria-label="列表输入" defaultValue="筛选" /></ModuleWorkspace>);
   const root = container.querySelector<HTMLElement>('.module-workspace-viewport')!;
   const before = Number(root.style.getPropertyValue('--workspace-available-height').replace('px', ''));
   expect(before).toBeGreaterThan(1500);
   act(() => { vi.stubGlobal('innerHeight', 600); window.dispatchEvent(new Event('resize')); });
-  const after = Number(root.style.getPropertyValue('--workspace-available-height').replace('px', ''));
-  expect(after).toBeLessThan(before);
+  await waitFor(()=>expect(Number(root.style.getPropertyValue('--workspace-available-height').replace('px', ''))).toBeLessThan(before));
   expect(screen.getByLabelText('列表输入')).toHaveValue('筛选');
   expect(screen.getByLabelText('详情内容')).toHaveValue('不清空');
 });
 
-it('keeps focus in the edited detail control through breakpoints and restores its origin on close', () => {
+it('keeps focus in the edited detail control through breakpoints and restores its origin on close', async () => {
   vi.stubGlobal('innerWidth', 1920);
   function Harness() {
     const [open, setOpen] = useState(false);
@@ -74,11 +73,11 @@ it('keeps focus in the edited detail control through breakpoints and restores it
   fireEvent.click(screen.getByRole('button', { name: '产品／批次导航' }));
   const field = screen.getByLabelText('正在编辑的字段'); field.focus();
   act(() => { vi.stubGlobal('innerWidth', 720); window.dispatchEvent(new Event('resize')); });
-  expect(field).toHaveFocus();
+  await screen.findByRole('dialog',{name:'图号详情窗口'});expect(field).toHaveFocus();
   act(() => { vi.stubGlobal('innerWidth', 1920); window.dispatchEvent(new Event('resize')); });
-  expect(field).toHaveFocus();
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'图号详情窗口'})).toBeNull());expect(field).toHaveFocus();
   act(() => { vi.stubGlobal('innerWidth', 720); window.dispatchEvent(new Event('resize')); });
-  expect(field).toHaveFocus();
+  await screen.findByRole('dialog',{name:'图号详情窗口'});expect(field).toHaveFocus();
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(origin).toHaveFocus();
 });

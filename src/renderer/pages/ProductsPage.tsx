@@ -233,6 +233,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
       {cleanupId === editingProduct.id && <ProductCleanupPanel key={editingProduct.id} api={api} productId={editingProduct.id} confirmLabel="确认删除档案" onCancel={() => setCleanupId(null)} onComplete={() => { cleanupComplete(editingProduct.id); setEditorOpen(false); }}/>}</section>}
   </section>;
   return <section ref={root} className="page-surface page-enter products-integrated products-compact">
+    <div className="page-sticky-controls">
     <PageHeader title="产品档案" description="产品档案是图号、BOM 与 PDF 记录共用的产品身份来源。">
       <div className="header-actions"><button className="secondary-button" onClick={() => void openHistoricalCandidates()} type="button">识别历史产品</button><button className="primary-button" onClick={openCreate} type="button">新建产品</button></div>
     </PageHeader>
@@ -243,6 +244,8 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
       <label><span>状态</span><select aria-label="产品状态" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">全部</option><option value="active">启用中</option><option value="inactive">已停用</option></select></label>
       <button className="primary-button" type="submit">筛选</button>
     </form>
+    <div className="page-query-feedback"><QueryFeedback state={queryState} error={queryError} onRetry={() => initialLoaded ? void load(queriedFilters) : loadInitial()}/></div>
+    </div>
     {dictionaryFeedback}
     {historicalOpen && <section className="historical-product-panel panel-enter" aria-label="历史产品候选">
       <div className="historical-product-heading"><div><p className="eyebrow">LIBRARY CANDIDATES</p><h2>从资料库识别历史产品</h2><p>这里只列出目录信息完整的候选。系统不会自动建档，确认前请核对 SKU、型号和产品类别。</p></div><button className="text-button" onClick={() => { setHistoricalOpen(false); setSelectedCandidate(null); }} type="button">关闭</button></div>
@@ -263,10 +266,9 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
       {historicalMessage && <p className="success-banner">{historicalMessage}</p>}
     </section>}
     {error && <p className="error-banner">{error}</p>}
-    {queryState !== 'ready' && <QueryFeedback state={queryState} error={queryError} onRetry={() => initialLoaded ? void load(queriedFilters) : loadInitial()}/>}
     {items.length === 0 ? queryState !== 'ready' ? null : <EmptyState title={Object.entries(queriedFilters).some(([key,value]) => key === 'status' ? value !== 'all' : Boolean(value)) ? '没有符合筛选条件的产品' : '还没有产品档案'} description="先完成编码字典，再创建首个产品型号。" symbol="品" /> :
       <><DataTable tableId="products.archive" fillViewport virtualize virtualKey={JSON.stringify(queriedFilters)} items={items} columns={[
-        { key: 'sku', label: 'SKU', width:210, minWidth:130, align:'left', render: item => <strong title={item.sku ?? undefined}>{item.sku ?? '待补录'}</strong> },
+        { key: 'sku', label: 'SKU', width:210, minWidth:130, align:'center', render: item => <strong title={item.sku ?? undefined}>{item.sku ?? '待补录'}</strong> },
         { key: 'model', label: '型号', width:170, minWidth:130, align:'center', render: item => <span title={item.model}>{item.model}</span> },
         { key: 'brand', label: '品牌', width:130, minWidth:130, align:'center', render: item => item.brandName },
         { key: 'category', label: '产品类别', width:150, minWidth:130, align:'center', render: item => item.productCategory },

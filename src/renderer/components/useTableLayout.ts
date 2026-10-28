@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 export interface LayoutColumn {key:string;label:string; width?:number; minWidth?:number; align?:'left'|'center'|'right'; locked?:'start'|'end'}
 export function columnAlignment(c:LayoutColumn){
+ if(c.align)return c.align;
  if(/^(sku|model|brand|name|fileName|filename)$/i.test(c.key))return 'left';
  if(/status|count|quantity|date|time|created|updated|color|action|operation|select|checkbox|^qty$/i.test(c.key))return 'center';
  return c.align??'left';
@@ -27,7 +28,13 @@ export function redistributeColumnWidths(columns:LayoutColumn[],widths:Record<st
  const others=columns.filter(c=>c.key!==key);
  const otherMinimum=others.reduce((sum,c)=>sum+columnMinimum(c),0);
  const budget=Math.max(available,otherMinimum+columnMinimum(column));
+ const receiver=[...others].reverse().find(c=>!(/^(select|selection|checkbox)$/i.test(c.key)||c.locked==='start'&&columnDefault(c)===columnMinimum(c)));
+ const current=widths[key]??columnDefault(column);
  const next=others.length?Math.max(columnMinimum(column),Math.min(budget-otherMinimum,width)):budget;
+ if(next<current){
+  if(!receiver)return widths;
+  return {...widths,[key]:next,[receiver.key]:(widths[receiver.key]??columnDefault(receiver))+current-next};
+ }
  return {...fitColumnWidths(others,widths,budget-next,true),[key]:next};
 }
 export interface TableLayout {fixed?:boolean;order:string[];widths:Record<string,number>}
