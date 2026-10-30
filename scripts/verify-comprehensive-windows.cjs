@@ -218,12 +218,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   report.aitPackaging.realProcessRestartPreservesTask=true;
  }finally{await app.close();}
  const afterRestart=snapshot(path.join(legacy,'planner.db'));
- for(const [table,rows]of Object.entries(beforeRestart)){
-  if(['file_scan_runs','file_scan_changes'].includes(table)){assertPreservedRows({[table]:rows},{[table]:afterRestart[table]});continue;}
-  const business=records=>records.map(row=>{if(table==='pdf_files'&&row.product_id===report.aitPackaging.productId){const {last_seen_at,last_seen_scan_run_id,...facts}=row;return facts;}return row;});
-  assert.deepEqual(business(afterRestart[table]),business(rows),`Restart changed protected ${table} facts`);
- }
- for(const scan of afterRestart.file_scan_runs.filter(row=>!beforeRestart.file_scan_runs.some(prior=>prior.id===row.id))){assert.equal(scan.scope_kind,'products');assert.deepEqual(JSON.parse(scan.scope_directories_json),[report.aitPackaging.productDirectory]);}
+ require('./verify-packaging-restart.cjs')(beforeRestart,afterRestart,{pdfIndexIds:report.aitPackaging.pdfIndexIds,productDirectory:report.aitPackaging.productDirectory});
  beforeRestart=afterRestart;report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
  // Real same-version reinstalls must ask again; ordinary restarts must not.
  const setup=path.join(evidence,'图号规划器-Windows-x64-安装包.exe');
