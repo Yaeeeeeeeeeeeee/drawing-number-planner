@@ -54,3 +54,13 @@ Windows前轮的任务归档功能已执行成功；重启验收脚本误把正�
 - 正式源码Tag：`v1.4.0`固定`541219c6dc17e7d6a207c2ed58f4b20bb41bd614`。
 - Windows同次工件：Setup ZIP SHA256 `83cd7908a0d3912b7614f2785630a6bcaab2fe1519c2513879ae17220fa11d48`；Verification ZIP SHA256 `62a7591e086c6f5392d7135baf82c8a12ad86895ac5c707c0d909b9fd1cd2a80`。这是Actions工件ZIP摘要；最终EXE摘要以Release的SHA256SUMS为准。
 - 安装前关闭程序并完整备份数据目录，下载新安装器、选择原planner.db继续升级24。真实AIT字段名/字体需本地配置；不需要清空数据库或重扫全库解决兼容。
+
+## 公开交付核验
+
+[正式Release v1.4.0](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.4.0)，发布运行41081678867成功。公开安装器和验证ZIP已实际下载，匹配Release的SHA256SUMS；EXE头为MZ，实际Windows截图已查看，报告确认安装版本1.4.0与源码541219c一致。
+
+- `DrawingNumberPlanner-1.4.0-Windows-x64-Setup.exe`：145163780字节，SHA256 `bb2e031ff0347a4ace290a9d3643d2959969bb0796ede90e0d3229dd6b011d91`。
+- `Verification-Windows-1.4.0.zip`：7244166字节，SHA256 `041a0b44cf305ec75bc04509fdb4d9b26240fb575aedfbfd1a5e17f7c2ce3bbe`；92张Windows截图，未包含DB、PDF、AIT或XLSX原始夹具。
+- 报告中 `realIllustratorGeneration=false`、`editablePdfReopenVerified=false`，明确保留真实Adobe验收限制，不把人工PDF与上传合约样本冒充真实自动制图。
+
+本地仍需：备份旧数据后继续原planner.db升级24；保持原资料路径；导入真实AIT，核对命名文字对象映射与字体，先单文件生成并在本机Illustrator重新打开确认版式和可编辑性；物理DPI另行核对。ZC100或其他真实产品归并不在启动时执行。

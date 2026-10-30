@@ -61,4 +61,4 @@ Files: PackagingTemplatesPage.tsx, packaging page components/CSS/client types, P
 
 ## Stage7 Verification/delivery
 - [x] Final full suite212/1793,13 E2E, type/build, real browser task/archive/backup, actual oldSchema23 upgrade and Windows41080505744 installed acceptance passed. Adobe editablePDF remains explicitly unverified.
-- [ ] Independent whole-change review fixed six reproduced issues; final integration review found no material issue. Publishing pinned successful Windows/source artifacts, then verify public download. Actual Adobe test limitation stays explicit.
+- [x] Independent review fixes and final integration review complete. Windows41080505744 and publisher41081678867 succeeded; v1.4.0 pinned541219c, public EXE/report downloaded/hash-checked and actual Windows screenshots inspected. Actual Adobe test limitation stays explicit.
