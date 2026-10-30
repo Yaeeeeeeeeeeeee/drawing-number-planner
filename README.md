@@ -2,23 +2,23 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.2.0
+## 当前版本 v1.3.0 · V5.2
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.2.0/DrawingNumberPlanner-1.2.0-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.2.0)
-- [安装、升级和恢复说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/4b664b510bf3c7a39a4d3695a367adf054a2aaf6/docs/install-and-upgrade.md)
-- [维护和发布方式](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/4b664b510bf3c7a39a4d3695a367adf054a2aaf6/docs/maintenance.md)
-- [上一版 v1.1.2（Schema22）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.1.2)
-- [V5.1 邮件导入与草稿实现、验证和限制](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/4b664b510bf3c7a39a4d3695a367adf054a2aaf6/docs/v51-mail-delivery-20261027.md)
-- [V5 修改记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/4b664b510bf3c7a39a4d3695a367adf054a2aaf6/docs/v5-delivery-20261026.md)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.3.0/DrawingNumberPlanner-1.3.0-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.0)
+- [安装、升级和恢复说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/d416ed62b10b8b86d13dd948eb3145cc9e4f8e12/docs/install-and-upgrade.md)
+- [维护和发布方式](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/d416ed62b10b8b86d13dd948eb3145cc9e4f8e12/docs/maintenance.md)
+- [上一版 v1.2.0（Schema22）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.2.0)
+- [V5.1 邮件导入与草稿实现、验证和限制](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/d416ed62b10b8b86d13dd948eb3145cc9e4f8e12/docs/v51-mail-delivery-20261027.md)
+- [V5 修改记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/d416ed62b10b8b86d13dd948eb3145cc9e4f8e12/docs/v5-delivery-20261026.md)
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
 
-## V5.1 邮件流程
+## V5.2 增量修正与邮件流程
 
 在「迁移检查 → 导入邮件模板」选择现有 XLSX，核对厂家、场景、正文及历史示例后确认。模板、联系人和签名统一在「外发资料 → 邮件配置」维护。ZIP 成功后点击「生成邮件草稿」，填写实际修改原因、调整收件人和正文，再复制使用；程序不自动发送邮件。
 
-未提供参考 Excel 原件时，结构测试数量不代表用户表的真实厂家或模板数；无法识别的内容留在预览中人工核对。Schema 仍为22，不清空旧库。
+已使用本轮上传的原始 Excel 验证：5 家供应商、20 个首批场景和 5 个更新案例独立解析，正文、签名和联系人分开处理；原始案例及单元格来源保存后仍可查看。实际历史内容始终先预览核对。Schema23 仅增量补充邮件配置关联，不清空旧库。详见 [本版说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/d416ed62b10b8b86d13dd948eb3145cc9e4f8e12/docs/release-1.3.0.md)。
 
 ## 主要功能
 
@@ -45,13 +45,13 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 - BOM 保留实际当前关系与历史快照。外发按明确选择的资料批次及打包范围核对文件，BOM 提供辅助依据；不隐式混入其他批次。
 - 二维码是独立记录，不参与正式图号占号。文件关联不会自动改变二维码启停状态。
 
-本版收紧包材扫描范围：产品目录中扫描 `02.未转曲源文件` 和已知生产变更目录，兼容 `03.量产后的变更文件（已量产的产品看最新日期）` 及历史“变更明细”名称；源文件使用独立节点，不作为生产批次。二维码手动文件关联不受此目录限制。
+本版新扫描仅进入产品目录下的 `02.未转曲源文件` 与 `03.量产后的变更文件（已量产的产品看最新日期）`。范围外既存索引和历史引用保留，不因未扫描而标为缺失。源文件使用独立节点，不作为生产批次；二维码手动关联不受此限制。图号详情只读核实文件，展示全部对应批次，不再使用批次选择框。
 
-详见 [项目 Skill](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/4b664b510bf3c7a39a4d3695a367adf054a2aaf6/.agents/skills/drawing-number-planner/SKILL.md) 及其业务、安全和模型参考。
+详见 [项目 Skill](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/d416ed62b10b8b86d13dd948eb3145cc9e4f8e12/.agents/skills/drawing-number-planner/SKILL.md) 及其业务、安全和模型参考。
 
 ## 数据安全与升级
 
-每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema22：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
+每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema23：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
 
 移除 PDF 记录或删除内部空批次不会删除原始文件及磁盘文件夹。已用图号、BOM、产品归并及外发历史的引用继续受保护。普通取消占号继续执行原资格检查。新增的「强制取消占号并删除图号」是独立危险操作：显示真实影响后确认，释放当前占用但保留原身份、历史快照和审计；原 PDF 不删除，重扫旧同号文件不会自动关联到重新占用的号码。用户正式数据库及实际显示器 DPI 仍应在本地核对。
 
@@ -59,7 +59,7 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 
 ```sh
 git fetch --tags
-git switch --detach v1.2.0
+git switch --detach v1.3.0
 pnpm install
 pnpm typecheck
 pnpm test
