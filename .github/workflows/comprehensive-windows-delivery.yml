@@ -34,13 +34,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Download only the explicitly verified original runtime
-        uses: actions/download-artifact@v4
-        with:
-          name: P4-Windows-x64-8dc2112
-          run-id: 38697339387
-          github-token: ${{ github.token }}
-          path: existing-p4
+      - name: Recover only the hash-pinned published stable runtime
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP 'dnp-v120-runtime-base.exe'
+          Invoke-WebRequest -Uri 'https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.2.0/DrawingNumberPlanner-1.2.0-Windows-x64-Setup.exe' -OutFile $setup -MaximumRetryCount 3 -RetryIntervalSec 2
+          if ((Get-Item $setup).Length -ne 145102853 -or (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne '0803cafaa91d28f79c9e0bfd0b51d7956cdd9b672ad9d076d157cb6dbd307f38') { throw 'Published runtime installer hash/size mismatch' }
+          $runtime = Join-Path (Get-Location).Path 'existing-stable'
+          $log = Join-Path $env:RUNNER_TEMP 'stable-runtime-install.log'
+          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$runtime`"", "/LOG=`"$log`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Stable runtime recovery failed' }
+          # Installer-generated program metadata only, inside this disposable runner directory.
+          foreach ($name in @('installation.id', 'unins000.exe', 'unins000.dat', 'unins000.msg')) {
+            $file = Join-Path $runtime $name
+            if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }
+          }
       - name: Build the exact clean application source
         shell: pwsh
         working-directory: app-source
@@ -57,7 +65,7 @@ jobs:
       - name: Verify every original runtime hash and bundle current Main/service/preload/renderer
         shell: pwsh
         run: |
-          node scripts/repack-comprehensive-windows.mjs app-source existing-p4 Comprehensive-Windows
+          node scripts/repack-comprehensive-windows.mjs app-source existing-stable Comprehensive-Windows (Join-Path $env:RUNNER_TEMP 'dnp-v120-runtime-base.exe')
           if ($LASTEXITCODE -ne 0) { throw 'Verified repack failed' }
       - name: Build Chinese installer with custom directory page
         shell: pwsh

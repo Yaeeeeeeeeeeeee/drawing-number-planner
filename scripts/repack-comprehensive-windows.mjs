@@ -8,9 +8,11 @@ import {verifyManifest} from './comprehensive-delivery-integrity.mjs';
 import { assertRendererIconDependencyOnly } from './p4-delivery-source-guard.ts';
 const revision = process.env.PLANNER_ACCEPTANCE_REVISION ?? '';
 if (!/^[0-9a-f]{40}$/.test(revision)) throw Error('Explicit pinned application SHA required');
-const baseRevision = '8dc2112b596cebc045a121f6e5126c8059a6c4e0';
-const [sourceArg, baseArg, outputArg] = process.argv.slice(2);
-if (!sourceArg || !baseArg || !outputArg) throw Error('Expected pinned source, existing delivered P4 package, NEW output');
+const dependencyBaseline = '8dc2112b596cebc045a121f6e5126c8059a6c4e0';
+const baseRevision = '33cbbe15f86bf5ff18bd6900ffe3f1f18ea34354';
+const baseInstallerSha256 = '0803cafaa91d28f79c9e0bfd0b51d7956cdd9b672ad9d076d157cb6dbd307f38';
+const [sourceArg, baseArg, outputArg, installerArg] = process.argv.slice(2);
+if (!sourceArg || !baseArg || !outputArg || !installerArg) throw Error('Expected pinned source, recovered stable package, NEW output and pinned base installer');
 const source = fs.realpathSync.native(sourceArg), base = fs.realpathSync.native(baseArg), output = path.resolve(outputArg);
 const git = (...args) => execFileSync('git', ['-C', source, ...args], {encoding:'utf8'}).trim();
 const inside = (root, file) => { const rel = path.relative(root, file); return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel); };
@@ -24,21 +26,20 @@ if (git('rev-parse','HEAD') !== revision || git('status','--porcelain')) throw E
 // This authorized release includes approved v16–v19 migrations; native verification checks the old-schema upgrade.
 const mainSource=git('show',`${revision}:src/main/index.ts`);
 for(const security of ['contextIsolation: true','nodeIntegration: false','sandbox: true','installRecoveryControls()'])if(!mainSource.includes(security))throw Error('Desktop security/recovery setting missing: '+security);
-assertRendererIconDependencyOnly(git('show',`${baseRevision}:package.json`),git('show',`${revision}:package.json`),git('show',`${baseRevision}:pnpm-lock.yaml`),git('show',`${revision}:pnpm-lock.yaml`));
+assertRendererIconDependencyOnly(git('show',`${dependencyBaseline}:package.json`),git('show',`${revision}:package.json`),git('show',`${dependencyBaseline}:pnpm-lock.yaml`),git('show',`${revision}:pnpm-lock.yaml`));
 if (fs.existsSync(output) || inside(base, output) || inside(output, base) || inside(source,output) || inside(output,source)) throw Error('Output must be a new separate delivery directory');
+if(hash(installerArg)!==baseInstallerSha256)throw Error('Published base installer SHA256 mismatch');
 const originalVersion=JSON.parse(fs.readFileSync(path.join(base,'resources/app/acceptance-version.json'),'utf8'));
-if(originalVersion.revision!==baseRevision)throw Error('Only the explicitly identified existing P4 package may be reused');
-if(!fs.existsSync(path.join(base,'图号规划器验收版.exe')))throw Error('Existing Windows executable is missing');
+if(originalVersion.revision!==baseRevision||originalVersion.applicationVersion!=='1.2.0'||originalVersion.bundledSample!==false)throw Error('Only the verified v1.2.0 stable runtime may be reused');
+if(!fs.existsSync(path.join(base,'图号规划器.exe')))throw Error('Verified stable Windows executable is missing');
 const manifest=JSON.parse(fs.readFileSync(path.join(base,'delivery-manifest.json'),'utf8'));
-if(manifest.revision!==baseRevision || manifest.platform!=='win32-x64')throw Error('Existing runtime manifest does not match');
-const runtimeVerification=verifyManifest(base,manifest,{allowOriginalReports:true});
-const oldSeed=path.join(base,'resources/app/acceptance-seed');
-const beforeSeed=files(oldSeed);
-const workspace=path.resolve(oldSeed,originalVersion.workspace);
-if(!inside(oldSeed,workspace)||!fs.statSync(workspace).isDirectory())throw Error('Existing sample workspace must remain isolated');
+if(manifest.revision!==baseRevision || manifest.platform!=='win32-x64')throw Error('Stable runtime manifest does not match');
+const runtimeVerification=verifyManifest(base,manifest);
+if(fs.existsSync(path.join(base,'resources/app/acceptance-seed')))throw Error('Stable base must not contain sample data');
+const beforeBase=files(base);
 // Reject links before copying the package, including runtime and native modules.
 files(base);
-fs.cpSync(base,output,{recursive:true,filter:entry=>{const relative=path.relative(base,entry).split(path.sep).join('/');return relative!=='resources/app/acceptance-seed'&&!relative.startsWith('resources/app/acceptance-seed/');}});
+fs.cpSync(base,output,{recursive:true});
 const app=path.join(output,'resources/app');
 const applicationVersion=JSON.parse(fs.readFileSync(path.join(source,'package.json'),'utf8')).version;
 const packagedManifest=JSON.parse(fs.readFileSync(path.join(app,'package.json'),'utf8'));
@@ -56,10 +57,10 @@ fs.copyFileSync(path.join(source,'dist/main/preload.cjs'),path.join(app,'dist/ma
 fs.copyFileSync(path.join(source,'scripts/production-entry.cjs'),path.join(app,'acceptance-entry.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-profile.cjs'),path.join(app,'production-profile.cjs'));
 fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,applicationVersion,schemaVersion:23,profile:'stable-user-selected',bundledSample:false},null,2));
-fs.renameSync(path.join(output,'图号规划器验收版.exe'),path.join(output,'图号规划器.exe'));
+// The stable base already has the production executable name.
 if(fs.existsSync(path.join(app,'acceptance-seed')))throw Error('Example data must not be included');
 for(const entry of files(output))if(/\.(db|sqlite|sqlite3|pdf)(-wal|-shm)?$/i.test(entry.path))throw Error('Database/PDF data must not be bundled: '+entry.path);
-if(JSON.stringify(beforeSeed)!==JSON.stringify(files(oldSeed)))throw Error('Original package sample must remain untouched');
+if(JSON.stringify(beforeBase)!==JSON.stringify(files(base)))throw Error('Verified stable runtime must remain untouched');
 const instructions=`图号规划器 Windows x64
 版本：${applicationVersion}\n源码：${revision}
 
@@ -76,7 +77,7 @@ const instructions=`图号规划器 Windows x64
 `;
 fs.writeFileSync(path.join(output,'先看这里-验收说明.txt'),instructions);
 fs.writeFileSync(path.join(output,'验收说明.txt'),instructions);
-fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:23,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
+fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:40527223187,sourceRelease:'v1.2.0',sourceAsset:'DrawingNumberPlanner-1.2.0-Windows-x64-Setup.exe',baseInstallerSha256,runtimeVerification,stableProfile:true,schemaVersion:23,bundledSample:false,originalRuntimeUnchanged:JSON.stringify(beforeBase)===JSON.stringify(files(base)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
 fs.writeFileSync(path.join(output,'delivery-manifest.json'),JSON.stringify({revision,platform:'win32-x64',baseRevision,files:files(output)},null,2));
 verifyManifest(output,JSON.parse(fs.readFileSync(path.join(output,'delivery-manifest.json'),'utf8')));
 console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:23,bundledSample:false}));
