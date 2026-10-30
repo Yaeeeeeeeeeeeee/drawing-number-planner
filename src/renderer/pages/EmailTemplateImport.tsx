@@ -49,7 +49,7 @@ export function EmailTemplateImport({ api, onClose }: { api: PlannerApi; onClose
       onChange={event => { setFile(event.target.files?.[0]); setReport(undefined); setRows([]); setPreviewId(''); setMessage(''); }}/>
       <button className="primary-button" type="button" disabled={!file || busy || !api.previewEmailTemplateImport} onClick={() => void preview()}>{busy ? '处理中…' : '识别并预览'}</button></div>
     <p>支持 .xlsx；旧版 .xls 请先另存为 .xlsx。仅导入首批和更新包材资料。</p>
-    {error && <p role="alert" className="error-banner">{error}</p>}{message && <p role="status" className="success-banner">{message}</p>}
+    {!report && error && <p role="alert" className="error-banner">{error}</p>}
     {report && <><div className="email-import-sheets">{report.sheets.map(sheet => <span key={sheet.name}>{sheet.name}：{sheet.supported ? `${sheet.candidates} 条${sheet.candidates ? '' : '，无法识别，请核对源表标签'}` : '未支持，不导入'}</span>)}</div>
       {!!report.signatures?.length && <section className="email-import-signatures"><strong>来源签名（独立保存，不设为默认）</strong>{report.signatures.map((signature, index) => {
         const choice = signatureChoices[index]; if (!choice) return null;
@@ -81,6 +81,10 @@ export function EmailTemplateImport({ api, onClose }: { api: PlannerApi; onClose
         <div className="email-import-review"><label><input aria-label={`已确认联系人关联 ${index + 1}`} type="checkbox" checked={row.contactsConfirmed} onChange={event => edit(index, { contactsConfirmed: event.target.checked }, false)}/>已确认联系人关联</label>
           <label><input aria-label={`已核对固定话术、动态信息及历史示例 ${index + 1}`} type="checkbox" checked={row.historyReviewed} onChange={event => edit(index, { historyReviewed: event.target.checked }, false)}/>已核对固定话术、动态信息及历史示例，排除不适用的旧型号、日期和修改原因</label></div>
       </fieldset>)}</div>
-      <footer><span>已选择 {selected.length} 条</span><button type="button" className="primary-button" disabled={busy || consumed || !ready} onClick={() => void confirm()}>确认导入所选模板</button></footer></>}
+      <footer><div className="email-import-feedback"><span>已选择 {selected.length} 条</span>
+        {error && <p role="alert" className="error-banner">{error}</p>}
+        {message && <p role="status" className="success-banner">{message}</p>}
+        {busy && <span role="status">正在导入，请稍候…</span>}
+      </div><button type="button" className="primary-button" disabled={busy || consumed || !ready} onClick={() => void confirm()}>{busy ? '导入中…' : '确认导入所选模板'}</button></footer></>}
   </section></div>,document.body);
 }

@@ -12,3 +12,4 @@
 
 .email-import-row .email-import-check{flex-shrink:0;white-space:nowrap}.email-import-row>select{width:auto;flex:1;min-width:0}.email-import-contacts>button{justify-self:start}
 .email-import-signatures{display:grid;gap:12px;margin:16px 0}.email-import-signatures fieldset{border:1px solid #d6dfeb;border-radius:8px;display:grid;gap:8px;min-width:0}.email-import-contact small{grid-column:1/-1;overflow-wrap:anywhere}
+.email-import-dialog>footer{z-index:3}.email-import-feedback{min-width:0;display:grid;gap:6px;overflow-wrap:anywhere}.email-import-feedback p{margin:0}.email-import-dialog>footer>button{flex-shrink:0;white-space:nowrap}

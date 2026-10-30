@@ -214,7 +214,8 @@ export function confirmEmailTemplates(report: EmailTemplateImportReport, selecti
         if (seen.has(key)) continue; seen.add(key);
         let found = service.listContacts().find(item => item.email.toLowerCase() === email);
         if (!found) {
-          if (contact.company.trim() !== row.manufacturer.trim()) fail('联系人厂家与模板厂家不一致');
+          // A supplier template may CC a shared coordinator from another company.
+          // Membership belongs to the reviewed template link, not the contact's company.
           found = service.createContact({ ...contact, email }); result.contactsCreated += 1;
         }
         links.push({ contactId: found.id, recipientType: contact.defaultRecipientType, displayOrder: orders[contact.defaultRecipientType]++ });

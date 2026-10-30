@@ -28,6 +28,25 @@ import { migrateDatabase } from '../../src/db/migrations';
 import { confirmEmailTemplates, previewEmailTemplates } from '../../src/core/import/email-template-import';
 import { OutboundReferenceService } from '../../src/core/outbound/outbound-reference-service';
 const reviewed = (report: Awaited<ReturnType<typeof parseEmailTemplateWorkbook>>) => report.candidates.map(row => ({ ...row, action: 'create' as const, confirmed: true, contactsConfirmed: true, historyReviewed: true }));
+it('imports a single H14 case with reviewed shared CC contacts from a different company', async () => {
+  const dir=mkdtempSync(join(tmpdir(),'matrix-single-')); const db=openDatabase(join(dir,'planner.db')); migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});
+  try {
+    const report=previewEmailTemplates(await parseEmailTemplateWorkbook(await matrixWorkbook()),db);
+    const row=reviewed(report).find(item=>item.sourceCoordinates?.body==='H14')!;
+    row.contacts=row.contacts.map(contact=>({...contact,company:contact.defaultRecipientType==='cc'?'Shared Company':row.manufacturer}));
+    const result=confirmEmailTemplates(report,[row],db);
+    expect(result).toMatchObject({created:1,contactsCreated:5,skipped:24});
+    const service=new OutboundReferenceService(db);const template=service.listTemplates().find(item=>item.manufacturer===row.manufacturer)!;
+    expect(template.contactLinks).toHaveLength(5);
+    const shared=service.listContacts().filter(contact=>contact.company==='Shared Company');
+    expect(shared).toHaveLength(4);
+    expect(shared.every(contact=>template.contactLinks?.some(link=>link.contactId===contact.id&&link.recipientType==='cc'))).toBe(true);
+    const again=previewEmailTemplates(await parseEmailTemplateWorkbook(await matrixWorkbook()),db);
+    expect(confirmEmailTemplates(again,[reviewed(again).find(item=>item.sourceCoordinates?.body==='H14')!],db)).toMatchObject({created:0,updated:0,contactsCreated:0,skipped:25});
+    expect(service.listContacts().filter(contact=>contact.company==='Shared Company')).toEqual(shared);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  } finally {db.close();rmSync(dir,{recursive:true,force:true});}
+});
 it('imports reviewed matrix as 14 shared contacts and 135 ordered role links with a separate nondefault signature', async () => {
   const dir=mkdtempSync(join(tmpdir(),'matrix-import-')); const db=openDatabase(join(dir,'planner.db')); migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});
   try {
