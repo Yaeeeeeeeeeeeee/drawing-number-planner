@@ -2,10 +2,10 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.3.1 · V5.2 邮件导入修复
+## 当前版本 v1.4.0 · 包材模板与制图任务
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.3.1/DrawingNumberPlanner-1.3.1-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.1)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.4.0/DrawingNumberPlanner-1.4.0-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.4.0)
 - [安装、升级和恢复说明](docs/install-and-upgrade.md)
 - [维护和发布方式](docs/maintenance.md)
 - [上一版 v1.3.0（Schema23）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.0)
@@ -15,11 +15,19 @@
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
 
+## 包材模板与制图任务
+
+「数据来源 → 包材模板」支持 AIT 原件、字段映射、独立尺寸/比例和匹配规则。规划前读取默认规格，确认占号后创建或继续真实产品的制图任务。支持自动制图、人工 PDF、无需生成、逐项重试、监听待关联、统一检查归档及修改原件的备份保护。临时00不进入正式索引，归档只扫描涉及产品。
+
+Windows 本机通过 Illustrator COM/JSX 用模板副本导出保留编辑能力的 PDF。**没有用户真实AIT及授权Illustrator的开发/CI环境，尚未验证真实字体、版式或PDF重开编辑；本机需配置对象映射与字体并检查实际成果。** 详见[版本说明](docs/release-1.4.0.md)与[实现、使用及验收范围](docs/ait-packaging-delivery-20261030.md)。
+
+Schema24为增量升级，保留旧业务记录和备份，不改占号/BOM/历史快照或当前资料根目录。[v1.3.1（回退需配套升级前Schema23备份）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.1)保留。
+
 ## V5.2 增量修正与邮件流程
 
 在「迁移检查 → 导入邮件模板」选择现有 XLSX，核对厂家、场景、正文及历史示例后确认。模板、联系人和签名统一在「外发资料 → 邮件配置」维护。ZIP 成功后点击「生成邮件草稿」，填写实际修改原因、调整收件人和正文，再复制使用；程序不自动发送邮件。
 
-已使用本轮上传的原始 Excel 验证：5 家供应商、20 个首批场景和 5 个更新案例独立解析，正文、签名和联系人分开处理；原始案例及单元格来源保存后仍可查看。实际历史内容始终先预览核对。Schema23 仅增量补充邮件配置关联，不清空旧库。详见 [V5.2说明](docs/release-1.3.0.md)。v1.3.1进一步修复单条导入共享抄送及底部反馈，见[本版说明](docs/release-1.3.1.md)。
+已使用本轮上传的原始 Excel 验证：5 家供应商、20 个首批场景和 5 个更新案例独立解析，正文、签名和联系人分开处理；原始案例及单元格来源保存后仍可查看。实际历史内容始终先预览核对。Schema23 仅增量补充邮件配置关联，不清空旧库。详见 [V5.2说明](docs/release-1.3.0.md)。v1.3.1进一步修复单条导入共享抄送及底部反馈，见[此前说明](docs/release-1.3.1.md)。
 
 ## 主要功能
 

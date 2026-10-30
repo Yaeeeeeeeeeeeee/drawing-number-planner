@@ -60,5 +60,5 @@ Files: PackagingTemplatesPage.tsx, packaging page components/CSS/client types, P
 - [x] Test menu order, real API saves, state retention, fullwidth resizing and disabled reasons.
 
 ## Stage7 Verification/delivery
-- [ ] Final full suite and 13 E2E running; stage gates, type/build, real browser task/archive/backup and actual old-schema23 migration passed. Windows installed acceptance next. No fake editablePDF success.
-- [ ] Independent whole-change review fixed six reproduced issues; update docs/progress/publish after successful final runs. Actual Adobe test limitation stays explicit.
+- [x] Final full suite212/1793,13 E2E, type/build, real browser task/archive/backup, actual oldSchema23 upgrade and Windows41080505744 installed acceptance passed. Adobe editablePDF remains explicitly unverified.
+- [ ] Independent whole-change review fixed six reproduced issues; final integration review found no material issue. Publishing pinned successful Windows/source artifacts, then verify public download. Actual Adobe test limitation stays explicit.
