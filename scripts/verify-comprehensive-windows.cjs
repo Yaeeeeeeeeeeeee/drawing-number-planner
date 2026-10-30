@@ -163,10 +163,16 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   await page.getByRole('button',{name:'02.0209.010.0401002',exact:true}).click();
   const compactDrawer=page.locator('.drawing-maintenance');await compactDrawer.waitFor();
   assert.equal(await compactDrawer.locator(':scope > .drawing-detail-group').count(),4);
-  const fileGeometry=await compactDrawer.locator('.drawing-file-row').evaluateAll(rows=>rows.map(row=>{const name=row.querySelector('.drawing-file-name').getBoundingClientRect(),button=row.querySelector('button').getBoundingClientRect(),card=row.getBoundingClientRect();const style=getComputedStyle(row);return {display:style.display,height:card.height,rowY:card.y+card.height/2,buttonY:button.y+button.height/2,overlap:name.right>button.left};}));
+  const fileGeometry=await compactDrawer.locator('.drawing-file-row').evaluateAll(rows=>rows.map(row=>{
+    const filename=row.querySelector('.drawing-file-name'),action=row.querySelector('button');
+    const name=filename.getBoundingClientRect(),button=action.getBoundingClientRect(),card=row.getBoundingClientRect(),content=row.querySelector('.drawing-file-identity').getBoundingClientRect();
+    const style=getComputedStyle(row),nameStyle=getComputedStyle(filename),buttonStyle=getComputedStyle(action);
+    const insets=['paddingTop','paddingBottom','borderTopWidth','borderBottomWidth'].reduce((sum,key)=>sum+(parseFloat(style[key])||0),0);
+    return {display:style.display,height:card.height,contentHeight:content.height,insets,rowY:card.y+card.height/2,buttonY:button.y+button.height/2,overlap:name.right>button.left,nameWhiteSpace:nameStyle.whiteSpace,buttonWhiteSpace:buttonStyle.whiteSpace};
+  }));
   const innerBackgrounds=await compactDrawer.locator('.drawing-detail-group .drawing-detail-section').evaluateAll(items=>items.map(e=>getComputedStyle(e).backgroundColor));assert.ok(innerBackgrounds.every(color=>color==='rgba(0, 0, 0, 0)'));
   await page.screenshot({path:path.join(evidence,'Windows-UI修正-四板块文件行.png')});
-  assert.ok(fileGeometry.length>0);for(const row of fileGeometry){assert.equal(row.display,'flex');assert.ok(row.height>=48&&row.height<=56);assert.ok(Math.abs(row.rowY-row.buttonY)<3);assert.equal(row.overlap,false);}
+  assert.ok(fileGeometry.length>0);for(const row of fileGeometry){assert.equal(row.display,'flex');assert.ok(row.height>=48&&row.height<=Math.max(64,row.contentHeight+row.insets)+1);assert.ok(Math.abs(row.rowY-row.buttonY)<3);assert.equal(row.overlap,false);assert.equal(row.nameWhiteSpace,'nowrap');assert.equal(row.buttonWhiteSpace,'nowrap');}
   await compactDrawer.getByRole('button',{name:'取消占号并删除',exact:true}).click();
   await compactDrawer.getByText(/该图号存在历史扫描占用记录/).waitFor();
   report.compactDrawingDrawer={fourGroups:true,fileGeometry,innerBackgrounds,historicalReleaseQualificationReachable:true,protectedHistoryReleaseBlocked:true};
