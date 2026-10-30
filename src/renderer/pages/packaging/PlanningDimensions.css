@@ -1,0 +1,18 @@
+.planning-real-page .planning-dimensions {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 8px 0 0;
+  padding: 12px;
+  border: 1px solid #dce1e6;
+  border-radius: 5px;
+  background: #f6f7f8;
+}
+.planning-real-page .planning-dimensions legend { padding: 0 5px; font-size: 13px; font-weight: 600; }
+.planning-real-page .planning-dimensions label { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 13px; }
+.planning-real-page .planning-dimensions .pkg-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 12px 0; }
+.planning-real-page .planning-dimensions > label { max-width: 320px; }
+.planning-real-page .planning-dimensions .pkg-check { display: flex; flex-direction: row; align-items: center; gap: 7px; }
+.planning-real-page .planning-dimensions .pkg-muted { color: #65717d; font-size: 12px; line-height: 1.5; }
+.planning-real-page .planning-dimensions input:not([type=checkbox]), .planning-real-page .planning-dimensions select { min-width: 0; width: 100%; height: 36px; box-sizing: border-box; padding: 5px 9px; }
+.planning-real-page .planning-dimensions details { margin-top: 10px; font-size: 13px; }
+.planning-real-page .planning-dimensions summary { cursor: pointer; }

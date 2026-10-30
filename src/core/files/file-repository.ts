@@ -7,7 +7,7 @@ import { PdfClassificationRepository } from './pdf-classification.js';
 import { PdfManagementRepository } from './pdf-management.js';
 import { listRawProductIds } from '../products/appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingCodeReference, FileNavigationFilters, FileNavigationResult, FileScanChangesView, FileScanRecord, FileScanRunView, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
+import type { DrawingCodeReference, FileNavigationFilters, FileNavigationResult, FileScanChangesView, FileScanRecord, FileScanRunView, FileScanScope, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
 import { FileError } from './file-errors.js';
 import { diffFileScan, type IndexedFileSnapshot } from './file-scan-diff.js';
 import { MaterialBatchRepository } from './material-batch-repository.js';
@@ -15,6 +15,7 @@ import { FileScanHistoryRepository } from './file-scan-history-repository.js';
 import { toWorkspacePathKey, validateWorkspaceRelativePath } from './workspace-paths.js';
 import type { QrFileScanRecord } from '../qr/qr-types.js';
 import { QrRepository } from '../qr/qr-repository.js';
+import { isPathInProductDirectories, normalizeProductDirectories } from './pdf-scanner.js';
 
 interface FileRow {
   management_state: 'included' | 'ignored' | 'needs_review';
@@ -143,12 +144,21 @@ export class FileRepository {
   scanChanges(id: number): FileScanChangesView | null { return this.history.changes(id); }
 
   replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string,
-    qrRecords?: QrFileScanRecord[], workspaceKey?: string): {
+    qrRecords?: QrFileScanRecord[], workspaceKey?: string, scope: FileScanScope = { kind: 'workspace' }): {
     missing: number; historicalRegistered: number;
   } {
+    const directories = scope.kind === 'products' ? normalizeProductDirectories(scope.productDirectories) : undefined;
+    if (directories && qrRecords !== undefined) throw new Error('产品 PDF 扫描不能替换二维码索引');
+    // Compare whole path segments; LIKE would treat real %/_ directory names as wildcards.
+    const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
+    const productScopeSql = directories ? ` and (${directories.map(directory => {
+      const prefix = `${toWorkspacePathKey(directory)}\\`;
+      return `substr(file.path_key,1,length(${quote(prefix)}))=${quote(prefix)}`;
+    }).join(' or ')})` : '';
     for (const record of records) {
       validateWorkspaceRelativePath(record.relativePath);
       record.pathKey = toWorkspacePathKey(record.relativePath);
+      if (directories && !isPathInProductDirectories(record.relativePath, directories)) throw new Error('扫描文件超出声明的产品范围');
     }
     for (const record of qrRecords ?? []) {
       validateWorkspaceRelativePath(record.relativePath);
@@ -163,7 +173,7 @@ export class FileRepository {
     return this.db.transaction(() => {
       const previous = this.db.prepare(`select id, relative_path as relativePath, path_key as pathKey, file_name as fileName,
         size_bytes as sizeBytes, modified_at as modifiedAt, content_sha256 as contentSha256, is_present as isPresent
-        from pdf_files file where is_present = 1 and ${materialScopeSql}`).all() as StoredFileSnapshotRow[];
+        from pdf_files file where is_present = 1 and ${materialScopeSql}${productScopeSql}`).all() as StoredFileSnapshotRow[];
       const current = records.map((record) => ({ relativePath: record.relativePath, pathKey: record.pathKey!, fileName: record.fileName,
         sizeBytes: record.sizeBytes, modifiedAt: record.modifiedAt, contentSha256: record.contentSha256 ?? null }));
       const differences = diffFileScan(previous.map((file) => ({ ...file, isPresent: file.isPresent === 1 })), current);
@@ -180,12 +190,13 @@ export class FileRepository {
         changed: allDifferences.filter((change) => change.type === 'changed').length,
         unchanged: allDifferences.filter((change) => change.type === 'unchanged').length };
       const scanRun = this.db.prepare(`insert into file_scan_runs
-        (started_at, completed_at, total_current, added_count, missing_count, moved_count, changed_count, unchanged_count)
-        values (@scannedAt, @scannedAt, @totalCurrent, @added, @missing, @moved, @changed, @unchanged) returning id`).get({
+        (started_at, completed_at, total_current, added_count, missing_count, moved_count, changed_count, unchanged_count, scope_kind, scope_directories_json)
+        values (@scannedAt, @scannedAt, @totalCurrent, @added, @missing, @moved, @changed, @unchanged, @scopeKind, @scopeDirectoriesJson) returning id`).get({
         scannedAt, totalCurrent: records.length + (qrRecords?.length ?? 0), ...counts,
+        scopeKind: scope.kind, scopeDirectoriesJson: JSON.stringify(directories ?? []),
       }) as { id: number };
       // An excluded path was not observed; exclusion does not establish physical absence.
-      this.db.prepare(`update pdf_files as file set is_present = 0 where ${materialScopeSql}`).run();
+      this.db.prepare(`update pdf_files as file set is_present = 0 where ${materialScopeSql}${productScopeSql}`).run();
       if (qrRecords !== undefined) this.db.prepare('update qr_code_files set is_present = 0').run();
       // Explicit legacy scan payloads may refresh indices, but never create or infer QR configurations.
       for (const record of qrRecords ?? []) {
@@ -193,7 +204,7 @@ export class FileRepository {
           record.matchStatus = 'pending'; record.classificationWarning = 'qr-manual-selection-required';
         }
       }
-      this.batches.markAllMissing();
+      this.batches.markAllMissing(directories);
       const batchIds = new Map<string, number>();
       for (const record of records) {
         if (record.materialBatch && !batchIds.has(record.materialBatch.relativePath)) {
@@ -390,12 +401,12 @@ export class FileRepository {
           relativePath: difference.relativePath, previousRelativePath: difference.previousRelativePath, fileName: snapshot.fileName });
       }
       if (workspaceKey !== undefined) {
-        this.management().reconcileMoves(workspaceKey, previous.map(file => ({...file,isPresent:file.isPresent===1})), current, differences, scannedAt);
+        this.management().reconcileMoves(workspaceKey, previous.map(file => ({...file,isPresent:file.isPresent===1})), current, differences, scannedAt, directories);
         this.management().reconcile(workspaceKey, scanRun.id);
       }
       // Scope changes do not authorize index cleanup. Unobserved legacy paths
       // retain their IDs, presence and historical/manual relationships.
-      const { missing } = this.db.prepare(`select count(*) as missing from pdf_files file where is_present = 0 and ${materialScopeSql}`).get() as { missing: number };
+      const { missing } = this.db.prepare(`select count(*) as missing from pdf_files file where is_present = 0 and ${materialScopeSql}${productScopeSql}`).get() as { missing: number };
       return { missing, historicalRegistered };
     }).immediate();
   }

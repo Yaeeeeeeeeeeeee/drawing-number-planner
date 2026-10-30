@@ -41,10 +41,10 @@ it('upgrades only the status guard with one backup and preserves all rows, schem
     const before = tables.map(table=>{const rows=db.prepare(`select * from "${table}" order by rowid`).all() as Record<string,unknown>[];return table==='outbound_email_templates'?rows.map(({manufacturer,scenario,contacts_configured,import_sources_json,...original})=>original):rows;});
     const objects = db.prepare("select type,name,sql from sqlite_master where name<>'drawing_usage_planned_update' order by type,name").all();
     const backup = vi.fn(() => expect(db.prepare('select max(version) as v from schema_migrations').get()).toEqual({v:19}));
-    expect(migrateDatabase(db, {databaseExists:true,createBackup:backup})).toEqual({from:19,to:23});
+    expect(migrateDatabase(db, {databaseExists:true,createBackup:backup})).toEqual({from:19,to:24});
     expect(backup).toHaveBeenCalledOnce();
     expect(tables.map(table=>{const rows=db.prepare(`select * from "${table}" order by rowid`).all() as Record<string,unknown>[];return table==='outbound_email_templates'?rows.map(({manufacturer,scenario,contacts_configured,import_sources_json,...original})=>original):rows;})).toEqual(before);
-    for(const object of objects as Array<{type:string;name:string;sql:string|null}>){if(['drawing_usage_historical_update','outbound_email_templates'].includes(object.name))continue;expect(db.prepare('select type,name,sql from sqlite_master where type=? and name=?').get(object.type,object.name)).toEqual(object);}
+    for(const object of objects as Array<{type:string;name:string;sql:string|null}>){if(['drawing_usage_historical_update','outbound_email_templates','file_scan_runs'].includes(object.name))continue;expect(db.prepare('select type,name,sql from sqlite_master where type=? and name=?').get(object.type,object.name)).toEqual(object);}
     const service = new DrawingQueryService(db);
     expect(service.transition(1,'voided')).toMatchObject({status:'voided',fullCode:'02.0209.010.0401001',occupied:true});
     expect(service.previewDeletion(1).releaseEligible).toBe(false);
@@ -59,7 +59,7 @@ it('upgrades only the status guard with one backup and preserves all rows, schem
     }
     expect(db.pragma('foreign_key_check')).toEqual([]);
     expect(db.pragma('foreign_keys',{simple:true})).toBe(1);
-    expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:23,to:23});
+    expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:24,to:24});
     expect(backup).toHaveBeenCalledOnce();
   } finally { db.close(); }
 });

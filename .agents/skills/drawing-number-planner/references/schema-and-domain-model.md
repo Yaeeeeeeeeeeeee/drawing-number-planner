@@ -36,3 +36,7 @@ Current registry reaches Schema22. Schema21 adds append-only force-release ident
 ## Current V5.2 observation — 2026-10-30
 
 The registry now reaches Schema23: additive outbound_template_contact_links reuses existing template/contact IDs and records ordered To/CC roles. contacts_configured distinguishes legacy company-default behavior from an explicitly empty recipient set. import_sources_json on the original template keeps server-bound original worksheet/cell/case facts as append-only import history, without changing normal template-edit inputs or existing drafts. Schema22 and earlier records are preserved by old-column equality checks, verified pre-upgrade backup and transactional rollback. Existing PDF/BOM/drawing/QR/outbound snapshot tables are unchanged by this migration.
+
+## Current AIT observation — 2026-10-30
+
+Registry reaches Schema24: additive packaging templates/dimensions/defaults/rules/project configurations, product-scoped durable tasks/items/pending files/archive journal and scan scope metadata. Old business columns/rows and FKs are retained and checked. Workspace hash pins relative task paths to their original root. One unfinished task per real product is a partial unique index. Migration still verifies a readable pre-upgrade backup and rolls back on failure.

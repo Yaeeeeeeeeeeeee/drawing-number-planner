@@ -80,7 +80,10 @@ export interface FileScanComparison {
   added: number; missing: number; moved: number; changed: number; unchanged: number;
 }
 
+export type FileScanScope = { kind: 'workspace' } | { kind: 'products'; productDirectories: string[] };
+
 export interface FileScanRunView extends FileScanComparison {
+  scope?: { kind: 'workspace' | 'products'; productDirectories: string[] };
   id: number; completedAt: string; currentTotal: number;
 }
 

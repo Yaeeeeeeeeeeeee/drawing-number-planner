@@ -2,6 +2,8 @@ import type { PlannerDatabase } from '../../src/db/database';
 import { schemaVersionSeventeen, schemaVersionTwenty } from '../../src/db/schema.sql';
 /** Reconstruct pre-V5 fixtures structurally, never just lower their migration ledger. */
 export function stripV5Schema(db: PlannerDatabase) {
+ for(const table of ['packaging_archive_journal','packaging_pending_files','packaging_task_items','packaging_tasks','packaging_project_configs','packaging_rules','packaging_dimension_products','packaging_dimensions','packaging_templates'])db.exec(`drop table if exists ${table}`);
+ for(const column of ['scope_kind','scope_directories_json'])if((db.pragma('table_info(file_scan_runs)') as {name:string}[]).some(c=>c.name===column))db.exec(`alter table file_scan_runs drop column ${column}`);
  db.exec('drop table if exists outbound_template_contact_links');
  const triggers=db.prepare("select name from sqlite_master where type='trigger' and (name like 'force_%' or name like 'drawing_force_release%')").all() as {name:string}[];
  for(const trigger of triggers)db.exec(`drop trigger "${trigger.name}"`);

@@ -1,7 +1,9 @@
-import { DraftingCompass, ClipboardList, PackageCheck, Boxes, LibraryBig, QrCode, Files, BookOpen, ShieldCheck, Menu, ChevronsLeft } from 'lucide-react';
+import { DraftingCompass, ClipboardList, PackageCheck, Boxes, LibraryBig, QrCode, Files, BookOpen, ShieldCheck, Menu, ChevronsLeft, PenTool } from 'lucide-react';
 import type { ProductVersionTarget } from '../pages/products/ProductAppearancePanel';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { PackagingTemplatesPage } from '../pages/PackagingTemplatesPage';
+import type { PackagingNavigationTarget } from '../pages/packaging/PackagingTaskPanel';
 import type { PlannerApi } from '../data/client';
 import { DictionariesPage } from '../pages/DictionariesPage';
 import { DrawingLibraryPage } from '../pages/DrawingLibraryPage';
@@ -25,7 +27,7 @@ import { isMigrationMock } from '../pages/migration-mock';
 import { isRecoveryMock, RecoveryMockPage } from '../pages/recovery-mock';
 import { isPublicUiMock, PublicUiMock } from '../pages/PublicUiMock';
 
-type Page = 'drawings' | 'dictionaries' | 'products' | 'import' | 'planning' | 'bom' | 'files' | 'qr' | 'exports';
+type Page = 'drawings' | 'dictionaries' | 'products' | 'import' | 'planning' | 'bom' | 'files' | 'qr' | 'exports' | 'packaging';
 const navigation = [
   { label: '日常工作', items: [
     { key: 'planning', label: '图号规划 / 更新包材', icon: DraftingCompass, enabled: true },
@@ -39,6 +41,7 @@ const navigation = [
   ] },
   { label: '数据来源', items: [
     { key: 'files', label: 'PDF 文件中心', icon: Files, enabled: true },
+    { key: 'packaging', label: '包材模板', icon: PenTool, enabled: true },
     { key: 'dictionaries', label: '编码字典', icon: BookOpen, enabled: true },
     { key: 'import', label: '迁移检查', icon: ShieldCheck, enabled: true },
   ] },
@@ -68,6 +71,9 @@ export function AppShell({ api }: { api: PlannerApi }) {
   const [versionTarget, setVersionTarget] = useState<ProductVersionTarget | null>(null);
   const [drawingBomTarget,setDrawingBomTarget]=useState<{productId:number;bomVersionId:number}|null>(null);
   const [drawingTarget, setDrawingTarget] = useState<{productId:number;appearanceVersionId?:number;revision?:number}>();
+  const [packagingTarget,setPackagingTarget]=useState<PackagingNavigationTarget|null>(null);
+  const [packagingVisited,setPackagingVisited]=useState(false);
+  useEffect(()=>{if(page==='packaging')setPackagingVisited(true);},[page]);
   const [filesVisited, setFilesVisited] = useState(false);
   useEffect(() => { if (page === 'files') setFilesVisited(true); }, [page]);
   const openVersion = (target:ProductVersionTarget) => {
@@ -141,6 +147,7 @@ export function AppShell({ api }: { api: PlannerApi }) {
     <main className="workspace" inert={narrow && navigationOpen}>    <button ref={navigationToggle} type="button" className="navigation-toggle" aria-controls="workspace-navigation"
       hidden={navigationOpen} aria-expanded={navigationOpen} aria-label="展开导航" title="展开工作导航"
       onClick={() => setNavigationOpen(true)}><Menu size={18} strokeWidth={1.8} aria-hidden="true"/></button>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage onNavigateBom={target=>{if(drawingLeaveGuard.current&&!drawingLeaveGuard.current())return;setVersionTarget(null);setDrawingBomTarget(target);setPage('bom');}} api={api} navigationTarget={drawingTarget} registerLeaveGuard={registerDrawingLeaveGuard} active={page === 'drawings'} onNavigatePdf={target => { if (drawingLeaveGuard.current && !drawingLeaveGuard.current()) return; setDrawingPdfTarget(target); setPage('files'); }} /></div>}{page === 'dictionaries' && <DictionariesPage api={api} />}
-      {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} onOpenVersion={openVersion} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{page === 'import' && <ImportPage api={api} />}{page === 'planning' && <PlanningPage api={api} onOpenDrawingLibrary={target => {setDrawingTarget({...target,revision:Date.now()});setPage('drawings');}} />}
+      {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} onOpenVersion={openVersion} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{page === 'import' && <ImportPage api={api} />}{page === 'planning' && <PlanningPage api={api} onGenerateFiles={target=>{setPackagingTarget(target);setPage('packaging');}} onOpenDrawingLibrary={target => {setDrawingTarget({...target,revision:Date.now()});setPage('drawings');}} />}
+      {(page === 'packaging'||packagingVisited)&&<div hidden={page!=='packaging'} className="packaging-page-host"><PackagingTemplatesPage api={api} target={packagingTarget}/></div>}
       {page === 'bom' && <BomPage api={api} target={drawingBomTarget??(versionTarget?.section === 'bom' ? versionTarget : undefined)} />}{page === 'exports' && <OutboundPage api={api} target={versionTarget?.section === 'outbound' ? versionTarget : undefined} registerLeaveGuard={registerOutboundLeaveGuard} />}{(page === 'files' || filesVisited) && <div hidden={page !== 'files'} className="files-page-host"><FilesPage active={page === 'files'} api={api} initialTarget={drawingPdfTarget} /></div>}{(page === 'qr' || qrVisited) && <div hidden={page !== 'qr'} className="qr-page-host"><QrCodesPage active={page === 'qr'} api={api} versionTarget={versionTarget?.section === 'qr' ? versionTarget : null} productTarget={productQrTarget} onReturnProducts={() => { setPage('products'); setProductQrTarget(null); }} /></div>}</main></div>;
 }

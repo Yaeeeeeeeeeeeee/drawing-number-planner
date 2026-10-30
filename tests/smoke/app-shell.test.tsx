@@ -20,7 +20,7 @@ describe('application shell', () => {
     expect(Array.from(navGroups[1].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
       '产品档案', '图号库', '二维码管理',
     ]);
-    expect(Array.from(navGroups[2].querySelectorAll('button')).map((button) => button.textContent)).toEqual(['PDF 文件中心','编码字典','迁移检查']);
+    expect(Array.from(navGroups[2].querySelectorAll('button')).map((button) => button.textContent)).toEqual(['PDF 文件中心','包材模板','编码字典','迁移检查']);
     expect(screen.getByRole('button', { name: /图号规划 \/ 更新包材/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /BOM 管理/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /二维码管理/ })).toBeEnabled();

@@ -1,3 +1,4 @@
+import { createPackagingApi, type PackagingApi } from './packaging-client';
 import type { DrawingForceReleasePreview } from '../../core/drawings/drawing-force-release-types';
 import { createAppearanceApi, type AppearanceApi, type AppearanceVersion } from './appearance-client';
 import { createBomAppearanceApi, type BomAppearanceApi } from './bom-appearance-client';
@@ -318,6 +319,7 @@ export interface LocalTaskView {
 }
 
 export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<DrawingAppearanceApi>, PdfManagementApi, QrManualApi {
+  packaging?: PackagingApi;
   getDrawingNavigationCounts?(filters?: Record<string, string | number | boolean | undefined>): Promise<DrawingNavigationCounts>;
   getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[];mainCategories?: DrawingNavigationCounts['mainCategories'] }>;
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
@@ -579,6 +581,7 @@ async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_i
 }
 
 export const apiClient: PlannerApi = {
+  packaging: createPackagingApi(request),
   ...createAppearanceApi(request), ...createBomAppearanceApi(request), ...createDrawingAppearanceApi(request),
   ...createPdfManagementApi(request), ...createQrManualApi(request),
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),

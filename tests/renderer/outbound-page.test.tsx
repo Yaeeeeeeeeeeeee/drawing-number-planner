@@ -301,7 +301,8 @@ describe('OutboundPage', () => {
     fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
       fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
       await screen.findByText('铭牌（转曲）.pdf');
-      fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+      const generateButton=screen.getByRole('button', { name: '生成压缩包' });
+      await waitFor(()=>expect(generateButton).toBeEnabled());fireEvent.click(generateButton);
     fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
       await waitFor(() => expect(api.createOutboundPackage).toHaveBeenCalledWith(expect.objectContaining({
         materialType, previewToken: 'preview-1', selectedPdfFileIds: [41],

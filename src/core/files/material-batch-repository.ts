@@ -1,3 +1,4 @@
+import { isPathInProductDirectories, normalizeProductDirectories } from './pdf-scanner.js';
 import { materialDirectoryScopeSql } from './material-directory-sql.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { MaterialBatchDeletionReference, ParsedMaterialBatch } from './material-batch-types.js';
@@ -60,8 +61,18 @@ export class MaterialBatchRepository {
     return references;
   }
 
-  markAllMissing(): void {
-    this.db.prepare(`update material_batches set is_present = 0 where ${materialDirectoryScopeSql("relative_path || char(92)",'production')}`).run();
+  markAllMissing(productDirectories?: string[]): void {
+    const materialScope = materialDirectoryScopeSql("relative_path || char(92)", 'production');
+    if (productDirectories === undefined) {
+      this.db.prepare(`update material_batches set is_present = 0 where ${materialScope}`).run();
+      return;
+    }
+    const directories = normalizeProductDirectories(productDirectories);
+    // Use the same Unicode/case normalization as PDF path keys, not SQLite's ASCII-only lower().
+    const batches = this.db.prepare(`select id, relative_path as relativePath from material_batches where ${materialScope}`)
+      .all() as Array<{ id: number; relativePath: string }>;
+    const mark = this.db.prepare('update material_batches set is_present = 0 where id = ?');
+    for (const batch of batches) if (isPathInProductDirectories(batch.relativePath, directories)) mark.run(batch.id);
   }
 
   upsert(batch: ParsedMaterialBatch, scannedAt: string, scanRunId: number): number {

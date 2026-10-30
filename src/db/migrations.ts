@@ -2,6 +2,7 @@ import type { PlannerDatabase } from './database.js';
 import { schemaVersionTwentyOne } from './schema-v21-force-release.js';
 import { schemaVersionTwentyTwo } from './schema-v22-email.js';
 import { schemaVersionTwentyThree } from './schema-v23-template-contacts.js';
+import { schemaVersionTwentyFour } from './schema-v24-packaging.js';
 import { toWorkspacePathKey } from '../core/files/workspace-paths.js';
 import {
   schemaVersionTwenty,
@@ -779,8 +780,8 @@ export function applyAppearanceVersionSchema(database: PlannerDatabase): void {
 
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 23) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 23`);
-  if (from >= 23) {
+  if (from > 24) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 24`);
+  if (from >= 24) {
     const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
@@ -1014,7 +1015,7 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
         database.exec('alter table bom_item_assets add column deleted_at text');
       }
     }
-    for (const [version, sql] of [[21, schemaVersionTwentyOne], [22, schemaVersionTwentyTwo], [23, schemaVersionTwentyThree]] as const) {
+    for (const [version, sql] of [[21, schemaVersionTwentyOne], [22, schemaVersionTwentyTwo], [23, schemaVersionTwentyThree], [24, schemaVersionTwentyFour]] as const) {
       if (from >= version) continue;
       const tables = (database.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' and name<>'schema_migrations' order by name").all() as {name:string}[]).map(row=>row.name);
       const before = tables.map(table=>({ columns:(database.pragma(`table_info(${quoteIdentifier(table)})`) as {name:string}[]).map(column=>column.name), rows:database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).all() }));
@@ -1028,5 +1029,5 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
     }
   })();
   } finally { database.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`); }
-  return { from, to: 23 };
+  return { from, to: 24 };
 }

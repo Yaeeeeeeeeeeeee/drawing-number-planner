@@ -4,10 +4,11 @@ import type { FileScanChangeView, FileScanChangesView, FileScanRunView } from '.
 interface ScanRunRow {
   id: number; completedAt: string; currentTotal: number; added: number; missing: number;
   moved: number; changed: number; unchanged: number;
+  scopeKind: 'workspace' | 'products'; scopeDirectoriesJson: string;
 }
 
 function toScanRun(row: ScanRunRow): FileScanRunView {
-  return { id: row.id, completedAt: row.completedAt, currentTotal: row.currentTotal,
+  return { scope: { kind: row.scopeKind, productDirectories: JSON.parse(row.scopeDirectoriesJson) as string[] }, id: row.id, completedAt: row.completedAt, currentTotal: row.currentTotal,
     added: row.added, missing: row.missing, moved: row.moved, changed: row.changed, unchanged: row.unchanged };
 }
 
@@ -17,14 +18,14 @@ export class FileScanHistoryRepository {
   latest(): FileScanRunView | null {
     const row = this.db.prepare(`select id, completed_at as completedAt, total_current as currentTotal,
       added_count as added, missing_count as missing, moved_count as moved, changed_count as changed,
-      unchanged_count as unchanged from file_scan_runs order by id desc limit 1`).get() as ScanRunRow | undefined;
+      unchanged_count as unchanged, scope_kind as scopeKind, scope_directories_json as scopeDirectoriesJson from file_scan_runs order by id desc limit 1`).get() as ScanRunRow | undefined;
     return row ? toScanRun(row) : null;
   }
 
   changes(id: number): FileScanChangesView | null {
     const scan = this.db.prepare(`select id, completed_at as completedAt, total_current as currentTotal,
       added_count as added, missing_count as missing, moved_count as moved, changed_count as changed,
-      unchanged_count as unchanged from file_scan_runs where id = ?`).get(id) as ScanRunRow | undefined;
+      unchanged_count as unchanged, scope_kind as scopeKind, scope_directories_json as scopeDirectoriesJson from file_scan_runs where id = ?`).get(id) as ScanRunRow | undefined;
     if (!scan) return null;
     const rows = this.db.prepare(`select id, change_type as type, index_kind as indexKind, relative_path as relativePath,
       previous_relative_path as previousRelativePath, file_name as fileName, full_code as fullCode

@@ -2,24 +2,24 @@ import { inspectIndexedPdfPresence } from './pdf-presence.js';
 import { isMaterialPdfPath } from './directory-policy.js';
 import type {PdfClassificationInput,PdfClassificationApplyInput} from './pdf-classification.js';
 import { createHash } from 'node:crypto';
-import { openSync, closeSync, readSync, statSync, existsSync } from 'node:fs';
+import { openSync, closeSync, readSync, statSync, lstatSync, existsSync } from 'node:fs';
 import { FileError } from './file-errors.js';
-import { FINGERPRINT_CONCURRENCY, mapWithConcurrency, resolveFileFingerprint } from './file-fingerprint.js';
+import { assertFileSnapshot, FINGERPRINT_CONCURRENCY, mapWithConcurrency, resolveFileFingerprint } from './file-fingerprint.js';
 import { FileRepository, type FileIndexClearResult } from './file-repository.js';
 import { classifyHistoricalPdf } from './historical-file-classifier.js';
 import { parseMaterialBatch } from './material-batch-parser.js';
-import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
-import type { FileNavigationFilters, FileNavigationResult, FileScanChangesView, FileScanComparison, FileScanRunView, FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
+import { isPathInProductDirectories, normalizeProductDirectories, scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
+import type { FileNavigationFilters, FileNavigationResult, FileScanChangesView, FileScanRunView, FileSearchFilters, FileSearchResult, FileScanRecord, FileScanScope, HistoricalDrawingScanRecord } from './file-types.js';
 import { WorkspaceSettingsStore } from './workspace-settings.js';
 import { resolveWorkspacePath, toWorkspacePathKey, validateWorkspaceRoot } from './workspace-paths.js';
 import { pdfWorkspaceKey, type PdfManagementInput, type PdfManagementApplyInput, type PdfDiskEvidence } from './pdf-management.js';
 import type { TaskContext } from '../tasks/task-types.js';
-import type { WorkspaceScanOptions } from './pdf-scanner.js';
+import type { DirectoryScanSnapshot, WorkspaceScanOptions } from './pdf-scanner.js';
 
 export interface FileScanSummary {
   total: number; matched: number; pending: number; unmatched: number; conflict: number; historicalRegistered: number;
   source: number; outlined: number; missing: number; scanId: number; currentTotal: number;
-  comparison: FileScanComparison; scannedAt: string;
+  comparison: FileScanRunView; scannedAt: string;
 }
 
 export const FILE_INDEX_CLEAR_CONFIRMATION = '清空资料库索引';
@@ -32,7 +32,8 @@ export interface FileIndexClearPreview {
 export class FileService {
   private scanning = false;
   constructor(private readonly repository: FileRepository, private readonly settings: WorkspaceSettingsStore,
-    private readonly scanner: (root: string, options?: WorkspaceScanOptions) => Promise<ScannedPdfFile[]> = scanPdfWorkspace) {}
+    private readonly scanner: (root: string, options?: WorkspaceScanOptions) => Promise<ScannedPdfFile[]> = scanPdfWorkspace,
+    private readonly workspaceBusy:()=>boolean=()=>false) {}
 
   getSettings(): { workspaceRoot: string | null; configured: boolean; available: boolean } {
     const current = this.settings.get();
@@ -45,6 +46,7 @@ export class FileService {
 
   updateSettings(input: { workspaceRoot: string }) {
     if (this.scanning) throw new FileError('SCAN_IN_PROGRESS', '资料库正在扫描，扫描完成后才能修改根目录');
+    if(this.workspaceBusy())throw new FileError('SCAN_IN_PROGRESS','制图文件正在处理，完成后才能修改资料根目录');
     const current = this.settings.setWorkspaceRoot(input.workspaceRoot);
     return { ...current, configured: true, available: true };
   }
@@ -122,6 +124,14 @@ export class FileService {
   }
 
   async scan(context?: TaskContext): Promise<FileScanSummary> {
+    return this.scanScope({ kind: 'workspace' }, context);
+  }
+
+  async scanProducts(productDirectories: string[], context?: TaskContext): Promise<FileScanSummary> {
+    return this.scanScope({ kind: 'products', productDirectories: normalizeProductDirectories(productDirectories) }, context);
+  }
+
+  private async scanScope(scope: FileScanScope, context?: TaskContext): Promise<FileScanSummary> {
     if (this.scanning) throw new FileError('SCAN_IN_PROGRESS', '资料库正在扫描，请等待当前扫描完成');
     const workspaceRoot = this.settings.get().workspaceRoot;
     if (!workspaceRoot) throw new FileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
@@ -132,7 +142,13 @@ export class FileService {
         context?.throwIfCancelled();
         context?.report({ processed, total, phase: 'scanning', message: relativePath });
       };
-      const files = (await this.scanner(workspaceRoot, { signal: context?.signal, onProgress: progress })).filter(file => isMaterialPdfPath(file.relativePath));
+      const directories = new Map<string, DirectoryScanSnapshot>();
+      const files = (await this.scanner(workspaceRoot, { signal: context?.signal, onProgress: progress,
+        onDirectoryObserved: (path, snapshot) => { directories.set(path, snapshot); },
+        ...(scope.kind === 'products' ? { productDirectories: scope.productDirectories } : {}) })).filter(file => isMaterialPdfPath(file.relativePath));
+      if (scope.kind === 'products' && files.some(file => !isPathInProductDirectories(file.relativePath, scope.productDirectories))) {
+        throw new Error('扫描器返回了产品范围之外的文件');
+      }
       context?.throwIfCancelled();
       const drawings = this.repository.listDrawingCodes();
       let fingerprinted = 0; const fingerprintTotal = files.length;
@@ -142,7 +158,7 @@ export class FileService {
         const pathKey = toWorkspacePathKey(file.relativePath);
         if (!file.absolutePath) throw new Error('扫描器未返回可只读计算指纹的文件路径');
         const result = await resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey, sizeBytes: file.sizeBytes,
-          modifiedAt: file.modifiedAt, existing: null });
+          modifiedAt: file.modifiedAt, existing: null, snapshot: file });
         fingerprinted += 1; context?.report({ processed: fingerprinted, total: fingerprintTotal,
           phase: 'fingerprinting', message: file.relativePath }); return result;
       });
@@ -161,8 +177,16 @@ export class FileService {
           contentSha256: fingerprints[index].contentSha256 };
       });
       const scannedAt = new Date().toISOString();
+      for (const [path, snapshot] of directories) {
+        const current = lstatSync(path);
+        if (!current.isDirectory() || current.isSymbolicLink() || current.dev !== snapshot.device || current.ino !== snapshot.inode
+          || current.mtimeMs !== snapshot.modifiedAtMs || current.ctimeMs !== snapshot.changedAtMs) {
+          throw new Error('资料目录在扫描期间发生变化，未更新索引，请重试');
+        }
+      }
+      for (const file of files) assertFileSnapshot(file.absolutePath, file);
       context?.beginFinalizing();
-      const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt, undefined, pdfWorkspaceKey(workspaceRoot));
+      const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt, undefined, pdfWorkspaceKey(workspaceRoot), scope);
       const completedScan = this.repository.latestScan();
       if (!completedScan) throw new Error('扫描完成后未找到扫描记录');
       return { total: records.length,

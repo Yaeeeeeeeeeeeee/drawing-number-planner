@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { IndexedFileSnapshot, CurrentFileSnapshot, FileScanDifference } from './file-scan-diff.js';
 import { FileError } from './file-errors.js';
+import { isPathInProductDirectories } from './pdf-scanner.js';
 
 export type PdfManagementAction = 'clear' | 'ignore' | 'restore';
 export interface PdfManagementInput { ids: number[]; action: PdfManagementAction }
@@ -100,8 +101,9 @@ export class PdfManagementRepository {
     }).immediate();
   }
 
-  reconcileMoves(workspaceKey: string, previous: IndexedFileSnapshot[], current: CurrentFileSnapshot[], differences: FileScanDifference[], scannedAt: string): void {
-    const decisions = this.db.prepare('select path_key as pathKey,content_sha256 as hash,decision from pdf_file_decisions where workspace_key=?').all(workspaceKey) as Array<{pathKey:string;hash:string;decision:string}>;
+  reconcileMoves(workspaceKey: string, previous: IndexedFileSnapshot[], current: CurrentFileSnapshot[], differences: FileScanDifference[], scannedAt: string, productDirectories?: string[]): void {
+    const decisions = (this.db.prepare('select path_key as pathKey,content_sha256 as hash,decision from pdf_file_decisions where workspace_key=?').all(workspaceKey) as Array<{pathKey:string;hash:string;decision:string}>)
+      .filter(decision => !productDirectories || isPathInProductDirectories(decision.pathKey, productDirectories));
     const paths = new Set(current.map(file => file.pathKey));
     const insert = this.db.prepare(`insert or ignore into pdf_file_decisions(workspace_key,path_key,content_sha256,decision,updated_at) values(?,?,?,?,?)`);
     for (const change of differences.filter(change => change.type === 'moved' || change.type === 'added')) {

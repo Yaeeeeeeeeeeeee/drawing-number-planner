@@ -5,7 +5,7 @@ import { QrManualService, type QrManualInput } from '../core/qr/qr-manual-servic
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import Fastify from 'fastify';
+import Fastify, {type FastifyRequest,type FastifyReply,type HookHandlerDoneFunction} from 'fastify';
 import fastifyStatic from '@fastify/static';
 
 import { resolveAppPaths } from '../core/config/app-paths.js';
@@ -44,6 +44,12 @@ import { registerPlanningRoutes } from './routes/planning.js';
 import { registerQrCodeRoutes } from './routes/qr-codes.js';
 import { TaskRegistry } from '../core/tasks/task-registry.js';
 import { registerTaskRoutes } from './routes/tasks.js';
+import {PackagingCatalogService} from '../core/packaging/packaging-catalog.js';
+import {PackagingTaskService} from '../core/packaging/packaging-task-service.js';
+import {WindowsIllustratorAutomation} from '../core/packaging/illustrator-automation.js';
+import {PackagingMonitor} from '../core/packaging/packaging-monitor.js';
+import {registerPackagingCatalogRoutes} from './routes/packaging-catalog.js';
+import {registerPackagingTaskRoutes} from './routes/packaging-tasks.js';
 import { assertLoopbackHost, registerLocalAccess } from './security/local-access.js';
 
 export interface ServerOptions {
@@ -82,6 +88,8 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   const databaseExists = existsSync(paths.database);
   const database = openDatabase(paths.database);
   let server: ReturnType<typeof Fastify> | undefined;
+  let packagingTasks:PackagingTaskService|undefined;
+  let packagingMonitor:PackagingMonitor|undefined;
   try {
     migrateDatabase(database, {
       databaseExists,
@@ -92,6 +100,12 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       if (backup.status === 'failed') console.error(`[backup] ${backup.error}`);
     }
     server = Fastify({ logger: false, forceCloseConnections: true });
+  server.addHook('onResponse',(request:FastifyRequest,reply:FastifyReply,done:HookHandlerDoneFunction)=>{
+    if(reply.statusCode<300&&((request.method==='PUT'&&request.url==='/api/files/settings')
+      ||request.method==='POST'&&['/api/packaging/tasks','/api/packaging/create-temporary-directories'].includes(request.url)))packagingMonitor?.refresh();
+    done();
+  });
+
 
     const localAccess = registerLocalAccess(server, {
       token,
@@ -112,7 +126,15 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerQrCodeRoutes(server, new QrService(database), qrManual);
     const drawingQueryService = new DrawingQueryService(database, () => workspaceSettings.get().workspaceRoot);
     registerDrawingRoutes(server, drawingQueryService);
-    registerFileRoutes(server, new FileService(fileRepository, workspaceSettings), tasks);
+    const fileService=new FileService(fileRepository, workspaceSettings,undefined,()=>packagingTasks?.hasOperations()??false);
+    registerFileRoutes(server, fileService, tasks);
+    const packagingCatalog=new PackagingCatalogService(database,paths.baseDir);
+    const illustrator=new WindowsIllustratorAutomation({operationRoot:join(paths.baseDir,'illustrator-operations')});
+    packagingTasks=new PackagingTaskService(database,{workspaceRoot:()=>workspaceSettings.get().workspaceRoot,dataDir:paths.baseDir,catalog:packagingCatalog,automation:illustrator,files:fileService});
+    packagingTasks.recover();
+    registerPackagingCatalogRoutes(server,packagingCatalog);
+    registerPackagingTaskRoutes(server,packagingTasks,illustrator);
+    packagingMonitor=new PackagingMonitor(packagingTasks,fileService);
     registerMaterialBatchRoutes(server, new MaterialBatchService(database, () => workspaceSettings.get().workspaceRoot));
     registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));
     registerOutboundPackageRoutes(server, new OutboundPackageService(database, {
@@ -129,6 +151,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     if (options.rendererDir) await server.register(fastifyStatic, { root: options.rendererDir });
     const address = await server.listen({ host, port: options.port ?? 4317 });
     if (!options.allowedOrigins) localAccess.allowOrigin(address);
+    packagingMonitor.start();
     let configuredOutputRoot: string | null = null;
     try { configuredOutputRoot = workspaceSettings.getOutboundOutputRoot(); }
     catch (error) { console.error(`[outbound-cleanup] ${error instanceof Error ? error.message : '外发目录设置无效'}`); }
@@ -207,11 +230,16 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       },
       close: async () => {
         server!.server.closeAllConnections();
-        await server!.close();
+        const httpClosed=server!.close();
+        await packagingMonitor?.close();
+        await packagingTasks?.close();
+        await httpClosed;
         if (database.open) database.close();
       },
     };
   } catch (error) {
+    await packagingMonitor?.close().catch(()=>undefined);
+    await packagingTasks?.close().catch(()=>undefined);
     if (server) await server.close().catch(() => undefined);
     if (database.open) database.close();
     throw error;

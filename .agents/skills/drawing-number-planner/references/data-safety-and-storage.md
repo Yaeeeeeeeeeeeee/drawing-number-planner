@@ -32,3 +32,7 @@
 ## Current V5 force-release exception — 2026-10-26
 
 The newest request explicitly authorizes a separate force-release action, not relaxation of normal release. Capture impacts and fingerprint, confirm once, transactionally archive original identities, preserve BOM/outbound snapshots and release the current occupation. Quarantine old file relationships, including historical outbound paths with no remaining PDF index; previously force-released complete codes never auto-bind rescanned PDFs to a new reservation. No original file is moved/deleted. Backups remain necessary; audit alone is not a rollback.
+
+## Current AIT task archive exception — 2026-10-30
+
+Explicitly confirmed formal modification tasks may replace only the selected formal PDF after original-hash concurrency check and verified retained backup. Work stays in the owned task copy until reviewed; archive publication/index/cleanup uses a resumable journal. Scans and classification remain read-only. New archive is exclusive create. Cleanup retains unknown/changed files, sibling00, old AIT assets and history.

@@ -1,3 +1,4 @@
+import type { FileScanRunView } from '../../core/files/file-types';
 import { ListChecks, Square, FolderInput, CircleOff, RotateCcw, Trash2 } from 'lucide-react';
 import { isSourcePdfPath } from '../../core/files/material-directory-policy';
 import type { AppearanceApi } from '../data/appearance-client';
@@ -29,6 +30,10 @@ export interface DrawingPdfNavigationTarget { productId?: number; appearanceVers
 function targetScope(target?: DrawingPdfNavigationTarget | null): PdfNavigationScope {
   if (target?.materialBatchId) return {kind:'batch',productId:target.productId,batchId:target.materialBatchId};
   return target?.productId ? {kind:'product',productId:target.productId} : {kind:'all'};
+}
+
+function scanScopeLabel(scope:FileScanRunView['scope'],prefix='本次扫描范围'):string {
+  return scope?.kind==='products'?`${prefix}：产品目录 · ${scope.productDirectories.join('、')}`:`${prefix}：整个资料库`;
 }
 
 function FilePath({ path, name, onClose }: { path: string; name: string; onClose?: () => void }) {
@@ -121,6 +126,12 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     setUnmatchedCount(unmatched.status==='fulfilled'?unmatched.value.total:null);
   };
   const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
+  const [latestScan,setLatestScan]=useState<FileScanRunView|null>(null);
+  const latestScanRequest=useRef(0);
+  const observedScanId=useRef<number|null>(null);
+  const currentScan:FileScanRunView|null=latestScan&&(!summary||latestScan.id>summary.scanId)?latestScan:summary?{...summary.comparison,id:summary.scanId,currentTotal:summary.currentTotal,completedAt:summary.scannedAt}:latestScan;
+  const productScan=currentScan?.scope?.kind==='products';
+  const currentSummary=summary?.scanId===currentScan?.id?summary:null;
   const [scanChanges, setScanChanges] = useState<FileScanChangesView | null>(null);
   const [showChanges, setShowChanges] = useState(false);
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
@@ -131,6 +142,12 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const [clearingIndex, setClearingIndex] = useState(false);
   const [loadingChanges, setLoadingChanges] = useState(false);
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const searchRequest = useRef(0);
+
+  const refreshLatestScan=async()=>{
+    if(!api.getLatestFileScan)return;const request=++latestScanRequest.current;
+    try{const next=await api.getLatestFileScan();if(request!==latestScanRequest.current)return;setLatestScan(next);if(observedScanId.current!==next?.id){observedScanId.current=next?.id??null;setScanChanges(null);setShowChanges(false);}}
+    catch(reason){if(request===latestScanRequest.current)setError(reason instanceof Error?reason.message:'最近扫描记录加载失败');}
+  };
 
   const loadChunks = async (values:typeof initialFilters, scope:PdfNavigationScope, through:number) => {
     const results=await Promise.all(Array.from({length:through},(_,index)=>{
@@ -172,6 +189,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     let live = true;
     const request = ++searchRequest.current; setLoading(true); setError('');
     void refreshNavigation();
+    void refreshLatestScan();
     void api.getDrawingNavigation?.().then(result => { if (live) setUsageBatches(result.batches); }).catch(() => { if (live) setUsageBatches([]); });
     void Promise.all([api.getWorkspaceSettings(), api.listProducts({ status: 'all' }).catch(() => []), api.listMaterialBatches({}).catch(() => [])])
       .then(([nextSettings, productItems, batchItems]) => {
@@ -184,7 +202,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       setFiles(result.items); setTotal(result.total);
     }).catch(reason => { if (live && request === searchRequest.current) setError(reason instanceof Error ? reason.message : 'PDF 文件中心加载失败'); })
       .finally(() => { if (live && request === searchRequest.current) setLoading(false); });
-    return () => { live = false; searchRequest.current++; navigationRequest.current++; };
+    return () => { live = false; searchRequest.current++; navigationRequest.current++; latestScanRequest.current++; };
   }, [api, active]);
 
   useEffect(() => {
@@ -195,7 +213,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   }, [initialTarget, active]);
 
   useEffect(() => {
-    const refresh = () => { if (!active || localMutation.current > 0) return; plannerQueryCache.invalidate('pdf:'); void search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope); };
+    const refresh = () => { if (!active || localMutation.current > 0) return; plannerQueryCache.invalidate('pdf:'); void search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope);void refreshLatestScan(); };
     window.addEventListener('planner:data-changed', refresh);
     return () => window.removeEventListener('planner:data-changed', refresh);
   }, [api, pageSize, active]);
@@ -258,10 +276,10 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     catch (reason) { setError(reason instanceof Error ? reason.message : '资料根目录保存失败'); }
     finally { setSaving(false); }
   };
-  const scan = async () => {
+  const scan = async (productId?:number) => {
     setScanning(true); setError(''); setMessage('');
     try {
-      const result = await locally(() => api.scanPdfFiles()); plannerQueryCache.invalidate('pdf:'); setSummary(result); setScanChanges(null); setShowChanges(false); setMessage('资料库扫描完成');
+      const result = await locally(() => productId&&api.packaging?.scanProduct?api.packaging.scanProduct(productId):api.scanPdfFiles()); plannerQueryCache.invalidate('pdf:'); setSummary(result);setLatestScan({...result.comparison,id:result.scanId,currentTotal:result.currentTotal,completedAt:result.scannedAt});observedScanId.current=result.scanId; setScanChanges(null); setShowChanges(false); setMessage(productId?'当前型号扫描完成':'资料库扫描完成');
       const [, batchItems] = await Promise.all([search(), api.listMaterialBatches({})]);
       setBatches(batchItems);
       try { const usage = await api.getDrawingNavigation?.(); setUsageBatches(usage?.batches ?? []); } catch { setUsageBatches([]); }
@@ -270,10 +288,10 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     finally { setScanning(false); }
   };
   const viewChanges = async () => {
-    if (!summary) return;
+    if (!currentScan) return;
     if (scanChanges) { setShowChanges((visible) => !visible); return; }
     setLoadingChanges(true); setError('');
-    try { setScanChanges(await api.getFileScanChanges(summary.scanId)); setShowChanges(true); }
+    try { setScanChanges(await api.getFileScanChanges(currentScan.id)); setShowChanges(true); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '扫描变化加载失败'); }
     finally { setLoadingChanges(false); }
   };
@@ -331,7 +349,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       setExpandedPathId(null);
       setFilters(nextFilters);
       setFiles([]); setTotal(0); setBatches([]); setUsageBatches([]);
-      setSummary(null); setScanChanges(null); setShowChanges(false);
+      setSummary(null);setLatestScan(null);observedScanId.current=null; setScanChanges(null); setShowChanges(false);
       setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.qrCodeFiles} 条二维码索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
       await refreshAfterIndexClear(nextFilters); void refreshNavigation(nextFilters);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引失败'); }
@@ -363,26 +381,28 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   return <section className="page-surface page-enter files-page">
     <div className="page-sticky-controls"><PageHeader title="PDF 文件中心" description="按产品与资料批次管理 PDF 文件。">
       <span className="record-count">{total} 个索引文件</span></PageHeader>
-    <div className="files-scan-toolbar"><span className="files-root-path" title={settings.workspaceRoot??''}>{settings.workspaceRoot??'尚未设置资料根目录'}</span><span>PDF {navigationCounts?.total??total}</span><span>未匹配 {unmatchedCount??'—'}</span><button className="text-button" type="button" aria-expanded={showScanDetails} onClick={()=>setShowScanDetails(!showScanDetails)}>详细信息</button><button className="text-button" type="button" onClick={()=>{resetTableLayouts('pdf-files');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button><button className="primary-button" type="button" disabled={saving||scanning||!settings.configured||!settings.available} onClick={()=>void scan()}>{scanning?'扫描中…':'扫描资料库'}</button></div></div>
+    <div className="files-scan-toolbar"><span className="files-root-path" title={settings.workspaceRoot??''}>{settings.workspaceRoot??'尚未设置资料根目录'}</span><span>PDF {navigationCounts?.total??total}</span><span>未匹配 {unmatchedCount??'—'}</span><button className="text-button" type="button" aria-expanded={showScanDetails} onClick={()=>setShowScanDetails(!showScanDetails)}>详细信息</button><button className="text-button" type="button" onClick={()=>{resetTableLayouts('pdf-files');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button>{api.packaging?.scanProduct&&<button type="button" disabled={saving||scanning||!settings.configured||!settings.available||!navigationScope.productId} onClick={()=>void scan(navigationScope.productId)}>扫描当前型号</button>}<button className="primary-button" type="button" disabled={saving||scanning||!settings.configured||!settings.available} onClick={()=>void scan()}>{scanning?'扫描中…':'扫描资料库'}</button></div></div>
     <details className="files-scan-details" open={showScanDetails}>
     <section className="workspace-strip" aria-label="资料根目录设置">
       <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
         placeholder="请输入本机资料库目录" onChange={(event) => { setRootInput(event.target.value); setMessage(''); setError(''); }} /></label>
       <button className="secondary-button" type="button" disabled={saving || scanning || !rootInput.trim()} onClick={() => void saveRoot()}>{saving ? '保存中…' : '保存根目录'}</button>
     </section>
-    {summary && <>
-      <section className="scan-summary" aria-label="当前资料库状态"><strong>当前索引统计</strong><span>{summary.currentTotal} {mock ? '个索引文件（PDF / 二维码）' : '个本次扫描 PDF 索引'}</span>
-        <span className="files-stat-scope">PDF：{summary.total} 个本次扫描文件</span>
-        <span>{summary.matched} 已匹配</span><span>{summary.pending} 待确认</span>
-        <span>{summary.historicalRegistered} 个历史图号已登记</span><span>{summary.unmatched} 未匹配</span>
-        <span>{summary.conflict} 冲突</span><span>{summary.source} 转曲前</span><span>{summary.outlined} 转曲后</span></section>
-      <section className="scan-comparison" aria-label="与上一次扫描相比"><div><strong>{mock ? '本次扫描变化（PDF / 二维码）' : '本次扫描变化（PDF）'}</strong>
-        <span>{summary.comparison.added} 新增</span><span>{summary.comparison.missing} 删除/缺失</span>
-        <span>{summary.comparison.moved} 路径变化</span><span>{summary.comparison.changed} 内容变化</span>
-        <span>{summary.comparison.unchanged} 无变化</span></div>
+    {currentScan && <>
+      <section className="scan-summary" aria-label="当前资料库状态"><strong>{productScan?'产品范围索引统计':'当前索引统计'}</strong><span>{currentScan.currentTotal} {productScan?'个所选产品范围 PDF 索引':mock ? '个索引文件（PDF / 二维码）' : '个本次扫描 PDF 索引'}</span><span className="files-stat-scope">{scanScopeLabel(currentScan.scope)}</span>
+        {currentSummary&&<>
+        <span className="files-stat-scope">PDF：{currentSummary.total} 个{productScan?'所选产品范围扫描文件':'本次扫描文件'}</span>
+        <span>{currentSummary.matched} 已匹配</span><span>{currentSummary.pending} 待确认</span>
+        <span>{currentSummary.historicalRegistered} 个历史图号已登记</span><span>{currentSummary.unmatched} 未匹配</span>
+        <span>{currentSummary.conflict} 冲突</span><span>{currentSummary.source} 转曲前</span><span>{currentSummary.outlined} 转曲后</span></>}</section>
+      <section className="scan-comparison" aria-label="与上一次扫描相比"><div><strong>{productScan?'本次产品范围变化（PDF）':mock ? '本次扫描变化（PDF / 二维码）' : '本次扫描变化（PDF）'}</strong>
+        <span>{currentScan.added} 新增</span><span>{currentScan.missing} 删除/缺失</span>
+        <span>{currentScan.moved} 路径变化</span><span>{currentScan.changed} 内容变化</span>
+        <span>{currentScan.unchanged} 无变化</span></div>
         <button className="text-button" type="button" disabled={loadingChanges} aria-expanded={showChanges}
           aria-controls="scan-change-details" onClick={() => void viewChanges()}>{loadingChanges ? '加载变化中…' : showChanges ? '收起本次变化' : '查看本次变化'}</button></section>
       {showChanges && scanChanges && <section id="scan-change-details" className="scan-change-details" aria-label="本次扫描变化详情">
+        <p className="files-stat-scope">{scanScopeLabel((scanChanges.scan as FileScanRunView).scope??currentScan.scope,'变化范围')}</p>
         {([['新增', scanChanges.changes.added], ['删除/缺失', scanChanges.changes.missing], ['变化', scanChanges.changes.changed]] as const)
           .map(([label, items]) => <div className="scan-change-group" key={label}><strong>{label}</strong>
             {items.length ? <ul>{items.map((item) => <li key={`${label}-${item.id}`}><span>{item.indexKind === 'qr' ? '二维码' : 'PDF'} · {item.fileName}</span><small className="mono">{item.relativePath}{item.previousRelativePath ? ` ← ${item.previousRelativePath}` : ''}</small></li>)}</ul>

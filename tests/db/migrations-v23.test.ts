@@ -27,12 +27,12 @@ it('backs up a populated schema22 on disk before upgrading original columns with
  const root=mkdtempSync(join(tmpdir(),'planner-v23-'));const source=oldDatabase();let db:PlannerDatabase|undefined;
  try{await source.backup(join(root,'planner.db'));source.close();db=openDatabase(join(root,'planner.db'));const before=snapshot(db);let backupPath='';
  const backup=vi.fn(()=>{expect(db!.prepare('select max(version) as version from schema_migrations').get()).toEqual({version:22});expect(db!.prepare("select name from sqlite_master where name='outbound_template_contact_links'").get()).toBeUndefined();return backupPath=createDatabaseBackup(db!,join(root,'planner.db'),join(root,'backups'),'migration');});
- expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:22,to:23});expect(backup).toHaveBeenCalledOnce();assertPreserved(db,before);
+ expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:22,to:24});expect(backup).toHaveBeenCalledOnce();assertPreserved(db,before);
  expect(db.prepare('select * from outbound_template_contact_links').all()).toEqual([]);expect(db.prepare('select distinct contacts_configured from outbound_email_templates').all()).toEqual([{contacts_configured:0}]);expect(db.pragma('foreign_key_check')).toEqual([]);
  expect(db.prepare('select distinct import_sources_json from outbound_email_templates').all()).toEqual([{import_sources_json:'[]'}]);
  for(const value of ['{}','null','invalid'])expect(()=>db!.prepare('update outbound_email_templates set import_sources_json=?').run(value)).toThrow();
  const saved=openDatabase(backupPath);try{expect(snapshot(saved)).toEqual(before);expect(saved.pragma('integrity_check',{simple:true})).toBe('ok');}finally{saved.close();}
- expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:23,to:23});expect(backup).toHaveBeenCalledOnce();
+ expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:24,to:24});expect(backup).toHaveBeenCalledOnce();
  }finally{if(db?.open)db.close();if(source.open)source.close();rmSync(root,{recursive:true,force:true});}
 });
 it.each(['abort','corrupt'])('rolls back the new table, flag, ledger and all data on schema23 %s',failure=>{
@@ -42,6 +42,6 @@ it.each(['abort','corrupt'])('rolls back the new table, flag, ledger and all dat
 });
 it('retains the partial-schema22 compatibility patches within the same backed-up upgrade',()=>{
  const db=oldDatabase();try{db.exec('drop index material_batches_relative_path_nocase_unique; alter table bom_item_assets drop column deleted_at');const before=snapshot(db);const backup=vi.fn();
- expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:22,to:23});expect(backup).toHaveBeenCalledOnce();assertPreserved(db,before);expect((db.pragma('table_info(bom_item_assets)') as {name:string}[]).some(item=>item.name==='deleted_at')).toBe(true);expect(db.prepare("select name from sqlite_master where name='material_batches_relative_path_nocase_unique'").get()).toBeTruthy();
+ expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:22,to:24});expect(backup).toHaveBeenCalledOnce();assertPreserved(db,before);expect((db.pragma('table_info(bom_item_assets)') as {name:string}[]).some(item=>item.name==='deleted_at')).toBe(true);expect(db.prepare("select name from sqlite_master where name='material_batches_relative_path_nocase_unique'").get()).toBeTruthy();
  }finally{db.close();}
 });

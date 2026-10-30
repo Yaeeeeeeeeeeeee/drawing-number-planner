@@ -450,3 +450,17 @@ it('places source-folder membership in the batch column and leaves business batc
  expect(row.querySelector('[data-column-key=batchStatus]')).toHaveTextContent('—');
  expect(within(row).queryByText('当前批次')).toBeNull();expect(within(row).queryByText('历史批次')).toBeNull();
 });
+
+it('labels the latest automatic product scan without replacing global navigation counts or file membership',async()=>{
+  const api=apiFixture(true);const scope={kind:'products',productDirectories:['SAMKYO/冰柜/ZC100']};
+  api.getLatestFileScan.mockResolvedValue({id:12,currentTotal:2,completedAt:'2026-10-30',added:1,missing:0,moved:0,changed:0,unchanged:1,scope});
+  Object.assign(api,{getPdfFileNavigation:vi.fn().mockResolvedValue({total:500,unassociatedProducts:0,categories:[],products:[],batches:[]})});
+  api.getFileScanChanges.mockResolvedValue({scan:{id:12,currentTotal:2,completedAt:'2026-10-30',added:1,missing:0,moved:0,changed:0,unchanged:1,scope},changes:{added:[],missing:[],changed:[]}});
+  render(<FilesPage api={api as never}/>);await screen.findByDisplayValue('X:\\Library');fireEvent.click(screen.getByText('详细信息'));
+  expect(await screen.findByText('本次扫描范围：产品目录 · SAMKYO/冰柜/ZC100')).toBeVisible();
+  expect(screen.getByText('产品范围索引统计')).toBeVisible();expect(screen.getByText('2 个所选产品范围 PDF 索引')).toBeVisible();
+  expect(screen.getByText('PDF 500')).toBeVisible();expect(screen.getByRole('checkbox',{name:`选择 ${file.fileName}`})).toBeVisible();
+  expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.not.objectContaining({productId:9}));expect(api.scanPdfFiles).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'查看本次变化'}));const details=await screen.findByRole('region',{name:'本次扫描变化详情'});
+  expect(within(details).getByText('变化范围：产品目录 · SAMKYO/冰柜/ZC100')).toBeVisible();expect(api.getFileScanChanges).toHaveBeenCalledWith(12);
+});

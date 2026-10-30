@@ -20,10 +20,10 @@ function v17(){
 }
 it('upgrades v17 product-only compatibility after backup without changing any old binding, audit or schema guards',()=>{
  const {product}=v17();const before=db.prepare('select * from drawing_appearance_bindings').all(),backup=vi.fn();
- expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:17,to:23});expect(backup).toHaveBeenCalledTimes(1);expect(db.prepare('select * from drawing_appearance_bindings').all()).toEqual(before);
+ expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:17,to:24});expect(backup).toHaveBeenCalledTimes(1);expect(db.prepare('select * from drawing_appearance_bindings').all()).toEqual(before);
  expect(db.prepare("select name from sqlite_master where name in ('legacy_binding_product','legacy_binding_update','drawing_usage_primary_binding_update') order by name").all()).toHaveLength(3);
  db.prepare("insert into drawing_appearance_bindings values('historical',83,?,null,'confirmed',1,'now')").run(product.id);
- expect(db.pragma('foreign_key_check')).toEqual([]);expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:23,to:23});expect(backup).toHaveBeenCalledTimes(1);
+ expect(db.pragma('foreign_key_check')).toEqual([]);expect(migrateDatabase(db,{databaseExists:true,createBackup:backup})).toEqual({from:24,to:24});expect(backup).toHaveBeenCalledTimes(1);
 });
 it('rolls back the entire constraint change if migration history cannot be recorded',()=>{
  v17();const before=db.prepare('select * from drawing_appearance_bindings').all();db.exec("create trigger reject_v18 before insert on schema_migrations when new.version=18 begin select raise(abort,'test rollback'); end");
