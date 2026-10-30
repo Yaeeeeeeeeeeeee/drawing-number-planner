@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/renderer/App';
 
 const api = new Proxy({}, {
-  get: (_target, key) => key === 'checkServiceHealth'
+  get: (_target, key) => key === 'packaging' ? undefined : key === 'checkServiceHealth'
     ? vi.fn(async () => ({ status: 'ok' }))
     : vi.fn(async () => []),
 }) as any;
