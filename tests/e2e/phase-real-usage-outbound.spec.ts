@@ -112,8 +112,8 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   const purposeId = (await purpose.json()).id as number;
 
   const modelRoot = join(workspaceRoot!, '17.验收产品', 'ACCEPT17-MODEL17');
-  const firstBatch = join(modelRoot, '03.量产后的变更文件', '00.首批大货');
-  const updateBatch = join(modelRoot, '03.量产后的变更文件', '01.20260917');
+  const firstBatch = join(modelRoot, '03.量产后的变更文件（已量产的产品看最新日期）', '00.首批大货');
+  const updateBatch = join(modelRoot, '03.量产后的变更文件（已量产的产品看最新日期）', '01.20260917');
   const sourceRoot = join(modelRoot, '02.未转曲源文件');
   mkdirSync(firstBatch, { recursive: true });
   mkdirSync(updateBatch, { recursive: true });
@@ -286,7 +286,6 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   await expect(page.getByRole('button', { name: '查看 验收二维码', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /BOM 管理/ }).click();
   await page.getByRole('button', { name: '查询 BOM' }).click();
-  await page.getByLabel('查询 BOM 产品类别').selectOption('17.验收产品');
   await page.getByLabel('查询 BOM 产品型号').selectOption(String(productId));
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await expect(page.getByRole('cell', { name: '2026-09-17', exact: true })).toBeVisible();

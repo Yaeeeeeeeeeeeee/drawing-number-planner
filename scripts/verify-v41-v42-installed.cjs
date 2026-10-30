@@ -79,11 +79,11 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   for (const drawing of formal) await request(`/api/drawings/${drawing.id}/activate`, { confirmed: true });
   const productPath = ['V41隔离验收', 'V41VERIFY-NativeV41'];
   const sourcePdf = recordPdf([...productPath, '02.未转曲源文件', `${formal[0].fullCode}-V41唯一源文件.pdf`], 'Native V41 unique source');
-  const outlinedPdf = recordPdf([...productPath, '03.量产后的变更文件', `${formal[0].fullCode}-V41唯一成品（转曲）.pdf`], 'Native V41 unique outlined');
+  const outlinedPdf = recordPdf([...productPath, '03.量产后的变更文件（已量产的产品看最新日期）', `${formal[0].fullCode}-V41唯一成品（转曲）.pdf`], 'Native V41 unique outlined');
   const historicalCode = `${formal[0].fullCode.slice(0, -3)}998`;
   assert.equal((await get(`/api/drawings?keyword=${encodeURIComponent(historicalCode)}`)).total, 0, 'Historical test code must be new');
-  const protectedPdf = recordPdf([...productPath, '03.量产后的变更文件', '01.V42保护批次', `${historicalCode}-V42历史文件.pdf`], 'Native V42 protected history');
-  const disposablePdf = recordPdf([...productPath, '03.量产后的变更文件', '02.V42空批次', 'V42无关联索引.pdf'], 'Native V42 disposable index only');
+  const protectedPdf = recordPdf([...productPath, '03.量产后的变更文件（已量产的产品看最新日期）', '01.V42保护批次', `${historicalCode}-V42历史文件.pdf`], 'Native V42 protected history');
+  const disposablePdf = recordPdf([...productPath, '03.量产后的变更文件（已量产的产品看最新日期）', '02.V42空批次', 'V42无关联索引.pdf'], 'Native V42 disposable index only');
   await go(page, 'PDF 文件中心');
   await scan();
   const initialCatalog = await showCatalog();
@@ -102,7 +102,8 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
 
   // Six actions, two groups, one row; only the toolbar scrolls at the narrow viewport.
   const toolbar = page.getByRole('region', { name: 'PDF 索引管理', exact: true });
-  assert.deepEqual(await toolbar.getByRole('button').allTextContents(), ['全选', '取消选择', '人工归纳', '排除所选文件', '恢复所选文件', '移除文件记录']);
+  assert.deepEqual(await toolbar.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['全选', '取消选择', '人工归纳', '排除所选文件', '恢复所选文件', '移除文件记录']);
+  assert.ok(await toolbar.getByRole('button').evaluateAll(buttons => buttons.every(button => !button.textContent.trim() && button.title === button.getAttribute('aria-label'))));
   assert.equal(await toolbar.getByRole('group').count(), 2);
   assert.equal(await page.getByRole('button', { name: '恢复默认表格布局', exact: true }).count(), 1);
   const toolbarGeometry = [];
@@ -181,7 +182,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   await page.waitForFunction(id => document.querySelector(`.pdf-nav-product[data-product-id="${id}"] button[data-navigation-select]`)?.getAttribute('aria-current') === 'page', product.id);
   assert.ok(fs.existsSync(heldDisposable) && fs.existsSync(path.dirname(disposablePdf)));
   fs.renameSync(heldDisposable,disposablePdf);
-  await page.waitForFunction(() => [...document.querySelectorAll('.files-management-toolbar button')].find(button => button.textContent === '全选')?.disabled === false);
+  await page.waitForFunction(() => [...document.querySelectorAll('.files-management-toolbar button')].find(button => button.getAttribute('aria-label') === '全选')?.disabled === false);
   await scan();
   batches = items(await get('/api/material-batches'));
   assert.ok(batches.some(batch => batch.relativePath === emptyBatch.relativePath), 'Externally restored fixture PDF must be rediscovered in the allowed scan scope');
@@ -253,16 +254,16 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   }
 
   // Introduce a second real unbatched outlined instance; the drawer must expose uncertainty, not choose a file.
-  const ambiguousPdf = recordPdf([...productPath, '03.量产后的变更文件', `${formal[0].fullCode}-V41第二成品（转曲）.pdf`], 'Native V41 competing outlined content');
+  const ambiguousPdf = recordPdf([...productPath, '03.量产后的变更文件（已量产的产品看最新日期）', `${formal[0].fullCode}-V41第二成品（转曲）.pdf`], 'Native V41 competing outlined content');
   await go(page, 'PDF 文件中心'); await scan(); await go(page, '图号库');
   await page.getByRole('textbox', { name: '关键词', exact: true }).fill(formal[0].fullCode);
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await page.getByRole('button', { name: formal[0].fullCode, exact: true }).click();
   const panel = page.getByRole('complementary', { name: '图号详情', exact: true }); await panel.waitFor();
   const outlined = panel.locator('.drawing-file-section').filter({ has: page.getByRole('heading', { name: /转曲后文件/ }) });
-  await outlined.getByText('找到 2 个存在的文件，尚未唯一确认。', { exact: true }).waitFor();
-  assert.equal(await outlined.locator('.drawing-file-presence.ambiguous').count(), 1);
-  assert.equal(await outlined.locator('.drawing-file-row').count(), 0);
+  await outlined.getByText('同一批次有 2 个内容不同的文件，未选择任何实例', { exact: true }).waitFor();
+  assert.equal(await outlined.locator('.drawing-file-row.conflict').count(), 1);
+  assert.equal(await outlined.getByRole('button').count(), 0);
   assert.equal(await panel.getByText(path.basename(ambiguousPdf), { exact: true }).count(), 0);
   await panel.getByText(path.basename(sourcePdf), { exact: true }).waitFor();
   await page.screenshot({ path: path.join(evidence, 'Windows-V41-多文件歧义不自动选.png') });
@@ -273,5 +274,5 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
     for (const row of before[tableName] ?? []) assert.ok(after[tableName].some(candidate => Object.keys(row).filter(key => tableName !== 'historical_drawing_numbers' || key !== 'last_seen_at').every(key => candidate[key] === row[key])), `V4.1/V4.2 must preserve existing ${tableName}`);
   }
   await size(1920);
-  return { isolatedFixture: true, actualInstalledHttpAndDom: true, productId: product.id, formalIds: formal.map(row => row.id), historicalId: historical.id, toolbarGeometry, categoryGeometry, stateEvidence, batchContextMenu: { noPersistentIcons: true, rightClickDoesNotNavigate: true, escapeAndOutsideClose: true, renameDisplayOnly: true, protectedDeleteHttpStatus: denied.status, references: guard.references, emptyBatchDeletionAndScanRediscovery: true }, uniqueUnbatchedFilesShown: true, competingUnbatchedFilesRequireConfirmation: true, existingHistoryPreserved: true, physicalPdfHashesPreserved: originalPdfs.length, nativeExecution: 'This report is produced only after the exported verifier completes in the installed Electron app.' };
+  return { isolatedFixture: true, actualInstalledHttpAndDom: true, productId: product.id, formalIds: formal.map(row => row.id), historicalId: historical.id, toolbarGeometry, categoryGeometry, stateEvidence, batchContextMenu: { noPersistentIcons: true, rightClickDoesNotNavigate: true, escapeAndOutsideClose: true, renameDisplayOnly: true, protectedDeleteHttpStatus: denied.status, references: guard.references, emptyBatchDeletionAndScanRediscovery: true }, uniqueUnbatchedFilesShown: true, competingUnbatchedFilesProtectedWithoutPicker: true, existingHistoryPreserved: true, physicalPdfHashesPreserved: originalPdfs.length, nativeExecution: 'This report is produced only after the exported verifier completes in the installed Electron app.' };
 };

@@ -13,13 +13,13 @@ it('uses selected template role order, active linked picker union and explicit e
  fireEvent.change(screen.getByLabelText('邮件场景'),{target:{value:'旧场景'}});await waitFor(()=>expect(screen.getByLabelText('收件人文本')).toHaveValue('old@example.test'));
  fireEvent.change(screen.getByLabelText('邮件资料类型'),{target:{value:'update'}});fireEvent.change(screen.getByLabelText('邮件场景'),{target:{value:'更新'}});await waitFor(()=>expect(screen.getByLabelText('抄送文本')).toHaveValue('third@example.test'));expect(screen.getByLabelText('收件人文本')).toHaveValue('');
 });
-it('keeps manual selection, free-text recipients and body across template, scenario and manufacturer changes',async()=>{
+it('keeps manual selection, free-text recipients and body across template and scenario changes within the same manufacturer',async()=>{
  const api=fixture();render(<EmailComposer api={api as never} mailContext={null}/>);await chooseFirst();
  await waitFor(()=>expect(screen.getByLabelText('抄送文本')).toHaveValue('second@example.test'));
  fireEvent.click(screen.getByLabelText('收件人 旧默认'));fireEvent.change(screen.getByLabelText('抄送文本'),{target:{value:'manual@example.test'}});fireEvent.change(screen.getByLabelText('正文'),{target:{value:'人工正文'}});
  const selected=(screen.getByLabelText('收件人文本') as HTMLInputElement).value;
  fireEvent.change(screen.getByLabelText('邮件模板'),{target:{value:'2'}});expect(screen.getByLabelText('收件人文本')).toHaveValue(selected);expect(screen.getByLabelText('抄送文本')).toHaveValue('manual@example.test');expect(screen.getByLabelText('正文')).toHaveValue('人工正文');
- fireEvent.change(screen.getByLabelText('邮件场景'),{target:{value:'旧场景'}});fireEvent.change(screen.getByLabelText('适用厂家'),{target:{value:'共享'}});expect(screen.getByLabelText('收件人文本')).toHaveValue(selected);expect(screen.getByLabelText('抄送文本')).toHaveValue('manual@example.test');
+ fireEvent.change(screen.getByLabelText('邮件场景'),{target:{value:'旧场景'}});expect(screen.getByLabelText('收件人文本')).toHaveValue(selected);expect(screen.getByLabelText('抄送文本')).toHaveValue('manual@example.test');
 });
 it('updates the untouched CC role while retaining manual To text in the filtered recipient picker',async()=>{
  const api=fixture();render(<EmailComposer api={api as never} mailContext={null} filterRecipients/>);await chooseFirst();
@@ -34,4 +34,21 @@ it('renders the first ordered linked To contact salutation on automatic initial 
  render(<EmailComposer api={api as never} mailContext={{packageName:'资料',manufacturer:'厂家甲',scenario:'完整',materialType:'initial',product:{id:1,model:'型号',brandName:'品牌',productCategory:'类别'},items:[]} as never}/>);
  await waitFor(()=>expect(api.renderOutboundTemplate).toHaveBeenCalled());
  expect(api.renderOutboundTemplate.mock.calls[0]?.[1]).toMatchObject({contact_salutation:'共享二'});
+});
+
+it('resets both edited recipient roles and text overrides to the newly selected manufacturer',async()=>{
+ const api=fixture();
+ api.listOutboundContacts.mockResolvedValue([...contacts,{id:5,company:'厂家乙',contactName:'乙收件',email:'to-b@example.test',defaultRecipientType:'to',status:'active'},{id:6,company:'厂家乙',contactName:'乙抄送',email:'cc-b@example.test',defaultRecipientType:'cc',status:'active'}]);
+ api.listOutboundTemplates.mockResolvedValue([...(await api.listOutboundTemplates()),{...base,id:5,name:'乙模板',manufacturer:'厂家乙',contactLinksConfigured:true,contactLinks:[{contactId:5,recipientType:'to',displayOrder:0},{contactId:6,recipientType:'cc',displayOrder:0}]}]);
+ render(<EmailComposer api={api as never} mailContext={null}/>);await chooseFirst();
+ await waitFor(()=>expect(screen.getByLabelText('收件人文本')).toHaveValue('second@example.test; third@example.test'));
+ fireEvent.click(screen.getByLabelText('收件人 旧默认'));
+ fireEvent.change(screen.getByLabelText('收件人文本'),{target:{value:'manual-a@example.test'}});
+ fireEvent.change(screen.getByLabelText('抄送文本'),{target:{value:'manual-cc-a@example.test'}});
+ fireEvent.change(screen.getByLabelText('正文'),{target:{value:'保留人工正文'}});
+ fireEvent.change(screen.getByLabelText('适用厂家'),{target:{value:'厂家乙'}});
+ await waitFor(()=>expect(screen.getByLabelText('收件人文本')).toHaveValue('to-b@example.test'));
+ expect(screen.getByLabelText('抄送文本')).toHaveValue('cc-b@example.test');
+ expect(screen.getByLabelText('收件人 乙收件')).toBeChecked();expect(screen.getByLabelText('抄送 乙抄送')).toBeChecked();
+ expect(screen.getByLabelText('正文')).toHaveValue('保留人工正文');
 });

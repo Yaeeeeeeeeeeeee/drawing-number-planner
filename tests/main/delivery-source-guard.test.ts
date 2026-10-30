@@ -24,3 +24,9 @@ it('accepts exactly the pinned renderer icon dependency and rejects unrelated pa
   expect(() => check(candidatePackage, candidateLock.replace('lockfileVersion:', 'changedVersion:'))).toThrow();
   expect(() => check(candidatePackage, candidateLock + '\nextra: true\n')).toThrow();
 });
+
+it('keeps the Chinese installer product version equal to the packaged application version', () => {
+  const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+  const installer = readFileSync('scripts/comprehensive-windows-installer.iss', 'utf8');
+  expect(/^AppVersion=(.+)$/m.exec(installer)?.[1]).toBe(version);
+});

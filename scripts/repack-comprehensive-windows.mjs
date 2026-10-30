@@ -55,7 +55,7 @@ fs.cpSync(path.join(source,'dist/renderer'),path.join(app,'dist/renderer'),{recu
 fs.copyFileSync(path.join(source,'dist/main/preload.cjs'),path.join(app,'dist/main/preload.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-entry.cjs'),path.join(app,'acceptance-entry.cjs'));
 fs.copyFileSync(path.join(source,'scripts/production-profile.cjs'),path.join(app,'production-profile.cjs'));
-fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,applicationVersion,schemaVersion:22,profile:'stable-user-selected',bundledSample:false},null,2));
+fs.writeFileSync(path.join(app,'acceptance-version.json'),JSON.stringify({revision,applicationVersion,schemaVersion:23,profile:'stable-user-selected',bundledSample:false},null,2));
 fs.renameSync(path.join(output,'图号规划器验收版.exe'),path.join(output,'图号规划器.exe'));
 if(fs.existsSync(path.join(app,'acceptance-seed')))throw Error('Example data must not be included');
 for(const entry of files(output))if(/\.(db|sqlite|sqlite3|pdf)(-wal|-shm)?$/i.test(entry.path))throw Error('Database/PDF data must not be bundled: '+entry.path);
@@ -76,7 +76,7 @@ const instructions=`图号规划器 Windows x64
 `;
 fs.writeFileSync(path.join(output,'先看这里-验收说明.txt'),instructions);
 fs.writeFileSync(path.join(output,'验收说明.txt'),instructions);
-fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:22,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
+fs.writeFileSync(path.join(output,'upgrade-profile-verification.json'),JSON.stringify({revision,baseRevision,sourceRun:38697339387,sourceArtifact:'P4-Windows-x64-8dc2112',runtimeVerification,stableProfile:true,schemaVersion:23,bundledSample:false,originalSampleUnchanged:JSON.stringify(beforeSeed)===JSON.stringify(files(oldSeed)),note:'Verified runtime reused. Source includes approved migrations. Selected existing database is backed up and upgraded; never reset.'},null,2));
 fs.writeFileSync(path.join(output,'delivery-manifest.json'),JSON.stringify({revision,platform:'win32-x64',baseRevision,files:files(output)},null,2));
 verifyManifest(output,JSON.parse(fs.readFileSync(path.join(output,'delivery-manifest.json'),'utf8')));
-console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:22,bundledSample:false}));
+console.log(JSON.stringify({revision,output,executable:path.join(output,'图号规划器.exe'),stableProfile:true,schemaVersion:23,bundledSample:false}));

@@ -15,7 +15,7 @@ module.exports=async function verifyV51({page,app,source,workspace,output,eviden
  const main=await dictionary('main_category','88','V51印刷件');await dictionary('project_item','01','V51铭牌',main.id);await dictionary('project_item','02','V51说明书',main.id);
  const product=await request('/api/products',{sku:'V51TEST',model:'V51MODEL',productCategory:'V51验收品类',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id});
  const code='88.8888.880.8801001',manualCode='88.8888.880.8802001';
- const productRoot=path.join(workspace,'V51验收品类','V51TEST-V51MODEL','03.量产后的变更文件');
+ const productRoot=path.join(workspace,'V51验收品类','V51TEST-V51MODEL','03.量产后的变更文件（已量产的产品看最新日期）');
  const original=[];
  for(const [batch,fullCode,item,text]of [['00.首批大货',code,'铭牌','nameplate before'],['00.首批大货',manualCode,'说明书','manual unchanged'],['01.20261027',code,'铭牌','nameplate after'],['01.20261027',manualCode,'说明书','manual unchanged']]){
   const file=path.join(productRoot,batch,`${fullCode}-V51MODEL-${item}（转曲）.pdf`);writePdf(file,text);original.push({file,hash:createHash('sha256').update(fs.readFileSync(file)).digest('hex')});

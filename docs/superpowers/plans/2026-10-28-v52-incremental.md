@@ -56,7 +56,7 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 - [x] GREEN actual workbook25 separate candidates and all mail/import/contact/signature/draft compatibility regressions before Phase6.
 
 ### Phase 6 — Full regression and delivery
-- [ ] Run complete suite, type/build, actual workbook acceptance, browser end-to-end and independent significant-issue review.
+- [x] Run complete suite, type/build, actual workbook acceptance, browser end-to-end and independent significant-issue review.
 - [ ] Run Windows installed/old Schema upgrade/backup/rollback/local-path protection/layout/native interaction and original data safety acceptance.
 - [ ] Commit/push verified code, source tag/release/install notes and installer with actual download/hash; report done/tested/unverified/unresolved separately.
 
@@ -72,3 +72,5 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 2026-10-28 Phase4 complete: shared9files82pass, PDF/batch6files88pass, HTTP28pass, browser1pass across720/1366/1920/2560/3840 with actual temporary indexed files/rows, rightmost transfer and outer-scroll pinned controls at1920x320; tsc/diffclean. Initial browser resize assertion read stale viewport geometry; wait for measured table-wrap width, not fixed sleeps. Existing batchcontextmenu/safety reused, physical empty directory preserved. BeginPhase5; Schema23 minimal links+explicit-empty marker proposal in spec before implementation.
 
 2026-10-28 Phase5 complete: final mail+all-DB30files178pass, tsc/diffclean; earlier importer12/98 and links24/158 compatibility runs also green. Original uploaded workbook actually saved/reopened:25templates/25sourcecases,14sharedcontacts/135rolelinks/1nondefaultsignature; all25same-source repeat skipped, originalworkbook/PDFs/preexistingrows preserved. Actual old compiled Schema22 fixture upgraded23 with51originalbusiness tables compared byoldcolumns, actualreadableSchema22backup,2PDFhashes preserved andidempotentreopen. Source provenance gap closed in existing template JSONhistory+defaultcollapsedreference ratherthan transientpreview. BeginPhase6.
+
+2026-10-30 Phase6 local gate: full197files1661pass, finalE2E11pass, types/buildclean. Initialfull2failures were deliveryassertions still22/allowedreleaseversion; synchronizedSchema23/1.3.0 andaddedinstaller-versioncontract. OldE2Eactive03fixturescanonicalized, filenameoutlinedmarker/query3filters/missinglabelsadaptedwithoutremovingbusinesschecks. FinalindependentreviewfoundoneImportantrecipientleakacrossmanufacturer; RED→GREENfixedresetbothroles+overridesonmanufacturerchange, preserves same-suppliermanualedits/body. Focused5files25pass, followedfullgreen. No otherImportantfindings. PreparingWindows actualinstalledgate.

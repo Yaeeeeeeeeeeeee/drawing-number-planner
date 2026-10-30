@@ -41,9 +41,10 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   await expect(page.getByLabel('第 1 行数量')).toHaveCount(0);
   await page.getByRole('button', { name: '保存当前 BOM' }).click();
   await expect(page.getByText('当前 BOM 已保存')).toBeVisible();
+  await expect(page.getByLabel('第 1 行主类别')).toHaveCount(0);
 
   await page.getByRole('button', { name: '查询 BOM' }).click();
-  await page.getByLabel('查询 BOM 产品类别').selectOption('冰柜');
+  await expect(page.getByLabel('查询 BOM 产品类别')).toHaveCount(0);
   await page.getByLabel('查询 BOM 产品型号').selectOption(String(productId));
   await page.getByLabel('查询 BOM 开始日期').fill('2026-09-02');
   await page.getByLabel('查询 BOM 结束日期').fill('2026-09-02');

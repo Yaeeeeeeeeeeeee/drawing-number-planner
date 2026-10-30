@@ -32,3 +32,7 @@ This checkout includes Schema20, replacing only the planned-drawing usage update
 ## Current V5 observation — 2026-10-26
 
 Current registry reaches Schema22. Schema21 adds append-only force-release identity/impact audit and PDF quarantine paths; original drawing rows remain archived FK identities. Schema22 adds nullable manufacturer/scenario to email_templates. Each upgrade backs up first, preserves original columns/rows, checks foreign keys, and rolls back on failure. Do not run real product merges or releases during startup. Earlier Schema20 notes are historical compatibility context.
+
+## Current V5.2 observation — 2026-10-30
+
+The registry now reaches Schema23: additive outbound_template_contact_links reuses existing template/contact IDs and records ordered To/CC roles. contacts_configured distinguishes legacy company-default behavior from an explicitly empty recipient set. import_sources_json on the original template keeps server-bound original worksheet/cell/case facts as append-only import history, without changing normal template-edit inputs or existing drafts. Schema22 and earlier records are preserved by old-column equality checks, verified pre-upgrade backup and transactional rollback. Existing PDF/BOM/drawing/QR/outbound snapshot tables are unchanged by this migration.

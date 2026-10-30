@@ -51,7 +51,7 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
 
   const modelDir = join(workspaceRoot!, '冰柜', 'PHASE4-ZC400');
   const sourceDir = join(modelDir, '02.未转曲源文件');
-  const outlinedDir = join(modelDir, '03.量产后的变更文件', '00.首批大货');
+  const outlinedDir = join(modelDir, '03.量产后的变更文件（已量产的产品看最新日期）', '00.首批大货');
   mkdirSync(sourceDir, { recursive: true });
   mkdirSync(outlinedDir, { recursive: true });
   writeFileSync(join(sourceDir, `${logoCode}-PHASE4-ZC400白色-LOGO.pdf`), '%PDF-1.4 source');

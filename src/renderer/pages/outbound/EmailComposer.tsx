@@ -32,6 +32,7 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
   const [signatureId, setSignatureId] = useState('');
   const loadedChoices = useRef(false);
   const recipientSelectionEdited = useRef({ to: false, cc: false });
+  const recipientManufacturer = useRef(manufacturer);
   const [blocks, setBlocks] = useState<number[]>([]);
   const [subject, setSubject] = useState(mailContext?.packageName ?? '');
   const [body, setBody] = useState('');
@@ -105,6 +106,11 @@ export function EmailComposer({ api, mailContext: incomingContext, filterRecipie
       : companyContacts.filter(item => item.defaultRecipientType === kind).map(item => item.id);
   };
   useEffect(() => {
+    if (recipientManufacturer.current !== manufacturer) {
+      recipientManufacturer.current = manufacturer;
+      recipientSelectionEdited.current = { to: false, cc: false };
+      setToOverride(null); setCcOverride(null);
+    }
     for (const kind of ['to', 'cc'] as const) {
       if (!recipientSelectionEdited.current[kind]) (kind === 'to' ? setTo : setCc)(defaultRecipientIds(kind));
     }

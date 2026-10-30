@@ -35,10 +35,10 @@ test('compatibility correction scans history, preserves occupancy, and reports c
 
   const sourceDir = join(workspaceRoot!, '01.洗碗机', 'SKDWT040JP-T40', '02.未转曲源文件');
   const outlinedDir = join(workspaceRoot!, '01.洗碗机', 'SKDWT040JP-T40',
-    '03.量产后的变更文件', '01.20241210');
+    '03.量产后的变更文件（已量产的产品看最新日期）', '01.20241210');
   mkdirSync(sourceDir, { recursive: true }); mkdirSync(outlinedDir, { recursive: true });
   const sourceFile = join(sourceDir, '02.0404.010.0401007-SAMKYO-T40-LOGO.pdf');
-  const outlinedFile = join(outlinedDir, '02.0404.010.0401007-SAMKYO-T40-LOGO.pdf');
+  const outlinedFile = join(outlinedDir, '02.0404.010.0401007-SAMKYO-T40-LOGO（转曲）.pdf');
   const pendingFile = join(sourceDir, '02.0404.010.0401000-invalid.pdf');
   writeFileSync(sourceFile, '%PDF source'); writeFileSync(outlinedFile, '%PDF outlined'); writeFileSync(pendingFile, '%PDF pending');
   const before = [sourceFile, outlinedFile, pendingFile].map((path) => ({ path, size: statSync(path).size, mtime: statSync(path).mtimeMs }));
@@ -89,7 +89,9 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await page.getByRole('button', { name: '查询', exact: true }).click();
   const historicalRow = page.getByRole('row').filter({ hasText: '02.0404.010.0401007' });
   await historicalRow.getByRole('button', { name: '查看 / 管理', exact: true }).click();
-  await expect(page.getByRole('complementary', { name: '图号详情' }).getByText('磁盘文件不存在', { exact: true })).toHaveCount(2);
+  await expect(detail.getByRole('heading', { name: '转曲前文件 已缺失', exact: true })).toBeVisible();
+  await expect(detail.getByRole('heading', { name: '转曲后文件 已缺失', exact: true })).toBeVisible();
+  await expect(detail.getByRole('button', { name: /打开转曲[前后]文件.*的位置/ })).toHaveCount(0);
   await page.getByRole('button', { name: '关闭图号详情', exact: true }).click();
 
   await page.getByRole('button', { name: /图号规划/ }).click();

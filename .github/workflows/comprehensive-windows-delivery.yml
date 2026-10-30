@@ -105,8 +105,8 @@ jobs:
           & ./scripts/verify-desktop-installation.ps1 -SetupPath 'installer/图号规划器-Windows-x64-安装包.exe' -PackageRoot 'Comprehensive-Windows' -OutputDirectory 'installer'
           $desktopReport = Get-Content installer/windows-desktop-install.json -Raw | ConvertFrom-Json
           $installedVersion = (Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{69BB0C19-7394-4ADC-92D1-54A7D56B32EF}_is1').DisplayVersion
-          if ($installedVersion -ne '1.2.0') { throw 'Installed application version mismatch' }
-          @{ packageVersion='1.2.0'; installedVersion=$installedVersion; revision=$env:PLANNER_ACCEPTANCE_REVISION } | ConvertTo-Json | Set-Content installer/installed-version.json
+          if ($installedVersion -ne '1.3.0') { throw 'Installed application version mismatch' }
+          @{ packageVersion='1.3.0'; installedVersion=$installedVersion; revision=$env:PLANNER_ACCEPTANCE_REVISION } | ConvertTo-Json | Set-Content installer/installed-version.json
           "COMPREHENSIVE_INSTALLED=$($desktopReport.chineseChild.installed)" >> $env:GITHUB_ENV
       - name: Bundle verification fixture only into runner temporary storage
         shell: pwsh
@@ -115,7 +115,7 @@ jobs:
           node scripts/build-comprehensive-verifier.mjs app-source "$helper"
           if ($LASTEXITCODE -ne 0) { throw 'Native database verification bundle failed' }
           "COMPREHENSIVE_DB_HELPER=$helper" >> $env:GITHUB_ENV
-      - name: Run installed Electron; native profile selection, v15 upgrade, backup, WAL, rollback, restart and screenshots
+      - name: Run installed Electron; native profile selection, v15 upgrade, backup, WAL, rollback, restart, V5.2 scoped files/BOM/matrix mail and screenshots
         shell: pwsh
         run: |
           node scripts/verify-comprehensive-windows.cjs app-source "$env:COMPREHENSIVE_INSTALLED/图号规划器.exe" installer "$env:COMPREHENSIVE_DB_HELPER"
