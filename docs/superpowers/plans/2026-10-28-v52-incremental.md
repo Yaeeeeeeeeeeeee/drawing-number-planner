@@ -58,7 +58,7 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 ### Phase 6 — Full regression and delivery
 - [x] Run complete suite, type/build, actual workbook acceptance, browser end-to-end and independent significant-issue review.
 - [x] Run Windows installed/old Schema upgrade/backup/rollback/local-path protection/layout/native interaction and original data safety acceptance.
-- [ ] Commit/push verified code, source tag/release/install notes and installer with actual download/hash; report done/tested/unverified/unresolved separately.
+- [x] Commit/push verified code, source tag/release/install notes and installer with actual download/hash; report done/tested/unverified/unresolved separately.
 
 ## Execution ledger
 2026-10-28: Stage1 gates met, scan/BOM/UI faults reproduced; original workbook privately inspected, local-path/internal-only deletion user clarification recorded. No source changes yet. Begin Phase2 only; other implementers wait.
@@ -78,3 +78,5 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 2026-10-30 Windowsrun40992456058 stoppedbeforebuild: originalP4artifact38697339387 expired. Replaceephemeralartifactdependencywithpublicverifiedv1.2.0setup (145102853bytes,SHA0803cafa...07f38,source33cbbe1). Independentlydownloaded+SHAchecked; runnerinstallsintoisolatedruntimefolderwithoutlaunch, removesonlyinstaller-generatedprogrammetadata, fullstablemanifest/revision/exe/dependency/securitychecksremain. Repackalsohashchecksoriginalbaseinstaller andpreservesentirebase. Deliveryhelper8tests andscriptsyntaxpass; businesssourceunchangedfromfullgreen. RetryWindowsgate, no releaseclaim.
 
 2026-10-30 Windows final:40993914648/sourcea80815d successful; installed15→23, backup/WAL/rollback/restart/Desktop/two-reinstall profiles, all old native controls and V5.2 scopedfiles/BOM/matrixmail passed. Expired P4 artifact recovered only from SHA-pinned permanent1.2.0; obsolete fixed56px assertion replaced by content-height/no-extra-blank/nowrap/alignment checks. Publisher pins same successful source/run/archive digests; public release/download verification pending.
+
+2026-10-30 Final delivery complete: immutablev1.3.0=a80815d; publisher40994488100 verified pinned native40993914648 digests and published/setup/homepage. PublicEXE145113744bytes SHA256a1587ed85a34abd61fdab905d37038da66377e2fc2bfebb112d02fd4923b14c1 and report SHA2566c7b26948d991b28121744c60e920d608a36c5d3f604d743789a766f9e92cd5c actually downloaded/matched. NativeV52 screenshots reviewed. ProductionDB/physicalDPI remain local verification; originalExcel actual private acceptance and anonymous native acceptance are distinguished.
