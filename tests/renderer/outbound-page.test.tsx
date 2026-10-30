@@ -360,7 +360,9 @@ describe('OutboundPage', () => {
     fireEvent.change(screen.getByLabelText('资料批次'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: '预览文件' }));
     await screen.findByText('铭牌（转曲）.pdf');
-    fireEvent.click(screen.getByRole('button', { name: '生成压缩包' }));
+    const generateButton=screen.getByRole('button',{name:'生成压缩包'});
+    await waitFor(()=>expect(generateButton).toBeEnabled());
+    fireEvent.click(generateButton);
     fireEvent.click(await screen.findByRole('button', { name: '确认生成' }));
     expect(await screen.findByText('生成 ZIP 仅支持 Windows 桌面版，请在桌面版选择输出目录。')).toBeVisible();
     expect(api.createOutboundPackage).not.toHaveBeenCalled();
