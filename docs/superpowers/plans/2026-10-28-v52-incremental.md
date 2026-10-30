@@ -57,7 +57,7 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 
 ### Phase 6 — Full regression and delivery
 - [x] Run complete suite, type/build, actual workbook acceptance, browser end-to-end and independent significant-issue review.
-- [ ] Run Windows installed/old Schema upgrade/backup/rollback/local-path protection/layout/native interaction and original data safety acceptance.
+- [x] Run Windows installed/old Schema upgrade/backup/rollback/local-path protection/layout/native interaction and original data safety acceptance.
 - [ ] Commit/push verified code, source tag/release/install notes and installer with actual download/hash; report done/tested/unverified/unresolved separately.
 
 ## Execution ledger
@@ -76,3 +76,5 @@ Interfaces: per-cell source/case identity, raw reference, independent signature 
 2026-10-30 Phase6 local gate: full197files1661pass, finalE2E11pass, types/buildclean. Initialfull2failures were deliveryassertions still22/allowedreleaseversion; synchronizedSchema23/1.3.0 andaddedinstaller-versioncontract. OldE2Eactive03fixturescanonicalized, filenameoutlinedmarker/query3filters/missinglabelsadaptedwithoutremovingbusinesschecks. FinalindependentreviewfoundoneImportantrecipientleakacrossmanufacturer; RED→GREENfixedresetbothroles+overridesonmanufacturerchange, preserves same-suppliermanualedits/body. Focused5files25pass, followedfullgreen. No otherImportantfindings. PreparingWindows actualinstalledgate.
 
 2026-10-30 Windowsrun40992456058 stoppedbeforebuild: originalP4artifact38697339387 expired. Replaceephemeralartifactdependencywithpublicverifiedv1.2.0setup (145102853bytes,SHA0803cafa...07f38,source33cbbe1). Independentlydownloaded+SHAchecked; runnerinstallsintoisolatedruntimefolderwithoutlaunch, removesonlyinstaller-generatedprogrammetadata, fullstablemanifest/revision/exe/dependency/securitychecksremain. Repackalsohashchecksoriginalbaseinstaller andpreservesentirebase. Deliveryhelper8tests andscriptsyntaxpass; businesssourceunchangedfromfullgreen. RetryWindowsgate, no releaseclaim.
+
+2026-10-30 Windows final:40993914648/sourcea80815d successful; installed15→23, backup/WAL/rollback/restart/Desktop/two-reinstall profiles, all old native controls and V5.2 scopedfiles/BOM/matrixmail passed. Expired P4 artifact recovered only from SHA-pinned permanent1.2.0; obsolete fixed56px assertion replaced by content-height/no-extra-blank/nowrap/alignment checks. Publisher pins same successful source/run/archive digests; public release/download verification pending.
