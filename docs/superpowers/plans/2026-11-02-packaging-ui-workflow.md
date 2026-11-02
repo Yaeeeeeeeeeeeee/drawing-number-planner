@@ -50,5 +50,5 @@ Files: shared file types/repository/routes/FilesPage.
 Files: relevant tests, actual browser/native verifier, version/installation/release/docs/progress.
 - [x] Final218/1855, actual oldSchema24 test DB upgrade, real browser13/13 and screenshots at3840/2560/1920/1440/720 passed.
 - [x] Independent final review found no blocker; nativeWindows41397786717 build/install/restart/task deletion passed, legacy directories verified against actual oldSchema24. Exact source/artifacts pinned.
-- [ ] Publishv1.5.0, verify actual public installer/report downloads and view native screenshots.
+- [x] Publishv1.5.0 (41398418752), actual public installer/report downloads match SHA256, native screenshots inspected and recorded.
 - [x] Report source files/data/path changes and real Adobe limitation; do not label unverified behavior passed.

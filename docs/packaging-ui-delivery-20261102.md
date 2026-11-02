@@ -60,4 +60,18 @@ Windows初跑41397203429已通过构建、自定义/桌面安装和前置业务�
 - 安装工件摘要：`sha256:de7d8edc4e71a6341a43acdafdc7f51705a30a3abe4b191947c37df5d60c7e40`；原始验证工件摘要：`sha256:73f0d8582709f0ed85e0913312fa0d325db004661766cc961b947da40855b3ec`。这两项是Actions工件ZIP摘要，EXE实际SHA256以Release的SHA256SUMS为准。
 - 原生验收没有运行真实Adobe生成；不将协议和人工PDF验收替代真实字体/版式/可编辑PDF重开验收。用户正式库和物理DPI不在环境。
 
-[安装包与校验文件](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)。公开下载复核结果在发布完成后记录。
+[安装包与校验文件](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)。公开安装包和验证ZIP已实际下载，MZ文件头、版本、源码、SHA256均核对一致，验证包未包含DB/PDF/AIT/Excel等业务文件。
+
+## 最终公开交付复核
+
+[发布运行41398418752](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/41398418752)成功，v1.5.0已正式公开。安装器145169138字节，SHA256 `dc9facc0ac45e2de673acfef2793f621dfaec95018d0848471a47f37bffda023`；验证ZIP9033354字节，SHA256 `10e4a9aae33789c8b0c46b5f947918a9c0856e93ec953a7e6eb8539780d9289f`。实际下载复核见[JSON记录](v1.5.0-public-download-verification.json)，与Release校验文件一致。
+
+已查看下列真实Windows安装后截图；全部分辨率截图、几何数据和业务报告随验证ZIP提供。普通页面不显示UUID，任务列表/设置紧凑、图号预览在字段下方、任务历史提供确认删除。原生报告 `rendererErrors=[]`；任务归档/备份哈希/删除保护及实际进程重启标志均通过。两次同版本重新安装均询问旧/新库，创建新库无需选文件且旧库保留，普通重启沿用选择。
+
+- [图号规划实际Windows截图](screenshots/v1.5.0/planning-windows-1920.png)
+- [制图任务实际Windows截图](screenshots/v1.5.0/drawing-tasks-windows-1920.png)
+- [任务历史实际Windows截图](screenshots/v1.5.0/task-history-windows-1920.png)
+
+提交记录：`8fa1a77`功能/Schema/UI；`096dabc`原生剪贴板等待与最终回归证据（正式应用源码Tag）；`0169195`固定已验证工件发布。最后文档提交仅补充实际公开下载与截图，不改变已安装验收的应用代码。
+
+本轮没有剩余已知实现阻塞；真实Adobe设计/字体/可编辑性及用户正式库/物理DPI仍属未验证范围。无需清空数据库或搬迁旧任务目录。
