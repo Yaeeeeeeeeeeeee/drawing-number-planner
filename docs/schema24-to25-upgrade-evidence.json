@@ -1,0 +1,19 @@
+{
+  "baselineTag": "v1.4.0",
+  "oldSchema": 24,
+  "upgradedTo": 25,
+  "originalTablesCompared": 61,
+  "allOldColumnsAndRowsPreserved": true,
+  "readableSchema24Backup": true,
+  "legacyReviewedNestedTaskResumed": true,
+  "legacyArchiveHashPreserved": true,
+  "legacyDirectoryAndUnrelatedFileRetained": true,
+  "newTaskFlatRoot": true,
+  "completedDeletionLeavesFormalPdfAndOccupancy": true,
+  "foreignKeys": true,
+  "reopenIdempotent": true,
+  "baselineSource": "541219c6dc17e7d6a207c2ed58f4b20bb41bd614",
+  "implementationSource": "8fa1a7763febe681f54b9e30013afa9e60a974af",
+  "fixtureOnly": true,
+  "productionDatabaseAccessed": false
+}

@@ -85,7 +85,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  const drawings=(await request(`/api/drawings?productId=${product.id}`)).items;assert.equal(drawings.length,1);const drawing=drawings[0];
  if(!app)await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:new URL(page.url()).origin});
  await page.getByRole('button',{name:`复制图号 ${drawing.fullCode}`,exact:true}).click();
- const copied=app?await app.evaluate(({clipboard})=>clipboard.readText()):await page.evaluate(()=>navigator.clipboard.readText());assert.equal(copied,drawing.fullCode);
+ await expect.poll(()=>app?app.evaluate(({clipboard})=>clipboard.readText()):page.evaluate(()=>navigator.clipboard.readText())).toBe(drawing.fullCode);
  await page.getByRole('button',{name:'查看图号库',exact:true}).click();const drawingDetail=page.getByRole('complementary',{name:'图号详情',exact:true});await drawingDetail.getByRole('heading',{name:drawing.fullCode,exact:true}).waitFor();
  await capture('UI15-占号结果精确定位图号');await drawingDetail.getByRole('button',{name:'关闭图号详情',exact:true}).click();
  await navigation.getByRole('button',{name:'图号规划 / 更新包材',exact:true}).click();await page.getByRole('region',{name:'本次占号结果',exact:true}).getByText(drawing.fullCode,{exact:true}).waitFor();
