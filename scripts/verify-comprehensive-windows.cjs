@@ -61,7 +61,7 @@ async function launch(){
 async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow(app,dialog);await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});return page;}catch(error){await captureFailure(app,app.__verificationLabel,error);throw error;}}
 (async()=>{
  fs.mkdirSync(evidence,{recursive:true});assert.equal(fs.existsSync(profileHome),false,'Refuse to touch any pre-existing runner/user production profile');
- const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,24);assert.equal(version.applicationVersion,'1.4.0');assert.equal(JSON.parse(fs.readFileSync(path.join(appRoot,'package.json'),'utf8')).version,version.applicationVersion);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
+ const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,25);assert.equal(version.applicationVersion,'1.5.0');assert.equal(JSON.parse(fs.readFileSync(path.join(appRoot,'package.json'),'utf8')).version,version.applicationVersion);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
  const legacy=path.join(temporary,'旧版原始数据目录');database('prepare',legacy);database('rollback-and-wal',legacy);const settingsBefore=fs.readFileSync(path.join(legacy,'settings.json'));
  const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));let app;
  try{app=await launch();const page=await ready(app,dialog);
@@ -74,7 +74,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
    await page.waitForTimeout(200);
    const viewport=await page.evaluate(()=>({width:innerWidth,height:innerHeight,devicePixelRatio,screenWidth:screen.width,screenHeight:screen.height}));
    assert.equal(viewport.width,width);assert.equal(viewport.height,height);report.viewports.push({requested:{width,height},actual:viewport,scope:'Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior'});
-   for(const label of ['产品档案','图号库','PDF 文件中心','包材模板','二维码管理','BOM 管理','外发资料']){
+   for(const label of ['产品档案','图号库','PDF 文件中心','包材模板','制图任务','二维码管理','BOM 管理','外发资料']){
     const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();
     await page.getByRole('heading',{name:label,exact:true}).waitFor();
     await page.waitForTimeout(150);if(label==='二维码管理')await assertQrListLayout(page,`${width}x${height}`);

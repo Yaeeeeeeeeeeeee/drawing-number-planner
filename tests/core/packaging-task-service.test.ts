@@ -1,4 +1,4 @@
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {afterEach,expect,it,vi} from 'vitest';
@@ -38,13 +38,13 @@ it('persists one unfinished task per real product without reserving or changing 
 });
 it('discovers one stable full-code manual PDF, requires exact review, archives/indexes only its product and keeps history',async()=>{
  const f=fixture(),task=await f.create();const rootFile=join(f.root,'冰柜','SKU1-M1','00.临时文件',`${f.drawing.fullCode}-铭牌.pdf`);writeFileSync(rootFile,pdf);
- const discovered=await f.service.discover(task.id),item=discovered.items[0];expect(item.state).toBe('awaiting_review');expect(existsSync(rootFile)).toBe(false);
+ const discovered=await f.service.discover(task.id),item=discovered.items[0];expect(item.state).toBe('awaiting_review');expect(existsSync(rootFile)).toBe(true);
  expect((await f.service.archivePreview(task.id)).ready).toBe(false);
  await expect(f.service.reviewItem(task.id,item.id,'0'.repeat(64))).rejects.toThrow(/变化|核对/);
  await f.service.reviewItem(task.id,item.id,item.sha256!);expect((await f.service.archivePreview(task.id)).ready).toBe(true);
  const archived=await f.service.archive(task.id,true);expect(archived.state).toBe('completed');
  const index=f.db.prepare('select * from pdf_files where drawing_id=?').get(f.drawing.id) as any;expect(index).toBeTruthy();expect(index.relative_path.replaceAll('\\','/')).toContain('/02.未转曲源文件/');
- expect(existsSync(join(f.root,index.relative_path))).toBe(true);expect(existsSync(join(f.root,'冰柜','SKU1-M1','00.临时文件'))).toBe(true);expect(existsSync(join(f.root,task.taskDirectory))).toBe(false);
+ expect(existsSync(join(f.root,index.relative_path))).toBe(true);expect(existsSync(join(f.root,'冰柜','SKU1-M1','00.临时文件'))).toBe(true);expect(existsSync(join(f.root,task.taskDirectory))).toBe(true);
  expect(f.db.prepare('select scope_kind from file_scan_runs order by id desc limit 1').get()).toEqual({scope_kind:'products'});
  expect((await f.service.getTask(task.id)).state).toBe('completed');
 });
@@ -140,7 +140,7 @@ it('blocks serving or opening a task PDF from a different configured root',async
  await expect(service.filePath(task.id,current.items[0].id)).rejects.toThrow(/资料根目录/);await expect(service.openItem(task.id,current.items[0].id)).rejects.toThrow(/资料根目录/);expect(f.automation.openPdf).not.toHaveBeenCalled();
 });
 it('shows a newly replaced PDF at a previously linked input filename as pending',async()=>{
- const f=fixture(),task=await readyManual(f),source=join(f.root,'冰柜','SKU1-M1','00.临时文件',`${f.drawing.fullCode}.pdf`);writeFileSync(source,pdf.replace('Catalog','NewArrival'));
+ const f=fixture(),created=await f.create(),legacy=`${created.productDirectory}/00.临时文件/当前任务_legacy_input`;mkdirSync(join(f.root,legacy));f.db.prepare('update packaging_tasks set task_directory=? where id=?').run(legacy,created.id);writeFileSync(join(f.root,created.productDirectory,'00.临时文件',`${f.drawing.fullCode}.pdf`),pdf);let task=await f.service.discover(created.id);task=await f.service.reviewItem(task.id,task.items[0].id,task.items[0].sha256!);const source=join(f.root,'冰柜','SKU1-M1','00.临时文件',`${f.drawing.fullCode}.pdf`);writeFileSync(source,pdf.replace('Catalog','NewArrival'));
  const found=await f.service.discover(task.id);expect(found.pendingFiles.filter(file=>file.status==='pending')).toHaveLength(1);expect(existsSync(source)).toBe(true);
  await f.service.reviewItem(task.id,found.items[0].id,found.items[0].sha256!);expect((await f.service.archivePreview(task.id)).ready).toBe(false);
 });
@@ -156,4 +156,36 @@ it('requires a new explicit template choice when changed dimensions turn an auto
 it('prevents changing the workspace setting during a tracked file review',async()=>{
  const f=fixture(),task=await readyManual(f);const settings=new WorkspaceSettingsStore(join(f.dir,'guarded-settings.json'));settings.setWorkspaceRoot(f.root);const service=new FileService(new FileRepository(f.db),settings,undefined,()=>f.service.hasOperations());const nextRoot=join(f.dir,'different-root');mkdirSync(nextRoot);
  const reviewing=f.service.reviewItem(task.id,task.items[0].id,task.items[0].sha256!);expect(()=>service.updateSettings({workspaceRoot:nextRoot})).toThrow(/制图文件/);await reviewing;expect(settings.get().workspaceRoot).toBe(f.root);expect(service.updateSettings({workspaceRoot:nextRoot}).workspaceRoot).toBe(nextRoot);
+});
+it('creates an automatically named task directly in root00 and retains all original source files until reviewed archive',async()=>{
+ const f=fixture(),task=await f.service.createTask({productId:f.product.id,type:'new',drawings:[{origin:'planned',id:f.drawing.id}]});expect(task.name).toContain('M1');expect(task.taskDirectory.replaceAll('\\','/')).toBe('冰柜/SKU1-M1/00.临时文件');expect(readdirSync(join(f.root,task.taskDirectory))).toEqual([]);
+ const file=join(f.root,task.taskDirectory,`${f.drawing.fullCode}-铭牌.pdf`);writeFileSync(file,pdf);const found=await f.service.discover(task.id);expect(found.items[0].relativePath).toBe(join(task.taskDirectory,`${f.drawing.fullCode}-铭牌.pdf`));expect(existsSync(file)).toBe(true);
+ await f.service.reviewItem(task.id,found.items[0].id,found.items[0].sha256!);await f.service.archive(task.id,true);expect(existsSync(file)).toBe(false);expect(existsSync(join(f.root,task.taskDirectory))).toBe(true);
+});
+it('retains a confirmed deleted task and physical files while releasing only its unfinished-product lock',async()=>{
+ const f=fixture(),task=await f.create(),originalDrawings=f.db.prepare('select * from drawing_numbers').all();const file=join(f.root,task.taskDirectory,`${f.drawing.fullCode}.pdf`);writeFileSync(file,pdf);await f.service.discover(task.id);
+ const preview=f.service.deletionPreview(task.id);expect(preview).toMatchObject({canDelete:true,releasesLock:true,model:'M1',fileCount:1});expect(preview.token).toHaveLength(64);
+ expect(()=>f.service.deleteTask(task.id,{confirmed:true,token:preview.token})).toThrow(/未完成/);
+ expect(f.service.deleteTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true})).toEqual({id:task.id,deleted:true});expect(f.service.listTasks()).toEqual([]);await expect(f.service.getTask(task.id)).rejects.toThrow(/不存在|删除/);expect(readFileSync(file,'utf8')).toBe(pdf);expect(f.db.prepare('select * from drawing_numbers').all()).toEqual(originalDrawings);
+ const next=await f.create();expect(next.id).not.toBe(task.id);const discovered=await f.service.discover(next.id);expect(discovered.items[0].relativePath).toBeUndefined();expect(discovered.pendingFiles).toEqual([]);expect(readFileSync(file,'utf8')).toBe(pdf);expect(f.db.pragma('foreign_key_check')).toEqual([]);
+});
+it('rejects stale task deletion and unfinished archive without losing recovery files or lock',async()=>{
+ const f=fixture(),task=await f.create();const preview=f.service.deletionPreview(task.id);f.service.store.state(task.id,'awaiting_index','recover me');expect(()=>f.service.deleteTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true})).toThrow(/变化|归档/);expect(f.service.deletionPreview(task.id)).toMatchObject({canDelete:false});await expect(f.create()).rejects.toThrow(/未完成/);
+});
+it('continues legacy nested task paths without moving files and keeps the legacy directory after archive',async()=>{
+ const f=fixture(),task=await f.create(),legacy=`${task.productDirectory}/00.临时文件/当前任务_legacy_旧任务`;mkdirSync(join(f.root,legacy));f.db.prepare('update packaging_tasks set task_directory=? where id=?').run(legacy,task.id);const path=join(f.root,legacy,`${f.drawing.fullCode}.pdf`);writeFileSync(path,pdf);
+ const found=await f.service.discover(task.id);expect(found.taskDirectory).toBe(legacy);expect(found.items[0].relativePath).toBe(join(legacy,`${f.drawing.fullCode}.pdf`));await f.service.reviewItem(task.id,found.items[0].id,found.items[0].sha256!);await f.service.archive(task.id,true);expect(existsSync(path)).toBe(false);expect(existsSync(join(f.root,legacy))).toBe(true);
+});
+it('passes only DRAWING_NO mappings and values to existing Illustrator generation even for legacy multi-field templates',async()=>{
+ const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode:'ait',parameters:[]});await f.catalog.uploadTemplate({name:'旧多字段模板',mainCategoryId:f.main.id,projectItemId:f.project.id,brandIds:[],productIds:[],fields:[{objectName:'Code',sourceKey:'DRAWING_NO',required:true},{objectName:'Brand',sourceKey:'BRAND',required:true}],requiredFonts:[],status:'active'},{fileName:'legacy.ait',buffer:Buffer.from('legacy AIT')});
+ f.automation.generate.mockImplementation(async input=>{expect(input.fields).toEqual([{objectName:'Code',sourceKey:'DRAWING_NO',required:true}]);expect(input.values).toEqual({DRAWING_NO:f.drawing.fullCode});writeFileSync(input.outputPath,pdf);return{preserveEditability:true,sha256:(await packagingFiles.pdfFact(input.outputPath)).sha256};});const task=await f.create();const generated=await f.service.generate(task.id);expect(generated.items[0].state).toBe('awaiting_review');expect(generated.items[0].fileName).not.toMatch(/[a-f0-9]{8}-/);expect(f.catalog.getCatalog().templates[0].fields).toHaveLength(2);
+});
+
+it('discovery refreshes the exact root00 working file hash and invalidates a previous content review',async()=>{const f=fixture(),task=await readyManual(f),path=join(f.root,task.items[0].relativePath!);writeFileSync(path,pdf.replace('Catalog','Pages'));const refreshed=await f.service.discover(task.id);expect(refreshed.items[0].sha256).not.toBe(task.items[0].sha256);expect(refreshed.items[0].reviewedSha256).toBeUndefined();expect(refreshed.pendingFiles.filter(file=>file.status==='pending')).toEqual([]);expect((await f.service.archivePreview(task.id)).ready).toBe(false);});
+it('archives only the reviewed regenerated file while retaining earlier task outputs without treating them as new pending inputs',async()=>{
+ const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode:'ait',parameters:[]});f.catalog.uploadTemplate({name:'图号模板',mainCategoryId:f.main.id,projectItemId:f.project.id,brandIds:[],productIds:[],fields:[{objectName:'Code',sourceKey:'DRAWING_NO',required:true}],requiredFonts:[],status:'active'},{fileName:'code.ait',buffer:Buffer.from('AIT')});let version=0;f.automation.generate.mockImplementation(async input=>{writeFileSync(input.outputPath,pdf.replace('Catalog',`Catalog${++version}`));return{preserveEditability:true,sha256:(await packagingFiles.pdfFact(input.outputPath)).sha256};});
+ const task=await f.create(),first=await f.service.generate(task.id),second=await f.service.generate(task.id,{regenerate:true});expect(second.items[0].relativePath).not.toBe(first.items[0].relativePath);const observed=await f.service.discover(task.id);expect(observed.pendingFiles.filter(file=>file.status==='pending')).toEqual([]);await f.service.reviewItem(task.id,observed.items[0].id,observed.items[0].sha256!);await f.service.archive(task.id,true);expect(existsSync(join(f.root,first.items[0].relativePath!))).toBe(true);expect(existsSync(join(f.root,second.items[0].relativePath!))).toBe(false);
+});
+it('keeps a completed but uncommitted original copy assigned to its deleted task instead of auto-adopting it into a new task',async()=>{
+ const f=fixture(),formal=join(f.root,'冰柜','SKU1-M1','02.未转曲源文件',`${f.drawing.fullCode}.pdf`);mkdirSync(dirname(formal),{recursive:true});writeFileSync(formal,pdf);await f.files.scanProducts(['冰柜/SKU1-M1']);const actualCopy=packagingFiles.copyPdfExclusive;const interrupted=vi.spyOn(packagingFiles,'copyPdfExclusive').mockImplementationOnce(async(...args)=>{await actualCopy(...args);throw Error('interrupted after copy');});const task=await f.service.createTask({productId:f.product.id,type:'modify',drawings:[{origin:'planned',id:f.drawing.id}]});interrupted.mockRestore();expect(task.items[0].relativePath).toBeUndefined();const claimed=f.db.prepare('select copy_destination_path as path from packaging_task_items where id=?').get(task.items[0].id) as {path:string};expect(existsSync(join(f.root,claimed.path))).toBe(true);const preview=f.service.deletionPreview(task.id);f.service.deleteTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true});const next=await f.create(),discovered=await f.service.discover(next.id);expect(discovered.items[0].relativePath).toBeUndefined();expect(discovered.pendingFiles.filter(file=>file.status==='pending')).toEqual([]);expect(readFileSync(join(f.root,claimed.path),'utf8')).toBe(pdf);
 });

@@ -96,8 +96,6 @@ export class PackagingWorkspace {
   }
   createTaskDirectory(productDirectory:string,taskId:string,name:string):string{
     const segments=packagingPathSegments(productDirectory);if(segments.length!==2)fail('PACKAGING_PATH_INVALID','产品目录必须为两级目录');
-    if(packagingPathSegments(taskId).length!==1)fail('PACKAGING_PATH_INVALID','任务编号无效');
-    const safeName=name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/gu,'_').replace(/[ .]+$/u,'').slice(0,80)||'制图';
-    const path=`${segments.join('/')}/00.临时文件/当前任务_${taskId}_${safeName}`;ensureSafeDirectory(this.path(path));return path;
+    const path=`${segments.join('/')}/00.临时文件`;ensureSafeDirectory(this.path(path));return path;
   }
 }

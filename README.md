@@ -2,10 +2,10 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.4.0 · 包材模板与制图任务
+## 当前版本 v1.5.0 · 包材模板与独立制图任务
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.4.0/DrawingNumberPlanner-1.4.0-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.4.0)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.5.0/DrawingNumberPlanner-1.5.0-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)
 - [安装、升级和恢复说明](docs/install-and-upgrade.md)
 - [维护和发布方式](docs/maintenance.md)
 - [上一版 v1.3.0（Schema23）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.0)
@@ -17,11 +17,11 @@ Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌�
 
 ## 包材模板与制图任务
 
-「数据来源 → 包材模板」支持 AIT 原件、字段映射、独立尺寸/比例和匹配规则。规划前读取默认规格，确认占号后创建或继续真实产品的制图任务。支持自动制图、人工 PDF、无需生成、逐项重试、监听待关联、统一检查归档及修改原件的备份保护。临时00不进入正式索引，归档只扫描涉及产品。
+「数据来源 → 包材模板」维护 AIT 原件、完整图号映射、简化的尺寸匹配规则和项目生成方式。图号规划只负责预览与确认占号，已保存图号直接进入独立「制图任务」，在任务中配置尺寸、匹配模板和制作文件。支持人工PDF监听关联、逐项重试、统一检查归档、正式文件副本修改与备份；新任务直接使用00，旧任务继续原路径，删除记录保留文件及历史。PDF列表筛选不限制指定型号的正式扫描范围。
 
-Windows 本机通过 Illustrator COM/JSX 用模板副本导出保留编辑能力的 PDF。**没有用户真实AIT及授权Illustrator的开发/CI环境，尚未验证真实字体、版式或PDF重开编辑；本机需配置对象映射与字体并检查实际成果。** 详见[版本说明](docs/release-1.4.0.md)与[实现、使用及验收范围](docs/ait-packaging-delivery-20261030.md)。
+Windows 本机通过 Illustrator COM/JSX 用模板副本导出保留编辑能力的 PDF。**没有用户真实AIT及授权Illustrator的开发/CI环境，尚未验证真实字体、版式或PDF重开编辑；本机需配置对象映射与字体并检查实际成果。** 详见[版本说明](docs/release-1.5.0.md)与[实现、使用及验收范围](docs/packaging-ui-delivery-20261102.md)。
 
-Schema24为增量升级，保留旧业务记录和备份，不改占号/BOM/历史快照或当前资料根目录。[v1.3.1（回退需配套升级前Schema23备份）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.1)保留。
+Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历史快照或当前资料根目录。[v1.3.1（回退需配套升级前Schema23备份）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.1)保留。
 
 ## V5.2 增量修正与邮件流程
 
@@ -34,12 +34,14 @@ Schema24为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 | 分组 | 页面 | 用途 |
 |---|---|---|
 | 日常工作 | 图号规划 / 更新包材 | 编码预览、查重和事务批量占号，关联所选产品 |
+| 日常工作 | 制图任务 | 从已占号项目制作PDF、监听人工文件、确认检查、统一归档和历史记录 |
 | 日常工作 | BOM 管理 | 当前关系、历史记录、差异和受保护的附件 |
 | 日常工作 | 外发资料 | 选择批次、核对范围和文件、生成 ZIP、邮件草稿及历史快照 |
 | 产品明细 | 产品档案 | SKU、型号、品牌、类别和用途入口；使用真实内部 ID 区分记录 |
 | 产品明细 | 图号库 | 产品/编码主类别导航、颜色和来源、状态切换、关联诊断及纠正 |
 | 产品明细 | 二维码管理 | 产品用途展开，手动校验、关联、更换或解除 PDF，网址打开和复制 |
 | 数据来源 | PDF 文件中心 | 扫描索引、产品/批次导航、人工归纳、排除/恢复和安全移除记录 |
+| 数据来源 | 包材模板 | AIT原件、图号映射、尺寸匹配规则和项目生成配置 |
 | 数据来源 | 编码字典 | 维护实际编码名称及停用、受保护删除 |
 | 数据来源 | 迁移检查 | 编码字典及邮件模板 Excel 识别、编辑预览和备份后的确认导入 |
 
@@ -60,7 +62,7 @@ Schema24为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 
 ## 数据安全与升级
 
-每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema23：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
+每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema25：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
 
 移除 PDF 记录或删除内部空批次不会删除原始文件及磁盘文件夹。已用图号、BOM、产品归并及外发历史的引用继续受保护。普通取消占号继续执行原资格检查。新增的「强制取消占号并删除图号」是独立危险操作：显示真实影响后确认，释放当前占用但保留原身份、历史快照和审计；原 PDF 不删除，重扫旧同号文件不会自动关联到重新占用的号码。用户正式数据库及实际显示器 DPI 仍应在本地核对。
 
@@ -68,7 +70,7 @@ Schema24为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 
 ```sh
 git fetch --tags
-git switch --detach v1.3.1
+git switch --detach v1.5.0
 pnpm install
 pnpm typecheck
 pnpm test

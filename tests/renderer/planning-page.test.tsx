@@ -1,8 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PlanningPage } from '../../src/renderer/pages/PlanningPage';
-import { PackagingTasks } from '../../src/renderer/pages/packaging/PackagingTaskPanel';
 import type { PackagingCatalog } from '../../src/core/packaging/packaging-types';
 
 function apiFixture() {
@@ -162,7 +161,7 @@ it('uses the original appearance dictionary and reserves a product-only library 
   fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));
   fireEvent.click(await screen.findByRole('button',{name:'查看图号库'}));
   expect(api.reservePlan.mock.calls[0][0]).not.toHaveProperty('appearanceVersionId');
-  expect(open).toHaveBeenCalledWith({productId:1});
+  expect(open).toHaveBeenCalledWith({productId:1,drawingIds:[10],fullCodes:['02.0404.010.0401001'],initialDrawingId:10});
 });
 
 it('allows choosing a different dictionary appearance without editing the product default',async()=>{
@@ -195,118 +194,115 @@ function dimensionsFixture() {
   return {api,catalog};
 }
 
-it('loads the specific default before preview, allows other profiles and keeps temporary ratio edits isolated',async()=>{
-  const {api,catalog}=dimensionsFixture();render(<PlanningPage api={api as never}/>);await completeFirstRow();
-  const dimensions=await screen.findByRole('group',{name:'第 1 行本次尺寸'});
-  expect(within(dimensions).getByLabelText('尺寸规格')).toHaveValue('2');
-  expect(within(dimensions).getByLabelText('宽度 (mm)')).toHaveValue(80);
-  fireEvent.change(within(dimensions).getByLabelText('尺寸规格'),{target:{value:'3'}});
-  expect(within(dimensions).getByLabelText('高度 (mm)')).toHaveValue(30);
-  fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));await screen.findByText('02.0404.010.0401001');
-  fireEvent.change(within(dimensions).getByLabelText('宽度 (mm)'),{target:{value:'120'}});
-  expect(within(dimensions).getByLabelText('高度 (mm)')).toHaveValue(60);
-  expect(screen.getByRole('button',{name:'确认批量占号'})).toBeEnabled();
-  expect(screen.getByRole('button',{name:'生成文件'})).toBeDisabled();
-  fireEvent.click(within(dimensions).getByLabelText(/锁定比例/));
-  fireEvent.change(within(dimensions).getByLabelText('宽度 (mm)'),{target:{value:'140'}});
-  expect(within(dimensions).getByLabelText('高度 (mm)')).toHaveValue(60);
-  expect(catalog.dimensions[2].parameters).toEqual({width:60,height:30});
-  expect(api.packaging.saveDimension).not.toHaveBeenCalled();
-  fireEvent.change(screen.getByLabelText('第 1 行项目明细'),{target:{value:'8'}});
-  fireEvent.change(screen.getByLabelText('第 1 行项目明细'),{target:{value:'6'}});
-  expect(screen.getByLabelText('宽度 (mm)')).toHaveValue(80);
-});
-
-it('saves a new dimension profile and changes the default only on explicit request',async()=>{
-  const {api}=dimensionsFixture();render(<PlanningPage api={api as never}/>);await completeFirstRow();
-  await screen.findByLabelText('宽度 (mm)');
-  fireEvent.change(screen.getByLabelText('宽度 (mm)'),{target:{value:'90'}});
-  fireEvent.change(screen.getByLabelText('新规格名称'),{target:{value:'本次 LOGO'}});
-  fireEvent.click(screen.getByRole('button',{name:'另存尺寸规格'}));
-  await waitFor(()=>expect(api.packaging.saveDimension).toHaveBeenCalledWith(expect.objectContaining({name:'本次 LOGO',projectItemId:6,scope:'specific',productIds:[1],parameters:{width:90,height:45},isDefault:false})));
-  await screen.findByText('已另存尺寸档案；本次参数保持不变');
-  fireEvent.click(screen.getByLabelText('设为此产品默认'));
-  fireEvent.click(screen.getByRole('button',{name:'另存尺寸规格'}));
-  await waitFor(()=>expect(api.packaging.saveDimension).toHaveBeenLastCalledWith(expect.objectContaining({isDefault:true})));
-  expect(screen.getByLabelText('宽度 (mm)')).toHaveValue(90);
-});
-
-it('freezes each reserved dimension setting by the returned formal drawing identity despite reordered results',async()=>{
-  const {api}=dimensionsFixture();const onGenerateFiles=vi.fn();
-  const first={clientId:'row-1',fullCode:'02.0404.010.0401001',displayName:'LOGO 1',sequence:1};
-  const second={...first,clientId:'row-2',fullCode:'02.0404.010.0401002',displayName:'LOGO 2',sequence:2};
-  api.previewPlan.mockResolvedValue({productId:1,appearanceId:3,rows:[second,first]} as never);
-  api.reservePlan.mockResolvedValue([{id:20,...second},{id:10,...first}] as never);
-  render(<PlanningPage api={api as never} onGenerateFiles={onGenerateFiles}/>);await completeFirstRow();
-  fireEvent.change(await screen.findByLabelText('宽度 (mm)'),{target:{value:'120'}});
-  fireEvent.click(screen.getByRole('button',{name:'添加项目'}));
-  for(const [label,value] of [['主类别','5'],['项目明细','6'],['颜色','4']])fireEvent.change(screen.getByLabelText(`第 2 行${label}`),{target:{value}});
-  fireEvent.change(within(screen.getByRole('group',{name:'第 2 行本次尺寸'})).getByLabelText('宽度 (mm)'),{target:{value:'160'}});
-  fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));await screen.findByText(first.fullCode);
-  fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));await screen.findByText('已成功占用 2 个图号 · 正式保存');
-  fireEvent.click(screen.getByRole('button',{name:'生成文件'}));
-  expect(onGenerateFiles).toHaveBeenCalledWith(expect.objectContaining({itemSettings:[
-    {origin:'planned',id:20,input:{mode:'ait',dimensionProfileId:2,parameters:{width:160,height:80},ratioLocked:true}},
-    {origin:'planned',id:10,input:{mode:'ait',dimensionProfileId:2,parameters:{width:120,height:60},ratioLocked:true}},
-  ]}));
-  expect(api.reservePlan.mock.calls[0][0].rows.map((r:{clientId:string})=>r.clientId)).toEqual(['row-1','row-2']);
-  expect(api.reservePlan.mock.calls[0][0].rows[0]).not.toHaveProperty('parameters');
-});
-
-it('applies planning settings once by drawing identity on creation and never overwrites an existing task on continue',async()=>{
-  const {api,catalog}=dimensionsFixture();
-  const task={id:'task',productId:1,model:'ZC200',name:'首批',type:'new',state:'active',productDirectory:'ZC200',taskDirectory:'ZC200/00.临时文件/当前任务',createdAt:'2026-10-30',pendingFiles:[],items:[{id:55,taskId:'task',drawing:{origin:'planned',id:10},fullCode:'02.0404.010.0401001',projectItemId:6,projectName:'LOGO',color:'白',mode:'ait',parameters:{width:80,height:40},state:'pending'}]};
-  const settings={mode:'ait' as const,dimensionProfileId:2,parameters:{width:120,height:60},ratioLocked:true};
-  const packaging={...api.packaging,listTasks:vi.fn().mockResolvedValue([]),getProductDirectories:vi.fn().mockResolvedValue([{relativePath:'ZC200',exists:true}]),createTask:vi.fn().mockResolvedValue(task),updateItem:vi.fn().mockResolvedValue({...task,items:[{...task.items[0],...settings}]}),getTask:vi.fn().mockResolvedValue(task)};
-  const target={productId:1,drawings:[{origin:'planned' as const,id:10}],itemSettings:[{origin:'planned' as const,id:10,input:settings}]};
-  const props={api:{...api,packaging,searchDrawings:vi.fn().mockResolvedValue({items:[],total:0})} as never,catalog,lookups:{products:[],projects:[],mains:[],brands:[]},target,onCatalogChanged:async()=>{}};
-  const view=render(<PackagingTasks {...props}/>);
-  fireEvent.change(screen.getByLabelText('任务名称'),{target:{value:'首批'}});
-  await waitFor(()=>expect(screen.getByLabelText('实际产品目录')).toHaveValue('ZC200'));
-  fireEvent.click(screen.getByRole('button',{name:'创建任务'}));
-  await screen.findByRole('region',{name:'02.0404.010.0401001 LOGO'});
-  expect(packaging.updateItem).toHaveBeenCalledExactlyOnceWith('task',55,settings);
-  view.unmount();packaging.listTasks.mockResolvedValue([task] as never);packaging.updateItem.mockClear();
-  render(<PackagingTasks {...props}/>);
-  fireEvent.click(await screen.findByRole('button',{name:'继续现有任务'}));
-  await screen.findByRole('region',{name:'02.0404.010.0401001 LOGO'});
-  expect(packaging.updateItem).not.toHaveBeenCalled();
-});
-
-it('waits for the optional dimension catalog before preview while preserving planning if its read fails',async()=>{
-  const {api}=dimensionsFixture();let rejectCatalog!:(reason:Error)=>void;
-  api.packaging.getCatalog.mockImplementationOnce(()=>new Promise((_resolve,reject)=>{rejectCatalog=reject;}));
-  render(<PlanningPage api={api as never}/>);
-  await screen.findByRole('option',{name:'SKU待补录 · ZC200 · SAMKYO'});
-  fireEvent.change(screen.getByLabelText('产品型号'),{target:{value:'1'}});
-  for(const [label,value] of [['主类别','5'],['项目明细','6'],['颜色','4']])fireEvent.change(screen.getByLabelText(`第 1 行${label}`),{target:{value}});
-  expect(screen.getByRole('button',{name:'查重并预览'})).toBeDisabled();
-  expect(api.previewPlan).not.toHaveBeenCalled();
-  rejectCatalog(new Error('尺寸接口暂不可用'));
-  await screen.findByText(/尺寸档案未读取：尺寸接口暂不可用/);
+it('keeps packaging setup out of planning and never waits for or reads the packaging catalog',async()=>{
+  const {api}=dimensionsFixture();api.packaging.getCatalog.mockImplementation(()=>new Promise(()=>{}));
+  render(<PlanningPage api={api as never}/>);await completeFirstRow();
+  expect(api.packaging.getCatalog).not.toHaveBeenCalled();
+  expect(screen.queryByRole('group',{name:'第 1 行本次尺寸'})).toBeNull();
+  expect(screen.queryByLabelText('新规格名称')).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));
   expect(await screen.findByText('02.0404.010.0401001')).toBeVisible();
+  expect(screen.getByRole('button',{name:'确认批量占号'})).toBeEnabled();
 });
 
-it('keeps an unconfigured project on the existing manual-generation default',async()=>{
-  const {api,catalog}=dimensionsFixture();api.packaging.getCatalog.mockResolvedValue({...catalog,configs:[]});
-  const onGenerateFiles=vi.fn();render(<PlanningPage api={api as never} onGenerateFiles={onGenerateFiles}/>);await completeFirstRow();
-  expect(await screen.findByText('本次尺寸 · 人工提供文件')).toBeVisible();
-  fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));await screen.findByText('02.0404.010.0401001');
-  fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));await screen.findByText('已成功占用 1 个图号 · 正式保存');
+it('shows each preview beneath its own fields and copies the confirmed batch with exact identity navigation',async()=>{
+  const api=apiFixture();const onGenerateFiles=vi.fn(),open=vi.fn(),copy=vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:copy}});
+  const first={clientId:'row-1',fullCode:'02.0404.010.0401001',displayName:'SAMKYO-ZC200白色-LOGO',sequence:1};
+  const second={...first,clientId:'row-2',fullCode:'02.0404.010.0403001',displayName:'SAMKYO-ZC200白色-面板',sequence:2};
+  api.previewPlan.mockResolvedValue({productId:1,appearanceId:3,rows:[second,first]} as never);
+  api.reservePlan.mockResolvedValue([{id:20,...second},{id:10,...first}] as never);
+  const view=render(<PlanningPage api={api as never} onGenerateFiles={onGenerateFiles} onOpenDrawingLibrary={open}/>);await completeFirstRow();
+  fireEvent.click(screen.getByRole('button',{name:'添加项目'}));
+  for(const [label,value] of [['主类别','5'],['项目明细','8'],['颜色','4']])fireEvent.change(screen.getByLabelText(`第 2 行${label}`),{target:{value}});
+  fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));
+  const preview1=await screen.findByLabelText('项目 1 预览'),preview2=screen.getByLabelText('项目 2 预览');
+  expect(within(preview1).getByText(first.fullCode)).toBeVisible();expect(within(preview2).getByText(second.fullCode)).toBeVisible();
+  expect(preview1.previousElementSibling).toHaveClass('pp-fields');
+  fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));await screen.findByText('已成功占用 2 个图号 · 正式保存');
+  const saved=screen.getByRole('region',{name:'本次占号结果'});
+  expect(within(saved).getByText('SAMKYO · ZC200 · 白色 · 面板')).toBeVisible();
+  fireEvent.click(within(saved).getByRole('button',{name:`复制图号 ${first.fullCode}`}));
+  await waitFor(()=>expect(copy).toHaveBeenCalledWith(first.fullCode));
+  view.rerender(<PlanningPage api={{...api} as never} onGenerateFiles={onGenerateFiles} onOpenDrawingLibrary={open}/>);
+  expect(screen.getByRole('region',{name:'本次占号结果'})).toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:'查看图号库'}));
+  expect(open).toHaveBeenCalledWith({productId:1,drawingIds:[20,10],fullCodes:[second.fullCode,first.fullCode],initialDrawingId:20});
   fireEvent.click(screen.getByRole('button',{name:'生成文件'}));
-  expect(onGenerateFiles.mock.calls[0][0].itemSettings[0].input.mode).toBe('manual');
+  expect(onGenerateFiles).toHaveBeenCalledWith(expect.objectContaining({productId:1,drawings:[{origin:'planned',id:20},{origin:'planned',id:10}]}));
+  expect(onGenerateFiles.mock.calls[0][0]).not.toHaveProperty('itemSettings');
 });
 
-it('shows the created task and explicit handoff error if saving the frozen dimensions fails',async()=>{
-  const {api,catalog}=dimensionsFixture();
-  const task={id:'created',productId:1,model:'ZC200',name:'首批',type:'new',state:'active',productDirectory:'ZC200',taskDirectory:'ZC200/00.临时文件/当前任务',createdAt:'2026-10-30',pendingFiles:[],items:[{id:55,taskId:'created',drawing:{origin:'planned',id:10},fullCode:'02.0404.010.0401001',projectItemId:6,projectName:'LOGO',color:'白',mode:'ait',parameters:{width:80,height:40},state:'pending'}]};
-  const packaging={...api.packaging,listTasks:vi.fn().mockResolvedValue([]),getProductDirectories:vi.fn().mockResolvedValue([{relativePath:'ZC200',exists:true}]),createTask:vi.fn().mockResolvedValue(task),updateItem:vi.fn().mockRejectedValue(new Error('尺寸规格已停用')),getTask:vi.fn().mockResolvedValue(task)};
-  render(<PackagingTasks api={{...api,packaging,searchDrawings:vi.fn().mockResolvedValue({items:[],total:0})} as never} catalog={catalog} lookups={{products:[],projects:[],mains:[],brands:[]}} target={{productId:1,drawings:[{origin:'planned',id:10}],itemSettings:[{origin:'planned',id:10,input:{dimensionProfileId:2,parameters:{width:120,height:60}}}]}} onCatalogChanged={async()=>{}}/>);
-  fireEvent.change(screen.getByLabelText('任务名称'),{target:{value:'首批'}});
-  await waitFor(()=>expect(screen.getByLabelText('实际产品目录')).toHaveValue('ZC200'));
-  fireEvent.click(screen.getByRole('button',{name:'创建任务'}));
-  expect(await screen.findByRole('region',{name:'02.0404.010.0401001 LOGO'})).toBeVisible();
-  expect(await screen.findByRole('alert')).toHaveTextContent('任务已创建，但本次尺寸未全部保存：尺寸规格已停用');
-  expect(packaging.createTask).toHaveBeenCalledTimes(1);expect(packaging.updateItem).toHaveBeenCalledTimes(1);
+it('previews rows independently while keeping the explicit batch approval gate',async()=>{
+  const api=apiFixture();
+  api.previewPlan.mockImplementation(async input=>({productId:1,appearanceId:3,rows:input.rows.map((row:{clientId:string})=>({clientId:row.clientId,fullCode:row.clientId==='row-1'?'02.0404.010.0401001':'02.0404.010.0403001',displayName:'实时图号',sequence:1,available:true}))}));
+  render(<PlanningPage api={api as never}/>);await completeFirstRow();
+  await waitFor(()=>expect(screen.getByLabelText('项目 1 预览')).toHaveTextContent('02.0404.010.0401001'));
+  expect(screen.getByRole('button',{name:'确认批量占号'})).toBeDisabled();
+  fireEvent.click(screen.getByRole('button',{name:'添加项目'}));
+  for(const [label,value] of [['主类别','5'],['项目明细','8'],['颜色','4']])fireEvent.change(screen.getByLabelText(`第 2 行${label}`),{target:{value}});
+  await waitFor(()=>expect(screen.getByLabelText('项目 2 预览')).toHaveTextContent('02.0404.010.0403001'));
+  expect(screen.getByLabelText('项目 1 预览')).toHaveTextContent('02.0404.010.0401001');
+  expect(screen.getByRole('button',{name:'确认批量占号'})).toBeDisabled();
+  fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'确认批量占号'})).toBeEnabled());
+  expect(api.previewPlan).toHaveBeenLastCalledWith(expect.objectContaining({rows:[expect.objectContaining({clientId:'row-1'}),expect.objectContaining({clientId:'row-2'})]}));
+  expect(api.reservePlan).not.toHaveBeenCalled();
+});
+
+it('discards stale per-row live responses and keeps another row preview after one row fails',async()=>{
+  const api=apiFixture();let release!:(value:unknown)=>void;
+  api.previewPlan.mockImplementation(input=>input.rows[0].clientId==='row-2'?Promise.resolve({productId:1,appearanceId:3,rows:[{clientId:'row-2',fullCode:'第二行有效',sequence:1,available:true}]} as never):new Promise(resolve=>{release=resolve;}));
+  render(<PlanningPage api={api as never}/>);await completeFirstRow();
+  await waitFor(()=>expect(release).toBeDefined());
+  fireEvent.change(screen.getByLabelText('第 1 行项目明细'),{target:{value:'8'}});
+  await act(async()=>{release({productId:1,appearanceId:3,rows:[{clientId:'row-1',fullCode:'过期结果',sequence:1,available:true}]});});
+  expect(screen.queryByText('过期结果')).toBeNull();
+  api.previewPlan.mockImplementation(input=>input.rows[0].clientId==='row-2'?Promise.resolve({productId:1,appearanceId:3,rows:[{clientId:'row-2',fullCode:'第二行有效',sequence:1,available:true}]} as never):Promise.reject(new Error('第一行占号冲突')));
+  fireEvent.click(screen.getByRole('button',{name:'添加项目'}));
+  for(const [label,value] of [['主类别','5'],['项目明细','8'],['颜色','4']])fireEvent.change(screen.getByLabelText(`第 2 行${label}`),{target:{value}});
+  expect(await screen.findByText('第一行占号冲突')).toBeVisible();
+  await waitFor(()=>expect(screen.getByLabelText('项目 2 预览')).toHaveTextContent('第二行有效'));
+  expect(api.reservePlan).not.toHaveBeenCalled();
+});
+
+it('refreshes newly saved products and dictionary options on reentry while preserving the same planning draft',async()=>{
+  const api={...apiFixture(),createProduct:vi.fn(),createDictionary:vi.fn()};const products=await api.listProducts();
+  const lookups=new Map<string,unknown[]>();for(const type of ['appearance','color','main_category','project_item'])lookups.set(type,await api.listDictionaries(type as never));
+  api.listProducts.mockImplementation(async()=>[...products]);api.listDictionaries.mockImplementation(async type=>[...(lookups.get(type)??[])] as never);
+  api.createProduct.mockImplementation(async input=>{const product={...products[0],...input,id:2};products.push(product);return product;});
+  api.createDictionary.mockImplementation(async(type,input)=>{const item={...input,id:25,status:'active'};lookups.get(type)!.push(item);return item;});
+  const view=render(<PlanningPage api={api as never} active/>);await completeFirstRow();
+  const note=screen.getByLabelText('第 1 行备注');fireEvent.change(note,{target:{value:'未完成草稿'}});
+  view.rerender(<PlanningPage api={api as never} active={false}/>);
+  await api.createProduct({model:'新增型号'});await api.createDictionary('appearance',{code:'25',name:'新增外观'});
+  expect(screen.queryByRole('option',{name:'SKU待补录 · 新增型号 · SAMKYO'})).toBeNull();
+  view.rerender(<PlanningPage api={api as never} active/>);
+  expect(await screen.findByRole('option',{name:'SKU待补录 · 新增型号 · SAMKYO'})).toBeInTheDocument();
+  expect(screen.getByRole('option',{name:'25 · 新增外观'})).toBeInTheDocument();
+  expect(screen.getByLabelText('第 1 行备注')).toBe(note);expect(note).toHaveValue('未完成草稿');
+  expect(screen.getByLabelText('产品型号')).toHaveValue('1');expect(screen.getByLabelText('第 1 行项目明细')).toHaveValue('6');
+});
+
+it('retains the successful reserved identities across lookup refresh on reentry',async()=>{
+  const api=apiFixture(),open=vi.fn(),generate=vi.fn();const view=render(<PlanningPage api={api as never} onOpenDrawingLibrary={open} onGenerateFiles={generate} active/>);await completeFirstRow();
+  fireEvent.click(screen.getByRole('button',{name:'查重并预览'}));await screen.findByText('02.0404.010.0401001');
+  fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));const result=await screen.findByRole('region',{name:'本次占号结果'});
+  view.rerender(<PlanningPage api={api as never} onOpenDrawingLibrary={open} onGenerateFiles={generate} active={false}/>);
+  const products=await api.listProducts();api.listProducts.mockResolvedValue([...products,{...products[0],id:2,model:'新增型号'}]);
+  view.rerender(<PlanningPage api={api as never} onOpenDrawingLibrary={open} onGenerateFiles={generate} active/>);
+  await screen.findByRole('option',{name:'SKU待补录 · 新增型号 · SAMKYO'});
+  expect(screen.getByRole('region',{name:'本次占号结果'})).toBe(result);expect(result).toHaveTextContent('SAMKYO · ZC200 · 白色 · LOGO');
+  fireEvent.click(screen.getByRole('button',{name:'查看图号库'}));expect(open).toHaveBeenCalledWith(expect.objectContaining({productId:1,drawingIds:[10],initialDrawingId:10}));
+  fireEvent.click(screen.getByRole('button',{name:'生成文件'}));expect(generate).toHaveBeenCalledWith(expect.objectContaining({productId:1,drawings:[{origin:'planned',id:10}]}));expect(api.reservePlan).toHaveBeenCalledOnce();
+});
+
+it('ignores an older activation lookup response after a newer reentry has loaded',async()=>{
+  const api=apiFixture();const old=await api.listProducts();let release!:(value:typeof old)=>void;
+  api.listProducts.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;})).mockResolvedValue([{...old[0],id:2,model:'新版本型号'}]);
+  const view=render(<PlanningPage api={api as never} active/>);
+  view.rerender(<PlanningPage api={api as never} active={false}/>);view.rerender(<PlanningPage api={api as never} active/>);
+  expect(await screen.findByRole('option',{name:'SKU待补录 · 新版本型号 · SAMKYO'})).toBeInTheDocument();
+  await act(async()=>{release(old);});
+  expect(screen.getByRole('option',{name:'SKU待补录 · 新版本型号 · SAMKYO'})).toBeInTheDocument();expect(screen.queryByRole('option',{name:'SKU待补录 · ZC200 · SAMKYO'})).toBeNull();
 });

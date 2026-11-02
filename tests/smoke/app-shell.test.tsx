@@ -15,7 +15,7 @@ describe('application shell', () => {
     const navGroups = Array.from(screen.getByRole('navigation').querySelectorAll<HTMLElement>('.nav-group'));
     expect(navGroups.map((group) => group.getAttribute('aria-label'))).toEqual(['日常工作', '产品明细', '数据来源']);
     expect(Array.from(navGroups[0].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
-      '图号规划 / 更新包材', 'BOM 管理', '外发资料',
+      '图号规划 / 更新包材','制图任务', 'BOM 管理', '外发资料',
     ]);
     expect(Array.from(navGroups[1].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
       '产品档案', '图号库', '二维码管理',

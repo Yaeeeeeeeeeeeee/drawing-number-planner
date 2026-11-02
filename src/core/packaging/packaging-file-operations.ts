@@ -1,4 +1,4 @@
-import { constants, lstatSync, readFileSync, renameSync, rmdirSync, unlinkSync, type Stats } from 'node:fs';
+import { constants, lstatSync, readFileSync, renameSync, unlinkSync, type Stats } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
@@ -74,12 +74,12 @@ export async function replacePdfWithBackup(input:{source:string;destination:stri
   return staged;
 }
 export async function cleanupOwnedTaskFiles(workspace:PackagingWorkspace,taskDirectory:string,owned:{relativePath:string;sha256:string}[]):Promise<{removed:string[];retained:string[]}>{
-  const segments=packagingPathSegments(taskDirectory);if(segments.length!==4||segments[2]!=='00.临时文件'||!segments[3].startsWith('当前任务_'))fail('PACKAGING_PATH_INVALID','只能清理指定任务临时目录');
-  const directory=segments.join('/'),absolute=workspace.path(directory),removed:string[]=[],retained:string[]=[];
+  const segments=packagingPathSegments(taskDirectory);if(![3,4].includes(segments.length)||segments[2]!=='00.临时文件'||segments.length===4&&!segments[3].startsWith('当前任务_'))fail('PACKAGING_PATH_INVALID','只能清理指定任务临时目录');
+  const directory=segments.join('/'),removed:string[]=[],retained:string[]=[];
   for(const entry of owned){
     try{
       const child=packagingPathSegments(entry.relativePath);
-      if(child.length!==5||child.slice(0,4).join('/')!==directory){retained.push(entry.relativePath);continue;}
+      if(child.length!==segments.length+1||child.slice(0,segments.length).join('/')!==directory){retained.push(entry.relativePath);continue;}
       const path=workspace.path(entry.relativePath),observation=await observe(path);
       if(observation.fact.sha256!==entry.sha256){retained.push(entry.relativePath);continue;}
       workspace.path(entry.relativePath);
@@ -87,6 +87,6 @@ export async function cleanupOwnedTaskFiles(workspace:PackagingWorkspace,taskDir
       unlinkSync(path);removed.push(entry.relativePath);
     }catch{retained.push(entry.relativePath);}
   }
-  try{workspace.path(directory);rmdirSync(absolute);}catch{/* Unknown or edited content keeps the task folder. Never remove root00. */}
+  // Keep root00 and legacy task directories; only proven owned files are cleaned.
   return{removed,retained};
 }

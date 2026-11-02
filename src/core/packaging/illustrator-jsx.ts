@@ -19,7 +19,7 @@ export function buildIllustratorJsx(input: IllustratorJsxInput): string {
 var job = ${literal};
 function quote(value) { return '"' + String(value).replace(/[\\\\"\\x00-\\x1f]/g, function (ch) { var map = {'"':'\\\\"', '\\\\':'\\\\\\\\', '\\n':'\\\\n', '\\r':'\\\\r', '\\t':'\\\\t'}; if (map[ch]) return map[ch]; var n=ch.charCodeAt(0).toString(16); return '\\\\u' + ('0000'+n).slice(-4); }) + '"'; }
 function json(value) { if (value === null) return 'null'; var t=typeof value; if(t==='string')return quote(value); if(t==='number'||t==='boolean')return String(value); var out=[], k; if(value instanceof Array){for(k=0;k<value.length;k++)out.push(json(value[k]));return '['+out.join(',')+']';} for(k in value)if(value.hasOwnProperty(k)&&typeof value[k]!=='undefined')out.push(quote(k)+':'+json(value[k])); return '{'+out.join(',')+'}'; }
-var inspection = {fields:[], fonts:[], issues:[], fontValidation:'declared-and-observed-only'};
+var inspection = {fields:[], textObjects:[], fonts:[], issues:[], fontValidation:'declared-and-observed-only'};
 var result = {operationId:job.operationId, ok:false, inspection:inspection};
 var doc = null, ownsDocument = false, previousInteraction;
 function issue(code,message,objectName,severity){var item={code:code,message:message,severity:severity||'error'};if(objectName)item.objectName=objectName;inspection.issues.push(item);}
@@ -44,6 +44,13 @@ try {
       for(i=0;i<existing.length;i++)if(existing[i]===doc){ownsDocument=false;throw new Error('Refusing to modify an already open document');}
       var frames=doc.textFrames;
       for(i=0;i<frames.length;i++) {
+        var name=frames[i].name;
+        if(typeof name==='string'&&name.replace(/\\s/g,'')!=='') {
+          var observed=null;
+          for(j=0;j<inspection.textObjects.length;j++)if(inspection.textObjects[j].objectName===name)observed=inspection.textObjects[j];
+          if(observed){observed.matches++;observed.editable=false;}
+          else inspection.textObjects.push({objectName:name,matches:1,editable:editable(frames[i])});
+        }
         var chars=frames[i].characters;
         if(chars)for(j=0;j<chars.length;j++) {try{recordFont(chars[j].characterAttributes.textFont.name);}catch(fontError){issue('FONT_INSPECTION_FAILED','Cannot inspect a text font');}}
       }
@@ -52,6 +59,7 @@ try {
       var selected=[];
       for(i=0;i<job.fields.length;i++) {
         var field=job.fields[i],matches=[];
+        if(job.mode==='generate'&&field.sourceKey!=='DRAWING_NO')continue;
         for(j=0;j<frames.length;j++)if(frames[j].name===field.objectName)matches.push(frames[j]);
         var info={objectName:field.objectName,sourceKey:field.sourceKey,required:field.required,matches:matches.length,editable:matches.length===1&&editable(matches[0])};inspection.fields.push(info);
         if(matches.length===0){var nonText=false;for(j=0;j<doc.pageItems.length;j++)if(doc.pageItems[j].name===field.objectName)nonText=true;issue(nonText?'FIELD_NOT_TEXT':'MISSING_FIELD','Named TextFrame is missing: '+field.objectName,field.objectName,field.required||nonText?'error':'warning');}
@@ -59,8 +67,13 @@ try {
         else if(!info.editable)issue('UNEDITABLE_FIELD','Named TextFrame is locked, hidden or not editable: '+field.objectName,field.objectName);
         var value=job.values&&Object.prototype.hasOwnProperty.call(job.values,field.sourceKey)?job.values[field.sourceKey]:undefined;
         if(job.mode==='generate'&&typeof value!=='undefined'&&(typeof value!=='string'&&typeof value!=='number'||typeof value==='number'&&!isFinite(value)))issue('INVALID_VALUE','Data must be text or a finite number: '+field.sourceKey,field.objectName);
-        if(job.mode==='generate'&&field.required&&(typeof value==='undefined'||value===null||String(value).replace(/\\s/g,'')===''))issue('MISSING_VALUE','Required data is missing: '+field.sourceKey,field.objectName);
+        if(job.mode==='generate'&&(typeof value==='undefined'||value===null||String(value).replace(/\\s/g,'')===''))issue('MISSING_VALUE','Required data is missing: '+field.sourceKey,field.objectName);
         selected.push({frame:matches.length===1?matches[0]:null,value:value});
+      }
+      if(job.mode==='generate') {
+        var hasNumber=false;
+        for(i=0;i<selected.length;i++)if(selected[i].frame&&editable(selected[i].frame))hasNumber=true;
+        if(!hasNumber)issue('DRAWING_NUMBER_FIELD_REQUIRED','请配置模板中实际存在的可编辑完整图号文字对象');
       }
       if(!blocking()) {
         if(job.mode==='generate') {

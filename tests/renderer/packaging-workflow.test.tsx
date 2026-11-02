@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { PackagingTemplatesPage } from '../../src/renderer/pages/PackagingTemplatesPage';
+import { DrawingTasksPage } from '../../src/renderer/pages/DrawingTasksPage';
 import { PlanningPage } from '../../src/renderer/pages/PlanningPage';
 
 const product = {id:7,model:'T40',sku:'SKU7',brandId:1,brandName:'品牌',productCategory:'冰柜',status:'active'};
@@ -23,25 +23,11 @@ function fixture() {
 }
 
 describe('packaging workflow',()=>{
-  it('saves dimension fields with real product IDs and preserves failed drafts',async()=>{
-    const api=fixture();api.packaging.saveDimension.mockRejectedValueOnce(new Error('保存失败，请重试'));
-    render(<PackagingTemplatesPage api={api as never}/>);
-    fireEvent.click(await screen.findByRole('tab',{name:'尺寸档案'}));
-    fireEvent.click(screen.getByRole('button',{name:'新增尺寸档案'}));
-    fireEvent.change(screen.getByRole('textbox',{name:'规格名称'}),{target:{value:'标准铭牌'}});
-    fireEvent.change(screen.getByLabelText('尺寸项目'),{target:{value:'3'}});
-    fireEvent.click(within(screen.getByRole('form',{name:'尺寸档案编辑'})).getByLabelText('SKU7 · T40 · 品牌'));
-    fireEvent.change(screen.getByLabelText('宽度 (mm)'),{target:{value:'80'}});
-    fireEvent.click(screen.getByRole('button',{name:'保存尺寸档案'}));
-    expect(await screen.findByText('保存失败，请重试')).toBeVisible();
-    expect(screen.getByRole('textbox',{name:'规格名称'})).toHaveValue('标准铭牌');
-    expect(api.packaging.saveDimension).toHaveBeenCalledWith(expect.objectContaining({name:'标准铭牌',projectItemId:3,productIds:[7],parameters:{width:80}}));
-  });
   it('continues persisted tasks and reviews the exact current hash before archive preview',async()=>{
-    const api=fixture();render(<PackagingTemplatesPage api={api as never}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'制图任务'}));
-    fireEvent.click(await screen.findByRole('button',{name:'继续处理'}));
+    const api=fixture();render(<DrawingTasksPage api={api as never}/>);
+    fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
     const card=await screen.findByRole('region',{name:'02.0404.010.0401001 铭牌'});
+    fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));
     fireEvent.click(within(card).getByLabelText('已检查当前 PDF 内容'));
     fireEvent.click(within(card).getByRole('button',{name:'确认当前文件'}));
     await waitFor(()=>expect(api.packaging.reviewItem).toHaveBeenCalledWith('task1',1,'hash-current'));
@@ -49,16 +35,9 @@ describe('packaging workflow',()=>{
     expect(await screen.findByText('文件有修改，请重新确认')).toBeVisible();
     expect(api.packaging.archive).not.toHaveBeenCalled();
   });
-  it('preserves dimension drafts across catalog tabs',async()=>{
-    const api=fixture();render(<PackagingTemplatesPage api={api as never}/>);
-    fireEvent.click(await screen.findByRole('tab',{name:'尺寸档案'}));fireEvent.click(screen.getByRole('button',{name:'新增尺寸档案'}));
-    fireEvent.change(screen.getByRole('textbox',{name:'规格名称'}),{target:{value:'未保存的规格'}});
-    fireEvent.click(screen.getByRole('tab',{name:'模板匹配规则'}));fireEvent.click(screen.getByRole('tab',{name:'尺寸档案'}));
-    expect(screen.getByRole('textbox',{name:'规格名称'})).toHaveValue('未保存的规格');expect(api.packaging.saveDimension).not.toHaveBeenCalled();
-  });
   it('blocks a second task for a product and offers its existing task',async()=>{
-    const api=fixture();render(<PackagingTemplatesPage api={api as never} target={{productId:7,drawings:[{origin:'planned',id:20}]}}/>);
-    expect(await screen.findByRole('button',{name:'继续现有任务'})).toBeEnabled();
+    const api=fixture();render(<DrawingTasksPage api={api as never} target={{productId:7,drawings:[{origin:'planned',id:20}]}}/>);
+    expect(await screen.findByRole('button',{name:'继续任务'})).toBeEnabled();
     expect(screen.queryByRole('button',{name:'创建任务'})).not.toBeInTheDocument();
     expect(api.packaging.createTask).not.toHaveBeenCalled();
   });
@@ -69,8 +48,9 @@ describe('packaging workflow',()=>{
     const aitTask={...task,items:[aitItem]};api.packaging.getTask.mockResolvedValue(aitTask);
     const updateItem=vi.fn().mockResolvedValue({...task,items:[{...aitItem,templateId:9,templateName:'标准模板'}]});
     Object.assign(api.packaging,{updateItem});
-    render(<PackagingTemplatesPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'制图任务'}));fireEvent.click(await screen.findByRole('button',{name:'继续处理'}));
+    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
     const card=await screen.findByRole('region',{name:'02.0404.010.0401001 铭牌'});
+    fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));
     expect(within(card).getByText('有多个匹配模板，请明确选择后保存。')).toBeVisible();
     fireEvent.change(within(card).getByLabelText('本次模板'),{target:{value:'9'}});
     expect(screen.getByRole('button',{name:'批量生成待处理项目'})).toBeDisabled();
@@ -82,7 +62,7 @@ describe('packaging workflow',()=>{
   it('archives only after a ready preview and explicit unified confirmation',async()=>{
     const api=fixture();api.packaging.archivePreview.mockResolvedValue({taskId:'task1',ready:true,blockers:[],files:[{itemId:1,fullCode:item.fullCode,destination:'T40/02.未转曲源文件/铭牌.pdf',replaces:false}]});
     api.packaging.archive.mockResolvedValue({...task,state:'completed'});
-    render(<PackagingTemplatesPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'制图任务'}));fireEvent.click(await screen.findByRole('button',{name:'继续处理'}));
+    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
     fireEvent.click(await screen.findByRole('button',{name:'归档预览'}));const confirm=await screen.findByRole('button',{name:'确认统一归档'});
     expect(confirm).toBeDisabled();expect(api.packaging.archive).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText('已核对全部文件和归档位置，确认统一归档'));fireEvent.click(confirm);
@@ -93,9 +73,9 @@ describe('packaging workflow',()=>{
     api.searchDrawings.mockResolvedValue({items:[{...item,id:20,origin:'planned',productId:7,projectItemName:'铭牌',colorName:'白',status:'active',hasSourceFile:true}],total:1});
     Object.assign(api,{getDrawing:vi.fn().mockResolvedValue({sourceFiles:[{pdfIndexId:81,fileName:'A.pdf',relativePath:'T40/02/A.pdf',isPresent:true},{pdfIndexId:82,fileName:'B.pdf',relativePath:'T40/02/B.pdf',isPresent:true}]})});
     api.packaging.createTask.mockResolvedValue(task);
-    render(<PackagingTemplatesPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'制图任务'}));
-    await screen.findByRole('option',{name:'SKU7 · T40 · 品牌'});fireEvent.change(screen.getByLabelText('任务产品'),{target:{value:'7'}});
-    fireEvent.change(screen.getByRole('textbox',{name:'任务名称'}),{target:{value:'正式修改'}});fireEvent.change(screen.getByLabelText('任务类型'),{target:{value:'modify'}});
+    render(<DrawingTasksPage api={api as never}/>);
+    await screen.findByRole('option',{name:'SKU7 · T40 · 品牌'});fireEvent.change(screen.getByRole('combobox',{name:'产品型号'}),{target:{value:'7'}});
+    fireEvent.change(screen.getByRole('combobox',{name:'任务类型'}),{target:{value:'modify'}});
     fireEvent.click(await screen.findByRole('checkbox',{name:`${item.fullCode} · 铭牌 · 白`}));
     const select=await screen.findByLabelText(`${item.fullCode} 原始源 PDF`);expect(screen.getByRole('button',{name:'创建任务'})).toBeDisabled();
     fireEvent.change(select,{target:{value:'82'}});await waitFor(()=>expect(screen.getByRole('button',{name:'创建任务'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'创建任务'}));
@@ -104,7 +84,7 @@ describe('packaging workflow',()=>{
   it('allows retrying the index stage of an interrupted archive despite pending preview readiness',async()=>{
     const api=fixture();api.packaging.getTask.mockResolvedValue({...task,state:'awaiting_index'});
     api.packaging.archivePreview.mockResolvedValue({taskId:'task1',ready:false,blockers:['等待索引重试'],files:[]});api.packaging.archive.mockResolvedValue({...task,state:'completed'});
-    render(<PackagingTemplatesPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'制图任务'}));fireEvent.click(await screen.findByRole('button',{name:'继续处理'}));
+    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
     fireEvent.click(await screen.findByRole('button',{name:'归档预览'}));await screen.findByText('等待索引重试');
     fireEvent.click(screen.getByRole('button',{name:'重试归档索引'}));await waitFor(()=>expect(api.packaging.archive).toHaveBeenCalledWith('task1'));
   });

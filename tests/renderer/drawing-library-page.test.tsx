@@ -972,3 +972,20 @@ it('renders a conflicting batch once and never offers an arbitrary file instance
  expect(within(panel).queryByRole('button',{name:/打开.*的位置/})).toBeNull();
  expect(within(panel).queryByLabelText('查看资料批次')).toBeNull();
 });
+
+it('opens an exact signed drawing identity after navigation and clears stale list filters',async()=>{
+  const historical={id:-10,productId:1,fullCode:'02.0209.010.0501001',origin:'historical',status:'active',readOnly:true,sourceFiles:[],outlinedFiles:[],currentBomUsage:[]};
+  const other={...historical,id:10,origin:'planned',fullCode:'02.0209.010.0501002'};
+  const api={searchDrawings:vi.fn().mockResolvedValue({items:[other],total:1}),listDictionaries:vi.fn().mockResolvedValue([]),getDrawing:vi.fn().mockImplementation(id=>Promise.resolve(id===-10?historical:other))};
+  const view=render(<DrawingLibraryPage api={api as never}/>);
+  await screen.findByRole('button',{name:other.fullCode});
+  fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'old filter'}});
+  view.rerender(<DrawingLibraryPage api={api as never} navigationTarget={{productId:1,drawingIds:[-10,10],fullCodes:[historical.fullCode,other.fullCode],initialDrawingId:-10,revision:1} as never}/>);
+  await waitFor(()=>expect(api.getDrawing).toHaveBeenCalledWith(-10));
+  expect(screen.getByLabelText('关键词')).toHaveValue('');
+  const detail=await screen.findByRole('complementary',{name:'图号详情'});
+  expect(within(detail).getAllByText(historical.fullCode).length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole('button',{name:`定位图号 ${other.fullCode}`}));
+  await waitFor(()=>expect(api.getDrawing).toHaveBeenCalledWith(10));
+  expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({productId:1,keyword:''}));
+});

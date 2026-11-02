@@ -10,6 +10,7 @@ export type { PackagingField } from './packaging-types.js';
 export interface IllustratorIssue { code: string; message: string; severity: 'error' | 'warning'; objectName?: string }
 export interface IllustratorInspection {
   fields: Array<PackagingField & { matches: number; editable: boolean }>;
+  textObjects?: Array<{ objectName: string; matches?: number; editable: boolean }>;
   fonts: string[];
   issues: IllustratorIssue[];
   /** Illustrator can substitute fonts on open; this is not proof of original-font fidelity. */
@@ -61,6 +62,7 @@ function validateInspection(value:unknown):value is IllustratorInspection {
   if(!value||typeof value!=='object')return false;
   const x=value as IllustratorInspection;
   return Array.isArray(x.fields)&&x.fields.every(field=>field&&typeof field.objectName==='string'&&typeof field.sourceKey==='string'&&typeof field.required==='boolean'&&Number.isInteger(field.matches)&&field.matches>=0&&typeof field.editable==='boolean')
+    &&(x.textObjects===undefined||Array.isArray(x.textObjects)&&x.textObjects.every(item=>item&&typeof item.objectName==='string'&&typeof item.editable==='boolean'&&(item.matches===undefined||Number.isInteger(item.matches)&&item.matches>0)))
     &&Array.isArray(x.fonts)&&x.fonts.every(font=>typeof font==='string')&&Array.isArray(x.issues)&&x.issues.every(issue=>issue&&typeof issue.code==='string'&&typeof issue.message==='string'&&['error','warning'].includes(issue.severity))&&x.fontValidation==='declared-and-observed-only';
 }
 const powershell = `param([string]$JsxPath,[string]$ResultPath,[string]$CompletedPath,[string]$OperationId)
@@ -156,6 +158,10 @@ export class WindowsIllustratorAutomation implements IllustratorAutomation {
   }
   private async perform(mode:'inspect'|'generate'|'open',input:IllustratorInspectInput|IllustratorGenerateInput|{pdfPath:string;fields:PackagingField[]}):Promise<{inspection?:IllustratorInspection;candidate?:string;operationDirectory:string}> {
     this.assertWindows();
+    if(mode==='generate'){
+      input={...input,fields:input.fields.filter(field=>field.sourceKey==='DRAWING_NO')};
+      if(!input.fields.length)fail('DRAWING_NUMBER_FIELD_REQUIRED','请配置至少一个完整图号文字对象');
+    }
     if(input.fields.some(field=>!field.objectName.trim()||!field.sourceKey.trim())||new Set(input.fields.map(field=>field.objectName)).size!==input.fields.length)fail('INVALID_FIELD_MAPPING','模板对象名称和数据字段不能为空或重复');
     mkdirSync(this.operationRoot,{recursive:true});
     const previous=this.readActive();if(previous)fail('AUTOMATION_UNSETTLED','上次 Illustrator 操作尚未核对，不能重复生成',previous);
@@ -192,6 +198,7 @@ export class WindowsIllustratorAutomation implements IllustratorAutomation {
     if(mode!=='open'){
       if(!validateInspection(result.inspection))fail('INVALID_ILLUSTRATOR_RESULT','Illustrator 返回的模板检查结果不完整',active);
       if(result.inspection.issues.some(issue=>issue.severity==='error'))fail('TEMPLATE_VALIDATION_FAILED','模板存在未解决的问题，未发布 PDF',result.inspection);
+      if(mode==='generate'&&!input.fields.some(field=>result.inspection!.fields.some(observed=>observed.objectName===field.objectName&&observed.sourceKey==='DRAWING_NO'&&observed.matches===1&&observed.editable)))fail('DRAWING_NUMBER_FIELD_REQUIRED','模板中未找到已配置的可编辑完整图号文字对象',result.inspection);
       for(const field of input.fields){const observed=result.inspection.fields.find(value=>value.objectName===field.objectName&&value.sourceKey===field.sourceKey);if(!observed||(field.required&&(observed.matches!==1||!observed.editable)))fail('TEMPLATE_VALIDATION_FAILED','模板必要对象检查未通过',result.inspection);}
     }
     return{inspection:result.inspection,candidate,operationDirectory};

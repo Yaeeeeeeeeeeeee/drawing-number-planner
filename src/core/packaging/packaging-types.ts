@@ -39,7 +39,7 @@ export interface PackagingMatch {
 }
 export interface PackagingDrawingRef { origin: 'planned' | 'historical'; id: number; sourcePdfFileId?: number }
 export interface PackagingTaskCreate {
-  productId: number; name: string; type: 'new' | 'modify'; productDirectory?: string;
+  productId: number; name?: string; type: 'new' | 'modify'; productDirectory?: string;
   drawings: PackagingDrawingRef[];
 }
 export interface PackagingTaskItemInput {
@@ -65,3 +65,6 @@ export interface PackagingTask {
 }
 export interface PackagingProductDirectory { productId: number; relativePath: string; exists: boolean }
 export interface PackagingArchivePreview { taskId: string; ready: boolean; blockers: string[]; files: {itemId:number;fullCode:string;destination:string;replaces:boolean}[] }
+
+export interface PackagingTaskDeletionPreview {taskId:string;productId:number;model:string;state:PackagingTask['state'];createdAt:string;token:string;canDelete:boolean;reason?:string;fileCount:number;releasesLock:boolean}
+export interface PackagingTaskDeleteInput {confirmed:true;token:string;acknowledgeUnfinished?:boolean}

@@ -35,6 +35,11 @@ export interface FileSearchFilters {
   productId?: number;
   appearanceVersionId?: number;
   materialBatchId?: number;
+  /** Optional intersection with the independently selected navigation batch. */
+  navigationMaterialBatchId?: number;
+  /** Inclusive file modification instants; list/count filters never restrict a scan. */
+  modifiedFrom?: string;
+  modifiedTo?: string;
   productCategory?: string;
   unassociatedProduct?: boolean;
   matchStatus?: FileMatchStatus;
@@ -98,7 +103,7 @@ export interface FileScanChangesView {
 }
 
 /** Manual filters shared by the file list and navigation counts; navigation scope is excluded. */
-export type FileNavigationFilters = Pick<FileSearchFilters, 'keyword' | 'matchStatus' | 'conversionType' | 'presence' | 'managementState'>;
+export type FileNavigationFilters = Pick<FileSearchFilters, 'keyword' | 'matchStatus' | 'conversionType' | 'presence' | 'managementState' | 'materialBatchId' | 'modifiedFrom' | 'modifiedTo'>;
 
 export interface FileNavigationResult {
   sources?: Array<{productId:number;count:number}>;

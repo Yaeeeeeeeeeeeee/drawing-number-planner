@@ -189,6 +189,13 @@ export interface PdfScanSummaryView {
   conflict: number; source: number; outlined: number; missing: number; scanId: number; currentTotal: number;
   comparison: FileScanComparisonView; scannedAt: string;
 }
+/** Inclusive indexed modification dates. These filters apply only to list/count requests. */
+export interface PdfFileFiltersView extends Record<string,string|number|undefined> {
+  materialBatchId?:number;
+  navigationMaterialBatchId?:number;
+  modifiedFrom?:string;
+  modifiedTo?:string;
+}
 export type QrBusinessStatus = 'active' | 'inactive';
 export type QrFileStatus = 'present' | 'missing' | 'none' | 'all';
 export interface QrFileView {
@@ -287,7 +294,7 @@ export interface OutboundRegenerationView {
 export interface MaterialBatchLogicalMaterialView {
   fullCode: string | null; outlinedFiles: MaterialBatchFileView[]; sourceFiles: MaterialBatchFileView[];
 }
-export interface FileScanComparisonView { added: number; missing: number; moved: number; changed: number; unchanged: number }
+export interface FileScanComparisonView { scope?: {kind:'workspace'|'products';productDirectories:string[]}; added: number; missing: number; moved: number; changed: number; unchanged: number }
 export interface FileScanRunView extends FileScanComparisonView { id: number; completedAt: string; currentTotal: number }
 export interface FileScanChangeView { id: number; type: 'added' | 'missing' | 'moved' | 'changed'; relativePath: string;
   indexKind: 'pdf' | 'qr'; previousRelativePath: string | null; fileName: string; fullCode: string | null }
@@ -440,8 +447,8 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
   cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
   getFileIndexClearPreview(): Promise<FileIndexClearPreviewView>;
   clearFileIndex(confirmation: string): Promise<FileIndexClearResultView>;
-  getPdfFileNavigation?(filters?: Record<string, string | number | undefined>): Promise<PdfNavigationCounts>;
-  searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
+  getPdfFileNavigation?(filters?: PdfFileFiltersView): Promise<PdfNavigationCounts>;
+  searchPdfFiles(filters?: PdfFileFiltersView): Promise<{
     items: PdfFileView[]; total: number; page: number; pageSize: number;
   }>;
   checkServiceHealth(): Promise<{ status: 'ok' }>;

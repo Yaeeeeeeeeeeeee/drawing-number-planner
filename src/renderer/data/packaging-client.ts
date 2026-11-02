@@ -1,6 +1,7 @@
-import type { DimensionProfile, DimensionProfileInput, PackagingArchivePreview, PackagingCatalog, PackagingProductDirectory, PackagingProjectConfig, PackagingTask, PackagingTaskCreate, PackagingTaskItemInput, PackagingTemplate, PackagingTemplateInput, TemplateRule, TemplateRuleInput } from '../../core/packaging/packaging-types';
+import type { PackagingField, PackagingTaskDeletionPreview, PackagingTaskDeleteInput, DimensionProfile, DimensionProfileInput, PackagingArchivePreview, PackagingCatalog, PackagingProductDirectory, PackagingProjectConfig, PackagingTask, PackagingTaskCreate, PackagingTaskItemInput, PackagingTemplate, PackagingTemplateInput, TemplateRule, TemplateRuleInput } from '../../core/packaging/packaging-types';
 import type {PdfScanSummaryView} from './client';
 
+export interface PackagingInspectionView {fields:Array<{objectName:string;matches:number;editable:boolean}>;fonts:string[];issues:Array<{severity:'error'|'warning';message:string}>;fontValidation:'declared-and-observed-only';textObjects?:Array<{objectName:string;matches?:number;editable:boolean}>}
 export interface PackagingApi {
   getAutomation(): Promise<{platform:string;available:boolean;message:string;blocked?:boolean}>;
   reconcileAutomation(): Promise<{platform:string;available:boolean;message:string;blocked?:boolean}>;
@@ -8,7 +9,8 @@ export interface PackagingApi {
   createTemplate(input: PackagingTemplateInput, file: File): Promise<PackagingTemplate>;
   updateTemplate(id: number, input: PackagingTemplateInput): Promise<PackagingTemplate>;
   replaceTemplateFile(id: number, file: File, input?:PackagingTemplateInput): Promise<PackagingTemplate>;
-  inspectTemplate(id: number): Promise<{ fields: Array<{objectName:string;matches:number;editable:boolean}>; fonts:string[]; issues:Array<{severity:'error'|'warning';message:string}>; fontValidation:'declared-and-observed-only' }>;
+  inspectTemplate(id: number): Promise<PackagingInspectionView>;
+  inspectTemplateFile(file:File,fields?:PackagingField[],requiredFonts?:string[]):Promise<PackagingInspectionView>;
   saveDimension(input: DimensionProfileInput & { id?: number }): Promise<DimensionProfile>;
   saveRule(input: TemplateRuleInput & { id?: number }): Promise<TemplateRule>;
   saveConfig(input: PackagingProjectConfig): Promise<PackagingProjectConfig>;
@@ -18,6 +20,8 @@ export interface PackagingApi {
   listTasks(productId?: number): Promise<PackagingTask[]>;
   createTask(input: PackagingTaskCreate): Promise<PackagingTask>;
   getTask(id: string): Promise<PackagingTask>;
+  deletionPreview(id:string):Promise<PackagingTaskDeletionPreview>;
+  deleteTask(id:string,input:PackagingTaskDeleteInput):Promise<{id:string;deleted:true}>;
   updateItem(taskId: string, itemId: number, input: PackagingTaskItemInput): Promise<PackagingTask>;
   generate(taskId: string, input?: {itemIds?: number[]; regenerate?: boolean}): Promise<PackagingTask>;
   discover(taskId: string): Promise<PackagingTask>;
@@ -40,6 +44,7 @@ export function createPackagingApi(request: <T>(path: string, init?: RequestInit
     updateTemplate:(id,input)=>request(`${base}/templates/${id}`,json('PUT',input)),
     replaceTemplateFile:(id,file,input)=>{const body=new FormData();if(input)body.append('metadata',JSON.stringify(input));body.append('file',file);return request(`${base}/templates/${id}/file`,{method:'POST',body});},
     inspectTemplate:id=>request(`${base}/templates/${id}/inspect`,json('POST')),
+    inspectTemplateFile:(file,fields,requiredFonts)=>{const body=new FormData();body.append('file',file);body.append('metadata',JSON.stringify({fields,requiredFonts}));return request(`${base}/inspect-template-file`,{method:'POST',body});},
     saveDimension:input=>request(`${base}/dimensions`,json('POST',input)),
     saveRule:input=>request(`${base}/rules`,json('POST',input)),
     saveConfig:input=>request(`${base}/configs`,json('POST',input)),
@@ -48,6 +53,7 @@ export function createPackagingApi(request: <T>(path: string, init?: RequestInit
     scanProduct:productId=>request(`${base}/scan-product`,json('POST',{productId})),
     listTasks:async productId=>(await request<{items:PackagingTask[]}>(`${base}/tasks${productId?`?productId=${productId}`:''}`)).items,
     createTask:input=>request(`${base}/tasks`,json('POST',input)),getTask:id=>request(task(id)),
+    deletionPreview:id=>request(`${task(id)}/deletion-preview`),deleteTask:(id,input)=>request(`${task(id)}/delete`,json('POST',input)),
     updateItem:(id,itemId,input)=>request(`${task(id)}/items/${itemId}`,json('PUT',input)),
     generate:(id,input)=>request(`${task(id)}/generate`,json('POST',input)),
     discover:id=>request(`${task(id)}/discover`,json('POST')),

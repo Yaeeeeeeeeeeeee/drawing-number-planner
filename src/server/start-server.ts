@@ -1,3 +1,4 @@
+import {registerPackagingTemplateInspectionRoutes} from './routes/packaging-template-inspection.js';
 import { createHash } from 'node:crypto';
 import { AppearanceService } from '../core/products/appearance-service.js';
 import { registerAppearanceRoutes } from './routes/appearances.js';
@@ -102,7 +103,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     server = Fastify({ logger: false, forceCloseConnections: true });
   server.addHook('onResponse',(request:FastifyRequest,reply:FastifyReply,done:HookHandlerDoneFunction)=>{
     if(reply.statusCode<300&&((request.method==='PUT'&&request.url==='/api/files/settings')
-      ||request.method==='POST'&&['/api/packaging/tasks','/api/packaging/create-temporary-directories'].includes(request.url)))packagingMonitor?.refresh();
+      ||request.method==='POST'&&(['/api/packaging/tasks','/api/packaging/create-temporary-directories'].includes(request.url)||/^\/api\/packaging\/tasks\/[^/]+\/delete$/u.test(request.url))))packagingMonitor?.refresh();
     done();
   });
 
@@ -134,6 +135,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     packagingTasks.recover();
     registerPackagingCatalogRoutes(server,packagingCatalog);
     registerPackagingTaskRoutes(server,packagingTasks,illustrator);
+    registerPackagingTemplateInspectionRoutes(server,illustrator,{dataDir:paths.baseDir});
     packagingMonitor=new PackagingMonitor(packagingTasks,fileService);
     registerMaterialBatchRoutes(server, new MaterialBatchService(database, () => workspaceSettings.get().workspaceRoot));
     registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));

@@ -11,7 +11,7 @@ export class PackagingTaskStore {
  constructor(readonly db:PlannerDatabase){}
  task(id:string):PackagingTask{
   const row=this.db.prepare(`select id,product_id as productId,model_snapshot as model,name,type,state,product_directory as productDirectory,
-   task_directory as taskDirectory,created_at as createdAt,completed_at as completedAt,error from packaging_tasks where id=?`).get(id) as PackagingTask|undefined;
+   task_directory as taskDirectory,created_at as createdAt,completed_at as completedAt,error from packaging_tasks where id=? and deleted_at is null`).get(id) as PackagingTask|undefined;
   if(!row)taskFail('TASK_NOT_FOUND','制图任务不存在');
   return{...row!,completedAt:optional(row!.completedAt),error:optional(row!.error),items:this.items(id),pendingFiles:this.pending(id)};
  }

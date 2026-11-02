@@ -25,8 +25,10 @@ async function indexedCompletion(service:PackagingTaskService,task:PackagingTask
  return rows;
 }
 async function finishCleanup(service:PackagingTaskService,task:PackagingTask){
- const owned=service.store.owned(task.id).filter(file=>existsSync(service.taskPath(task.id,file.relativePath)));
+ const archived=new Set((service.db.prepare("select source_relative_path as path from packaging_archive_journal where task_id=? and state='indexed'").all(task.id) as {path:string}[]).map(row=>toWorkspacePathKey(row.path)));
+ const owned=service.store.owned(task.id).filter(file=>archived.has(toWorkspacePathKey(file.relativePath))&&existsSync(service.taskPath(task.id,file.relativePath)));
  const cleanup=await cleanupOwnedTaskFiles(service.taskWorkspace(task.id),task.taskDirectory,owned);
+ const removed=new Set(cleanup.removed.map(toWorkspacePathKey));service.db.prepare('update packaging_tasks set owned_files_json=? where id=?').run(JSON.stringify(service.store.owned(task.id).filter(file=>!removed.has(toWorkspacePathKey(file.relativePath)))),task.id);
  service.store.state(task.id,'completed',cleanup.retained.length?'已归档，部分已变化或非任务所有的临时文件保留，请人工核对':undefined);return service.store.task(task.id);
 }
 function destination(service:PackagingTaskService,task:PackagingTask,item:PackagingTaskItem){

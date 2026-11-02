@@ -25,7 +25,7 @@ it('runs the real local HTTP manual-file task through review/archive/index and r
   let found=(await request(`/api/packaging/tasks/${task.id}/discover`,{})).data;
   for(let i=0;i<30&&!found.pendingFiles.length;i++){await new Promise(resolve=>setTimeout(resolve,25));found=(await request(`/api/packaging/tasks/${task.id}`)).data;}
   expect(found.pendingFiles[0].status).toBe('pending');expect((await request('/api/files')).data.items).toHaveLength(0);
-  const linked=await request(`/api/packaging/tasks/${task.id}/files/${found.pendingFiles[0].id}/link`,{itemId:task.items[0].id});expect(linked.status).toBe(200);const item=linked.data.items[0];expect(existsSync(source)).toBe(false);
+  const linked=await request(`/api/packaging/tasks/${task.id}/files/${found.pendingFiles[0].id}/link`,{itemId:task.items[0].id});expect(linked.status).toBe(200);const item=linked.data.items[0];expect(existsSync(source)).toBe(true);
   expect((await request(`/api/packaging/tasks/${task.id}/items/${item.id}/review`,{sha256:'0'.repeat(64)})).status).toBe(409);
   expect((await request(`/api/packaging/tasks/${task.id}/items/${item.id}/review`,{sha256:item.sha256})).status).toBe(200);
   expect((await request(`/api/packaging/tasks/${task.id}/archive`,{confirmed:false})).status).toBe(422);
@@ -35,6 +35,8 @@ it('runs the real local HTTP manual-file task through review/archive/index and r
   expect((await request('/api/packaging/scan-product',{productId:99999})).status).toBe(422);
   const file=await fetch(`${server.url}/api/packaging/tasks/${task.id}/items/${item.id}/file`);expect(file.status).toBe(200);expect(await file.text()).toBe(original);
   expect((await request(`/api/packaging/tasks/${task.id}/items/${item.id}`,{parameters:{length:99}},'PUT')).status).toBe(422);
+  const deletion=await request(`/api/packaging/tasks/${task.id}/deletion-preview`);expect(deletion.data).toMatchObject({canDelete:true,releasesLock:false});expect((await request(`/api/packaging/tasks/${task.id}/delete`,{confirmed:true,token:deletion.data.token})).status).toBe(200);expect((await request(`/api/packaging/tasks/${task.id}`)).status).toBe(404);expect((await request('/api/packaging/tasks')).data.items).toEqual([]);expect(readFileSync(join(root,files[0].relativePath),'utf8')).toBe(original);
+  const next=await request('/api/packaging/tasks',{productId:product.id,type:'new',drawings:[{origin:'planned',id:drawing.id}]});expect(next.status).toBe(201);const unfinished=await request(`/api/packaging/tasks/${next.data.id}/deletion-preview`);expect((await request(`/api/packaging/tasks/${next.data.id}/delete`,{confirmed:true,token:unfinished.data.token})).status).toBe(422);expect((await request(`/api/packaging/tasks/${next.data.id}/delete`,{confirmed:true,token:unfinished.data.token,acknowledgeUnfinished:true})).status).toBe(200);
   expect(db.prepare('select count(*) n from drawing_numbers').get()).toEqual({n:1});expect(db.pragma('foreign_key_check')).toEqual([]);
  }finally{await server.close();db.close();rmSync(dataDir,{recursive:true,force:true});}
 },20000);

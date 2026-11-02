@@ -1,4 +1,13 @@
-# AIT包材模板当前执行
+# 1.5 包材模板与任务 UI 当前执行
+
+- 需求：docs/packaging-ui-requirements-20261102.md；计划：docs/superpowers/plans/2026-11-02-packaging-ui-workflow.md。
+- 页面/服务/Schema25已实施：独立制图任务、仅图号替换、简化尺寸规则、紧凑规划/任务、平铺00、任务留痕删除、列表日期/批次筛选与扫描范围分离。
+- 真实浏览器13/13、多分辨率实际截图、原1.4代码生成的真实旧Schema24（61表）升级/嵌套任务恢复归档通过；最终全量1855项串行复跑中（初跑1项并行超时已单独通过）。
+- 继续：核对真实截图、全套端到端、Windows实际安装/任务兼容/删除保护；固定新源码Tag和工件后交付。
+- 旧任务不批量搬迁；原始AIT/PDF不因删除任务/索引而删除；不改占号、BOM、外发与本地根路径。
+- 真正Adobe字体/版式/PDF重开能力仍需本机实际模板验收，开发/CI只声称协议/JSX合约及人工PDF真实保存归档通过。
+
+# 1.4 AIT包材模板历史交付
 
 - 需求：docs/ait-packaging-requirements-20261030.md；实施计划：docs/superpowers/plans/2026-10-30-ait-packaging-workflow.md。
 - Schema24、模板/独立尺寸/规则、规划前尺寸交接、本机Illustrator适配、产品扫描与监听、持久任务、人工关联和归档备份已实施。

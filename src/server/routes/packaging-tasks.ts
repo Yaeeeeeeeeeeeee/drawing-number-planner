@@ -7,7 +7,7 @@ import type {WindowsIllustratorAutomation} from '../../core/packaging/illustrato
 
 const numberId=z.number().int().positive(),params=z.object({id:z.string().uuid(),itemId:z.coerce.number().int().positive().optional(),fileId:z.coerce.number().int().positive().optional()});
 const drawing=z.object({origin:z.enum(['planned','historical']),id:numberId,sourcePdfFileId:numberId.optional()}).strict();
-const create=z.object({productId:numberId,name:z.string().trim().min(1).max(150),type:z.enum(['new','modify']),productDirectory:z.string().max(2000).optional(),drawings:z.array(drawing).min(1).max(100)}).strict();
+const create=z.object({productId:numberId,name:z.string().trim().min(1).max(150).optional(),type:z.enum(['new','modify']),productDirectory:z.string().max(2000).optional(),drawings:z.array(drawing).min(1).max(100)}).strict();
 const item=z.object({templateId:numberId.optional(),dimensionProfileId:numberId.optional(),mode:z.enum(['ait','manual','none']).optional(),ratioLocked:z.boolean().optional(),parameters:z.record(z.string().min(1).max(100).refine(key=>!['__proto__','prototype','constructor'].includes(key)),z.union([z.string().max(1000),z.number().finite()])).optional()}).strict();
 function parsed<T>(schema:z.ZodType<T>,value:unknown):T{const result=schema.safeParse(value);if(!result.success)throw Object.assign(new Error('制图请求参数无效，请核对所选记录和输入内容'),{code:'INVALID_PACKAGING_REQUEST'});return result.data;}
 export function registerPackagingTaskRoutes(app:FastifyInstance,service:PackagingTaskService,automation:WindowsIllustratorAutomation){
@@ -23,6 +23,8 @@ export function registerPackagingTaskRoutes(app:FastifyInstance,service:Packagin
  app.get('/api/packaging/tasks',execute(request=>{const {productId}=parsed(z.object({productId:z.coerce.number().int().positive().optional()}).strict(),request.query);return{items:service.listTasks(productId)};}));
  app.post('/api/packaging/tasks',execute((request,reply)=>service.createTask(parsed(create,request.body)).then(task=>reply.code(201).send(task))));
  app.get('/api/packaging/tasks/:id',execute(request=>service.getTask(parsed(params,request.params).id)));
+ app.get('/api/packaging/tasks/:id/deletion-preview',execute(request=>service.deletionPreview(parsed(params,request.params).id)));
+ app.post('/api/packaging/tasks/:id/delete',execute(request=>service.deleteTask(parsed(params,request.params).id,parsed(z.object({confirmed:z.literal(true),token:z.string().regex(/^[a-f0-9]{64}$/u),acknowledgeUnfinished:z.boolean().optional()}).strict(),request.body))));
  app.put('/api/packaging/tasks/:id/items/:itemId',execute(request=>{const{id,itemId}=parsed(params,request.params);return service.configureItem(id,itemId!,parsed(item,request.body));}));
  app.post('/api/packaging/tasks/:id/generate',execute(request=>service.startGenerate(parsed(params,request.params).id,parsed(z.object({itemIds:z.array(numberId).min(1).max(100).optional(),regenerate:z.boolean().optional()}).strict(),request.body??{}))));
  app.post('/api/packaging/tasks/:id/discover',execute(request=>service.discover(parsed(params,request.params).id)));

@@ -18,6 +18,9 @@ const searchSchema = z.object({
   productId: z.coerce.number().int().positive().optional(),
   appearanceVersionId: z.coerce.number().int().positive().optional(),
   materialBatchId: z.coerce.number().int().positive().optional(),
+  navigationMaterialBatchId: z.coerce.number().int().positive().optional(),
+  modifiedFrom: z.iso.datetime({offset:true}).optional(),
+  modifiedTo: z.iso.datetime({offset:true}).optional(),
   productCategory: z.string().min(1).max(500).optional(),
   unassociatedProduct: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
   matchStatus: z.enum(['matched', 'pending', 'unmatched', 'conflict']).optional(),
@@ -26,7 +29,9 @@ const searchSchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 }).strict();
-const navigationSchema = searchSchema.pick({ managementState: true, keyword: true, matchStatus: true, conversionType: true, presence: true }).strict();
+const validDateRange = (filters:{modifiedFrom?:string;modifiedTo?:string}) => !filters.modifiedFrom || !filters.modifiedTo || Date.parse(filters.modifiedFrom) <= Date.parse(filters.modifiedTo);
+const fileListSchema = searchSchema.refine(validDateRange,{message:'文件变更日期范围无效'});
+const navigationSchema = searchSchema.pick({ managementState: true, keyword: true, matchStatus: true, conversionType: true, presence: true, materialBatchId:true, modifiedFrom:true, modifiedTo:true }).strict().refine(validDateRange,{message:'文件变更日期范围无效'});
 const clearIndexSchema = z.object({ confirmation: z.string() }).strict();
 const scanIdSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
 
@@ -138,7 +143,7 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService, t
   });
 
   app.get('/api/files', async (request, reply) => {
-    const query = searchSchema.safeParse(request.query);
+    const query = fileListSchema.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 文件筛选条件无效' } });
     try { return service.search(query.data); }
     catch (error) { return sendFileError(reply, error); }

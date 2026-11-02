@@ -38,7 +38,7 @@ let nextCacheApiId=1;
 const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', appearanceId: '', mainCategoryId: '', projectItemId: '', colorId: '', materialBatchId: '', status: '', deletionState: 'normal', exactDrawingNumber: false };
 
 export interface DrawingPdfNavigationTarget { productId?: number; materialBatchId?: number; fullCode: string; }
-export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf, onNavigateBom, registerLeaveGuard,navigationTarget }: { navigationTarget?:{productId:number;appearanceVersionId?:number;revision?:number}; api: PlannerApi; active?: boolean; registerLeaveGuard?(guard:(() => boolean) | null): void; onNavigateBom?(target: {productId:number;bomVersionId:number}): void; onNavigatePdf?(target: DrawingPdfNavigationTarget): void }) {
+export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf, onNavigateBom, registerLeaveGuard,navigationTarget }: { navigationTarget?:{productId:number;appearanceVersionId?:number;revision?:number;drawingIds?:number[];fullCodes?:string[];initialDrawingId?:number}; api: PlannerApi; active?: boolean; registerLeaveGuard?(guard:(() => boolean) | null): void; onNavigateBom?(target: {productId:number;bomVersionId:number}): void; onNavigatePdf?(target: DrawingPdfNavigationTarget): void }) {
   useEffect(upgradeDrawingColumnLayout,[]);
   const mockMode = isDrawingLibraryMockEnabled();
   const api = useMemo(() => mockMode ? createDrawingLibraryMockApi() : realApi, [mockMode, realApi]);
@@ -74,6 +74,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   useEffect(() => { setCheckedIds([]); }, [scope]);
   const [productCategories, setProductCategories] = useState<string[]>([]);
   const [materialBatchOptions, setMaterialBatchOptions] = useState<MaterialBatchView[]>([]);
+  const [navigationFocus,setNavigationFocus]=useState<Array<{id:number;fullCode?:string}>>([]);
   const [selected, setSelected] = useState<DrawingDetailView | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [queryState, setQueryState] = useState<QueryState>('idle');
   const [queryError, setQueryError] = useState('');
@@ -187,7 +188,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
       setPdfCandidates(result.items); setSelectedPdfId(String(result.items[0]?.id ?? ''));
     } catch (reason) { if (request === pdfRequest.current && detail === detailRequest.current) throw reason; }
   };
-  const openDetail = async (item: DrawingView) => {
+  const openDetail = async (item: Pick<DrawingView,'id'>) => {
     if (maintainingRef.current) return;
     // A pending record load must not leave the previous record editable under its new epoch.
     setSelected(null); setEditing(false); setStaged([]);
@@ -316,9 +317,22 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const navigateScope = (nextScope: CatalogNavigationScope) => {
     if (maintainingRef.current) return;
     detailRequest.current++; pdfRequest.current++; setSelected(null); setEditing(false); setStaged([]);
-    setScope(nextScope); setCheckedIds([]); setPage(1); void search(appliedQuery.current.values,1,pageSize,nextScope);
+    setNavigationFocus([]);setScope(nextScope); setCheckedIds([]); setPage(1); void search(appliedQuery.current.values,1,pageSize,nextScope);
   };
-  useEffect(()=>{if(navigationTarget)navigateScope({kind:'product',productId:navigationTarget.productId});},[navigationTarget]);
+  useEffect(()=>{
+    if(!navigationTarget||!active)return;
+    const nextScope:CatalogNavigationScope={kind:'product',productId:navigationTarget.productId};
+    detailRequest.current++;pdfRequest.current++;setSelected(null);setEditing(false);setStaged([]);
+    setScope(nextScope);setCheckedIds([]);setFilters(emptyFilters);setPage(1);
+    // Navigation must not inherit a previous model/category/text filter or cached pre-reservation list.
+    plannerQueryCache.invalidate('drawing:');
+    void search(emptyFilters,1,pageSize,nextScope);
+    const focus=(navigationTarget.drawingIds??[]).map((id,index)=>({id,fullCode:navigationTarget.fullCodes?.[index]}));
+    setNavigationFocus(focus);
+    const initialId=navigationTarget.initialDrawingId??focus[0]?.id;
+    // Signed IDs carry the formal/historical identity; never locate a different record by code text.
+    if(initialId!==undefined)void openDetail({id:initialId});
+  },[navigationTarget,active]);
   const clearFilters = () => { plannerQueryCache.invalidate('drawing:');setFilters(emptyFilters); setCheckedIds([]); setPage(1); void search(emptyFilters,1,pageSize); };
   const scopeProduct = products.find(product => product.id === scope.productId);
   const scopeBatch = navigationBatches.find(batch => batch.id === scope.batchId);
@@ -370,6 +384,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     {associationResult && <p role="status" className="drawing-association-result">已更新 {associationResult.updated} 条关联{associationResult.before && associationResult.after && <> · 历史已关联 {associationResult.before.historicalAssociated} → {associationResult.after.historicalAssociated} / {associationResult.after.historicalTotal} · 正式已关联 {associationResult.before.plannedAssociated} → {associationResult.after.plannedAssociated} / {associationResult.after.plannedTotal}</>}<button className="text-button" type="button" aria-label="关闭关联结果" onClick={()=>setAssociationResult(null)}>关闭</button></p>}
     <ModuleWorkspace drawingWorkspace resizable hideLayoutReset navigation={({ collapseControl }) => <ProductCatalogNavigation products={products} batches={catalogBatches} usageBatches={navigationBatches} counts={navigationCounts} scope={scope} onSelect={navigateScope} mode="drawings" mainCategories={mainCategories} collapseControl={collapseControl} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
     <header className="drawing-list-heading"><h2 className="drawing-scope-title">{scopeTitle}</h2><span>{total} 个图号</span><button className="text-button" type="button" onClick={()=>{resetTableLayouts('drawing-library');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button></header>
+    {navigationFocus.length>0&&<section className="drawing-list-heading" aria-label="本次图号定位" style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}><strong>本次图号 · {navigationFocus.length}</strong>{navigationFocus.map(item=><button key={item.id} type="button" className="text-button" aria-label={`定位图号 ${item.fullCode??item.id}`} aria-pressed={selected?.id===item.id} onClick={()=>void openDetail(item)}>{item.fullCode??`图号记录 ${item.id}`}</button>)}</section>}
     <form className="filter-bar filter-grid drawing-search-bar" onSubmit={submit}>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('主类别', 'mainCategoryId', 'main_category')}

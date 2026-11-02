@@ -237,7 +237,7 @@ describe('FilesPage', () => {
     expect(await screen.findByText('当前索引统计')).toBeVisible();
     expect(screen.getByText('本次扫描变化（PDF）')).toBeVisible();
     expect(screen.getByText('1 新增')).toBeVisible();
-    expect(screen.getByText('1 删除/缺失')).toBeVisible();
+    expect(screen.getByText('1 确认缺失')).toBeVisible();
     expect(screen.getByText('1 路径变化')).toBeVisible();
     expect(screen.getByText('1 内容变化')).toBeVisible();
     const viewChanges = screen.getByRole('button', { name: '查看本次变化' });
@@ -463,4 +463,59 @@ it('labels the latest automatic product scan without replacing global navigation
   expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.not.objectContaining({productId:9}));expect(api.scanPdfFiles).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button',{name:'查看本次变化'}));const details=await screen.findByRole('region',{name:'本次扫描变化详情'});
   expect(within(details).getByText('变化范围：产品目录 · SAMKYO/冰柜/ZC100')).toBeVisible();expect(api.getFileScanChanges).toHaveBeenCalledWith(12);
+});
+
+describe('PDF quick filters and scan scope',()=>{
+  beforeEach(()=>Object.defineProperty(window,'innerWidth',{configurable:true,value:1600}));
+  it('switches source, outlined, missing and all shortcuts without changing selected product scope',async()=>{
+    const api=apiFixture(true);render(<FilesPage api={api as never} initialTarget={{productId:9}}/>);
+    const quick=await screen.findByRole('group',{name:'PDF 快捷筛选'});
+    for(const [name,conversionType,presence] of [['仅源文件','source','all'],['仅转曲后','outlined','all'],['仅缺失','','missing'],['全部','','all']]){
+      fireEvent.click(within(quick).getByRole('button',{name}));
+      await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.objectContaining({productId:9,conversionType,presence})));
+      await waitFor(()=>expect(within(quick).getByRole('button',{name})).toBeEnabled());
+      expect(within(quick).getByRole('button',{name})).toHaveAttribute('aria-pressed','true');
+    }
+    expect(api.scanPdfFiles).not.toHaveBeenCalled();
+  });
+  it('sends inclusive local file change dates and manual batch to list/count queries but only product ID to a scan',async()=>{
+    const api=apiFixture(true);const scanProduct=vi.fn().mockResolvedValue({...await api.scanPdfFiles(),comparison:{added:1,missing:1,moved:0,changed:0,unchanged:3,scope:{kind:'products',productDirectories:['冰柜/ZC100']}}});api.scanPdfFiles.mockClear();
+    const getPdfFileNavigation=vi.fn().mockResolvedValue({total:4,unassociatedProducts:0,categories:[],products:[],batches:[],batchProducts:[{materialBatchId:2,productId:9}]});
+    Object.assign(api,{packaging:{scanProduct},getPdfFileNavigation});
+    render(<FilesPage api={api as never} initialTarget={{productId:9}}/>);await screen.findByText('PDF 4');
+    fireEvent.click(screen.getByText('文件筛选'));
+    fireEvent.change(screen.getByLabelText('资料批次筛选'),{target:{value:'2'}});
+    fireEvent.change(screen.getByLabelText('文件变更日期从'),{target:{value:'2026-11-01'}});fireEvent.change(screen.getByLabelText('文件变更日期至'),{target:{value:'2026-11-02'}});
+    fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));
+    const dates={modifiedFrom:new Date(2026,10,1,0,0,0,0).toISOString(),modifiedTo:new Date(2026,10,2,23,59,59,999).toISOString(),materialBatchId:2};
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({...dates,productId:9})));
+    await waitFor(()=>expect(getPdfFileNavigation).toHaveBeenCalledWith(expect.objectContaining(dates)));
+    expect(screen.getByText('列表筛选不限制扫描；当前型号扫描包含源文件和全部量产批次。')).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'扫描当前型号'}));
+    await waitFor(()=>expect(scanProduct).toHaveBeenCalledWith(9));expect(scanProduct.mock.calls[0]).toEqual([9]);expect(api.scanPdfFiles).not.toHaveBeenCalled();
+    expect(await screen.findByText('当前型号扫描完成')).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'详细信息'}));
+    expect(screen.getByText('本次扫描范围：产品目录 · 冰柜/ZC100')).toBeVisible();
+    expect(screen.getByText('4 个所选产品范围 PDF 索引')).toBeVisible();
+    expect(screen.getByText('1 确认缺失')).toBeVisible();expect(screen.getByText('0 扫描失败')).toBeVisible();
+  });
+  it('keeps the last successful summary and reports unknown counts after an incomplete scan',async()=>{
+    const api=apiFixture(true);api.scanPdfFiles.mockRejectedValueOnce(new Error('目录不可访问，上次索引未更改'));
+    api.getLatestFileScan.mockResolvedValue({id:10,currentTotal:12,completedAt:'2026-10-30',added:2,missing:3,moved:0,changed:1,unchanged:9});
+    render(<FilesPage api={api as never}/>);await screen.findByDisplayValue('X:\\Library');
+    fireEvent.click(screen.getByRole('button',{name:'扫描资料库'}));
+    expect(await screen.findByText(/扫描未完成：目录不可访问/)).toBeVisible();
+    expect(screen.getByText('本次扫描未完成；新增、变化、确认缺失和失败文件数尚未确定。')).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'详细信息'}));
+    expect(screen.getByText('12 个本次扫描 PDF 索引')).toBeVisible();expect(screen.getByText('3 确认缺失')).toBeVisible();
+    expect(screen.queryByText('0 确认缺失')).not.toBeInTheDocument();
+  });
+  it('clears a detailed batch filter after the batch index was explicitly cleared',async()=>{
+    const api=apiFixture(true);render(<FilesPage api={api as never}/>);await screen.findByDisplayValue('X:\\Library');
+    fireEvent.click(screen.getByText('文件筛选'));fireEvent.change(screen.getByLabelText('资料批次筛选'),{target:{value:'2'}});fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({materialBatchId:2})));
+    fireEvent.click(screen.getByRole('button',{name:'清空资料库索引'}));fireEvent.click(await screen.findByRole('button',{name:'继续'}));fireEvent.change(screen.getByLabelText('确认短语'),{target:{value:'清空资料库索引'}});fireEvent.click(screen.getByRole('button',{name:'确认清空资料库索引'}));
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.not.objectContaining({materialBatchId:2})));
+    expect(screen.getByLabelText('资料批次筛选')).toHaveValue('');
+  });
 });

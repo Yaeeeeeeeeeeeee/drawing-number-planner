@@ -1,0 +1,17 @@
+.packaging-catalog .pkg-editor{padding:14px;background:#fff}
+.packaging-catalog .pkg-editor>fieldset>*{margin-bottom:12px}
+.packaging-catalog .pkg-fields{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end}
+.packaging-catalog .pkg-field-row{display:grid;grid-template-columns:minmax(180px,2fr) minmax(150px,1fr) auto auto;gap:10px;align-items:end}
+.packaging-catalog .pkg-field-row:has(label:nth-of-type(4)){grid-template-columns:minmax(120px,1fr) minmax(170px,1.4fr) minmax(100px,1fr) minmax(100px,1fr) auto}
+.packaging-catalog .pkg-field-row .pkg-check{height:36px}
+.packaging-catalog .pkg-editor button,.packaging-catalog .pkg-filters button{min-height:36px}
+.packaging-catalog .pkg-file-inspection{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.packaging-catalog .pkg-file-inspection>label{flex:1;min-width:200px}
+.packaging-catalog .pkg-file-inspection button{flex:0 0 auto}
+.packaging-catalog .pkg-fonts{margin-top:12px;max-width:680px}
+.packaging-catalog .pkg-editor h4{margin:14px 0 8px;font-size:14px}
+.packaging-catalog .pkg-project-settings{max-width:960px;margin-top:0}
+.packaging-catalog .pkg-actions{margin-bottom:0}
+.packaging-catalog .pkg-empty{background:none;padding:16px 0}
+@media(max-width:800px){.packaging-catalog .pkg-field-row,.packaging-catalog .pkg-field-row:has(label:nth-of-type(4)){grid-template-columns:repeat(2,minmax(0,1fr))}.packaging-catalog .pkg-field-row>button{justify-self:start}}
+@media(max-width:480px){.packaging-catalog .pkg-fields,.packaging-catalog .pkg-field-row,.packaging-catalog .pkg-field-row:has(label:nth-of-type(4)){grid-template-columns:1fr}}

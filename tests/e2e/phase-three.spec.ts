@@ -35,13 +35,13 @@ test('Phase 3 creates and queries a product-level BOM with a business date', asy
   await expect(page.getByLabel('业务变更日期')).toBeVisible(); await expect(page.getByLabel('BOM 颜色')).toHaveCount(0);
   await page.getByLabel('业务变更日期').fill('2026-09-02');
   await page.getByRole('button', { name: '添加 BOM 项目' }).click();
-  await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
-  await page.getByLabel('第 1 行项目明细').selectOption(String(logoId));
+  await page.getByRole('combobox', { name: '第 1 行主类别', exact: true }).selectOption(String(mainId));
+  await page.getByRole('combobox', { name: '第 1 行项目明细', exact: true }).selectOption(String(logoId));
   await selectDrawing(page, '第 1 行图号', fullCode);
   await expect(page.getByLabel('第 1 行数量')).toHaveCount(0);
   await page.getByRole('button', { name: '保存当前 BOM' }).click();
   await expect(page.getByText('当前 BOM 已保存')).toBeVisible();
-  await expect(page.getByLabel('第 1 行主类别')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: '第 1 行主类别', exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: '查询 BOM' }).click();
   await expect(page.getByLabel('查询 BOM 产品类别')).toHaveCount(0);

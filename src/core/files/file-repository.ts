@@ -91,10 +91,13 @@ function fileSearchPredicate(filters: FileSearchFilters, db: PlannerDatabase): {
     parameters.appearanceVersionId = filters.appearanceVersionId;
   }
   if (filters.materialBatchId != null) { where.push('file.material_batch_id = @materialBatchId'); parameters.materialBatchId = filters.materialBatchId; }
+  if (filters.navigationMaterialBatchId != null) { where.push('file.material_batch_id = @navigationMaterialBatchId'); parameters.navigationMaterialBatchId = filters.navigationMaterialBatchId; }
   if (filters.productCategory != null) { where.push('product.product_category = @productCategory'); parameters.productCategory = filters.productCategory; }
   if (filters.unassociatedProduct != null) { where.push(`product.id is ${filters.unassociatedProduct ? '' : 'not '}null`); }
   if (filters.matchStatus) { where.push('file.match_status = @matchStatus'); parameters.matchStatus = filters.matchStatus; }
   if (filters.conversionType) { where.push('file.conversion_type = @conversionType'); parameters.conversionType = filters.conversionType; }
+  if (filters.modifiedFrom) { where.push('julianday(file.modified_at) >= julianday(@modifiedFrom)'); parameters.modifiedFrom = filters.modifiedFrom; }
+  if (filters.modifiedTo) { where.push('julianday(file.modified_at) <= julianday(@modifiedTo)'); parameters.modifiedTo = filters.modifiedTo; }
   const presence = filters.presence ?? 'present';
   if (presence !== 'all') { where.push('file.is_present = @isPresent'); parameters.isPresent = presence === 'present' ? 1 : 0; }
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
@@ -461,7 +464,8 @@ export class FileRepository {
     return this.db.transaction(() => {
       // Explicitly pick manual filters so a navigation selection cannot narrow its own counts.
       const { whereSql, parameters } = fileSearchPredicate({ managementState: filters.managementState, keyword: filters.keyword, matchStatus: filters.matchStatus,
-        conversionType: filters.conversionType, presence: filters.presence }, this.db);
+        conversionType: filters.conversionType, presence: filters.presence, materialBatchId: filters.materialBatchId,
+        modifiedFrom: filters.modifiedFrom, modifiedTo: filters.modifiedTo }, this.db);
       const scope = `${FILE_SEARCH_JOINS} ${whereSql}`;
       const batchProducts = this.db.prepare(`select distinct file.material_batch_id as materialBatchId, product.id as productId
         ${FILE_SEARCH_JOINS} where file.material_batch_id is not null

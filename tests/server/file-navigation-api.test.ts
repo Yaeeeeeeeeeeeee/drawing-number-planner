@@ -79,7 +79,7 @@ describe('read-only PDF navigation endpoint', () => {
   it('rejects malformed filters and navigation scope on the statistics endpoint', async () => {
     const { app } = await fixture();
     try {
-      for (const query of ['unknown=true', 'page=1', 'productId=1', 'materialBatchId=1',
+      for (const query of ['unknown=true', 'page=1', 'productId=1', 'navigationMaterialBatchId=1',
         'productCategory=anything', 'unassociatedProduct=true', 'presence=invalid', 'matchStatus=invalid']) {
         expect((await app.inject(`/api/files/navigation?${query}`)).statusCode, query).toBe(400);
       }

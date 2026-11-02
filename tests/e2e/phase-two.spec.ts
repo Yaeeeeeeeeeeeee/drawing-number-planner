@@ -46,6 +46,6 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   await page.getByLabel('关键词', { exact: true }).fill('ZC200');
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await expect(page.getByText('2 个图号', { exact: true })).toBeVisible();
-  await expect(page.getByText('12.0404.010.0405001')).toBeVisible();
-  await expect(page.getByText('12.0404.010.0405002')).toBeVisible();
+  await expect(page.getByRole('button', { name: '12.0404.010.0405001', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '12.0404.010.0405002', exact: true })).toBeVisible();
 });
