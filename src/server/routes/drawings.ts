@@ -10,6 +10,7 @@ const querySchema = z.object({
   model: z.string().optional(),
   sku: z.string().optional(),
   productCategory: z.string().optional(),
+  navigationProductCategory: z.string().optional(),
   brandId: z.coerce.number().int().positive().optional(),
   appearanceId: z.coerce.number().int().positive().optional(),
   mainCategoryId: z.coerce.number().int().positive().optional(),
@@ -17,7 +18,7 @@ const querySchema = z.object({
   colorId: z.coerce.number().int().positive().optional(),
   productId: z.coerce.number().int().positive().optional(),
   usageBatchId: z.coerce.number().int().positive().optional(),
-  associationState: z.literal('pending').optional(),
+  associationState: z.enum(['pending', 'unassociated']).optional(),
   materialBatchId: z.coerce.number().int().positive().optional(),
   status: z.enum(['reserved', 'active', 'voided', 'inactive', 'historical']).optional(),
   sourcePresence: z.enum(['present', 'missing', 'all']).optional(),
@@ -25,7 +26,7 @@ const querySchema = z.object({
   keyword: z.string().optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
-  deletionState: z.enum(['normal', 'deleted-retained', 'deleted-released', 'all']).optional(),
+  deletionState: z.enum(['normal', 'deleted', 'deleted-retained', 'deleted-released', 'all']).optional(),
 }).strict();
 const paramsSchema = z.object({ id: z.coerce.number().int().refine((value) => value !== 0) }).strict();
 const historicalParamsSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
@@ -65,6 +66,12 @@ export function registerDrawingRoutes(app: FastifyInstance, service: DrawingQuer
       return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '图号筛选条件无效' } });
     }
     return service.search(query.data);
+  });
+
+  app.get('/api/drawings/navigation-counts', async (request, reply) => {
+    const query = querySchema.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '图号统计条件无效' } });
+    return service.navigationCounts(query.data);
   });
 
   app.get('/api/drawings/navigation', async () => service.navigation());

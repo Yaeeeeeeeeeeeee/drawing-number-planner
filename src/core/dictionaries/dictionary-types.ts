@@ -26,3 +26,15 @@ export interface CreateDictionaryItem {
   name: string;
   parentId?: number;
 }
+
+export interface DictionaryDeletionPreview {
+  item: DictionaryItem;
+  allowed: boolean;
+  blockers: string[];
+}
+
+export interface PermanentDictionaryDeletionInput {
+  confirmationCode: string;
+  expectedName: string;
+  expectedDeletedAt: string;
+}

@@ -87,8 +87,10 @@ describe('PDF renderer-only preview isolation', () => {
     const network = vi.fn(); vi.stubGlobal('fetch', network);
     render(<App api={new Proxy({}, { get: () => real }) as never} />);
     await screen.findByText('包装箱-002-转曲后');
+    fireEvent.click(screen.getByRole('button', { name: '产品／批次导航' }));
     fireEvent.change(screen.getByLabelText('存在状态'), { target: { value: 'all' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭产品导航' }));
     await screen.findByText('说明书-001-源文件');
     expect(document.querySelector('.file-match.pending .files-match-badge')?.textContent).toBe('待确认');
     expect(document.querySelector('.file-match.conflict .files-match-badge')?.textContent).toBe('多图号冲突');
@@ -100,6 +102,17 @@ describe('PDF renderer-only preview isolation', () => {
     fireEvent.click(await screen.findByRole('button', { name: '取消模拟扫描' }));
     await screen.findByRole('alert');
     expect(real).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled(); expect(desktop).not.toHaveBeenCalled();
+  });
+  it('aggregates navigation over every filtered mock row while keeping navigation scope separate', async () => {
+    const api = createFilesMockApi('normal');
+    const filters = {presence:'all',conversionType:'source'};
+    const result = await api.searchPdfFiles({...filters,pageSize:1000});
+    const counts = await api.getPdfFileNavigation!(filters);
+    expect(counts.total).toBe(result.total);
+    expect(counts.unassociatedProducts).toBe(result.items.filter(row => row.productId === null).length);
+    const orphan = await api.searchPdfFiles({...filters,unassociatedProduct:'true',pageSize:1000});
+    expect(orphan.total).toBe(counts.unassociatedProducts);
+    expect(orphan.items.every(row => row.productId === null)).toBe(true);
   });
   it('keeps filters and pagination independent and returns cloned fixture data', async () => {
     const api = createFilesMockApi('normal');

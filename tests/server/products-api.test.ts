@@ -12,6 +12,17 @@ import { registerProductRoutes } from '../../src/server/routes/products';
 let db: PlannerDatabase;
 let refs: { brandId: number; productSizeId: number; defaultAppearanceId: number };
 
+it('accepts explicit independent exit choices and rejects unsupported bypass flags', async () => {
+  const service=new ProductService(db);const product=service.create({...refs,sku:'CHOICES',model:'CHOICES',productCategory:'冰柜'});
+  const app=Fastify();registerProductRoutes(app,service,new ProductCleanupService(db));
+  const preview=(await app.inject({method:'GET',url:`/api/products/${product.id}/cleanup-preview`})).json();
+  const payload={confirmed:true,confirmedModel:product.model,selection:{occupancy:'release',history:'purge',expectedFingerprint:preview.choices?.fingerprint,confirmedCodes:[],confirmedHistory:'永久清除历史'}};
+  expect((await app.inject({method:'POST',url:`/api/products/${product.id}/cleanup`,payload:{...payload,force:true}})).statusCode).toBe(400);
+  expect((await app.inject({method:'POST',url:`/api/products/${product.id}/cleanup`,payload})).statusCode).toBe(200);
+  expect(db.prepare('select deleted_at from products where id=?').get(product.id)).toEqual({deleted_at:expect.any(String)});
+  await app.close();
+});
+
 beforeEach(() => {
   db = openDatabase(':memory:');
   migrateDatabase(db, { databaseExists: false, createBackup: () => undefined });

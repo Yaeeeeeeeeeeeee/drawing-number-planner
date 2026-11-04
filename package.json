@@ -20,6 +20,7 @@
     "archiver": "8.0.0",
     "better-sqlite3": "^13.0.3",
     "fastify": "^5.12.1",
+    "lucide-react": "1.59.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "read-excel-file": "^9.3.10",

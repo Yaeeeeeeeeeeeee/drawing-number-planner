@@ -1,37 +1,53 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../../src/renderer/layout/AppShell';
 import type { PlannerApi } from '../../src/renderer/data/client';
 
 vi.mock('../../src/renderer/pages/PlanningPage', () => ({ PlanningPage: () => <label>规划输入<input aria-label="规划输入" /></label> }));
+vi.mock('../../src/renderer/pages/DictionariesPage', () => ({ DictionariesPage: () => <h1>字典内容</h1> }));
 vi.mock('../../src/renderer/components/SafeRecovery', () => ({ SafeRecovery: () => <button>安全恢复</button> }));
 
-function narrowScreen() {
-  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+function viewport(narrow: boolean) {
+  let change: (() => void) | undefined;
+  const query = { matches: narrow, addEventListener: vi.fn((_event, callback) => { change = callback; }), removeEventListener: vi.fn() };
+  vi.stubGlobal('matchMedia', vi.fn(() => query));
+  return (value: boolean) => { query.matches = value; change?.(); };
 }
 
-describe('responsive workspace navigation', () => {
-  it('keeps the current page and input mounted when opening and closing navigation', () => {
-    narrowScreen();
+describe('floating workspace navigation', () => {
+  it('starts open on wide screens without a topbar, backdrop or inert workspace', () => {
+    viewport(false);
+    try {
+      const { container } = render(<AppShell api={{} as PlannerApi} />);
+      expect(container.querySelector('.workspace-topbar')).toBeNull();
+      expect(screen.getByRole('complementary', { name: '工作导航' })).not.toHaveAttribute('inert');
+      expect(screen.getByRole('button', { name: '关闭导航' })).toBeVisible();
+      expect(container.querySelector('main')).not.toHaveAttribute('inert');
+      expect(screen.queryByRole('button', { name: '关闭导航遮罩' })).toBeNull();
+      expect(screen.getByRole('button', { name: '安全恢复' })).toBeVisible();
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('keeps the page, input and focus when manually hiding and reopening wide navigation', () => {
+    viewport(false);
     try {
       render(<AppShell api={{} as PlannerApi} />);
       const input = screen.getByLabelText('规划输入');
       fireEvent.change(input, { target: { value: '尚未提交' } });
+      fireEvent.click(screen.getByRole('button', { name: '关闭导航' }));
       const toggle = screen.getByRole('button', { name: '展开导航' });
+      expect(toggle).toHaveFocus();
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
       fireEvent.click(toggle);
-      expect(screen.getByRole('dialog', { name: '工作导航' })).toHaveAttribute('aria-modal', 'true');
-      expect(screen.getByRole('button', { name: '安全恢复' })).toBeVisible();
-      fireEvent.click(screen.getByRole('button', { name: '关闭导航' }));
       expect(screen.getByLabelText('规划输入')).toBe(input);
       expect(input).toHaveValue('尚未提交');
     } finally { vi.unstubAllGlobals(); }
   });
-  it('moves focus into narrow navigation and cycles Tab without reaching the workspace', () => {
-    narrowScreen();
+  it('starts open as a modal only when narrow and cycles focus without reaching the workspace', () => {
+    viewport(true);
     try {
-      render(<AppShell api={{} as PlannerApi} />);
-      fireEvent.click(screen.getByRole('button', { name: '展开导航' }));
+      const { container } = render(<AppShell api={{} as PlannerApi} />);
+      expect(screen.getByRole('dialog', { name: '工作导航' })).toHaveAttribute('aria-modal', 'true');
+      expect(container.querySelector('main')).toHaveAttribute('inert');
       const close = screen.getByRole('button', { name: '关闭导航' });
       expect(close).toHaveFocus();
       fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
@@ -40,17 +56,55 @@ describe('responsive workspace navigation', () => {
       expect(close).toHaveFocus();
       fireEvent.keyDown(close, { key: 'Escape' });
       expect(screen.getByRole('button', { name: '展开导航' })).toHaveFocus();
-      expect(screen.getByLabelText('规划输入')).toBeVisible();
+      expect(container.querySelector('main')).not.toHaveAttribute('inert');
     } finally { vi.unstubAllGlobals(); }
   });
-  it('closes narrow navigation with Escape and restores focus without navigating', () => {
-    narrowScreen();
+  it('closes the narrow backdrop without remounting the current page', () => {
+    viewport(true);
     try {
       render(<AppShell api={{} as PlannerApi} />);
-      fireEvent.click(screen.getByRole('button', { name: '展开导航' }));
-      fireEvent.keyDown(screen.getByRole('navigation', { name: '主导航' }), { key: 'Escape' });
+      const input = screen.getByLabelText('规划输入');
+      fireEvent.click(screen.getByRole('button', { name: '关闭导航遮罩' }));
+      expect(screen.queryByRole('dialog', { name: '工作导航' })).toBeNull();
+      expect(screen.getByLabelText('规划输入')).toBe(input);
       expect(screen.getByRole('button', { name: '展开导航' })).toHaveFocus();
-      expect(screen.getByLabelText('规划输入')).toBeVisible();
     } finally { vi.unstubAllGlobals(); }
   });
+  it('keeps default-open navigation and current input across docked/overlay resizing', () => {
+    const resize = viewport(false);
+    try {
+      const { container } = render(<AppShell api={{} as PlannerApi} />);
+      const input = screen.getByLabelText('规划输入');
+      fireEvent.change(input, { target: { value: '窗口切换保留' } });
+      act(() => resize(true));
+      expect(screen.getByRole('dialog', { name: '工作导航' })).toHaveAttribute('aria-modal', 'true');
+      expect(container.querySelector('main')).toHaveAttribute('inert');
+      act(() => resize(false));
+      expect(screen.getByRole('complementary', { name: '工作导航' })).toBeVisible();
+      expect(container.querySelector('main')).not.toHaveAttribute('inert');
+      expect(screen.getByLabelText('规划输入')).toBe(input);
+      expect(input).toHaveValue('窗口切换保留');
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('preserves a manually closed directory while resizing', () => {
+    const resize = viewport(false);
+    try {
+      render(<AppShell api={{} as PlannerApi} />);
+      fireEvent.click(screen.getByRole('button', { name: '关闭导航' }));
+      act(() => resize(true));
+      act(() => resize(false));
+      expect(screen.getByRole('button', { name: '展开导航' })).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('complementary', { name: '工作导航' })).toBeNull();
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it.each([false, true])('selects a module and only dismisses navigation in overlay mode (%s)', narrow => {
+    viewport(narrow);
+    try {
+      render(<AppShell api={{} as PlannerApi} />);
+      fireEvent.click(screen.getByRole('button', { name: '编码字典' }));
+      expect(screen.getByRole('heading', { name: '字典内容' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: '关闭导航' }) !== null).toBe(!narrow);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
 });

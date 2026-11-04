@@ -257,3 +257,26 @@ it('serves navigation before signed detail IDs and validates actual usage filter
     expect(db.serialize().equals(before)).toBe(true);
   } finally { db.pragma('query_only = OFF'); await app.close(); }
 });
+
+it('serves actual catalog counts and product-only unassociated filters without modifying data', async () => {
+  seedPlannedDrawing(db);
+  seedHistoricalDrawing(db);
+  const app = Fastify(); registerDrawingRoutes(app, new DrawingQueryService(db));
+  const before = db.serialize(); db.pragma('query_only = ON');
+  try {
+    const response = await app.inject({ method: 'GET', url: '/api/drawings/navigation-counts?page=9&pageSize=1' });
+    expect(response.statusCode).toBe(200);
+    const counts = response.json();
+    const all = await app.inject({ method: 'GET', url: '/api/drawings' });
+    const pending = await app.inject({ method: 'GET', url: '/api/drawings?associationState=unassociated' });
+    expect(counts.total).toBe(all.json().total);
+    expect(counts.unassociated).toBe(pending.json().total);
+    expect(counts.products).toEqual([expect.objectContaining({ count: 1 })]);
+    const recycle = await app.inject({ method: 'GET', url: '/api/drawings?deletionState=deleted' });
+    expect(recycle.statusCode).toBe(200); expect(recycle.json().total).toBe(counts.recycle);
+    const category = await app.inject({ method: 'GET', url: '/api/drawings?navigationProductCategory=C' });
+    expect(category.statusCode).toBe(200); expect(category.json().total).toBe(1);
+    expect((await app.inject({ method: 'GET', url: '/api/drawings/navigation-counts?unknown=1' })).statusCode).toBe(400);
+    expect(db.serialize().equals(before)).toBe(true);
+  } finally { db.pragma('query_only = OFF'); await app.close(); }
+});

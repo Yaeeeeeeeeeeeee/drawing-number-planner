@@ -65,39 +65,38 @@ export function AppShell({ api }: { api: PlannerApi }) {
   useEffect(() => { if (page === 'drawings') setDrawingsVisited(true); }, [page]);
   const [productsVisited, setProductsVisited] = useState(false);
   useEffect(() => { if (page === 'products') setProductsVisited(true); }, [page]);
-  const [narrow, setNarrow] = useState(() => window.matchMedia?.('(max-width: 1279px)').matches ?? false);
-  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [narrow, setNarrow] = useState(() => window.matchMedia?.('(max-width: 1023px)').matches ?? false);
+  const [navigationOpen, setNavigationOpen] = useState(true);
   const navigationToggle = useRef<HTMLButtonElement>(null);
   const navigationPanel = useRef<HTMLElement>(null);
-  const modalWasOpen = useRef(false);
+  const navigationWasOpen = useRef(false);
   useEffect(() => {
-    const query = window.matchMedia?.('(max-width: 1279px)');
+    const query = window.matchMedia?.('(max-width: 1023px)');
     if (!query) return;
     const change = () => {
-      if (query.matches && document.activeElement?.closest('#workspace-navigation')) navigationToggle.current?.focus();
-      setNarrow(query.matches); setNavigationOpen(false);
+      setNarrow(query.matches);
     };
     query.addEventListener('change', change);
     return () => query.removeEventListener('change', change);
   }, []);
   useEffect(() => {
-    if (!narrow || !navigationOpen) {
-      // Restore after React removes inert; focusing an inert header during the event is ignored by browsers.
-      if (modalWasOpen.current) navigationToggle.current?.focus();
-      modalWasOpen.current = false;
+    if (!navigationOpen) {
+      // Restore after React removes inert; the toggle is hidden until the directory has closed.
+      if (navigationWasOpen.current) navigationToggle.current?.focus();
+      navigationWasOpen.current = false;
       return;
     }
-    modalWasOpen.current = true;
+    navigationWasOpen.current = true;
     const panel = navigationPanel.current;
     if (!panel) return;
     const focusable = () => [...panel.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]')]
       .filter(element => !element.closest('[hidden], [inert], [aria-hidden="true"]') && getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden');
-    focusable()[0]?.focus();
+    if (narrow) focusable()[0]?.focus();
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && (narrow || panel.contains(document.activeElement))) {
         event.preventDefault(); setNavigationOpen(false); navigationToggle.current?.focus();
-      } else if (event.key === 'Tab') {
+      } else if (narrow && event.key === 'Tab') {
         const controls = focusable(), first = controls[0], last = controls.at(-1);
         if (!first || !last) return;
         if (!panel.contains(document.activeElement) || event.shiftKey && document.activeElement === first) {
@@ -109,20 +108,14 @@ export function AppShell({ api }: { api: PlannerApi }) {
     return () => document.removeEventListener('keydown', keydown);
   }, [narrow, navigationOpen]);
   const closeNavigation = () => { setNavigationOpen(false); navigationToggle.current?.focus(); };
-  const navigationVisible = narrow ? navigationOpen : !navigationOpen;
-  const currentLabel = navigation.flatMap(group => [...group.items]).find(item => item.key === page)?.label ?? '开发预览';
-  return <div className={`app-shell engineering-workspace ${navigationOpen ? 'navigation-open' : ''}`}>
-    <header className="workspace-topbar" inert={narrow && navigationOpen} aria-hidden={narrow && navigationOpen ? true : undefined}>
-      <button ref={navigationToggle} type="button" className="navigation-toggle" aria-controls="workspace-navigation"
-        aria-expanded={navigationVisible} aria-label={navigationVisible ? '收起导航' : '展开导航'}
-        onClick={() => setNavigationOpen(value => !value)}><span aria-hidden="true">☰</span></button>
-      <strong className="workspace-brand">图号规划器</strong><span className="workspace-module">{currentLabel}</span>
-    </header>
+  return <div className={`app-shell engineering-workspace ${navigationOpen ? 'navigation-open' : 'navigation-closed'} ${narrow ? 'navigation-overlay' : 'navigation-wide'}`}>
+    <button ref={navigationToggle} type="button" className="navigation-toggle" aria-controls="workspace-navigation"
+      hidden={navigationOpen} aria-expanded={navigationOpen} aria-label="展开导航" title="展开工作导航"
+      onClick={() => setNavigationOpen(true)}><span aria-hidden="true">☰</span></button>
     {narrow && navigationOpen && <button type="button" tabIndex={-1} className="navigation-backdrop" aria-label="关闭导航遮罩" onClick={closeNavigation} />}
-    <aside ref={navigationPanel} id="workspace-navigation" className="sidebar" inert={!navigationVisible}
-      role={narrow ? 'dialog' : undefined} aria-label={narrow ? '工作导航' : undefined} aria-modal={narrow && navigationOpen ? true : undefined}>
-      {narrow && <button className="secondary-button navigation-close" type="button" onClick={closeNavigation}>关闭导航</button>}
-      <div className="brand-mark"><span className="brand-icon" aria-hidden="true">D</span><div><strong>工作导航</strong><small>DRAWING CONTROL</small></div></div>
+    <aside ref={navigationPanel} id="workspace-navigation" className="sidebar" hidden={!navigationOpen} inert={!navigationOpen}
+      role={narrow ? 'dialog' : undefined} aria-label="工作导航" aria-modal={narrow && navigationOpen ? true : undefined}>
+      <div className="navigation-heading"><strong>图号规划器</strong><button className="navigation-close" type="button" aria-label="关闭导航" title="收起工作导航" onClick={closeNavigation}>‹</button></div>
     <nav aria-label="主导航">{navigation.map((group) => <section className="nav-group" key={group.label} aria-label={group.label}>
       <p className="nav-group-label">{group.label}</p>{group.items.map((item) => <button className={`nav-item ${page === item.key ? 'active' : ''}`} disabled={!item.enabled || (previewPage !== null && item.key !== previewPage)} onClick={() => item.enabled && (!previewPage || item.key === previewPage) && navigatePage(item.key as Page)} key={item.key} type="button">
         <span className="nav-label"><i aria-hidden="true">{item.icon}</i>{item.label}</span></button>)}</section>)}</nav>

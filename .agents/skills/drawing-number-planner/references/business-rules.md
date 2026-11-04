@@ -41,3 +41,14 @@ The original Excel workbook is an authority when coding structure, dictionary ma
 ## Current P4 BOM historical editing correction (2026-10-16)
 
 The latest explicit user request makes an existing BOM record's ID, business date (including legacy NULL), original createdAt, predecessor and version identity immutable during ordinary editing. Only an explicit create action may create a new record. Preserve editRevision concurrency and updatedAt; refresh the exact selected snapshot and do not fall back from a missing edit target to POST. The earlier date-correction-and-rearchive behavior is Historical for ordinary edits and must not be restored silently. Preserve unchanged legacy NULL-date attachments without inventing a dated archive; explicit new/replaced managed attachments must still pass existing path/type/size/existence/hash checks. Do not clean up duplicate user rows as part of this fix. See `docs/p4-bom-edit-corrections-20261016.md`.
+
+## 字典永久删除与恢复（2026-10-19）
+
+用户要求编码字典对已删除记录提供永久删除入口。仅已删除且无直接/历史编码引用的记录可物理删除，需完整编码及核对身份，事务内再检查；禁止级联、解除引用或通过旧DELETE绕过。普通删除遇到引用保留字典历史身份。恢复后仍可改名称，编码保持锁定，历史快照及图号字符串不随改名重写。见docs/p4-dictionary-corrections-20261019.md。本次功能授权不等于授权执行用户真实数据删除。
+
+## Current：产品退出选项（2026-10-19 后续）
+
+用户明确要求分别选择占号和是否保留业务历史。界面不可替用户预选；释放必须逐条完整图号确认并复用既有释放规则。永久清除仅涵盖明确属于本产品的BOM/二维码/批次/外发及邮件业务记录，需清除确认和事务重检，范围外引用必须阻止；文件索引和磁盘文件、图号凭据、退出审计保留并明示。这仅取代产品退出全部历史一律保留的旧处理；未选择清除时保持旧历史保护，其他模块不可据此自动清除历史。详见docs/p4-product-corrections-20261019.md。
+## Current：整产品批量确认的最新交互（2026-10-19）
+
+用户明确纠正整产品删除须逐个输入图号的不合理要求。仅整产品向导改为一次输入型号、明确选择占号和历史策略、核对数量后确认；完整图号/ID列表从已显示可展开的预检快照自动形成载荷，服务端逐项精确校验和指纹/引用重查不变。历史清除的额外手输短语同样由明确选择和最终确认代替。独立单图号释放不因本交互改动而减省规则。见docs/p4-pdf-navigation-20261019.md。

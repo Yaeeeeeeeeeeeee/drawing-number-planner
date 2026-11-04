@@ -1,6 +1,6 @@
 import './drawing-library.css';
-import { ProductBatchNavigation, type DrawingNavigationScope } from '../components/ProductBatchNavigation';
-import { CopyButton } from '../components/CopyButton';
+import { ProductCatalogNavigation, type CatalogNavigationScope, type CatalogNavigationCounts } from '../components/ProductCatalogNavigation';
+import { Copy } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
@@ -36,7 +36,9 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const listRequest = useRef(0);
   const maintainingRef = useRef(false);
   useEffect(() => () => { detailRequest.current++; }, []);
-  const [scope, setScope] = useState<DrawingNavigationScope>({kind:'all',title:'全部图号'});
+  const [scope, setScope] = useState<CatalogNavigationScope>({kind:'all'});
+  const [navigationCounts, setNavigationCounts] = useState<CatalogNavigationCounts | null>(null);
+  const countsRequest = useRef(0);
   const [products, setProducts] = useState<ProductView[]>([]);
   const [navigationBatches, setNavigationBatches] = useState<DrawingNavigationBatchView[]>([]);
   const [editing, setEditing] = useState(false);
@@ -63,11 +65,24 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const [deletionMode, setDeletionMode] = useState<'retain_occupied' | 'release'>('retain_occupied');
   const [deletionReason, setDeletionReason] = useState('');
   const [deletionConfirmation, setDeletionConfirmation] = useState('');
-  const search = async (values: Record<string, string | number | boolean> = filters, requestedPage = page, requestedPageSize = pageSize) => {
+  const appliedQuery = useRef<{values: Record<string, string | number | boolean>; page: number; pageSize: number; scope: CatalogNavigationScope}>({values:emptyFilters,page:1,pageSize:50,scope:{kind:'all'}});
+  const scopeFilters = (selectedScope: CatalogNavigationScope, values: Record<string, string | number | boolean>) => ({
+    productId: selectedScope.productId ?? '', usageBatchId: selectedScope.batchId ?? '',
+    associationState: selectedScope.kind === 'unassociated' ? 'unassociated' : '',
+    ...(selectedScope.kind === 'category' ? { navigationProductCategory: selectedScope.category ?? '' } : {}),
+    ...(selectedScope.kind === 'recycle' ? { deletionState: ['deleted-retained', 'deleted-released'].includes(String(values.deletionState)) ? values.deletionState : 'deleted' } : {}),
+  });
+  const search = async (values: Record<string, string | number | boolean> = filters, requestedPage = page, requestedPageSize = pageSize, selectedScope = scope, preserveRows = false) => {
+    appliedQuery.current = {values, page:requestedPage, pageSize:requestedPageSize, scope:selectedScope};
     const request = ++listRequest.current;
-    setLoading(true); setQueryState('loading'); setQueryError(''); setQueriedValues(values); setError('');
+    setLoading(true); if (!preserveRows) { setQueryState('loading'); setError(''); } setQueryError(''); setQueriedValues(values);
+    const countsEpoch = ++countsRequest.current;
+    setNavigationCounts(null);
+    void api.getDrawingNavigationCounts?.(values)
+      .then(result => { if (countsEpoch === countsRequest.current) setNavigationCounts(result); })
+      .catch(() => { if (countsEpoch === countsRequest.current) setNavigationCounts(null); });
     try {
-      const result = await api.searchDrawings({ ...values,
+      const result = await api.searchDrawings({ ...values, ...scopeFilters(selectedScope, values),
         brandId: values.brandId ? Number(values.brandId) : '', appearanceId: values.appearanceId ? Number(values.appearanceId) : '',
         mainCategoryId: values.mainCategoryId ? Number(values.mainCategoryId) : '', projectItemId: values.projectItemId ? Number(values.projectItemId) : '',
         colorId: values.colorId ? Number(values.colorId) : '', materialBatchId: values.materialBatchId ? Number(values.materialBatchId) : '',
@@ -75,11 +90,15 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
       });
       if (request !== listRequest.current) return;
       const lastPage = Math.max(1, Math.ceil(result.total / requestedPageSize));
-      if (requestedPage > lastPage) return await search(values, lastPage, requestedPageSize);
+      if (requestedPage > lastPage) return await search(values, lastPage, requestedPageSize, selectedScope, preserveRows);
       setItems(result.items); setTotal(result.total); setPage(requestedPage); setQueryState('ready');
     }
     catch (reason) { if (request !== listRequest.current) return; setQueryState('failed'); setQueryError(reason instanceof Error ? reason.message : '图号检索失败'); }
     finally { if (request === listRequest.current) setLoading(false); }
+  };
+  const refreshCurrentQuery = () => {
+    const current = appliedQuery.current;
+    return search(current.values, current.page, current.pageSize, current.scope, true);
   };
   useEffect(() => {
     void search();
@@ -133,7 +152,10 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   };
   const refreshDetail = async (id: number) => {
     const epoch = detailRequest.current; const detail = await api.getDrawing(id); if (epoch !== detailRequest.current) return; setSelected(current => current?.id === id ? detail : current);
-    setItems((current) => current.map((item) => item.id === id ? { ...item, ...detail } : item));
+  };
+  const refreshMutationResult = async (id: number, epoch: number) => {
+    try { await refreshDetail(id); }
+    finally { if (epoch === detailRequest.current) await refreshCurrentQuery(); }
   };
   const changeStatus = async (target: 'active' | 'voided') => {
     if (!selected || maintainingRef.current) return;
@@ -143,7 +165,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     if (!confirmed) return;
     const request = detailRequest.current;
     setMaintaining(true); setError('');
-    try { if (target === 'active') await api.activateDrawing(selected.id); else await api.voidDrawing(selected.id); if (request !== detailRequest.current) return; await refreshDetail(selected.id); }
+    try { if (target === 'active') await api.activateDrawing(selected.id); else await api.voidDrawing(selected.id); if (request !== detailRequest.current) return; await refreshMutationResult(selected.id, request); }
     catch (reason) { if (request !== detailRequest.current) return; setError(reason instanceof Error ? reason.message : '业务状态更新失败'); }
     finally { if (request === detailRequest.current) setMaintaining(false); }
   };
@@ -158,7 +180,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     try {
       if (target === 'active') await api.activateHistoricalDrawing(selected.id);
       else await api.deactivateHistoricalDrawing(selected.id);
-      if (request !== detailRequest.current) return; await refreshDetail(selected.id);
+      if (request !== detailRequest.current) return; await refreshMutationResult(selected.id, request);
     } catch (reason) { if (request !== detailRequest.current) return; setError(reason instanceof Error ? reason.message : '历史图号状态更新失败'); }
     finally { if (request === detailRequest.current) setMaintaining(false); }
   };
@@ -228,17 +250,22 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     setStaged(failed);
     try { await refreshDetail(id); } catch { if (epoch === detailRequest.current) setError('关联请求已执行，但详情刷新失败，请重新打开核对。'); }
     if (epoch !== detailRequest.current) return;
+    if (succeeded) await refreshCurrentQuery();
+    if (epoch !== detailRequest.current) return;
     if (failed.length) setError(`已保存 ${succeeded} 项，${failed.length} 项失败；再次保存仅重试失败项。`);
     else setEditing(false);
     setMaintaining(false);
   };
-  const navigateScope = (nextScope: DrawingNavigationScope) => {
+  const navigateScope = (nextScope: CatalogNavigationScope) => {
     if (maintainingRef.current) return;
-    const next = {...emptyFilters, productId: nextScope.productId ?? '', usageBatchId:nextScope.batchId ?? '',
-      associationState:nextScope.kind === 'pending' ? 'pending' : '', deletionState:nextScope.kind === 'recycle' ? 'deleted-retained' : 'normal'};
     detailRequest.current++; pdfRequest.current++; setSelected(null); setEditing(false); setStaged([]);
-    setScope(nextScope); setFilters(next); setCheckedIds([]); setPage(1); void search(next,1,pageSize);
+    setScope(nextScope); setCheckedIds([]); setPage(1); void search(filters,1,pageSize,nextScope);
   };
+  const clearFilters = () => { setFilters(emptyFilters); setCheckedIds([]); setPage(1); void search(emptyFilters,1,pageSize); };
+  const scopeProduct = products.find(product => product.id === scope.productId);
+  const scopeBatch = navigationBatches.find(batch => batch.id === scope.batchId);
+  const scopeTitle = scope.kind === 'all' ? '全部图号' : scope.kind === 'category' ? scope.category : scope.kind === 'unassociated' ? '未关联图号' : scope.kind === 'recycle' ? '回收站' : scope.kind === 'batch' ? `${scopeProduct?.model ?? ''} / ${scopeBatch ? materialBatchLabel(scopeBatch.name) : '资料批次'}` : scopeProduct?.model ?? '产品图号';
+  const catalogBatches = [...new Map([...materialBatchOptions, ...navigationBatches].map(batch => [batch.id, batch])).values()];
   const openLocation = async (id: number) => {
     if (mockMode) { setError('Mock 预览不支持磁盘操作'); return; }
     const epoch = detailRequest.current; setError(''); const result = await openIndexedPdfLocation(id);
@@ -268,19 +295,20 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     <PageHeader title="图号库" description="按产品型号及资料批次查看使用图号。"><span className="record-count">{total} 条记录</span></PageHeader>
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
-    <ModuleWorkspace drawingWorkspace resizable navigation={<ProductBatchNavigation products={products} batches={navigationBatches} scope={scope} onSelect={navigateScope} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
+    <ModuleWorkspace drawingWorkspace resizable navigation={({ collapseControl }) => <ProductCatalogNavigation products={products} batches={catalogBatches} usageBatches={navigationBatches} counts={navigationCounts} scope={scope} onSelect={navigateScope} mode="drawings" collapseControl={collapseControl} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
     <header className="drawing-list-heading">
-      <h2 className="drawing-scope-title">{scope.kind === 'product' ? products.find(product => product.id === scope.productId)?.model ?? scope.title : scope.title}</h2>
+      <h2 className="drawing-scope-title">{scopeTitle}</h2>
       {scope.kind === 'product' && <p>{products.find(product => product.id === scope.productId)?.sku ?? 'SKU待补录'} · 全部资料批次</p>}
       {scope.kind === 'batch' && <p>{(() => {const batch=navigationBatches.find(item=>item.id===scope.batchId);const state=scope.productId ? batch?.usageProducts.find(item=>item.productId===scope.productId)?.state : batch?.currentState;return state==='current'?'当前批次实际使用图号':state==='historical'?'历史批次实际使用图号':'当前使用关系未确定';})()}</p>}
-      {scope.kind === 'pending' && <p>仅表示产品或使用批次关系未登记，不代表图号异常或文件缺失。</p>}
+      {scope.kind === 'unassociated' && <p>仅显示未关联产品的图号；未归使用批次的已关联产品图号仍归属于该产品。</p>}
     </header>
     <form className="filter-bar filter-grid drawing-search-bar" onSubmit={submit}>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('主类别', 'mainCategoryId', 'main_category')}
       <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={event => set('status',event.target.value)}><option value="">全部</option><option value="reserved">已占号</option><option value="active">使用中</option><option value="voided">已作废</option><option value="inactive">已停用</option></select></label>
-      <button className="primary-button" type="submit" disabled={loading}>{loading ? '检索中…' : '检索'}</button>
+      <button className="primary-button" type="submit" disabled={loading}>{loading ? '查询中…' : '查询'}</button>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
+      <button className="text-button" type="button" onClick={clearFilters} disabled={loading}>清除筛选</button>
       {moreFilters && <div className="drawing-advanced-filters">      <label className="check-field"><input aria-label="精确图号" type="checkbox" checked={filters.exactDrawingNumber} onChange={(event) => set('exactDrawingNumber', event.target.checked)} /><span>精确图号</span></label>
       <label><span>完整图号</span><input aria-label="完整图号" value={filters.drawingNumber} onChange={(event) => set('drawingNumber', event.target.value)} /></label>
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
@@ -303,10 +331,10 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
           onClick={(event) => event.stopPropagation()} onChange={(event) => setCheckedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /> },
         { key: 'code', label: '完整图号', render: (item) => <span className="drawing-code-inline"><button className="link-button" type="button"
           ref={(node) => { if (node) disclosureButtons.current.set(item.id, node); else disclosureButtons.current.delete(item.id); }}
-          aria-expanded={selected?.id === item.id} aria-controls={`drawing-detail-${item.id}`}>{item.fullCode}</button><CopyDrawingCode code={item.fullCode} /><small>{item.origin === 'planned' ? '正式规划' : '历史扫描'}{item.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</small></span> },
-        { key: 'category', label: '主类别 / 项目', render: (item) => <span>{item.mainCategoryName}<small>{item.projectItemName}</small></span> }, {key:'version',label:'版本',render:() => '未记录'},
+          aria-expanded={selected?.id === item.id} aria-controls={`drawing-detail-${item.id}`}>{item.fullCode}</button><CopyDrawingCode code={item.fullCode} /></span> },
+        { key: 'origin', label: '来源', render: (item) => <span className="drawing-origin-cell">{item.origin === 'planned' ? '正式规划' : '历史扫描'}{item.dictionaryMappingStatus === 'unmapped' && <small className="mapping-warning">字典待映射</small>}</span> },
+        { key: 'category', label: '主类别 / 项目', render: (item) => <span className="drawing-category-project"><span className="drawing-category-badge">{item.mainCategoryName}</span><span className="drawing-project-name">{item.projectItemName}</span></span> }, {key:'version',label:'版本',render:item => typeof item.version === 'string' && item.version.trim() ? item.version : typeof item.versionNumber === 'number' ? String(item.versionNumber) : '未记录'},
         { key: 'status', label: '图号状态', render: (item) => <span className="drawing-status-summary"><span className={`status-text ${item.status}`}>{statusLabel(item.origin, item.status)}</span>{item.deletedAt && <span className="mapping-warning">{item.deletionMode === 'retain_occupied' ? '删除·保留占号' : '删除·已释放'}</span>}</span> },
-        { key: 'files', label: '文件完整性', render: (item) => <span className="file-integrity-summary"><span>源文件<strong className={item.hasSourceFile ? 'integrity-present' : 'integrity-missing'}>{item.hasSourceFile ? '已有' : '缺失'}</strong></span><span>转曲后<strong className={item.hasOutlinedFile ? 'integrity-present' : 'integrity-missing'}>{item.hasOutlinedFile ? '已有' : '缺失'}</strong></span></span> },
         {key:'actions',label:'操作',render:item => <button className="text-button" type="button" onClick={event => {event.stopPropagation(); void openDetail(item);}}>查看 / 管理</button>},
 
       ]} />}
@@ -347,6 +375,7 @@ function DrawingDetailPanel({ selected, contextBatchId, contextProductId, editin
     <div className="drawing-code-inline"><h2>{selected.fullCode}</h2><CopyDrawingCode key={selected.fullCode} code={selected.fullCode} /></div>
     <span className={`status-text ${selected.status}`}>{statusLabel(selected.origin, selected.status)}</span><p className="detail-name">{selected.displayName}</p><p className="muted-text">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</p>
     {errorMessage && <p className="error-banner" role="alert">{errorMessage}</p>}
+    <p className="file-integrity-summary"><span>源文件<strong className={selected.hasSourceFile ? 'integrity-present' : 'integrity-missing'}>{selected.hasSourceFile ? '已有' : '缺失'}</strong></span><span>转曲后<strong className={selected.hasOutlinedFile ? 'integrity-present' : 'integrity-missing'}>{selected.hasOutlinedFile ? '已有' : '缺失'}</strong></span></p>
     <dl className="drawing-detail-attributes">
       <div><dt>SKU</dt><dd>{selected.sku ?? '待补录'}</dd></div><div><dt>型号</dt><dd>{selected.model}</dd></div><div><dt>品牌</dt><dd>{selected.brandName}</dd></div>
       <div><dt>产品类别</dt><dd>{selected.productCategory}</dd></div><div><dt>主类别</dt><dd>{selected.mainCategoryName}</dd></div><div><dt>项目明细</dt><dd>{selected.projectItemName}</dd></div>
@@ -465,10 +494,10 @@ function FileSection({ title, present, files, onOpen, previewOnly = false }: { t
 function CopyDrawingCode({ code }: { code: string }) {
   const [error, setError] = useState('');
   return <span className="drawing-copy-control" onClick={event => event.stopPropagation()}>
-    <CopyButton label="复制完整图号" type="button" className="secondary-button" onClick={() => {
+    <button aria-label="复制完整图号" title="复制完整图号" type="button" className="copy-icon-button" onClick={() => {
       void (async () => { try { await navigator.clipboard.writeText(code); setError(''); }
         catch { setError('复制不可用，请选中完整图号复制'); } })();
-    }} />
+    }}><Copy size={18} strokeWidth={1.8} aria-hidden="true" /></button>
     {error && <span role="alert" className="drawing-copy-error">{error}</span>}
   </span>;
 }

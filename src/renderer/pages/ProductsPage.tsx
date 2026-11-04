@@ -36,6 +36,8 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
   const [brands, setBrands] = useState<DictionaryItemView[]>([]);
   const [sizes, setSizes] = useState<DictionaryItemView[]>([]);
   const [appearances, setAppearances] = useState<DictionaryItemView[]>([]);
+  const [dictionaryError, setDictionaryError] = useState('');
+  const dictionaryGeneration = useRef(0);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
@@ -63,16 +65,33 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
     setQrCodes((current) => [...current.filter((item) => item.productId !== productId), ...result.items]);
   };
 
+  const readDictionaries = () => Promise.all([
+    api.listDictionaries('brand', false),
+    api.listDictionaries('product_size', false),
+    api.listDictionaries('appearance', false),
+  ]);
+  const applyDictionaries = ([brandItems, sizeItems, appearanceItems]: DictionaryItemView[][]) => {
+    setBrands(brandItems); setSizes(sizeItems); setAppearances(appearanceItems); setDictionaryError('');
+  };
+  const refreshDictionaries = async () => {
+    const generation = ++dictionaryGeneration.current;
+    try {
+      const dictionaries = await readDictionaries();
+      if (generation === dictionaryGeneration.current) applyDictionaries(dictionaries);
+    } catch (reason) {
+      if (generation === dictionaryGeneration.current) setDictionaryError(`编码字典加载失败：${reason instanceof Error ? reason.message : '请稍后重试'}`);
+    }
+  };
   const loadInitial = () => {
+    const dictionaryRequest = ++dictionaryGeneration.current;
     setQueryState('loading'); setQueryError('');
     void Promise.all([
       api.listProducts({ status: 'all' }),
-      api.listDictionaries('brand', false),
-      api.listDictionaries('product_size', false),
-      api.listDictionaries('appearance', false),
+      readDictionaries(),
       typeof (api as Partial<PlannerApi>).listQrCodes === 'function' ? api.listQrCodes() : Promise.resolve({ items: [] as ProductQrCodeView[] }),
-    ]).then(([products, brandItems, sizeItems, appearanceItems, qrCodeResult]) => {
-      setItems(products); setAllProducts(products); setBrands(brandItems); setSizes(sizeItems); setAppearances(appearanceItems);
+    ]).then(([products, dictionaries, qrCodeResult]) => {
+      setItems(products); setAllProducts(products);
+      if (dictionaryRequest === dictionaryGeneration.current) applyDictionaries(dictionaries);
       setQrCodes(qrCodeResult.items); setInitialLoaded(true); setQueryState('ready');
     }).catch((reason) => { setQueryState('failed'); setQueryError(reason instanceof Error ? reason.message : '产品档案加载失败'); });
   };
@@ -80,6 +99,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
   useEffect(() => {
     if (active && !wasActive.current) {
       void load(queriedFilters);
+      void refreshDictionaries();
       if (typeof api.listQrCodes === 'function') void api.listQrCodes().then(result => setQrCodes(result.items)).catch(() => setError('资料状态刷新失败，请重新进入页面核对。'));
     }
     wasActive.current = active;
@@ -102,7 +122,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
   };
 
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const openCreate = () => { setEditingId(null); setForm(blank); setEditorOpen(true); };
+  const openCreate = () => { setEditingId(null); setForm(blank); setEditorOpen(true); void refreshDictionaries(); };
   const openEdit = (item: ProductView) => {
     setCleanupId(null);
     setEditingId(item.id);
@@ -110,12 +130,14 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
       productSizeId: String(item.productSizeId), defaultAppearanceId: item.defaultAppearanceId ? String(item.defaultAppearanceId) : '',
       referenceProductId: item.referenceProductId ? String(item.referenceProductId) : '' });
     setEditorOpen(true);
+    void refreshDictionaries();
   };
   const payload = () => ({ sku: form.sku, model: form.model, productCategory: form.productCategory, brandId: Number(form.brandId),
     productSizeId: Number(form.productSizeId), defaultAppearanceId: form.defaultAppearanceId ? Number(form.defaultAppearanceId) : null,
     referenceProductId: form.referenceProductId ? Number(form.referenceProductId) : null });
   const save = async (event: FormEvent) => {
     event.preventDefault(); setError('');
+    if (dictionaryError) return;
     try {
       const product = editingId ? await api.updateProduct(editingId, payload()) : await api.createProduct(payload());
       const replace = (current: ProductView[]) => editingId
@@ -149,6 +171,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
     setQrCodes((current) => current.filter((code) => code.productId !== id)); setCleanupId(null);
   };
   const openHistoricalCandidates = async () => {
+    void refreshDictionaries();
     setHistoricalOpen(true); setHistoricalLoading(true); setHistoricalMessage(''); setSelectedCandidate(null);
     try { setHistoricalCandidates(await api.listHistoricalProductCandidates()); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '历史产品候选加载失败'); }
@@ -159,7 +182,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
   };
   const confirmHistoricalCandidate = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedCandidate) return;
+    if (!selectedCandidate || dictionaryError) return;
     setError(''); setHistoricalMessage('');
     try {
       const result = await api.confirmHistoricalProductCandidate({
@@ -176,25 +199,29 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
       setSelectedCandidate(null); setHistoricalForm(blankHistorical);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '历史产品确认失败'); }
   };
+  const editingProduct = items.find(item => item.id === editingId) ?? allProducts.find(item => item.id === editingId);
+  const historicalOption = (options: DictionaryItemView[], id: number | null | undefined, name: string | null | undefined) =>
+    id && !options.some(item => item.id === id) ? <option value={id} disabled>{name ?? `字典项 ${id}`}（已停用或删除）</option> : null;
+  const dictionaryFeedback = dictionaryError && <div className="error-banner" role="alert">{dictionaryError} <button className="text-button" type="button" onClick={() => void refreshDictionaries()}>重试加载字典</button></div>;
   const productEditor = <form className="editor-strip panel-enter" onSubmit={save}><div className="form-grid">
     <label><span>SKU</span><input aria-label="SKU" value={form.sku} onChange={(event) => set('sku', event.target.value)} required /></label>
     <label><span>型号</span><input aria-label="型号" value={form.model} onChange={(event) => set('model', event.target.value)} required /></label>
     <label><span>产品类别</span><input aria-label="产品类别" value={form.productCategory} onChange={(event) => set('productCategory', event.target.value)} required /></label>
-    <label><span>品牌</span><select aria-label="品牌" value={form.brandId} onChange={(event) => set('brandId', event.target.value)} required><option value="">请选择</option>{brands.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-    <label><span>品类尺寸</span><select aria-label="品类尺寸" value={form.productSizeId} onChange={(event) => set('productSizeId', event.target.value)} required><option value="">请选择</option>{sizes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-    <label><span>默认外观</span><select aria-label="默认外观" value={form.defaultAppearanceId} onChange={(event) => set('defaultAppearanceId', event.target.value)}><option value="">不指定</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+    <label><span>品牌</span><select aria-label="品牌" value={form.brandId} onChange={(event) => set('brandId', event.target.value)} required><option value="">请选择</option>{historicalOption(brands, editingProduct?.brandId, editingProduct?.brandName)}{brands.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+    <label><span>品类尺寸</span><select aria-label="品类尺寸" value={form.productSizeId} onChange={(event) => set('productSizeId', event.target.value)} required><option value="">请选择</option>{historicalOption(sizes, editingProduct?.productSizeId, editingProduct?.productSizeName)}{sizes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+    <label><span>默认外观</span><select aria-label="默认外观" value={form.defaultAppearanceId} onChange={(event) => set('defaultAppearanceId', event.target.value)}><option value="">不指定</option>{historicalOption(appearances, editingProduct?.defaultAppearanceId, editingProduct?.defaultAppearanceName)}{appearances.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
     <label><span>参考来源型号</span><select aria-label="参考来源型号" value={form.referenceProductId} onChange={(event) => set('referenceProductId', event.target.value)}><option value="">不指定</option>{allProducts.filter((item) => item.id !== editingId && item.status === 'active').map((item) => <option value={item.id} key={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
-  </div><div className="form-actions"><button className="text-button" onClick={() => setEditorOpen(false)} type="button">取消</button><button className="primary-button" type="submit">{editingId ? '保存修改' : '保存产品'}</button></div></form>;
+  </div><div className="form-actions"><button className="text-button" onClick={() => setEditorOpen(false)} type="button">取消</button><button className="primary-button" type="submit" disabled={Boolean(dictionaryError)}>{editingId ? '保存修改' : '保存产品'}</button></div></form>;
 
-  const editingProduct = items.find(item => item.id === editingId) ?? allProducts.find(item => item.id === editingId);
   if (editorOpen) return <section className="page-surface products-integrated products-compact product-editor-page">
     <PageHeader title={editingProduct ? `编辑产品 · ${editingProduct.model}` : '新建产品'} description="维护产品基础信息与业务状态，历史身份和关联资料保持原有规则。">
       <button className="secondary-button" type="button" onClick={() => { setEditorOpen(false); setCleanupId(null); }}>返回产品档案</button>
     </PageHeader>
     {error && <p className="error-banner">{error}</p>}
+    {dictionaryFeedback}
     {productEditor}
     {editingProduct && <section className="product-maintenance" aria-label="产品状态与删除管理"><h2>产品管理</h2>
-      <p>当前状态：{editingProduct.status === 'active' ? '启用中' : '已停用'}；退出当前业务仍保留历史身份和快照，不删除实际文件。</p>
+      <p>当前状态：{editingProduct.status === 'active' ? '启用中' : '已停用'}；删除前可分别选择占号及业务历史的处理方式，不删除实际文件。</p>
       <div className="row-actions"><button className="secondary-button" type="button" aria-label={`${editingProduct.status === 'active' ? '停用' : '启用'} ${editingProduct.model}`} onClick={() => void (editingProduct.status === 'active' ? deactivate(editingProduct) : activate(editingProduct))}>{editingProduct.status === 'active' ? '停用产品' : '重新启用产品'}</button>
       <button className="text-button danger" type="button" aria-label={`删除档案 ${editingProduct.model}`} onClick={() => setCleanupId(editingProduct.id)}>删除档案</button></div>
       {cleanupId === editingProduct.id && <ProductCleanupPanel key={editingProduct.id} api={api} productId={editingProduct.id} confirmLabel="确认删除档案" onCancel={() => setCleanupId(null)} onComplete={() => { cleanupComplete(editingProduct.id); setEditorOpen(false); }}/>}</section>}
@@ -210,6 +237,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
       <label><span>状态</span><select aria-label="产品状态" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">全部</option><option value="active">启用中</option><option value="inactive">已停用</option></select></label>
       <button className="primary-button" type="submit">筛选</button>
     </form>
+    {dictionaryFeedback}
     {historicalOpen && <section className="historical-product-panel panel-enter" aria-label="历史产品候选">
       <div className="historical-product-heading"><div><p className="eyebrow">LIBRARY CANDIDATES</p><h2>从资料库识别历史产品</h2><p>这里只列出目录信息完整的候选。系统不会自动建档，确认前请核对 SKU、型号和产品类别。</p></div><button className="text-button" onClick={() => { setHistoricalOpen(false); setSelectedCandidate(null); }} type="button">关闭</button></div>
       {historicalLoading ? <p className="muted-text">正在读取候选…</p> : historicalCandidates.length === 0
@@ -223,7 +251,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi; 
             <label><span>品牌</span><select aria-label="历史产品品牌" value={historicalForm.brandId} onChange={(event) => setHistoricalForm((current) => ({ ...current, brandId: event.target.value }))} required><option value="">请选择</option>{brands.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label><span>品类尺寸</span><select aria-label="历史产品品类尺寸" value={historicalForm.productSizeId} onChange={(event) => setHistoricalForm((current) => ({ ...current, productSizeId: event.target.value }))} required><option value="">请选择</option>{sizes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label><span>默认外观</span><select aria-label="历史产品默认外观" value={historicalForm.defaultAppearanceId} onChange={(event) => setHistoricalForm((current) => ({ ...current, defaultAppearanceId: event.target.value }))} required><option value="">请选择</option>{appearances.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-            <div className="form-actions"><button className="text-button" type="button" onClick={() => setSelectedCandidate(null)}>取消</button><button className="primary-button" type="submit" disabled={!historicalForm.brandId || !historicalForm.productSizeId || !historicalForm.defaultAppearanceId}>确认建立产品档案</button></div>
+            <div className="form-actions"><button className="text-button" type="button" onClick={() => setSelectedCandidate(null)}>取消</button><button className="primary-button" type="submit" disabled={Boolean(dictionaryError) || !historicalForm.brandId || !historicalForm.productSizeId || !historicalForm.defaultAppearanceId}>确认建立产品档案</button></div>
           </form>}
         </article>)}</div>}
       {historicalMessage && <p className="success-banner">{historicalMessage}</p>}

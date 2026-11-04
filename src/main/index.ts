@@ -33,6 +33,8 @@ async function createWindow() {
     minWidth: 720,
     minHeight: 600,
     backgroundColor: '#FFFFFF',
+    // Keep native recovery available via Alt, without a permanently visible menu row.
+    autoHideMenuBar: true,
     show: false,
     webPreferences: {
       contextIsolation: true,
@@ -63,6 +65,7 @@ async function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.once('closed', () => { mainWindow = undefined; });
   installRecoveryControls();
+  mainWindow.setMenuBarVisibility(false);
   const result = await loadDesktopSurface({
     startService: () => localService!.start(),
     loadURL: (url) => mainWindow!.loadURL(url),
