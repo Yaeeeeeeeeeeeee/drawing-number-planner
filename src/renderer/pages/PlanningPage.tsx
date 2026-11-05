@@ -28,10 +28,11 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
   const saved=usePlanningDrafts(api,mode),draft=saved.draft;
   const [checks,setChecks]=useState<BatchPlanningPreview|null>(null),[focused,setFocused]=useState('');
   const [results,setResults]=useState<Partial<Record<PlanningDraftMode,BatchPlanningResult>>>({}),[showResults,setShowResults]=useState(false);
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirmed,setConfirmed]=useState(false);
+  const [requestBusy,setBusy]=useState(false),[error,setError]=useState(''),[confirmed,setConfirmed]=useState(false);
+  const busy=requestBusy||saved.removing;
   const [whiteBases,setWhiteBases]=useState<Record<string,WhiteDrawingBase[]>>({}),[whiteErrors,setWhiteErrors]=useState<Record<string,string>>({});
   const [preferredWidth,setPreferredWidth]=useState(360),[width,setWidth]=useState(1200);
-  const root=useRef<HTMLDivElement>(null),lookupsRequest=useRef(0),checkRequest=useRef(0),epoch=useRef(0),busyRef=useRef(false);
+  const root=useRef<HTMLDivElement>(null),lookupsRequest=useRef(0),checkRequest=useRef(0),epoch=useRef(0),busyRef=useRef(false),reserving=useRef(false);
   const checkedInputs=useRef(new Map<string,string>()),lookupSignature=useRef('');
   const currentMode=useRef(mode);currentMode.current=mode;
   const load=async()=>{
@@ -45,7 +46,7 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
     if(lookupSignature.current&&signature!==lookupSignature.current){checkedInputs.current.clear();setConfirmed(false);epoch.current++;}
     lookupSignature.current=signature;setReferences(current=>({...current,...changes}));setLookupErrors(errors);setLoaded(true);setLoading(false);
   };
-  useEffect(()=>{if(active)void load();else{checkRequest.current++;busyRef.current=false;setBusy(false);}return()=>{lookupsRequest.current++;checkRequest.current++;};},[api,active]);
+  useEffect(()=>{if(active)void load();else{checkRequest.current++;if(!reserving.current){busyRef.current=false;setBusy(false);}}return()=>{lookupsRequest.current++;checkRequest.current++;};},[api,active]);
   useEffect(()=>{setChecks(null);checkedInputs.current.clear();setConfirmed(false);setError('');setShowResults(false);checkRequest.current++;epoch.current++;},[mode]);
   useEffect(()=>{
     const element=root.current;if(!element)return;const measure=()=>{const next=element.clientWidth;if(next>0)setWidth(current=>current===next?current:next);};measure();
@@ -81,7 +82,7 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
     if(draft.step===3)update({...draft,step:4});
   };
   const reserve=async()=>{
-    if(!confirmed||!eligible.length||busyRef.current)return;busyRef.current=true;setBusy(true);setError('');
+    if(!confirmed||!eligible.length||busyRef.current||saved.removing)return;busyRef.current=true;reserving.current=true;setBusy(true);setError('');
     const accepted=new Map(eligible.map(row=>[planningRowKey(row.productId,row.clientId),row]));
     const input:BatchReservePlanningInput={confirmed:true,groups:batchInput(draft).groups.map(group=>({...group,rows:group.rows.filter(row=>accepted.has(planningRowKey(group.productId,row.clientId))).map(row=>({...row,expectedFullCode:accepted.get(planningRowKey(group.productId,row.clientId))!.fullCode!,fingerprint:accepted.get(planningRowKey(group.productId,row.clientId))!.fingerprint!}))})).filter(group=>group.rows.length)};
     try{
@@ -92,7 +93,7 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
       const succeeded=new Set(result.results.filter(row=>row.outcome!=='failed').map(row=>planningRowKey(row.productId,row.clientId)));
       const groups=draft.groups.map(group=>{const remaining=group.rows.filter(row=>!succeeded.has(planningRowKey(group.productId,row.clientId)));return {...group,rows:remaining.length?remaining:[newPlanningProject()]};});
       saved.update({...draft,step:result.results.some(row=>row.outcome==='failed')?3:1,groups});setChecks(null);checkedInputs.current.clear();
-    }catch(reason){setError(errorText(reason));setConfirmed(false);checkedInputs.current.clear();saved.update({...draft,step:3});}finally{busyRef.current=false;setBusy(false);}
+    }catch(reason){setError(errorText(reason));setConfirmed(false);checkedInputs.current.clear();saved.update({...draft,step:3});}finally{reserving.current=false;busyRef.current=false;setBusy(false);}
   };
   const white=async(row:DraftProject)=>{
     if(!selectedGroup||!row.projectItemId)return;

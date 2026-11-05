@@ -2,9 +2,28 @@ import {act,fireEvent,render,screen,waitFor,within} from '@testing-library/react
 import {describe,expect,it,vi} from 'vitest';
 import {PlanningPage} from '../../src/renderer/pages/PlanningPage';
 
-import {planningApiFixture,choosePlanningProduct as chooseProduct,fillPlanningProject as fillProject} from './planning-workspace-fixture';
+import {planningApiFixture,choosePlanningProduct as chooseProduct,fillPlanningProject as fillProject,checkPlanning} from './planning-workspace-fixture';
 
 describe('four-step planning workspace',()=>{
+ it('restores an older nonwhite draft with default sharing checked and submits the same sharing decision',async()=>{
+  const api=planningApiFixture();api.getPlanningDraft.mockResolvedValue({revision:7,draft:{revision:7,updatedAt:'2026-11-05T00:00:00Z',requiresCheck:true,input:{step:2,activeProductId:1,groups:[{productId:1,appearanceId:3,rows:[{clientId:'legacy',colorId:7,mainCategoryId:5,projectItemId:6}]}]}}} as never);
+  render(<PlanningPage api={api as never}/>);expect(await screen.findByLabelText('第 1 行其他颜色共用白色图号')).toBeChecked();await checkPlanning();
+  expect(api.previewBatchPlan).toHaveBeenCalledWith({groups:[expect.objectContaining({rows:[expect.objectContaining({shareWhite:true})]})]});
+ });
+ it('locks inputs and mode changes while deleting the current draft',async()=>{
+  const api=planningApiFixture();let finish!:(value:never)=>void;api.deletePlanningDraft.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}) as never);
+  render(<PlanningPage api={api as never}/>);await chooseProduct();await fillProject();fireEvent.click(screen.getByRole('button',{name:'删除当前草稿'}));
+  await waitFor(()=>expect(api.deletePlanningDraft).toHaveBeenCalled());
+  expect(screen.getByLabelText('第 1 行备注')).toBeDisabled();expect(screen.getByRole('button',{name:'批量规划'})).toBeDisabled();expect(screen.getByRole('button',{name:'删除当前草稿'})).toBeDisabled();
+  await act(async()=>{finish({deleted:true,revision:10} as never);});await screen.findByText('草稿已删除，正式图号保持不变');
+ });
+ it('keeps a pending reservation locked when the page is hidden and reactivated',async()=>{
+  const api=planningApiFixture();let finish!:(value:never)=>void;api.reserveBatchPlan.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}) as never);
+  const view=render(<PlanningPage api={api as never} active/>);await chooseProduct();await fillProject();await checkPlanning();fireEvent.click(screen.getByRole('button',{name:'下一步'}));fireEvent.click(screen.getByLabelText('已核对本次占号清单'));fireEvent.click(screen.getByRole('button',{name:'确认批量占号'}));
+  view.rerender(<PlanningPage api={api as never} active={false}/>);view.rerender(<PlanningPage api={api as never} active/>);
+  expect(screen.getByRole('button',{name:'选择项目'})).toBeDisabled();expect(screen.getByRole('button',{name:'批量规划'})).toBeDisabled();
+  await act(async()=>{finish({results:[]} as never);});expect(await screen.findByRole('heading',{name:'本次占号结果'})).toBeVisible();expect(api.reserveBatchPlan).toHaveBeenCalledTimes(1);
+ });
  it('uses the returned tombstone revision after reading and deleting an absent draft',async()=>{
   const api=planningApiFixture();api.getPlanningDraft.mockResolvedValue({draft:null,revision:15} as never);
   api.deletePlanningDraft.mockResolvedValue({deleted:true,revision:17} as never);

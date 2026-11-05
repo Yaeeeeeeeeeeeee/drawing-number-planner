@@ -8,6 +8,7 @@ import {openDatabase} from '../../src/db/database';
 import {DictionaryService} from '../../src/core/dictionaries/dictionary-service';
 import {ProductService} from '../../src/core/products/product-service';
 import {PlanningService} from '../../src/core/planning/planning-service';
+import {PlanningDraftStore} from '../../src/core/planning/planning-draft-store';
 
 async function fixture() {
   const data=mkdtempSync(join(tmpdir(),'planning-workbench-e2e-')),root=join(data,'library');mkdirSync(root);
@@ -46,6 +47,12 @@ test('real saved white identity is shared without occupation; explicit confirmat
     await page.setViewportSize({width:1920,height:1080});await planning(page);
     await page.getByRole('combobox',{name:'产品型号',exact:true}).selectOption(String(f.products[0].id));
     await page.getByRole('button',{name:'下一步',exact:true}).click();await fields(page,f.main.id,f.label.id,f.black.id);
+    // Restore a valid older draft without the later optional sharing flag. The
+    // checked default in the UI must be sent explicitly to the real service.
+    const drafts=new PlanningDraftStore(join(f.data,'planning-drafts.json'));
+    await expect.poll(()=>drafts.read('new')?.input.groups[0].rows[0].colorId).toBe(f.black.id);
+    const saved=drafts.read('new')!;drafts.save('new',{...saved.input,groups:saved.input.groups.map(group=>({...group,rows:group.rows.map(row=>{const{shareWhite,...legacy}=row;return legacy;})}))},saved.revision);
+    await page.reload();await expect(page.getByRole('checkbox',{name:'第 1 行其他颜色共用白色图号'})).toBeChecked();
     await page.getByRole('button',{name:'下一步',exact:true}).click();
     await expect(page.getByText('共用已有图号',{exact:true})).toBeVisible();
     expect(f.db.prepare('select count(*) n from drawing_numbers').get()).toEqual({n:1});
