@@ -152,7 +152,7 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: `打开 ${file.fileName} 的位置` }));
     await waitFor(() => expect(showFileInFolder).toHaveBeenCalledWith(file.id));
     expect(screen.getByRole('button', { name: `打开 ${missing.fileName} 的位置` })).toBeDisabled();
-    expect(screen.getByText('缺失',{selector:'.presence-label'})).toBeVisible();
+    expect(screen.getByText('上次扫描：缺失',{selector:'.presence-label'})).toBeVisible();
   });
 
   it('shows the desktop-only browser message without calling the API', async () => {

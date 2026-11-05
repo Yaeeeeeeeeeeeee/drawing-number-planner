@@ -319,6 +319,11 @@ export interface PdfFileView {
   materialBatchStatus?: 'recognized' | 'pending' | null;
 }
 
+export interface PdfPresenceView {
+  id:number;scannedAt:string;scanIsPresent:boolean;checkedAt:string;
+  status:import('../../core/files/pdf-presence.js').PdfPresenceStatus;message:string;path:string|null;sizeBytes?:number;
+}
+
 export type LocalTaskStatusView = 'queued' | 'running' | 'finalizing' | 'completed' | 'failed' | 'cancelled';
 export interface LocalTaskView {
   id: string; kind: string; status: LocalTaskStatusView; cancelRequested: boolean; createdAt: string;
@@ -443,6 +448,7 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
   getWorkspaceSettings(): Promise<WorkspaceSettingsView>;
   updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
   scanPdfFiles(): Promise<PdfScanSummaryView>;
+  getPdfFilePresence?(id:number):Promise<PdfPresenceView>;
   getLatestFileScan(): Promise<FileScanRunView | null>;
   getFileScanChanges(id: number): Promise<FileScanChangesView>;
   cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
@@ -725,6 +731,7 @@ export const apiClient: PlannerApi = {
   getWorkspaceSettings: () => request('/api/files/settings'),
   updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
   scanPdfFiles: () => runLocalTask('workspace_scan', {}),
+  getPdfFilePresence:id=>request(`/api/files/${id}/presence`),
   getLatestFileScan: () => request('/api/files/scans/latest'),
   getFileScanChanges: (id) => request(`/api/files/scans/${id}/changes`),
   cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),

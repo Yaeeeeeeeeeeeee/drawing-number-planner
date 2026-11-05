@@ -72,7 +72,11 @@ export class PdfManagementRepository {
       if (row && input.action !== 'clear' && !row.content_sha256) reason = '缺少内容指纹，请先扫描后再决定';
       return { id, relativePath: String(row?.relative_path ?? ''), allowed: reason === null, reason };
     });
-    const decisions = this.db.prepare('select * from pdf_file_decisions where workspace_key = ? order by id').all(workspaceKey);
+    // The decision guard belongs to these concrete paths. An unrelated batch's
+    // decision cannot invalidate this preview; same-path history remains pinned.
+    const selectedPaths=new Set(snapshots.flatMap(snapshot=>typeof snapshot.row?.path_key==='string'?[snapshot.row.path_key]:[]));
+    const decisions = (this.db.prepare('select * from pdf_file_decisions where workspace_key = ? order by id').all(workspaceKey) as Array<{path_key:string}>)
+      .filter(decision=>selectedPaths.has(decision.path_key));
     return { action: input.action, ids, entries, allowed: entries.filter(entry => entry.allowed).length,
       blocked: entries.filter(entry => !entry.allowed).length,
       confirmation: { clear: '清除 PDF 索引', ignore: '暂不纳入 PDF', restore: '恢复纳入 PDF' }[input.action],

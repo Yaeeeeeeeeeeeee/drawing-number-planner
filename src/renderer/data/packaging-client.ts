@@ -17,6 +17,7 @@ export interface PackagingApi {
   getProductDirectories(productId: number): Promise<PackagingProductDirectory[]>;
   createTemporaryDirectories(productIds: number[]): Promise<{items:Array<{productId:number;relativePath?:string;created?:boolean;error?:string}>}>;
   scanProduct(productId:number):Promise<PdfScanSummaryView>;
+  scanCategory(category:string):Promise<PdfScanSummaryView>;
   listTasks(productId?: number): Promise<PackagingTask[]>;
   createTask(input: PackagingTaskCreate): Promise<PackagingTask>;
   getTask(id: string): Promise<PackagingTask>;
@@ -53,6 +54,7 @@ export function createPackagingApi(request: <T>(path: string, init?: RequestInit
     getProductDirectories:async productId=>(await request<{items:PackagingProductDirectory[]}>(`${base}/product-directories?productId=${productId}`)).items,
     createTemporaryDirectories:productIds=>request(`${base}/create-temporary-directories`,json('POST',{productIds})),
     scanProduct:productId=>request(`${base}/scan-product`,json('POST',{productId})),
+    scanCategory:category=>request(`${base}/scan-category`,json('POST',{category})),
     listTasks:async productId=>(await request<{items:PackagingTask[]}>(`${base}/tasks${productId?`?productId=${productId}`:''}`)).items,
     createTask:input=>request(`${base}/tasks`,json('POST',input)),getTask:id=>request(task(id)),
     deletionPreview:id=>request(`${task(id)}/deletion-preview`),deleteTask:(id,input)=>request(`${task(id)}/delete`,json('POST',input)),

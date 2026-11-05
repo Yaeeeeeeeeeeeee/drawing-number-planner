@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-11-05T13:06:17.084955+00:00",
+  "updatedAt": "2026-11-05T13:34:42.207356+00:00",
   "branch": "codex/confirmed-requirements-20261105",
-  "lastCommit": "8c64640",
-  "execution": "已授权完整实施；P0专项与浏览器验收通过，P1/P2及发布尚未完成",
+  "lastCommit": "6fe6ddb",
+  "execution": "已授权连续实施；P0/P1及刷新反馈已通过复核，PDF专项通过，数据库重选和正式交付进行中",
   "current": "已确认未落实需求实施",
-  "recent": "P0复核修正后68项通过；P1服务133项及工作台17项、真实浏览器2项通过，草稿并发复核中",
-  "next": "完成P1并发复核与UI审查，继续P2刷新、PDF、数据库重选及Windows发布",
+  "recent": "P1三项UI复核问题已修正；Task4五组100项通过；PDF核心59项、UI61项、真实501条浏览器通过",
+  "next": "完成PDF独立复核与数据库重选，整轮回归、Windows安装升级及正式发布",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
   ],
-  "tests": "P0专项68，P1服务133（阶段报告）、renderer17、浏览器2和typecheck通过；最终完整回归及Windows未执行。",
+  "tests": "P0 68；P1服务/界面/真实浏览器通过且复核关闭；Task4 100；PDF核心59/UI61/浏览器1。最终全套与Windows未完成。",
   "completionRule": "仅功能实现且对应验收测试通过才记为已完成；未完成项保持真实剩余工作。",
   "items": [
     {
@@ -848,15 +848,13 @@
   "confirmedImplementation": {
     "spec": "docs/confirmed-implementation-requirements-20261105.md",
     "stages": {
-      "p0": "implemented-tested-awaiting-review",
-      "planningDomain": "pending",
-      "planningUi": "pending",
-      "feedback": "pending",
-      "pdf": "pending",
-      "databaseReselection": "pending",
+      "p0": "complete-reviewed",
+      "planningDomain": "complete-reviewed",
+      "planningUi": "complete-reviewed",
+      "feedback": "complete-reviewed",
+      "pdf": "implemented-tested-review-pending",
+      "databaseReselection": "in-progress",
       "release": "pending"
-    },
-    "p0": "implemented-reviewed",
-    "p1": "implemented-review-in-progress"
+    }
   }
 }

@@ -38,6 +38,19 @@ function createDrawing() {
 }
 
 describe('FileService', () => {
+  it('keeps list presence at the last scan, observing only an explicitly opened index in real time',async()=>{
+    const source=join(dataDir,'冰柜','SKU-MODEL','02.未转曲源文件');mkdirSync(source,{recursive:true});
+    const path=join(source,'file.pdf');writeFileSync(path,'%PDF-1.7\ncontent\n%%EOF');settings.setWorkspaceRoot(dataDir);
+    const service=new FileService(repository,settings);await service.scan();const indexed=service.search({presence:'all'}).items[0];
+    unlinkSync(path);const list=service.search({presence:'all'}).items[0];
+    expect(list).toMatchObject({id:indexed.id,isPresent:true,presenceStatus:'present',presenceMessage:'上次扫描：存在'});
+    const before=db.prepare('select * from pdf_files').all();
+    expect(service.presence(indexed.id)).toMatchObject({id:indexed.id,scanIsPresent:true,scannedAt:indexed.scannedAt,status:'missing'});
+    expect(db.prepare('select * from pdf_files').all()).toEqual(before);
+    writeFileSync(path,'%PDF-1.7\ncontent\n%%EOF');
+    expect(service.presence(indexed.id)).toMatchObject({status:'present',scanIsPresent:true});
+    expect(service.presence(99999)).toBeNull();
+  });
   it('reports recursive scan progress and cancellation leaves the previous index unchanged', async () => {
     let release!: () => void;
     const scanner = async (_root: string, options?: { signal?: AbortSignal; onProgress?(processed: number, total: number | null, path: string): void }) => {

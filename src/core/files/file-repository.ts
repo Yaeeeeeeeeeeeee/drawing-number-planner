@@ -110,10 +110,10 @@ export class FileRepository {
   private readonly history: FileScanHistoryRepository;
   constructor(private readonly db: PlannerDatabase) { this.batches = new MaterialBatchRepository(db); this.history = new FileScanHistoryRepository(db); }
 
-  getIndexedFile(id: number): { relativePath: string; isPresent: boolean } | null {
-    const row = this.db.prepare('select relative_path as relativePath, is_present as isPresent from pdf_files where id = ?')
-      .get(id) as { relativePath: string; isPresent: number } | undefined;
-    return row ? { relativePath: row.relativePath, isPresent: row.isPresent === 1 } : null;
+  getIndexedFile(id: number): { relativePath: string; isPresent: boolean; scannedAt:string } | null {
+    const row = this.db.prepare('select relative_path as relativePath, is_present as isPresent, scanned_at as scannedAt from pdf_files where id = ?')
+      .get(id) as { relativePath: string; isPresent: number; scannedAt:string } | undefined;
+    return row ? { relativePath: row.relativePath, isPresent: row.isPresent === 1,scannedAt:row.scannedAt } : null;
   }
 
   listDrawingCodes(): DrawingCodeReference[] {

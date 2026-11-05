@@ -69,7 +69,7 @@ describe('IndexedPdfResolver', () => {
   });
 
   it('rejects unsafe stored paths and a junction whose real target escapes the workspace', () => {
-    const corruptRowResolver = new IndexedPdfResolver({ getIndexedFile: () => ({ relativePath: '..\\outside.pdf', isPresent: true }) }, settings);
+    const corruptRowResolver = new IndexedPdfResolver({ getIndexedFile: () => ({ relativePath: '..\\outside.pdf', isPresent: true,scannedAt:'2026-11-05T00:00:00Z' }) }, settings);
     expect(() => corruptRowResolver.resolve(1)).toThrowError(expect.objectContaining({ code: 'PATH_OUTSIDE_WORKSPACE' }));
 
     const outside = join(root, 'outside'); mkdirSync(outside); writeFileSync(join(outside, 'escape.pdf'), '%PDF');

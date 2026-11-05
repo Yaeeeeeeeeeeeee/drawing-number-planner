@@ -105,13 +105,9 @@ export class PackagingMonitor {
     }
    }catch(error){this.error=message(error);}
   }
-  this.known=new Map([...claims].filter(([key,claim])=>{
-   if(claim.owners.size!==1)return false;
-   // An existing sibling00 or durable unfinished task explicitly opts the product into this workflow.
-   if(allTasks.some(task=>!task.endedAt&&task.state!=='completed'&&task.productId===claim.directory.productId&&toWorkspacePathKey(task.productDirectory)===key))return true;
-   try{const stats=lstatSync(this.service.workspace.path(`${claim.directory.relativePath}/00.临时文件`));return stats.isDirectory()&&!stats.isSymbolicLink();}
-   catch{return false;}
-  }).map(([key,claim])=>[key,claim.directory]));
+  // All active products participate in formal02/03 watching. Temporary00 and
+  // unfinished tasks only decide discovery work; neither grants scan membership.
+  this.known=new Map([...claims].filter(([,claim])=>claim.owners.size===1).map(([key,claim])=>[key,claim.directory]));
   if([...claims.values()].some(claim=>claim.owners.size>1))this.error='部分产品共用同一资料目录，已暂停该目录的自动扫描';
   this.tasks=new Map(allTasks.filter(task=>!task.endedAt&&task.state==='active').filter(task=>{
    try{return this.known.get(toWorkspacePathKey(task.productDirectory))?.productId===task.productId;}catch{return false;}

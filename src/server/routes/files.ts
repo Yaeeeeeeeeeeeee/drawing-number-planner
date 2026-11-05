@@ -142,6 +142,13 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService, t
     catch (error) { return sendFileError(reply, error); }
   });
 
+  app.get('/api/files/:id/presence',async(request,reply)=>{
+    const params=scanIdSchema.safeParse(request.params);
+    if(!params.success)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'PDF索引编号无效'}});
+    try{return service.presence(params.data.id)??reply.code(404).send({error:{code:'FILE_NOT_FOUND',message:'PDF索引不存在'}});}
+    catch(error){return sendFileError(reply,error);}
+  });
+
   app.get('/api/files', async (request, reply) => {
     const query = fileListSchema.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 文件筛选条件无效' } });

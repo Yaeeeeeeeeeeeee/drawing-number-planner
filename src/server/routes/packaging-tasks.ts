@@ -20,6 +20,17 @@ export function registerPackagingTaskRoutes(app:FastifyInstance,service:Packagin
  app.get('/api/packaging/product-directories',execute(request=>{const {productId}=parsed(z.object({productId:z.coerce.number().int().positive()}).strict(),request.query);return{items:service.workspace.productDirectories(productId)};}));
  app.post('/api/packaging/create-temporary-directories',execute(request=>{const{productIds}=parsed(z.object({productIds:z.array(numberId).min(1).max(1000)}).strict(),request.body);return service.workspace.createTemporaryDirectories(productIds);}));
  app.post('/api/packaging/scan-product',execute(async request=>{const{productId}=parsed(z.object({productId:numberId}).strict(),request.body);const directories=service.workspace.productDirectories(productId).map(directory=>service.workspace.resolveProductDirectory(productId,directory.relativePath).relativePath);return service.options.files.scanProducts(directories);}));
+ app.post('/api/packaging/scan-category',execute(async request=>{
+  const{category}=parsed(z.object({category:z.string().trim().min(1).max(500)}).strict(),request.body);
+  const products=service.db.prepare(`select product.id from products product
+   left join product_identity_members identity on identity.raw_product_id=product.id
+   where product.product_category=? and product.status='active' and product.deleted_at is null
+    and coalesce(identity.canonical_product_id,product.id)=product.id order by product.id`).all(category) as {id:number}[];
+  if(!products.length)throw Object.assign(new Error('当前类别没有可扫描的启用产品'),{code:'PACKAGING_CATEGORY_EMPTY'});
+  const directories=[...new Set(products.flatMap(product=>service.workspace.productDirectories(product.id)
+   .map(directory=>service.workspace.resolveProductDirectory(product.id,directory.relativePath).relativePath)))];
+  return service.options.files.scanProducts(directories);
+ }));
  app.get('/api/packaging/tasks',execute(request=>{const {productId}=parsed(z.object({productId:z.coerce.number().int().positive().optional()}).strict(),request.query);return{items:service.listTasks(productId)};}));
  app.post('/api/packaging/tasks',execute((request,reply)=>service.createTask(parsed(create,request.body)).then(task=>reply.code(201).send(task))));
  app.get('/api/packaging/tasks/:id',execute(request=>service.getTask(parsed(params,request.params).id)));

@@ -23,28 +23,28 @@
 ## Tasks
 
 ### Task 1: P0 lifecycle and G-03
-- [ ] RED: packaging-task-service真实库覆盖等待索引/已删图号/强制脱钩/中断/停止失败/并发；renderer同弹窗过期重查。
-- [ ] GREEN: 独立终止预检和确认，事务留痕；操作安全边界、后台发现保护；不清理文件、不依赖重关联。
-- [ ] Verify: npm test -- tests/core/packaging-task-service.test.ts tests/core/packaging/packaging-monitor.test.ts tests/server/packaging/packaging-workflow.test.ts tests/renderer/drawing-tasks-page.test.tsx
-- [ ] Commit and ledger.
+- [x] RED: packaging-task-service真实库覆盖等待索引/已删图号/强制脱钩/中断/停止失败/并发；renderer同弹窗过期重查。
+- [x] GREEN: 独立终止预检和确认，事务留痕；操作安全边界、后台发现保护；不清理文件、不依赖重关联。
+- [x] Verify: npm test -- tests/core/packaging-task-service.test.ts tests/core/packaging/packaging-monitor.test.ts tests/server/packaging/packaging-workflow.test.ts tests/renderer/drawing-tasks-page.test.tsx
+- [x] Commit and ledger.
 
 ### Task 2: Planning domain and drafts
-- [ ] RED: 多产品/逐项错误/同码冲突/真实白色共用/过期资料/重复提交；独立草稿原子保存恢复及自动备份。
-- [ ] GREEN: 保原接口，增批量检查确认和草稿接口；沿用编号规则、真实归属事务，不建批次档案。
-- [ ] Verify: npm test -- tests/core/planning-service.test.ts tests/core/planning-reservation.test.ts tests/core/planning-batch.test.ts tests/core/planning-draft-store.test.ts tests/server/planning-api.test.ts tests/core/daily-backup.test.ts
-- [ ] Commit and ledger.
+- [x] RED: 多产品/逐项错误/同码冲突/真实白色共用/过期资料/重复提交；独立草稿原子保存恢复及自动备份。
+- [x] GREEN: 保原接口，增批量检查确认和草稿接口；沿用编号规则、真实归属事务，不建批次档案。
+- [x] Verify: npm test -- tests/core/planning-service.test.ts tests/core/planning-reservation.test.ts tests/core/planning-batch.test.ts tests/core/planning-draft-store.test.ts tests/server/planning-api.test.ts tests/core/daily-backup.test.ts
+- [x] Commit and ledger.
 
 ### Task 3: Planning workspace UI
-- [ ] RED: 双模式独立恢复、型号项目切换、四步确认、分组错误/单项重查、结果精确定位、宽度适配。
-- [ ] GREEN: 复用现有产品/字典/图号入口及分隔组件；增工作台状态和检查/结果组件。
-- [ ] Verify: npm test -- tests/renderer/planning-page.test.tsx tests/renderer/planning-workspace.test.tsx
-- [ ] Commit and ledger.
+- [x] RED: 双模式独立恢复、型号项目切换、四步确认、分组错误/单项重查、结果精确定位、宽度适配。
+- [x] GREEN: 复用现有产品/字典/图号入口及分隔组件；增工作台状态和检查/结果组件。
+- [x] Verify: npm test -- tests/renderer/planning-page.test.tsx tests/renderer/planning-workspace.test.tsx
+- [x] Commit and ledger.
 
 ### Task 4: G-02/G-05 feedback
-- [ ] RED: 返回历史刷新、乱序响应、dirty编辑保留、五类资源加载/空/筛选空/部分失败/重试。
-- [ ] GREEN: active传递与请求序列、局部反馈，保旧数据，隐藏页停不必要轮询。
-- [ ] Verify: npm test -- tests/renderer/packaging-page-freshness.test.tsx tests/renderer/packaging-catalog-ui.test.tsx tests/renderer/drawing-tasks-page.test.tsx tests/renderer/files-page.test.tsx tests/renderer/qr-codes-page.test.tsx
-- [ ] Commit and ledger.
+- [x] RED: 返回历史刷新、乱序响应、dirty编辑保留、五类资源加载/空/筛选空/部分失败/重试。
+- [x] GREEN: active传递与请求序列、局部反馈，保旧数据，隐藏页停不必要轮询。
+- [x] Verify: npm test -- tests/renderer/packaging-page-freshness.test.tsx tests/renderer/packaging-catalog-ui.test.tsx tests/renderer/drawing-tasks-page.test.tsx tests/renderer/files-page.test.tsx tests/renderer/qr-codes-page.test.tsx
+- [x] Commit and ledger.
 
 ### Task 5: PDF monitoring/category/presence/batches
 - [ ] RED: 无00启用产品监听、精确类别、列表快照/详情实时、501+分批与失败重试。

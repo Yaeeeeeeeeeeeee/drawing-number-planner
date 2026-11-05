@@ -53,11 +53,17 @@ export class FileService {
 
   search(filters: FileSearchFilters = {}): FileSearchResult {
     const result = this.repository.search(filters);
-    const root = this.settings.get().workspaceRoot;
-    return {...result,items:result.items.map(file=>{
-      const fact = inspectIndexedPdfPresence(root,file);
-      return {...file,presenceStatus:fact.status,presenceMessage:fact.message};
-    })};
+    // Lists are scan snapshots. Opening one record explicitly observes disk;
+    // routine filtering must not stat every indexed path or rewrite presence.
+    return {...result,items:result.items.map(file=>({...file,
+      presenceStatus:file.isPresent?'present' as const:'missing' as const,
+      presenceMessage:file.isPresent?'上次扫描：存在':'上次扫描：缺失'}))};
+  }
+
+  presence(id:number) {
+    const file=this.repository.getIndexedFile(id);if(!file)return null;
+    return {id,scannedAt:file.scannedAt,scanIsPresent:file.isPresent,checkedAt:new Date().toISOString(),
+      ...inspectIndexedPdfPresence(this.settings.get().workspaceRoot,file)};
   }
 
   navigation(filters: FileNavigationFilters = {}): FileNavigationResult { return this.repository.navigation(filters); }

@@ -63,10 +63,14 @@ it('close drains in-flight discovery and stops every later read before database 
  const reads=f.listCount(),scans=f.scans.length;f.db.close();await new Promise(resolve=>setTimeout(resolve,70));expect(f.listCount()).toBe(reads);expect(f.scans).toHaveLength(scans);
 });
 
-it('leaves untouched legacy products unscanned until sibling00 explicitly opts them in',async()=>{
- const f=registered();rmSync(join(f.root,'category','ONE-MODEL','00.临时文件'),{recursive:true});rmSync(join(f.root,'category','TWO-MODEL','00.临时文件'),{recursive:true});pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/legacy.pdf');
- monitor(f,{intervalMs:10000,debounceMs:10}).start();await new Promise(resolve=>setTimeout(resolve,80));expect(f.scans).toHaveLength(0);
- mkdirSync(join(f.root,'category','ONE-MODEL','00.临时文件'));await expect.poll(()=>f.db.prepare("select count(*) as count from pdf_files where file_name='legacy.pdf'").get(),{timeout:3000}).toEqual({count:1});
+it('watches every active product 02 and03 without00 or unfinished tasks, excluding inactive products',async()=>{
+ const f=registered();for(const name of ['ONE-MODEL','TWO-MODEL'])rmSync(join(f.root,'category',name,'00.临时文件'),{recursive:true});
+ const source=pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/source.pdf');pdf(f.root,'category/ONE-MODEL/03.量产后的变更文件（已量产的产品看最新日期）/00.首批大货/outlined（转曲）.pdf');
+ pdf(f.root,'category/TWO-MODEL/02.未转曲源文件/inactive.pdf');f.db.prepare("update products set status='inactive' where id=?").run(f.second);
+ monitor(f,{intervalMs:10000,debounceMs:10}).start();
+ await expect.poll(()=>f.db.prepare('select count(*) n from pdf_files').get(),{timeout:3000}).toEqual({n:2});
+ expect(f.scans.flat()).toEqual(['category/ONE-MODEL']);expect(f.tasks).toHaveLength(0);expect(readFileSync(source,'utf8')).toContain('%%EOF');
+ pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/new.pdf');await expect.poll(()=>f.db.prepare("select count(*) n from pdf_files where file_name='new.pdf'").get(),{timeout:3000}).toEqual({n:1});
 });
 it('discovers files retained without a task once an active task appears during catchup',async()=>{
  const f=registered();const manual=pdf(f.root,'category/ONE-MODEL/00.临时文件/retain.pdf');monitor(f,{intervalMs:40,debounceMs:5}).start();await new Promise(resolve=>setTimeout(resolve,70));expect(f.discovered).toHaveLength(0);expect(readFileSync(manual,'utf8')).toContain('%%EOF');
@@ -78,7 +82,7 @@ it('skips queued formal events already covered by an archive or manual product s
  await new Promise(resolve=>setTimeout(resolve,200));expect(f.scans).toHaveLength(0);expect(real.latestScan()?.id).toBe(archiveScan?.id);
 });
 it('preserves the original busy-event time so a later archive scan satisfies its retry',async()=>{
- const f=registered();rmSync(join(f.root,'category','TWO-MODEL','00.临时文件'),{recursive:true});pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/a.pdf');
+ const f=registered();f.db.prepare("update products set status='inactive' where id=?").run(f.second);pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/a.pdf');
  let busy=true;const real=new FileService(new FileRepository(f.db),f.settings);f.setScan(async(paths)=>{if(busy)throw Object.assign(new Error('busy'),{code:'SCAN_IN_PROGRESS'});return real.scanProducts(paths);});
  monitor(f,{intervalMs:100,debounceMs:5}).start();await expect.poll(()=>f.scans.length,{interval:5}).toBe(1);busy=false;await real.scanProducts(['category/ONE-MODEL']);
  await new Promise(resolve=>setTimeout(resolve,110));expect(f.scans).toHaveLength(1);

@@ -19,6 +19,12 @@ beforeEach(() => {
 });
 afterEach(()=>{ db.close(); rmSync(dir,{recursive:true,force:true}); });
 function apply(ids:number[], action:'clear'|'ignore'|'restore') {const p=service.previewManagement({ids,action});return service.applyManagement(p);}
+it('independent batch previews survive other selected-path decisions while the same-path token still expires',async()=>{
+ writeFileSync(fixturePdfPath(dir,'a.pdf'),'%PDF A');writeFileSync(fixturePdfPath(dir,'b.pdf'),'%PDF B');await service.scan();const ids=service.search().items.map(file=>file.id);
+ const first=service.previewManagement({ids:[ids[0]],action:'ignore'}),second=service.previewManagement({ids:[ids[1]],action:'ignore'});
+ expect(service.applyManagement(first).changed).toBe(1);expect(()=>service.applyManagement(first)).toThrow('重新预览');
+ expect(service.applyManagement(second).changed).toBe(1);expect(service.search({managementState:'ignored'}).total).toBe(2);
+});
 it('keeps same-name and same-content copies independent, survives clear/rescan, and marks changed ignored content for review',async()=>{
  mkdirSync(join(dir,'a'));mkdirSync(join(dir,'b'));writeFileSync(fixturePdfPath(dir,'a','same.pdf'),'%PDF copy');writeFileSync(fixturePdfPath(dir,'b','same.pdf'),'%PDF copy');
  await service.scan();const files=service.search().items;const a=files.find(f=>f.relativePath.includes('a/same.pdf'))!;
