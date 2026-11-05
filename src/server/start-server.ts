@@ -42,6 +42,7 @@ import { registerOutboundPackageRoutes } from './routes/outbound-packages.js';
 import { registerProductRoutes } from './routes/products.js';
 import { ProductCleanupService } from '../core/products/product-cleanup-service.js';
 import { registerPlanningRoutes } from './routes/planning.js';
+import {PlanningDraftStore} from '../core/planning/planning-draft-store.js';
 import { registerQrCodeRoutes } from './routes/qr-codes.js';
 import { TaskRegistry } from '../core/tasks/task-registry.js';
 import { registerTaskRoutes } from './routes/tasks.js';
@@ -143,7 +144,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       workspaceRoot: () => workspaceSettings.get().workspaceRoot,
       outputRoot: () => workspaceSettings.getOutboundOutputRoot() ?? paths.exports,
     }), tasks);
-    registerPlanningRoutes(server, new PlanningService(database));
+    registerPlanningRoutes(server, new PlanningService(database),new PlanningDraftStore(join(paths.baseDir,'planning-drafts.json')));
     registerBomRoutes(server, new BomService(database, () => workspaceSettings.get().workspaceRoot));
     await registerImportRoutes(server, database, () => {
       createDatabaseBackup(database, paths.database, paths.backups, 'import');

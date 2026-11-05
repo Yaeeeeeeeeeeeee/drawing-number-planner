@@ -1,191 +1,127 @@
-import { CircleCheck } from 'lucide-react';
-import { CopyButton } from '../components/CopyButton';
+import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
+import type {BatchPlanningCheck,BatchPlanningPreview,BatchPlanningResult,BatchReservePlanningInput,PlanningDraftInput,PlanningDraftMode,WhiteDrawingBase} from '../../core/planning/planning-types';
+import {parseDrawingCode} from '../../core/drawings/drawing-code';
+import type {DictionaryItemView,PlannerApi,ProductView} from '../data/client';
+import {PageHeader} from '../components/PageHeader';
+import {PanelResizeHandle} from '../components/PanelResizeHandle';
+import type {PackagingNavigationTarget} from './packaging/PackagingTaskPanel';
+import {isPlanningMock,PlanningMockPage} from './planning-mock';
+import {usePlanningDrafts} from './planning/usePlanningDrafts';
+import {batchInput,newPlanningProject,planningRowKey,type DraftProject} from './planning/planning-workspace-state';
+import {PlanningProducts,PlanningProjects} from './planning/PlanningProductInputs';
+import {PlanningChecks} from './planning/PlanningChecks';
+import {PlanningResults} from './planning/PlanningResults';
 import './planning-workspace.css';
-import type { PackagingNavigationTarget } from './packaging/PackagingTaskPanel';
-import { PageHeader } from '../components/PageHeader';
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-import type { DictionaryItemView, PlannerApi, PlanningPreviewView, PlanningRowInputView, ProductView, ReservedDrawingView } from '../data/client';
-import { isPlanningMock, PlanningMockPage } from './planning-mock';
-
-interface DraftRow { clientId: string; colorId: string; mainCategoryId: string; projectItemId: string; notes: string }
-interface ApprovedInput { productId: number; appearanceId: number; rows: PlanningRowInputView[] }
-const blankRow = (id: number): DraftRow => ({ clientId: `row-${id}`, colorId: '', mainCategoryId: '', projectItemId: '', notes: '' });
 
 export interface PlanningDrawingTarget {productId:number;appearanceVersionId?:number;drawingIds?:number[];fullCodes?:string[];initialDrawingId?:number}
-export function PlanningPage({ api,active=true,onOpenDrawingLibrary,onGenerateFiles }: { api: PlannerApi;active?:boolean;onOpenDrawingLibrary?(target:PlanningDrawingTarget):void;onGenerateFiles?(target:PackagingNavigationTarget):void }) {
-  return isPlanningMock() ? <PlanningMockPage/> : <PlanningWorkspace api={api} active={active} onOpenDrawingLibrary={onOpenDrawingLibrary} onGenerateFiles={onGenerateFiles}/>;
-}
-function PlanningWorkspace({ api,active=true,onOpenDrawingLibrary,onGenerateFiles }: { api: PlannerApi;active?:boolean;onOpenDrawingLibrary?(target:PlanningDrawingTarget):void;onGenerateFiles?(target:PackagingNavigationTarget):void }) {
-  const [products, setProducts] = useState<ProductView[]>([]);
-  const [appearances, setAppearances] = useState<DictionaryItemView[]>([]);
-  const [colors, setColors] = useState<DictionaryItemView[]>([]);
-  const [mains, setMains] = useState<DictionaryItemView[]>([]);
-  const [projects, setProjects] = useState<DictionaryItemView[]>([]);
-  const [brands, setBrands] = useState<DictionaryItemView[]>([]);
-  const [sizes, setSizes] = useState<DictionaryItemView[]>([]);
-  const [productId, setProductId] = useState('');
-  const [productCategory,setProductCategory]=useState('');
-  const [appearanceId, setAppearanceId] = useState('');
-  const [rows, setRows] = useState<DraftRow[]>([blankRow(1)]);
-  const [preview, setPreview] = useState<PlanningPreviewView | null>(null);
-  const [approvedInput, setApprovedInput] = useState<ApprovedInput | null>(null);
-  const [reservedContext,setReservedContext]=useState<PlanningDrawingTarget|null>(null);
-  const [reserved, setReserved] = useState<ReservedDrawingView[]>([]);
-  const [reservedDescriptions,setReservedDescriptions]=useState<Record<number,string>>({});
-  const [error, setError] = useState('');
-  const [needsRefresh, setNeedsRefresh] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const nextRow = useRef(2);
-  const draftVersion = useRef(0);
+interface PlanningPageProps {api:PlannerApi;active?:boolean;onOpenDrawingLibrary?(target:PlanningDrawingTarget):void;onGenerateFiles?(target:PackagingNavigationTarget):void}
+interface References {products:ProductView[];appearance:DictionaryItemView[];color:DictionaryItemView[];main_category:DictionaryItemView[];project_item:DictionaryItemView[];brand:DictionaryItemView[];product_size:DictionaryItemView[]}
+const emptyReferences:References={products:[],appearance:[],color:[],main_category:[],project_item:[],brand:[],product_size:[]};
+const steps=['产品资料','选择项目','图号检查','确认占号'];
+const errorText=(reason:unknown)=>reason instanceof Error?reason.message:'操作失败，请重试';
+const rowSignature=(group:PlanningDraftInput['groups'][number],row:DraftProject)=>JSON.stringify({productId:group.productId,appearanceId:group.appearanceId,appearanceVersionId:group.appearanceVersionId,row});
 
-  useEffect(() => {
-    if(!active)return;
-    let current=true;
-    void Promise.all([
-    api.listProducts({ status: 'active' }), api.listDictionaries('appearance', false),
-    api.listDictionaries('color', false), api.listDictionaries('main_category', false),
-    api.listDictionaries('project_item', false),
-  ]).then(([productItems, appearanceItems, colorItems, mainItems, projectItems]) => {
-    if(!current)return;
-    setProducts(productItems); setAppearances(appearanceItems); setColors(colorItems);
-    setMains(mainItems); setProjects(projectItems);
-  }).catch((reason) => {if(current)setError(reason instanceof Error ? reason.message : '基础资料加载失败');});
-    return()=>{current=false;};
-  }, [api,active]);
-
-  // Optional display metadata cannot prevent the original five-query planning workflow.
+export function PlanningPage(props:PlanningPageProps) {return isPlanningMock()?<PlanningMockPage/>:<PlanningWorkspace {...props}/>;}
+function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles}:PlanningPageProps) {
+  const [mode,setMode]=useState<PlanningDraftMode>('new'),[references,setReferences]=useState<References>(emptyReferences);
+  const [loading,setLoading]=useState(true),[lookupErrors,setLookupErrors]=useState<string[]>([]),[loaded,setLoaded]=useState(false);
+  const saved=usePlanningDrafts(api,mode),draft=saved.draft;
+  const [checks,setChecks]=useState<BatchPlanningPreview|null>(null),[focused,setFocused]=useState('');
+  const [results,setResults]=useState<Partial<Record<PlanningDraftMode,BatchPlanningResult>>>({}),[showResults,setShowResults]=useState(false);
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirmed,setConfirmed]=useState(false);
+  const [whiteBases,setWhiteBases]=useState<Record<string,WhiteDrawingBase[]>>({}),[whiteErrors,setWhiteErrors]=useState<Record<string,string>>({});
+  const [preferredWidth,setPreferredWidth]=useState(360),[width,setWidth]=useState(1200);
+  const root=useRef<HTMLDivElement>(null),lookupsRequest=useRef(0),checkRequest=useRef(0),epoch=useRef(0),busyRef=useRef(false);
+  const checkedInputs=useRef(new Map<string,string>()),lookupSignature=useRef('');
+  const currentMode=useRef(mode);currentMode.current=mode;
+  const load=async()=>{
+    const request=++lookupsRequest.current;if(!loaded)setLoading(true);
+    const names=['products','appearance','color','main_category','project_item','brand','product_size'] as const;
+    const resources=await Promise.allSettled(names.map(name=>name==='products'?api.listProducts({status:'all'}):api.listDictionaries(name,false)));
+    if(request!==lookupsRequest.current)return;
+    const errors:string[]=[];const changes:Partial<References>={};
+    resources.forEach((result,index)=>{const name=names[index];if(result.status==='fulfilled')Object.assign(changes,{[name]:result.value});else errors.push(`${{products:'产品',appearance:'外观',color:'颜色',main_category:'主类别',project_item:'项目明细',brand:'品牌',product_size:'品类尺寸'}[name]}：${errorText(result.reason)}`);});
+    const signature=JSON.stringify(resources.map(result=>result.status==='fulfilled'?result.value:null));
+    if(lookupSignature.current&&signature!==lookupSignature.current){checkedInputs.current.clear();setConfirmed(false);epoch.current++;}
+    lookupSignature.current=signature;setReferences(current=>({...current,...changes}));setLookupErrors(errors);setLoaded(true);setLoading(false);
+  };
+  useEffect(()=>{if(active)void load();else{checkRequest.current++;busyRef.current=false;setBusy(false);}return()=>{lookupsRequest.current++;checkRequest.current++;};},[api,active]);
+  useEffect(()=>{setChecks(null);checkedInputs.current.clear();setConfirmed(false);setError('');setShowResults(false);checkRequest.current++;epoch.current++;},[mode]);
   useEffect(()=>{
-    if(!active)return;
-    let current=true;
-    void api.listDictionaries('brand',false).then(items=>{if(current)setBrands(items??[]);}).catch(()=>{if(current)setBrands([]);});
-    void api.listDictionaries('product_size',false).then(items=>{if(current)setSizes(items??[]);}).catch(()=>{if(current)setSizes([]);});
-    return ()=>{current=false;};
-  },[api,active]);
-
-  const invalidate = () => {
-    draftVersion.current += 1;
-    setPreview(null); setApprovedInput(null); setReserved([]); setReservedContext(null); setReservedDescriptions({}); setNeedsRefresh(false); setError('');
+    const element=root.current;if(!element)return;const measure=()=>{const next=element.clientWidth;if(next>0)setWidth(current=>current===next?current:next);};measure();
+    const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(measure);observer?.observe(element);window.addEventListener('resize',measure);return()=>{observer?.disconnect();window.removeEventListener('resize',measure);};
+  },[]);
+  const update=(next:PlanningDraftInput)=>{epoch.current++;setConfirmed(false);setError('');saved.update(next);};
+  const selectedGroup=draft.groups.find(group=>group.productId===draft.activeProductId)??draft.groups[0];
+  const effective=useMemo<BatchPlanningPreview>(()=>{
+    const groups=draft.groups.map(group=>({productId:group.productId,model:references.products.find(product=>product.id===group.productId)?.model??`产品 ${group.productId}`,rows:group.rows.map<BatchPlanningCheck>(row=>{
+      const key=planningRowKey(group.productId,row.clientId),previous=checks?.groups.find(item=>item.productId===group.productId)?.rows.find(item=>item.clientId===row.clientId);
+      if(previous&&checkedInputs.current.get(key)===rowSignature(group,row))return {...previous};
+      return {clientId:row.clientId,productId:group.productId,colorId:row.colorId??0,mainCategoryId:row.mainCategoryId??0,projectItemId:row.projectItemId??0,available:false,error:{code:'CHECK_REQUIRED',message:previous?'本项目有修改，请重新检查':'尚未检查'}};
+    })}));
+    const byCode=new Map<string,BatchPlanningCheck[]>();for(const group of groups)for(const row of group.rows)if(row.available&&row.fullCode)byCode.set(row.fullCode,[...(byCode.get(row.fullCode)??[]),row]);
+    for(const rows of byCode.values())if(rows.length>1){const first=rows[0],sameShared=rows.every(row=>row.productId===first.productId&&row.projectItemId===first.projectItemId&&row.shared&&first.shared&&row.shared.id===first.shared.id&&row.shared.origin===first.shared.origin);if(!sameShared)for(const row of rows){row.available=false;row.error={code:'BATCH_CODE_CONFLICT',message:'不同型号或项目产生相同完整图号，请核对编码资料'};}}
+    return {groups};
+  },[draft,checks,references]);
+  const rows=effective.groups.flatMap(group=>group.rows),eligible=rows.filter(row=>row.available&&row.fullCode&&row.fingerprint);
+  const check=async(only?:BatchPlanningCheck)=>{
+    if(busyRef.current||!draft.groups.length)return;busyRef.current=true;setBusy(true);setError('');setConfirmed(false);
+    const request=++checkRequest.current,captured=epoch.current,capturedMode=mode,input=batchInput(draft);
+    const narrowed=only?{groups:input.groups.filter(group=>group.productId===only.productId).map(group=>({...group,rows:group.rows.filter(row=>row.clientId===only.clientId)}))}:input;
+    try{
+      const next=await api.previewBatchPlan(narrowed);if(request!==checkRequest.current||captured!==epoch.current||capturedMode!==currentMode.current)return;
+      for(const group of draft.groups)for(const row of group.rows)if(!only||group.productId===only.productId&&row.clientId===only.clientId)checkedInputs.current.set(planningRowKey(group.productId,row.clientId),rowSignature(group,row));
+      setChecks(current=>only&&current?{groups:effective.groups.map(group=>({...group,rows:group.rows.map(row=>group.productId===only.productId&&row.clientId===only.clientId?next.groups.find(item=>item.productId===group.productId)?.rows.find(item=>item.clientId===row.clientId)??row:row)}))}:next);
+      const first=next.groups.flatMap(group=>group.rows)[0];if(first)setFocused(planningRowKey(first.productId,first.clientId));
+    }catch(reason){if(request===checkRequest.current)setError(errorText(reason));}finally{if(request===checkRequest.current){busyRef.current=false;setBusy(false);}}
   };
-  const selectProduct = (value: string) => {
-    setProductId(value); const product = products.find((item) => item.id === Number(value));
-    setAppearanceId(product?.defaultAppearanceId ? String(product.defaultAppearanceId) : ''); invalidate();
+  const nextStep=()=>{
+    if(draft.step===1){update({...draft,step:2,activeProductId:selectedGroup?.productId});return;}
+    if(draft.step===2){update({...draft,step:3});void check();return;}
+    if(draft.step===3)update({...draft,step:4});
   };
-  const updateRow = (clientId: string, field: keyof Omit<DraftRow, 'clientId'>, value: string) => {
-    setRows((current) => current.map((row) => row.clientId === clientId
-      ? { ...row, [field]: value, ...(field === 'mainCategoryId' ? { projectItemId: '' } : {}) } : row));
-    invalidate();
+  const reserve=async()=>{
+    if(!confirmed||!eligible.length||busyRef.current)return;busyRef.current=true;setBusy(true);setError('');
+    const accepted=new Map(eligible.map(row=>[planningRowKey(row.productId,row.clientId),row]));
+    const input:BatchReservePlanningInput={confirmed:true,groups:batchInput(draft).groups.map(group=>({...group,rows:group.rows.filter(row=>accepted.has(planningRowKey(group.productId,row.clientId))).map(row=>({...row,expectedFullCode:accepted.get(planningRowKey(group.productId,row.clientId))!.fullCode!,fingerprint:accepted.get(planningRowKey(group.productId,row.clientId))!.fingerprint!}))})).filter(group=>group.rows.length)};
+    try{
+      const result=await api.reserveBatchPlan(input);const combined=new Map((results[mode]?.results??[]).map(row=>[planningRowKey(row.productId,row.clientId),row]));
+      for(const row of rows.filter(row=>!row.available))combined.set(planningRowKey(row.productId,row.clientId),{productId:row.productId,clientId:row.clientId,outcome:'failed',error:row.error});
+      for(const row of result.results)combined.set(planningRowKey(row.productId,row.clientId),row);
+      setResults(current=>({...current,[mode]:{results:[...combined.values()]}}));setShowResults(true);setConfirmed(false);
+      const succeeded=new Set(result.results.filter(row=>row.outcome!=='failed').map(row=>planningRowKey(row.productId,row.clientId)));
+      const groups=draft.groups.map(group=>{const remaining=group.rows.filter(row=>!succeeded.has(planningRowKey(group.productId,row.clientId)));return {...group,rows:remaining.length?remaining:[newPlanningProject()]};});
+      saved.update({...draft,step:result.results.some(row=>row.outcome==='failed')?3:1,groups});setChecks(null);checkedInputs.current.clear();
+    }catch(reason){setError(errorText(reason));setConfirmed(false);checkedInputs.current.clear();saved.update({...draft,step:3});}finally{busyRef.current=false;setBusy(false);}
   };
-  const complete = useMemo(() => Boolean(productId && appearanceId && rows.length
-    && rows.every((row) => row.colorId && row.mainCategoryId && row.projectItemId)), [productId, appearanceId, rows]);
-  const planningRows = () => rows.map((row) => ({
-    clientId: row.clientId, colorId: Number(row.colorId), mainCategoryId: Number(row.mainCategoryId),
-    projectItemId: Number(row.projectItemId), ...(row.notes.trim() ? { notes: row.notes.trim() } : {}),
-  }));
-  const check = async () => {
-    if (!complete) return; setBusy(true); setError(''); setNeedsRefresh(false); setReserved([]);
-    const version = draftVersion.current;
-    const input: ApprovedInput = { productId: Number(productId), appearanceId: Number(appearanceId), rows: planningRows() };
-    try {
-      const result = await api.previewPlan(input);
-      if (version === draftVersion.current) { setPreview(result); setApprovedInput(input); }
-    }
-    catch (reason) {
-      if (version === draftVersion.current) setError(reason instanceof Error ? reason.message : '图号查重失败');
-    }
-    finally { setBusy(false); }
+  const white=async(row:DraftProject)=>{
+    if(!selectedGroup||!row.projectItemId)return;
+    const key=`${selectedGroup.productId}:${selectedGroup.appearanceId??0}:${row.projectItemId}`;
+    try{const result=await api.listPlanningWhiteBases({productId:selectedGroup.productId,appearanceId:selectedGroup.appearanceId,appearanceVersionId:selectedGroup.appearanceVersionId,projectItemId:row.projectItemId,mainCategoryId:row.mainCategoryId});setWhiteBases(current=>({...current,[key]:result.items}));setWhiteErrors(current=>({...current,[key]:result.items.length?'':'没有真实可用的白色基准，不能自动共用'}));}
+    catch(reason){setWhiteErrors(current=>({...current,[key]:errorText(reason)}));}
   };
-  const reserve = async () => {
-    if (!preview || !approvedInput) return;
-    const currentInput: ApprovedInput = {
-      productId: Number(productId), appearanceId: Number(appearanceId), rows: planningRows(),
-    };
-    if (JSON.stringify(currentInput) !== JSON.stringify(approvedInput)) {
-      setPreview(null); setApprovedInput(null); setNeedsRefresh(true); setError('规划条件已变化，请重新查重');
-      return;
-    }
-    const expectedByClientId = new Map(preview.rows.map((row) => [row.clientId, row.fullCode]));
-    if (approvedInput.rows.some((row) => !expectedByClientId.has(row.clientId))) {
-      setPreview(null); setApprovedInput(null); setNeedsRefresh(true); setError('占号预览与当前项目不一致，请重新查重');
-      return;
-    }
-    const reservationRows = approvedInput.rows.map((row) => {
-      const expectedFullCode = expectedByClientId.get(row.clientId)!;
-      return { ...row, expectedFullCode };
-    });
-    const product=products.find(item=>item.id===approvedInput.productId);
-    const descriptionsByFullCode=new Map(approvedInput.rows.map(row=>[expectedByClientId.get(row.clientId)!,[product?.brandName,product?.model,colors.find(item=>item.id===row.colorId)?.name,projects.find(item=>item.id===row.projectItemId)?.name].filter(Boolean).join(' · ')]));
-    setBusy(true); setError('');
-    try {
-      const items = await api.reservePlan({ ...approvedInput, rows: reservationRows });
-      setReservedDescriptions(Object.fromEntries(items.map(item=>[item.id,descriptionsByFullCode.get(item.fullCode)??item.displayName])));
-      setReserved(items);setReservedContext({productId:approvedInput.productId,drawingIds:items.map(item=>item.id),fullCodes:items.map(item=>item.fullCode),initialDrawingId:items[0]?.id}); setPreview(null); setApprovedInput(null); setRows([blankRow(nextRow.current++)]);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '批量占号失败'); setPreview(null); setApprovedInput(null); setNeedsRefresh(true);
-    } finally { setBusy(false); }
-  };
-
-  const copyDrawing=async(code:string)=>{
-    try { await navigator.clipboard.writeText(code); }
-    catch { setError('复制失败，请手动选择图号复制'); }
-  };
-  const selectedProduct = products.find(item => item.id === Number(productId));
-  return <section className="page-surface page-enter planning-page planning-real-page pm-plan approved-planning">
-    <PageHeader title="图号规划" description="选择产品与外观，核对项目及预计图号后确认占号。"></PageHeader>
-    <section className="planning-stage" aria-label="产品与外观"><h2><span>01</span> 产品与外观</h2>
-    <div className="pp-context">
-      <label><span>产品类别</span><select aria-label="产品类别" value={productCategory} disabled={busy} onChange={event=>{setProductCategory(event.target.value);if(productId&&products.find(item=>item.id===Number(productId))?.productCategory!==event.target.value)selectProduct('');}}><option value="">全部类别</option>{[...new Set(products.map(item=>item.productCategory))].sort().map(category=><option key={category} value={category}>{category}</option>)}</select></label>
-      <label><span>产品型号</span><select aria-label="产品型号" disabled={busy} value={productId} onChange={(event) => selectProduct(event.target.value)}><option value="">请选择</option>{products.filter(item=>!productCategory||item.productCategory===productCategory).map((item) => <option value={item.id} key={item.id}>{item.sku ?? 'SKU待补录'} · {item.model} · {item.brandName}</option>)}</select></label>
-      <label><span>外观</span><select aria-label="外观" disabled={busy} value={appearanceId} onChange={(event) => { setAppearanceId(event.target.value); invalidate(); }}><option value="">请选择</option>{appearances.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
-    </div>
-    <div className="pp-derived"><div className="pp-context-fact"><span>品牌</span><strong>{selectedProduct ? `${brands.find(item=>item.id===selectedProduct.brandId)?.code ? brands.find(item=>item.id===selectedProduct.brandId)?.code+' · ' : ''}${selectedProduct.brandName}` : '随产品确定'}</strong></div><div className="pp-context-fact"><span>品类尺寸</span><strong>{selectedProduct ? `${sizes.find(item=>item.id===selectedProduct.productSizeId)?.code ? sizes.find(item=>item.id===selectedProduct.productSizeId)?.code+' · ' : ''}${selectedProduct.productSizeName}` : '随产品确定'}</strong></div></div>
-    </section>
-    <section className="planning-stage planning-items" aria-label="规划项目"><h2><span>02</span> 规划项目</h2>
-    <div className="pp-toolbar"><strong>规划项目 · {rows.length} 行</strong><button type="button" disabled={busy} onClick={() => { setRows((current) => [...current, blankRow(nextRow.current++)]); invalidate(); }}>添加项目</button></div>
-    <div className="pp-rows">{rows.map((row, index) => <div className="pp-item" key={row.clientId}>
-      <span className="pp-row-no" aria-label={`项目 ${index + 1}`}>项目 {index + 1}</span>
-      <article className="pp-row"><div className="pp-fields">
-        <label><span>主类别</span><select aria-label={`第 ${index + 1} 行主类别`} disabled={busy} value={row.mainCategoryId} onChange={(event) => updateRow(row.clientId, 'mainCategoryId', event.target.value)}><option value="">请选择</option>{mains.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
-        <label><span>项目明细</span><select aria-label={`第 ${index + 1} 行项目明细`} disabled={busy || !row.mainCategoryId} value={row.projectItemId} onChange={(event) => updateRow(row.clientId, 'projectItemId', event.target.value)}><option value="">请选择</option>{projects.filter((item) => item.parentId === Number(row.mainCategoryId)).map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
-        <label><span>颜色</span><select aria-label={`第 ${index + 1} 行颜色`} disabled={busy} value={row.colorId} onChange={(event) => updateRow(row.clientId, 'colorId', event.target.value)}><option value="">请选择</option>{colors.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
-        <label><span>备注</span><input aria-label={`第 ${index + 1} 行备注`} disabled={busy} value={row.notes} onChange={(event) => updateRow(row.clientId, 'notes', event.target.value)} /></label>
-        <button aria-label={`删除项目 ${index + 1}`} type="button" disabled={busy || rows.length === 1} onClick={() => { setRows((current) => current.filter((item) => item.clientId !== row.clientId)); invalidate(); }}>移除</button>
+  const focus=rows.find(row=>planningRowKey(row.productId,row.clientId)===focused)??rows.find(row=>row.fullCode)??rows[0];
+  const parts=focus?.parts??(focus?.fullCode?parseDrawingCode(focus.fullCode):null);
+  const canProducts=draft.groups.length>0&&draft.groups.every(group=>group.appearanceId&&references.products.some(product=>product.id===group.productId&&product.status==='active'&&product.brandId&&product.productSizeId));
+  const ready=saved.ready&&loaded&&!loading;
+  return <section className="page-surface page-enter planning-page planning-workbench">
+    <PageHeader title="图号规划" description=""/>
+    <div className="planning-workbench-toolbar"><div role="group" aria-label="规划模式">{(['new','batch'] as const).map(value=><button type="button" key={value} aria-pressed={mode===value} disabled={busy} onClick={()=>setMode(value)}>{value==='new'?'新建图号':'批量规划'}</button>)}</div><div className="row-actions">{results[mode]&&<button type="button" onClick={()=>setShowResults(true)}>查看本次结果</button>}<button type="button" disabled={!saved.ready||busy} onClick={()=>void saved.remove().then(()=>{setChecks(null);checkedInputs.current.clear();setConfirmed(false);}).catch(()=>{})}>删除当前草稿</button></div></div>
+    {loading&&<p role="status">正在加载规划资料…</p>}{lookupErrors.length>0&&<div role="alert" className="error-banner"><strong>{Object.keys(references).some(key=>references[key as keyof References].length)?'部分资料加载失败':'规划资料加载失败'}</strong>{lookupErrors.map(item=><p key={item}>{item}</p>)}<button type="button" onClick={()=>void load()}>重新加载资料</button></div>}
+    {saved.error&&<div role="alert" className="error-banner">{saved.error}<button type="button" onClick={()=>saved.ready?saved.retry():void saved.reload()}>{saved.ready?'重试保存草稿':'重新读取草稿'}</button></div>}{saved.status&&<p className="planning-draft-status" role="status">{saved.status}</p>}{error&&<p role="alert" className="error-banner">{error}</p>}
+    {showResults&&results[mode]?<PlanningResults result={results[mode]!} products={references.products} onBack={()=>setShowResults(false)} onOpenLibrary={onOpenDrawingLibrary} onGenerate={onGenerateFiles}/>:<>
+    <nav className="planning-steps" aria-label="规划步骤">{steps.map((label,index)=><button type="button" aria-label={label} aria-current={draft.step===index+1?'step':undefined} key={label} disabled={!ready||busy||(index>0&&!draft.groups.length)} onClick={()=>update({...draft,step:(index+1) as PlanningDraftInput['step']})}><span>{index+1}</span>{label}</button>)}</nav>
+    <div ref={root} className={`planning-workbench-layout${width<900?' compact':''}`} style={{'--planning-preview-width':`${Math.min(preferredWidth,Math.max(280,width*.45))}px`} as CSSProperties}>
+      <div className="planning-step-content" aria-busy={busy||!ready}>
+        {draft.step===1&&<PlanningProducts mode={mode} draft={draft} products={references.products} appearances={references.appearance} disabled={!ready||busy} onChange={update}/>}
+        {draft.step===2&&<PlanningProjects group={selectedGroup} groups={draft.groups} products={references.products} mains={references.main_category} projects={references.project_item} colors={references.color} disabled={!ready||busy} onGroup={group=>update({...draft,groups:draft.groups.map(item=>item.productId===group.productId?group:item)})} onSelect={id=>update({...draft,activeProductId:id})} whiteBases={whiteBases} whiteError={whiteErrors} onLoadWhite={row=>void white(row)}/>}
+        {(draft.step===3||draft.step===4)&&<><div className="planning-section-title"><h2>{steps[draft.step-1]}</h2><button type="button" disabled={busy||!ready||!draft.groups.length} onClick={()=>void check()}>重新检查全部项目</button></div>
+        <PlanningChecks preview={effective} projects={references.project_item} colors={references.color} busy={busy} onFocus={row=>setFocused(planningRowKey(row.productId,row.clientId))} onRecheck={row=>void check(row)}/>
+        {draft.step===4&&<div className="planning-confirmation"><p>本次确认 {eligible.length} 项；未通过检查的项目不占号。</p><label><input type="checkbox" aria-label="已核对本次占号清单" checked={confirmed} disabled={busy||!eligible.length} onChange={event=>setConfirmed(event.target.checked)}/>已核对本次占号清单</label><button type="button" className="primary-button" disabled={busy||!eligible.length||!confirmed} onClick={()=>void reserve()}>{busy?'正在占号…':'确认批量占号'}</button></div>}</>}
+        <footer className="planning-step-actions"><button type="button" disabled={!ready||busy||draft.step===1} onClick={()=>update({...draft,step:(draft.step-1) as PlanningDraftInput['step']})}>上一步</button>{draft.step<4&&<button type="button" className="primary-button" disabled={!ready||busy||!draft.groups.length||draft.step===1&&!canProducts||draft.step===3&&!eligible.length} onClick={nextStep}>下一步</button>}</footer>
       </div>
-      <PlanningRowPreview api={api} productId={productId} appearanceId={appearanceId} row={row} index={index} paused={busy||!active} approved={preview?.rows.find(item=>item.clientId===row.clientId)}/>
-    </article></div>)}</div>
-    </section>
-    <section className="planning-stage planning-confirm" aria-label="查重与确认"><h2><span>03</span> 查重与确认</h2>
-    <div className="pp-bottom"><span>{complete ? '条件完整' : '待完成：产品、外观及各行主类别 / 项目明细 / 颜色'}</span><div><button type="button" title={reserved.length ? '使用本次已正式保存的图号创建或继续制图任务' : '请先查重并确认批量占号'} disabled={busy || !reserved.length || !reservedContext || !onGenerateFiles} onClick={()=>{if(reservedContext&&reserved.length)onGenerateFiles?.({productId:reservedContext.productId,drawings:reserved.map(item=>({origin:'planned' as const,id:item.id})),revision:Date.now()});}}>生成文件</button><button className="secondary-button planning-check" type="button" disabled={!complete || busy} onClick={() => void check()}>{busy ? '处理中…' : needsRefresh ? '重新查重' : '查重并预览'}</button><button className="primary-button" type="button" disabled={!preview || !approvedInput || busy} onClick={() => void reserve()}>确认批量占号</button></div></div>
-    </section>
-    {error && <p className="error-banner">{error}</p>}
-    {reserved.length > 0 && <section className="pp-saved" aria-label="本次占号结果"><header><div><CircleCheck size={20} aria-hidden="true"/><strong>已成功占用 {reserved.length} 个图号 · 正式保存</strong></div>{reservedContext&&onOpenDrawingLibrary&&<button type="button" onClick={()=>onOpenDrawingLibrary(reservedContext)}>查看图号库</button>}</header><ul>{reserved.map(item => <li key={item.id}><div><strong>{item.fullCode}</strong><span>{reservedDescriptions[item.id]??item.displayName}</span></div><CopyButton label={`复制图号 ${item.fullCode}`} onClick={()=>void copyDrawing(item.fullCode)}/></li>)}</ul></section>}
-
+      <PanelResizeHandle label="调整图号预览宽度" value={Math.min(preferredWidth,Math.max(280,width*.45))} min={280} max={Math.max(280,width*.45)} reversed onChange={setPreferredWidth}/>
+      <aside className="planning-preview-panel" aria-label="完整图号与编码拆解"><h2>图号预览</h2>{focus?.fullCode?<><strong className="planning-code planning-preview-code">{focus.fullCode}</strong><p className={focus.available?'planning-pass':'error-banner'}>{focus.available?focus.shared?'共用已有图号，不重复占号':'检查通过，尚未正式占号':focus.error?.message}</p>{parts&&<dl>{Object.entries({品牌:parts.brandCode,品类尺寸:parts.productSizeCode,外观:parts.appearanceCode,颜色:parts.colorCode,主类别:parts.mainCategoryCode,项目明细:parts.projectItemCode,流水号:focus.sequence?String(focus.sequence).padStart(3,'0'):'—'}).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}</>:<p>{focus?.error?.message??'选择产品和项目后进行图号检查'}</p>}</aside>
+    </div></>}
   </section>;
-}
-
-
-type PreviewRow=PlanningPreviewView['rows'][number];
-function PlanningRowPreview({api,productId,appearanceId,row,index,paused,approved}:{api:PlannerApi;productId:string;appearanceId:string;row:DraftRow;index:number;paused:boolean;approved?:PreviewRow}) {
-  const ready=Boolean(productId&&appearanceId&&row.colorId&&row.mainCategoryId&&row.projectItemId);
-  const input:ApprovedInput={productId:Number(productId),appearanceId:Number(appearanceId),rows:[{clientId:row.clientId,colorId:Number(row.colorId),mainCategoryId:Number(row.mainCategoryId),projectItemId:Number(row.projectItemId),...(row.notes.trim()?{notes:row.notes.trim()}:{})}]};
-  const identity=ready?JSON.stringify(input):'';
-  const [live,setLive]=useState<{identity:string;item?:PreviewRow;error?:string}>();
-  useEffect(()=>{
-    if(!identity||paused||approved)return;
-    let current=true;
-    const timer=window.setTimeout(()=>{
-      void api.previewPlan(JSON.parse(identity) as ApprovedInput).then(result=>{
-        if(!current)return;
-        const item=result.rows.find(item=>item.clientId===row.clientId);
-        setLive({identity,...(item?{item}:{error:'未取得本项目预览，请重新查重'})});
-      }).catch(reason=>{if(current)setLive({identity,error:reason instanceof Error?reason.message:'实时查重失败'});});
-    },250);
-    return()=>{current=false;window.clearTimeout(timer);};
-  },[api,identity,paused,approved,row.clientId]);
-  const item=approved??(live?.identity===identity?live.item:undefined);
-  const error=live?.identity===identity&&!approved?live.error:undefined;
-  if(!ready)return null;
-  return <div className="pp-result" aria-label={`项目 ${index+1} 预览`} aria-live="polite">
-    {item?<><span className="planning-preview-link">预计完整图号</span><strong className="pp-code">{item.fullCode}</strong><span>推荐流水号 <b>{String(item.sequence).padStart(3,'0')}</b></span><span className="status-text active">可占用</span><small>尚未占号</small></>:error?<span className="status-text inactive">{error}</span>:<small>正在查重预览…</small>}
-  </div>;
 }

@@ -1,4 +1,5 @@
 import { createPackagingApi, type PackagingApi } from './packaging-client';
+import {createPlanningWorkspaceApi,type PlanningWorkspaceApi} from './planning-client';
 import type { DrawingForceReleasePreview } from '../../core/drawings/drawing-force-release-types';
 import { createAppearanceApi, type AppearanceApi, type AppearanceVersion } from './appearance-client';
 import { createBomAppearanceApi, type BomAppearanceApi } from './bom-appearance-client';
@@ -325,7 +326,7 @@ export interface LocalTaskView {
   startedAt?: string; finishedAt?: string; result?: unknown; error?: { code: string; message: string };
 }
 
-export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<DrawingAppearanceApi>, PdfManagementApi, QrManualApi {
+export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<DrawingAppearanceApi>, PdfManagementApi, QrManualApi, PlanningWorkspaceApi {
   packaging?: PackagingApi;
   getDrawingNavigationCounts?(filters?: Record<string, string | number | boolean | undefined>): Promise<DrawingNavigationCounts>;
   getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[];mainCategories?: DrawingNavigationCounts['mainCategories'] }>;
@@ -588,6 +589,7 @@ async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_i
 }
 
 export const apiClient: PlannerApi = {
+  ...createPlanningWorkspaceApi(request),
   packaging: createPackagingApi(request),
   ...createAppearanceApi(request), ...createBomAppearanceApi(request), ...createDrawingAppearanceApi(request),
   ...createPdfManagementApi(request), ...createQrManualApi(request),
