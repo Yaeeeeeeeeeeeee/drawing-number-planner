@@ -45,8 +45,11 @@ export class PlanningDraftStore {
     return parsePlanningDraftFile(text);
   }
   read(mode: PlanningDraftMode): PlanningDraftRecord | null {
-    const draft = this.load().modes[mode];
-    return draft ? { ...draft, requiresCheck: true } : null;
+    return this.state(mode).draft;
+  }
+  state(mode: PlanningDraftMode): {draft: PlanningDraftRecord | null; revision: number} {
+    const file = this.load(), draft = file.modes[mode];
+    return {draft: draft ? { ...draft, requiresCheck: true } : null, revision: file.revisions[mode] ?? draft?.revision ?? 0};
   }
   private mutate<T>(operation: (file: DraftFile) => T): T {
     mkdirSync(dirname(this.path), { recursive: true });
@@ -67,7 +70,7 @@ export class PlanningDraftStore {
   }
   private checkRevision(file: DraftFile, mode: PlanningDraftMode, expectedRevision?: number): number {
     const revision = file.revisions[mode] ?? file.modes[mode]?.revision ?? 0;
-    if ((expectedRevision !== undefined && expectedRevision !== revision) || (file.modes[mode] && expectedRevision === undefined)) {
+    if ((expectedRevision !== undefined && expectedRevision !== revision) || (revision > 0 && expectedRevision === undefined)) {
       throw new PlanningDraftError('DRAFT_STALE', '草稿已被其他操作更新，请重新读取后再保存或删除');
     }
     return revision;
@@ -82,10 +85,11 @@ export class PlanningDraftStore {
       return { ...draft, requiresCheck: true };
     });
   }
-  delete(mode: PlanningDraftMode, expectedRevision?: number): void {
-    this.mutate(file => {
+  delete(mode: PlanningDraftMode, expectedRevision?: number): number {
+    return this.mutate(file => {
       const revision = this.checkRevision(file, mode, expectedRevision);
       if (file.modes[mode]) { delete file.modes[mode]; file.revisions[mode] = revision + 1; }
+      return file.revisions[mode] ?? revision;
     });
   }
 }

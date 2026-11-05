@@ -26,7 +26,9 @@ it('rejects stale saves/deletes across store instances and keeps revisions after
  expect(()=>second.delete('new',saved.revision)).toThrowError(expect.objectContaining({code:'DRAFT_STALE'}));
  first.delete('new',newer.revision);expect(second.read('new')).toBeNull();
  expect(()=>second.save('new',input,0)).toThrowError(expect.objectContaining({code:'DRAFT_STALE'}));
- expect(second.save('new',input).revision).toBeGreaterThan(newer.revision);
+ expect(()=>second.save('new',input)).toThrowError(expect.objectContaining({code:'DRAFT_STALE'}));
+ const state=second.state('new');expect(state).toEqual({draft:null,revision:newer.revision+1});
+ expect(second.save('new',input,state.revision).revision).toBeGreaterThan(newer.revision);
 });
 it('does not overwrite an invalid or unreadable draft file with an empty replacement',()=>{
  const {path}=fixture();writeFileSync(path,'{broken');const store=new PlanningDraftStore(path);
@@ -41,4 +43,11 @@ it('deletes only one mode and never accepts saved check approval fields in neste
  store.save('batch',input);store.delete('new',first.revision);
  expect(store.read('new')).toBeNull();expect(store.read('batch')).not.toBeNull();
  expect(readFileSync(path,'utf8')).not.toContain('secret');
+});
+
+it('rejects a delayed initial save after another client saved and deleted the draft',()=>{
+ const {path}=fixture(),a=new PlanningDraftStore(path),b=new PlanningDraftStore(path);
+ expect(a.read('new')).toBeNull();const saved=b.save('new',input);b.delete('new',saved.revision);
+ const before=readFileSync(path,'utf8');expect(()=>a.save('new',input)).toThrowError(expect.objectContaining({code:'DRAFT_STALE'}));
+ expect(readFileSync(path,'utf8')).toBe(before);expect(a.read('new')).toBeNull();
 });

@@ -96,7 +96,7 @@ export function registerPlanningRoutes(app: FastifyInstance, service: PlanningSe
     app.get('/api/planning/drafts/:mode', async (request, reply) => {
       const mode = draftModeSchema.safeParse((request.params as {mode:string}).mode);
       if (!mode.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '草稿模式无效' } });
-      try { return { draft: draftStore.read(mode.data) }; }
+      try { return draftStore.state(mode.data); }
       catch (error) { return sendPlanningError(error, reply); }
     });
     app.put('/api/planning/drafts/:mode', async (request, reply) => {
@@ -110,7 +110,7 @@ export function registerPlanningRoutes(app: FastifyInstance, service: PlanningSe
       const mode = draftModeSchema.safeParse((request.params as {mode:string}).mode);
       const input = z.object({ expectedRevision: expectedRevisionSchema }).safeParse(request.body ?? {});
       if (!mode.success || !input.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '草稿数据无效' } });
-      try { draftStore.delete(mode.data, input.data.expectedRevision); return { deleted: true }; }
+      try { return { deleted: true, revision: draftStore.delete(mode.data, input.data.expectedRevision) }; }
       catch (error) { return sendPlanningError(error, reply); }
     });
   }
