@@ -1,6 +1,4 @@
 import {createHash} from 'node:crypto';
-import {existsSync} from 'node:fs';
-import {join} from 'node:path';
 import type {PackagingTaskService} from './packaging-task-service.js';
 import {taskFail} from './packaging-task-store.js';
 import type {PackagingTaskDeleteInput,PackagingTaskDeletionPreview} from './packaging-types.js';
@@ -9,7 +7,7 @@ import type {PackagingTaskDeleteInput,PackagingTaskDeletionPreview} from './pack
 export function previewTaskTermination(service:PackagingTaskService,id:string):PackagingTaskDeletionPreview {
   const task=service.store.task(id),base=service.deletionPreview(id);
   const busy=service.isTaskBusy(id)||task.items.some(item=>item.state==='generating');
-  const unsettled=task.items.some(item=>item.mode==='ait')&&existsSync(join(service.options.dataDir,'illustrator-operations','active-operation.json'));
+  const unsettled=service.hasUnsettledAutomation();
   const reason=task.endedAt?'任务已经安全结束':task.state==='completed'?'任务已经完成归档，可删除任务记录':busy?'任务仍在处理文件，请等待当前操作停止后重新检查':unsettled?'Illustrator 上次操作尚未核对结束，请先执行中断核对':undefined;
   return {...base,token:createHash('sha256').update(`terminate:${base.token}`).digest('hex'),canDelete:!reason,reason};
 }

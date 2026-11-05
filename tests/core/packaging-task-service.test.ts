@@ -63,6 +63,21 @@ it('preserves an interrupted task and its lock when its Illustrator operation ha
  await expect(f.create()).rejects.toThrow(/未完成/);expect(f.service.listTasks()[0].endedAt).toBeUndefined();
  rmSync(join(folder,'active-operation.json'));const settled=f.service.terminationPreview(task.id);f.service.terminateTask(task.id,{confirmed:true,token:settled.token,acknowledgeUnfinished:true});expect((await f.create()).id).not.toBe(task.id);
 });
+it('does not bypass an unsettled Illustrator operation by changing to manual mode or choosing ordinary delete',async()=>{
+ const f=fixture(),task=await f.create(),folder=join(f.dir,'illustrator-operations');mkdirSync(folder);writeFileSync(join(folder,'active-operation.json'),'{}');
+ expect(f.service.deletionPreview(task.id).canDelete).toBe(false);
+ expect(f.service.terminationPreview(task.id).canDelete).toBe(false);
+ const preview=f.service.deletionPreview(task.id);expect(()=>f.service.deleteTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true})).toThrow(/Illustrator|核对/);
+ const ending=f.service.terminationPreview(task.id);expect(()=>f.service.terminateTask(task.id,{confirmed:true,token:ending.token,acknowledgeUnfinished:true})).toThrow(/Illustrator|核对/);
+ await expect(f.create()).rejects.toThrow(/未完成/);expect(f.service.listTasks()[0].endedAt).toBeUndefined();
+});
+it('tracks an in-flight Illustrator open so ending cannot release the task lock mid-operation',async()=>{
+ const f=fixture(),task=await readyManual(f);let release!:()=>void,entered!:()=>void;
+ const started=new Promise<void>(resolve=>{entered=resolve;});f.automation.openPdf.mockImplementation(()=>new Promise<void>(resolve=>{release=resolve;entered();}));
+ const operation=f.service.openItem(task.id,task.items[0].id);await started;
+ expect(f.service.deletionPreview(task.id).canDelete).toBe(false);expect(f.service.terminationPreview(task.id).canDelete).toBe(false);
+ release();await operation;const preview=f.service.terminationPreview(task.id);expect(preview.canDelete).toBe(true);f.service.terminateTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true});expect((await f.create()).id).not.toBe(task.id);
+});
 it('persists one unfinished task per real product without reserving or changing BOM/history',async()=>{
  const f=fixture(),before=f.db.prepare('select * from drawing_numbers').all();const task=await f.create();
  expect(task.items[0]).toMatchObject({fullCode:f.drawing.fullCode,state:'awaiting_upload',mode:'manual'});

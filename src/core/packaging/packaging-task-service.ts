@@ -36,6 +36,7 @@ export class PackagingTaskService {
  private workspaceKey(root=this.workspace.root()){const canonical=root.replaceAll('\\','/');return createHash('sha256').update(process.platform==='win32'?canonical.toLocaleLowerCase('en-US'):canonical).digest('hex');}
  hasOperations(){return this.operations.size>0;}
  isTaskBusy(id:string){return this.operations.has(id);}
+ hasUnsettledAutomation(){return existsSync(join(this.options.dataDir,'illustrator-operations','active-operation.json'));}
  assertNotEnded(id:string){if(this.store.task(id).endedAt)taskFail('TASK_TERMINATED','任务已安全结束，全部文件和历史均已保留，不能继续生成或归档');}
  taskWorkspace(id:string){const root=this.workspace.root();const key=(this.db.prepare('select workspace_key as key from packaging_tasks where id=?').get(id) as {key:string}|undefined)?.key;if(key!==this.workspaceKey(root))taskFail('TASK_WORKSPACE_CHANGED','资料根目录与任务创建时不同，请恢复原资料根目录后继续任务');return new PackagingWorkspace(this.db,()=>root);}
  taskPath(id:string,path:string){return this.taskWorkspace(id).path(path);}
@@ -137,7 +138,7 @@ export class PackagingTaskService {
  }
  deletionPreview(id:string):PackagingTaskDeletionPreview{
   const task=this.store.task(id);const busy=this.operations.has(id)||task.items.some(item=>item.state==='generating');
-  const reason=busy?'任务正在处理文件，请完成后再删除':!task.endedAt&&(task.state==='archiving'||task.state==='awaiting_index')?'归档尚未完成，可选择保留文件并结束任务':undefined;
+  const reason=busy?'任务正在处理文件，请完成后再删除':this.hasUnsettledAutomation()?'Illustrator 上次操作尚未核对结束，请先执行中断核对':!task.endedAt&&(task.state==='archiving'||task.state==='awaiting_index')?'归档尚未完成，可选择保留文件并结束任务':undefined;
   const snapshot={task,owned:this.store.owned(id),journal:this.db.prepare('select * from packaging_archive_journal where task_id=? order by item_id').all(id)};
   return{taskId:id,productId:task.productId,model:task.model,state:task.state,createdAt:task.createdAt,token:createHash('sha256').update(JSON.stringify(snapshot)).digest('hex'),canDelete:!reason,reason,fileCount:task.items.filter(item=>item.relativePath).length,releasesLock:!task.endedAt&&task.state!=='completed'};
  }
@@ -257,7 +258,12 @@ export class PackagingTaskService {
  }
  async filePath(taskId:string,itemId:number){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');this.assertWorkspace(taskId);const task=this.store.task(taskId),item=this.store.item(taskId,itemId);let relativePath=item.relativePath;if(task.state==='completed'){const row=this.db.prepare('select destination_relative_path as path from packaging_archive_journal where task_id=? and item_id=?').get(taskId,itemId) as {path:string}|undefined;relativePath=row?.path;}if(!relativePath)taskFail('FILE_REQUIRED','项目尚无 PDF');const path=this.taskPath(taskId,relativePath!);await pdfFact(path);return path;}
  async backupPath(taskId:string,itemId:number){this.store.task(taskId);if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');const item=this.store.item(taskId,itemId);if(!item.backupRelativePath||!item.originalSha256)taskFail('BACKUP_NOT_FOUND','此项目没有正式原件备份');const path=resolveWorkspacePath(this.options.dataDir,item.backupRelativePath);if((await pdfFact(path)).sha256!==item.originalSha256)taskFail('BACKUP_CHANGED','原件备份内容已变化，不能作为已核实备份打开');return path;}
- async openItem(taskId:string,itemId:number){if(!this.options.automation.openPdf)taskFail('ILLUSTRATOR_UNAVAILABLE','当前环境不能打开 Illustrator');await this.options.automation.openPdf!(await this.filePath(taskId,itemId));return{ok:true};}
+ async openItem(taskId:string,itemId:number){
+  this.mutable(taskId);if(this.operations.has(taskId))taskFail('TASK_BUSY','任务正在处理文件，请稍后重试');
+  if(!this.options.automation.openPdf)taskFail('ILLUSTRATOR_UNAVAILABLE','当前环境不能打开 Illustrator');
+  const work=(async()=>{await this.options.automation.openPdf!(await this.filePath(taskId,itemId));return{ok:true};})();
+  this.operations.set(taskId,work);try{return await work;}finally{this.operations.delete(taskId);}
+ }
  archivePreview(taskId:string){return previewPackagingArchive(this,taskId);}
  async archive(taskId:string,confirmed:boolean){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');this.assertNotEnded(taskId);this.assertWorkspace(taskId);if(!confirmed)taskFail('CONFIRMATION_REQUIRED','请确认本次整批归档');if(this.operations.has(taskId))taskFail('TASK_BUSY','任务正在处理中');const work=archivePackagingTask(this,taskId);this.operations.set(taskId,work);try{return await work;}finally{this.operations.delete(taskId);}}
 }
