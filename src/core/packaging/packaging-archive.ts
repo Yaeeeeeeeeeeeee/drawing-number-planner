@@ -37,6 +37,7 @@ function destination(service:PackagingTaskService,task:PackagingTask,item:Packag
  return join(task.productDirectory,'02.未转曲源文件',`${item.fullCode}-${packagingName(product.brandName)}-${packagingName(product.model)}${packagingName(item.color)}-${packagingName(item.projectName)}.pdf`);
 }
 export async function previewPackagingArchive(service:PackagingTaskService,id:string):Promise<PackagingArchivePreview>{
+ service.assertNotEnded(id);
  const task=await service.getTask(id),blockers:string[]=[],files:PackagingArchivePreview['files']=[];
  try{service.validateTaskDrawings(task);}catch(error){blockers.push(error instanceof Error?error.message:'图号所属校验失败');}
  if(task.state==='completed')return{taskId:id,ready:false,blockers:['任务已完成归档'],files:[]};
@@ -49,6 +50,7 @@ export async function previewPackagingArchive(service:PackagingTaskService,id:st
    if(!item.relativePath||!item.reviewedSha256||item.state!=='completed')taskFail('REVIEW_REQUIRED',`${item.projectName}尚未生成或完成人工检查`);
    const source=await pdfFact(service.taskPath(id,item.relativePath!));if(source.sha256!==item.reviewedSha256)taskFail('FILE_CHANGED',`${item.projectName}在人工确认后发生变化，请重新检查`);
    const target=destination(service,task,item),journal=service.db.prepare('select * from packaging_archive_journal where item_id=?').get(item.id) as Journal|undefined;
+   if(service.db.prepare('select 1 from drawing_force_release_files where path_key=? and full_code=?').get(toWorkspacePathKey(target),item.fullCode))taskFail('PDF_FORCE_DETACHED','此正式路径的旧 PDF 已强制脱钩，不能自动重新认领；可保留文件并结束任务');
    if(!journal&&existsSync(service.taskPath(id,target))){
     if(task.type==='new')taskFail('DESTINATION_EXISTS',`${item.projectName}正式文件同名冲突，不允许覆盖`);
     if((await pdfFact(service.taskPath(id,target))).sha256!==item.originalSha256)taskFail('ORIGINAL_CHANGED',`${item.projectName}正式文件在任务创建后发生变化`);

@@ -127,6 +127,17 @@ describe('independent drawing task page',()=>{
     render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'删除'}));
     const dialog=await screen.findByRole('dialog');expect(within(dialog).getByRole('alert')).toHaveTextContent('归档处理中，请稍后再删除');expect(within(dialog).getByRole('button',{name:'确认删除记录'})).toBeDisabled();expect(api.packaging.deleteTask).not.toHaveBeenCalled();
   });
+  it('refreshes a stale deletion preview inside the existing dialog and requires renewed acknowledgement',async()=>{
+    const api=fixture();api.packaging.deleteTask.mockRejectedValueOnce(Object.assign(new Error('任务状态已变化，请重新核对删除信息'),{code:'TASK_DELETE_CHANGED'}));
+    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'删除'}));
+    const dialog=await screen.findByRole('dialog');fireEvent.click(within(dialog).getByRole('checkbox'));
+    api.packaging.deletionPreview.mockResolvedValueOnce({taskId:task.id,productId:7,model:'T40',state:'active',createdAt:task.createdAt,token:'fresh-preview',canDelete:true,fileCount:2,releasesLock:true});
+    fireEvent.click(within(dialog).getByRole('button',{name:'确认删除记录'}));
+    await waitFor(()=>expect(api.packaging.deletionPreview).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('dialog')).toBe(dialog);expect(within(dialog).getByRole('checkbox')).not.toBeChecked();
+    fireEvent.click(within(dialog).getByRole('checkbox'));fireEvent.click(within(dialog).getByRole('button',{name:'确认删除记录'}));
+    await waitFor(()=>expect(api.packaging.deleteTask).toHaveBeenLastCalledWith(task.id,{confirmed:true,token:'fresh-preview',acknowledgeUnfinished:true}));
+  });
   it('renders completed history read only and deletes without unfinished acknowledgement',async()=>{
     const api=fixture();const completed={...task,state:'completed',completedAt:'2026-11-02T04:10:00Z',items:[{...item,state:'completed',sha256:'current',fileName:'铭牌.pdf'}]};api.packaging.listTasks.mockResolvedValue([completed]);api.packaging.getTask.mockResolvedValue(completed);
     api.packaging.deletionPreview.mockResolvedValue({taskId:task.id,productId:7,model:'T40',state:'completed',createdAt:task.createdAt,token:'completed-token',canDelete:true,fileCount:1,releasesLock:false});

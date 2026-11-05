@@ -13,6 +13,7 @@ import {WorkspaceSettingsStore} from '../../src/core/files/workspace-settings';
 import {PackagingCatalogService} from '../../src/core/packaging/packaging-catalog';
 import {PackagingTaskService} from '../../src/core/packaging/packaging-task-service';
 import * as packagingFiles from '../../src/core/packaging/packaging-file-operations';
+import {DrawingForceReleaseService} from '../../src/core/drawings/drawing-force-release-service';
 
 const cleanups:(()=>void)[]=[];afterEach(()=>cleanups.splice(0).reverse().forEach(fn=>fn()));
 const pdf='%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n';
@@ -28,6 +29,40 @@ function fixture(){
  const create=()=>service.createTask({productId:product.id,name:'首批铭牌',type:'new',drawings:[{origin:'planned',id:drawing.id}]});
  return{dir,root,db,files,service,catalog,product,drawing,project,main,brand,create,options,plan,input,color,products,size,appearance,automation};
 }
+it.each(['active','archiving','awaiting_index'] as const)('ends a settled %s task without finishing archive, indexing or changing its files',async(state)=>{
+ const f=fixture(),task=await f.create(),path=join(f.root,task.taskDirectory,'retained.pdf');writeFileSync(path,pdf);
+ const observed=await f.service.discover(task.id);f.service.store.state(task.id,state,'index failed');
+ const drawings=f.db.prepare('select * from drawing_numbers').all(),indices=f.db.prepare('select * from pdf_files').all();
+ const preview=f.service.terminationPreview(task.id);expect(preview.canDelete).toBe(true);
+ expect(f.service.terminateTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true})).toMatchObject({terminated:true,filesPreserved:true});
+ const ended=f.service.listTasks().find(t=>t.id===task.id);expect(ended?.endedAt).toBeTruthy();expect(ended?.state).toBe(state);expect(ended?.completedAt).toBeUndefined();
+ expect(ended?.pendingFiles).toEqual(observed.pendingFiles);expect(readFileSync(path,'utf8')).toBe(pdf);
+ expect(f.db.prepare('select * from drawing_numbers').all()).toEqual(drawings);expect(f.db.prepare('select * from pdf_files').all()).toEqual(indices);
+ await expect(f.service.archive(task.id,true)).rejects.toThrow(/结束/);await expect(f.service.discover(task.id)).rejects.toThrow(/结束/);
+ expect((await f.create()).id).not.toBe(task.id);expect(f.db.pragma('foreign_key_check')).toEqual([]);
+});
+it('ends a task after its drawing and formal PDF were force detached without reclaiming the original PDF',async()=>{
+ const f=fixture(),task=await f.create(),path=join(f.root,task.productDirectory,'02.未转曲源文件',`${f.drawing.fullCode}.pdf`);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,pdf);await f.files.scanProducts([task.productDirectory]);
+ const release=new DrawingForceReleaseService(f.db),impact=release.preview(f.drawing.id);release.confirm({signedId:f.drawing.id,fingerprint:impact.fingerprint,confirmed:true});
+ f.service.store.state(task.id,'awaiting_index','旧 PDF 已强制脱钩');
+ const before=f.db.prepare('select * from pdf_files').all(),preview=f.service.terminationPreview(task.id);
+ f.service.terminateTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true});
+ expect(f.db.prepare('select * from pdf_files').all()).toEqual(before);expect(readFileSync(path,'utf8')).toBe(pdf);
+ expect((await f.service.getTask(task.id)).endedAt).toBeTruthy();expect(f.service.listTasks()[0].endedAt).toBeTruthy();
+ const planned=f.plan.preview(f.input),drawing=f.plan.reserve({...f.input,rows:[{...f.input.rows[0],expectedFullCode:planned.rows[0].fullCode}]})[0];
+ const next=await f.service.createTask({productId:f.product.id,type:'new',drawings:[{origin:'planned',id:drawing.id}]});expect(next.id).not.toBe(task.id);
+ expect(f.db.prepare('select * from pdf_files').all()).toEqual(before);
+ await f.files.scanProducts([task.productDirectory]);await f.service.discover(next.id);
+ expect(f.db.prepare('select drawing_id,historical_drawing_id,match_status,classification_warning from pdf_files').all()).toEqual([{drawing_id:null,historical_drawing_id:null,match_status:'pending',classification_warning:'drawing-force-released'}]);
+});
+it('preserves an interrupted task and its lock when its Illustrator operation has not safely settled',async()=>{
+ const f=fixture(),task=await f.create();f.service.store.updateItem(task.items[0].id,{mode:'ait',state:'generating'});f.service.recover();
+ const folder=join(f.dir,'illustrator-operations');mkdirSync(folder);writeFileSync(join(folder,'active-operation.json'),'{}');
+ const preview=f.service.terminationPreview(task.id);expect(preview.canDelete).toBe(false);expect(preview.reason).toMatch(/Illustrator|核对/);
+ expect(()=>f.service.terminateTask(task.id,{confirmed:true,token:preview.token,acknowledgeUnfinished:true})).toThrow(/Illustrator|核对/);
+ await expect(f.create()).rejects.toThrow(/未完成/);expect(f.service.listTasks()[0].endedAt).toBeUndefined();
+ rmSync(join(folder,'active-operation.json'));const settled=f.service.terminationPreview(task.id);f.service.terminateTask(task.id,{confirmed:true,token:settled.token,acknowledgeUnfinished:true});expect((await f.create()).id).not.toBe(task.id);
+});
 it('persists one unfinished task per real product without reserving or changing BOM/history',async()=>{
  const f=fixture(),before=f.db.prepare('select * from drawing_numbers').all();const task=await f.create();
  expect(task.items[0]).toMatchObject({fullCode:f.drawing.fullCode,state:'awaiting_upload',mode:'manual'});

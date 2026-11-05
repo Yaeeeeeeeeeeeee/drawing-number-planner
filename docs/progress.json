@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-11-02T14:13:55.823522+08:00",
-  "branch": "codex/v3-business-ui-20261022",
+  "updatedAt": "2026-11-05T17:33:31.142387+08:00",
+  "branch": "codex/confirmed-requirements-20261105",
   "lastCommit": "0169195",
-  "execution": "上次记录的执行状态：v1.5.0已发布；完整218文件1855项、浏览器13项、Windows41397786717、发布41398418752成功；公开EXE/报告已实际下载校验，真实Windows截图已查看。",
-  "current": "包材模板、独立制图任务及图号规划UI优化",
-  "recent": "完整本轮页面/Schema25/任务路径与安全兼容交付。Tag v1.5.0固定096dabc；Windows和发布成功，公开EXE145169138字节、SHA256匹配，报告无业务数据库或设计文件，实际截图已记录。",
-  "next": "用户本地关闭旧版并完整备份，安装1.5.0后选择原planner.db；沿用本地资料路径。先用真实AIT完成一份字体/版式/可编辑PDF重开核对，再批量制图。",
+  "execution": "已授权完整实施；P0专项与浏览器验收通过，P1/P2及发布尚未完成",
+  "current": "已确认未落实需求实施",
+  "recent": "P0安全结束及G-03令牌更新；专项7文件66项、浏览器1项与类型检查通过",
+  "next": "P1规划服务、多型号及持久草稿，然后四步工作台；继续至正式交付",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
   ],
-  "tests": "完整218文件1855项、浏览器13项、类型/前端/Main构建、实际旧Schema24 61表升级/续作、Windows41397786717安装/任务/重启通过；发布41398418752成功，公开EXE和报告下载SHA256核对通过，实际Windows截图已查看。",
+  "tests": "本轮P0 7文件66项；实际浏览器1项，typecheck通过。首次完整既有1855项通过，新增G-03先复现失败；最终完整回归尚待。",
   "completionRule": "仅功能实现且对应验收测试通过才记为已完成；未完成项保持真实剩余工作。",
   "items": [
     {
@@ -839,6 +839,22 @@
     {
       "at": "2026-11-02T13:46:30.862888+08:00",
       "message": "独立制图任务菜单、简化配置、编号专用AIT映射、紧凑预览/结果/任务行、root00与留痕删除已实现。原v1.4代码实际生成Schema24+已确认嵌套任务升级25，61表旧列值/备份/FK/原路径续作/归档/新任务平铺/删记录保文件占号全部通过；补齐未提交原件副本仍归原任务的保护。"
+    },
+    {
+      "at": "2026-11-05T17:33:31.142387+08:00",
+      "message": "P0安全结束及G-03令牌更新；专项7文件66项、浏览器1项与类型检查通过；无生产库操作，无真实设计文件改动。"
     }
-  ]
+  ],
+  "confirmedImplementation": {
+    "spec": "docs/confirmed-implementation-requirements-20261105.md",
+    "stages": {
+      "p0": "implemented-tested-awaiting-review",
+      "planningDomain": "pending",
+      "planningUi": "pending",
+      "feedback": "pending",
+      "pdf": "pending",
+      "databaseReselection": "pending",
+      "release": "pending"
+    }
+  }
 }

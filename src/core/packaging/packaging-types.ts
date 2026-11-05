@@ -61,6 +61,8 @@ export interface PackagingTask {
   id: string; productId: number; model: string; name: string; type: 'new' | 'modify';
   state: 'active' | 'archiving' | 'awaiting_index' | 'completed'; productDirectory: string;
   taskDirectory: string; createdAt: string; completedAt?: string; error?: string;
+  /** Retained termination is distinct from successful archive completion. */
+  endedAt?: string;
   items: PackagingTaskItem[]; pendingFiles: PackagingPendingFile[];
 }
 export interface PackagingProductDirectory { productId: number; relativePath: string; exists: boolean }

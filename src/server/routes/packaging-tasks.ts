@@ -24,6 +24,8 @@ export function registerPackagingTaskRoutes(app:FastifyInstance,service:Packagin
  app.post('/api/packaging/tasks',execute((request,reply)=>service.createTask(parsed(create,request.body)).then(task=>reply.code(201).send(task))));
  app.get('/api/packaging/tasks/:id',execute(request=>service.getTask(parsed(params,request.params).id)));
  app.get('/api/packaging/tasks/:id/deletion-preview',execute(request=>service.deletionPreview(parsed(params,request.params).id)));
+ app.get('/api/packaging/tasks/:id/termination-preview',execute(request=>service.terminationPreview(parsed(params,request.params).id)));
+ app.post('/api/packaging/tasks/:id/terminate',execute(request=>service.terminateTask(parsed(params,request.params).id,parsed(z.object({confirmed:z.literal(true),token:z.string().regex(/^[a-f0-9]{64}$/u),acknowledgeUnfinished:z.literal(true)}).strict(),request.body))));
  app.post('/api/packaging/tasks/:id/delete',execute(request=>service.deleteTask(parsed(params,request.params).id,parsed(z.object({confirmed:z.literal(true),token:z.string().regex(/^[a-f0-9]{64}$/u),acknowledgeUnfinished:z.boolean().optional()}).strict(),request.body))));
  app.put('/api/packaging/tasks/:id/items/:itemId',execute(request=>{const{id,itemId}=parsed(params,request.params);return service.configureItem(id,itemId!,parsed(item,request.body));}));
  app.post('/api/packaging/tasks/:id/generate',execute(request=>service.startGenerate(parsed(params,request.params).id,parsed(z.object({itemIds:z.array(numberId).min(1).max(100).optional(),regenerate:z.boolean().optional()}).strict(),request.body??{}))));

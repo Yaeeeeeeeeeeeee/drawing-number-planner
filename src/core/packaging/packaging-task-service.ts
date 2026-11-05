@@ -13,6 +13,7 @@ import {PackagingWorkspace} from './packaging-workspace.js';
 import {copyPdfExclusive,pdfFact,stablePdfFact} from './packaging-file-operations.js';
 import {PackagingTaskStore,taskFail} from './packaging-task-store.js';
 import {archivePackagingTask,previewPackagingArchive} from './packaging-archive.js';
+import {previewTaskTermination,terminatePackagingTask} from './packaging-task-lifecycle.js';
 import type {IllustratorAutomation} from './illustrator-automation.js';
 import type {PackagingDrawingRef,PackagingTask,PackagingTaskCreate,PackagingTaskItem,PackagingTaskItemInput,PackagingParameters,PackagingTaskDeletionPreview,PackagingTaskDeleteInput} from './packaging-types.js';
 
@@ -34,10 +35,12 @@ export class PackagingTaskService {
  assertWorkspace(id:string){const key=(this.db.prepare('select workspace_key as key from packaging_tasks where id=?').get(id) as {key:string}|undefined)?.key;if(key!==this.workspaceKey())taskFail('TASK_WORKSPACE_CHANGED','资料根目录与任务创建时不同，请恢复原资料根目录后继续任务');}
  private workspaceKey(root=this.workspace.root()){const canonical=root.replaceAll('\\','/');return createHash('sha256').update(process.platform==='win32'?canonical.toLocaleLowerCase('en-US'):canonical).digest('hex');}
  hasOperations(){return this.operations.size>0;}
+ isTaskBusy(id:string){return this.operations.has(id);}
+ assertNotEnded(id:string){if(this.store.task(id).endedAt)taskFail('TASK_TERMINATED','任务已安全结束，全部文件和历史均已保留，不能继续生成或归档');}
  taskWorkspace(id:string){const root=this.workspace.root();const key=(this.db.prepare('select workspace_key as key from packaging_tasks where id=?').get(id) as {key:string}|undefined)?.key;if(key!==this.workspaceKey(root))taskFail('TASK_WORKSPACE_CHANGED','资料根目录与任务创建时不同，请恢复原资料根目录后继续任务');return new PackagingWorkspace(this.db,()=>root);}
  taskPath(id:string,path:string){return this.taskWorkspace(id).path(path);}
  validateTaskDrawings(task:PackagingTask){this.assertWorkspace(task.id);for(const item of task.items){const drawing=this.drawing(item.drawing,task.productId);if(drawing.fullCode!==item.fullCode)taskFail('DRAWING_CHANGED','任务关联图号已变化，不能继续生成或归档');}}
- private mutable(id:string){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');const task=this.store.task(id);this.assertWorkspace(id);if(task.state!=='active')taskFail('TASK_NOT_EDITABLE','任务正在归档或已完成，不能更改项目');return task;}
+ private mutable(id:string){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');const task=this.store.task(id);this.assertNotEnded(id);this.assertWorkspace(id);if(task.state!=='active')taskFail('TASK_NOT_EDITABLE','任务正在归档或已完成，不能更改项目');return task;}
  private drawing(ref:PackagingDrawingRef,productId:number):DrawingRecord{
   if(!['planned','historical'].includes(ref.origin)||!Number.isSafeInteger(ref.id)||ref.id<=0)taskFail('INVALID_DRAWING','请选择真实已确认的图号');
   const drawing=new DrawingRepository(this.db).get(ref.origin==='historical'?-ref.id:ref.id);
@@ -45,11 +48,11 @@ export class PackagingTaskService {
   return drawing!;
  }
  private match(task:PackagingTask,item:PackagingTaskItem){const drawing=this.drawing(item.drawing,task.productId),product=this.workspace.product(task.productId);return matchPackagingTemplates(this.options.catalog.getCatalog(),{productId:task.productId,brandId:product.brandId,projectItemId:item.projectItemId,mainCategoryId:drawing.mainCategoryId!,parameters:item.parameters});}
- listTasks(productId?:number){return(this.db.prepare(`select id from packaging_tasks where deleted_at is null ${productId===undefined?'':'and product_id=?'} order by created_at desc,id desc`).all(...(productId===undefined?[]:[resolveCanonicalProductId(this.db,productId)])) as {id:string}[]).map(row=>this.store.task(row.id));}
+ listTasks(productId?:number){return(this.db.prepare(`select id from packaging_tasks where (deleted_at is null or json_extract(deletion_snapshot_json,'$.action')='terminated') ${productId===undefined?'':'and product_id=?'} order by created_at desc,id desc`).all(...(productId===undefined?[]:[resolveCanonicalProductId(this.db,productId)])) as {id:string}[]).map(row=>this.store.task(row.id));}
  async getTask(id:string):Promise<PackagingTask>{
   if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');
   const task=this.store.task(id);
-  if(task.state==='active'&&!this.operations.has(id)){
+  if(!task.endedAt&&task.state==='active'&&!this.operations.has(id)){
    this.assertWorkspace(id);const work=this.refreshFiles(task);this.operations.set(id,work);try{await work;}finally{this.operations.delete(id);}
   }
   return this.presentTask(id);
@@ -57,7 +60,7 @@ export class PackagingTaskService {
  private presentTask(id:string){
   const fresh=this.store.task(id);
   const owned=new Set(this.store.owned(id).map(file=>toWorkspacePathKey(file.relativePath)));fresh.pendingFiles=fresh.pendingFiles.filter(file=>file.status!=='pending'||!owned.has(toWorkspacePathKey(file.relativePath)));
-  if(fresh.state==='active')fresh.items=fresh.items.map(item=>{try{return{...item,match:this.match(fresh,item)};}catch(error){return{...item,error:item.error??errorText(error)};}});
+  if(!fresh.endedAt&&fresh.state==='active')fresh.items=fresh.items.map(item=>{try{return{...item,match:this.match(fresh,item)};}catch(error){return{...item,error:item.error??errorText(error)};}});
   return fresh;
  }
  private async refreshFiles(task:PackagingTask){for(const item of task.items){
@@ -134,10 +137,12 @@ export class PackagingTaskService {
  }
  deletionPreview(id:string):PackagingTaskDeletionPreview{
   const task=this.store.task(id);const busy=this.operations.has(id)||task.items.some(item=>item.state==='generating');
-  const reason=busy?'任务正在处理文件，请完成后再删除':task.state==='archiving'||task.state==='awaiting_index'?'归档尚未完成，请先恢复或完成归档后再删除':undefined;
+  const reason=busy?'任务正在处理文件，请完成后再删除':!task.endedAt&&(task.state==='archiving'||task.state==='awaiting_index')?'归档尚未完成，可选择保留文件并结束任务':undefined;
   const snapshot={task,owned:this.store.owned(id),journal:this.db.prepare('select * from packaging_archive_journal where task_id=? order by item_id').all(id)};
-  return{taskId:id,productId:task.productId,model:task.model,state:task.state,createdAt:task.createdAt,token:createHash('sha256').update(JSON.stringify(snapshot)).digest('hex'),canDelete:!reason,reason,fileCount:task.items.filter(item=>item.relativePath).length,releasesLock:task.state!=='completed'};
+  return{taskId:id,productId:task.productId,model:task.model,state:task.state,createdAt:task.createdAt,token:createHash('sha256').update(JSON.stringify(snapshot)).digest('hex'),canDelete:!reason,reason,fileCount:task.items.filter(item=>item.relativePath).length,releasesLock:!task.endedAt&&task.state!=='completed'};
  }
+ terminationPreview(id:string){return previewTaskTermination(this,id);}
+ terminateTask(id:string,input:PackagingTaskDeleteInput){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');return terminatePackagingTask(this,id,input);}
  deleteTask(id:string,input:PackagingTaskDeleteInput):{id:string;deleted:true}{
   if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');
   return this.db.transaction(()=>{
@@ -145,7 +150,8 @@ export class PackagingTaskService {
    if(!input.confirmed||input.token!==preview.token)taskFail('TASK_DELETE_CHANGED','任务状态已变化，请重新核对删除信息');
    if(!preview.canDelete)taskFail('TASK_DELETE_BLOCKED',preview.reason!);
    if(preview.releasesLock&&!input.acknowledgeUnfinished)taskFail('TASK_UNFINISHED_CONFIRMATION','此任务未完成，请确认保留文件并解除当前任务限制');
-   this.db.prepare('update packaging_tasks set deleted_at=?,deletion_snapshot_json=? where id=? and deleted_at is null').run(new Date().toISOString(),JSON.stringify({...preview,filesPreserved:true}),id);
+   const previous=this.db.prepare('select deletion_snapshot_json as snapshot from packaging_tasks where id=?').get(id) as {snapshot:string|null};
+   this.db.prepare('update packaging_tasks set deleted_at=?,deletion_snapshot_json=? where id=?').run(new Date().toISOString(),JSON.stringify({...preview,action:'deleted',previous:previous.snapshot?JSON.parse(previous.snapshot):undefined,filesPreserved:true}),id);
    return{id,deleted:true as const};
   }).immediate();
  }
@@ -227,6 +233,7 @@ export class PackagingTaskService {
  }
  private async runLinkFile(taskId:string,fileId:number,itemId:number){
   const task=this.mutable(taskId),item=this.store.item(taskId,itemId),file=this.store.pending(taskId).find(file=>file.id===fileId);
+  this.drawing(item.drawing,task.productId);
   if(!file||file.status!=='pending')taskFail('PENDING_FILE_NOT_FOUND','文件不存在或已关联处理');
   if(item.relativePath||item.mode==='none'||item.state==='generating')taskFail('ITEM_HAS_FILE','该项目已有文件或无需生成，不能重复关联');
   if(this.otherTaskOwns(task,file!.relativePath))taskFail('FILE_OWNED_BY_HISTORY','文件仍属于其他保留任务，请保留原文件并以新副本处理');
@@ -252,5 +259,5 @@ export class PackagingTaskService {
  async backupPath(taskId:string,itemId:number){this.store.task(taskId);if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');const item=this.store.item(taskId,itemId);if(!item.backupRelativePath||!item.originalSha256)taskFail('BACKUP_NOT_FOUND','此项目没有正式原件备份');const path=resolveWorkspacePath(this.options.dataDir,item.backupRelativePath);if((await pdfFact(path)).sha256!==item.originalSha256)taskFail('BACKUP_CHANGED','原件备份内容已变化，不能作为已核实备份打开');return path;}
  async openItem(taskId:string,itemId:number){if(!this.options.automation.openPdf)taskFail('ILLUSTRATOR_UNAVAILABLE','当前环境不能打开 Illustrator');await this.options.automation.openPdf!(await this.filePath(taskId,itemId));return{ok:true};}
  archivePreview(taskId:string){return previewPackagingArchive(this,taskId);}
- async archive(taskId:string,confirmed:boolean){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');this.assertWorkspace(taskId);if(!confirmed)taskFail('CONFIRMATION_REQUIRED','请确认本次整批归档');if(this.operations.has(taskId))taskFail('TASK_BUSY','任务正在处理中');const work=archivePackagingTask(this,taskId);this.operations.set(taskId,work);try{return await work;}finally{this.operations.delete(taskId);}}
+ async archive(taskId:string,confirmed:boolean){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');this.assertNotEnded(taskId);this.assertWorkspace(taskId);if(!confirmed)taskFail('CONFIRMATION_REQUIRED','请确认本次整批归档');if(this.operations.has(taskId))taskFail('TASK_BUSY','任务正在处理中');const work=archivePackagingTask(this,taskId);this.operations.set(taskId,work);try{return await work;}finally{this.operations.delete(taskId);}}
 }

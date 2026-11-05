@@ -22,6 +22,8 @@ export interface PackagingApi {
   getTask(id: string): Promise<PackagingTask>;
   deletionPreview(id:string):Promise<PackagingTaskDeletionPreview>;
   deleteTask(id:string,input:PackagingTaskDeleteInput):Promise<{id:string;deleted:true}>;
+  terminationPreview(id:string):Promise<PackagingTaskDeletionPreview>;
+  terminateTask(id:string,input:PackagingTaskDeleteInput):Promise<{id:string;terminated:true;filesPreserved:true}>;
   updateItem(taskId: string, itemId: number, input: PackagingTaskItemInput): Promise<PackagingTask>;
   generate(taskId: string, input?: {itemIds?: number[]; regenerate?: boolean}): Promise<PackagingTask>;
   discover(taskId: string): Promise<PackagingTask>;
@@ -54,6 +56,7 @@ export function createPackagingApi(request: <T>(path: string, init?: RequestInit
     listTasks:async productId=>(await request<{items:PackagingTask[]}>(`${base}/tasks${productId?`?productId=${productId}`:''}`)).items,
     createTask:input=>request(`${base}/tasks`,json('POST',input)),getTask:id=>request(task(id)),
     deletionPreview:id=>request(`${task(id)}/deletion-preview`),deleteTask:(id,input)=>request(`${task(id)}/delete`,json('POST',input)),
+    terminationPreview:id=>request(`${task(id)}/termination-preview`),terminateTask:(id,input)=>request(`${task(id)}/terminate`,json('POST',input)),
     updateItem:(id,itemId,input)=>request(`${task(id)}/items/${itemId}`,json('PUT',input)),
     generate:(id,input)=>request(`${task(id)}/generate`,json('POST',input)),
     discover:id=>request(`${task(id)}/discover`,json('POST')),
