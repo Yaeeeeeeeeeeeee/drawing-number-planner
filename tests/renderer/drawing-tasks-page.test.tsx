@@ -147,3 +147,29 @@ describe('independent drawing task page',()=>{
     await waitFor(()=>expect(api.packaging.deleteTask).toHaveBeenCalledWith(task.id,{confirmed:true,token:'completed-token'}));
   });
 });
+
+it('stops hidden polling and rejects an interval response that predates a saved mutation',async()=>{
+  let poll=()=>{};vi.spyOn(window,'setInterval').mockImplementation((callback)=>{poll=callback as ()=>void;return 123 as never;});
+  const api=fixture();const view=render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
+  const row=await screen.findByRole('region',{name:`${item.fullCode} 铭牌`});fireEvent.click(within(row).getByRole('button',{name:'设置 / 检查'}));
+  let resolve!:(value:typeof task)=>void;api.packaging.getTask.mockImplementationOnce(()=>new Promise(yes=>{resolve=yes;}));await act(async()=>poll());
+  fireEvent.change(within(row).getByRole('spinbutton'),{target:{value:'99'}});api.packaging.updateItem.mockResolvedValue({...task,items:[{...item,parameters:{width:99}}]});
+  fireEvent.click(within(row).getByRole('button',{name:'保存本次设置'}));await waitFor(()=>expect(within(row).getByRole('button',{name:'保存本次设置'})).toBeDisabled());
+  await act(async()=>resolve(task));expect(within(row).getByRole('spinbutton')).toHaveValue(99);
+  const clear=vi.spyOn(window,'clearInterval');view.rerender(<DrawingTasksPage api={api as never} active={false}/>);expect(clear).toHaveBeenCalledWith(123);
+  const calls=api.packaging.getTask.mock.calls.length;await act(async()=>poll());expect(api.packaging.getTask).toHaveBeenCalledTimes(calls);
+});
+
+it('accepts a successful save across hiding and reactivation without losing the draft or leaving it dirty',async()=>{
+ const api=fixture();const view=render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));const row=await screen.findByRole('region',{name:`${item.fullCode} 铭牌`});fireEvent.click(within(row).getByRole('button',{name:'设置 / 检查'}));fireEvent.change(within(row).getByRole('spinbutton'),{target:{value:'99'}});
+ let resolve!:(value:typeof task)=>void;api.packaging.updateItem.mockImplementationOnce(()=>new Promise(yes=>{resolve=yes;}));fireEvent.click(within(row).getByRole('button',{name:'保存本次设置'}));await waitFor(()=>expect(api.packaging.updateItem).toHaveBeenCalled());
+ view.rerender(<DrawingTasksPage api={api as never} active={false}/>);view.rerender(<DrawingTasksPage api={api as never}/>);
+ await act(async()=>resolve({...task,items:[{...item,parameters:{width:99}}]}));expect(within(row).getByRole('spinbutton')).toHaveValue(99);expect(within(row).getByRole('button',{name:'保存本次设置'})).toBeDisabled();expect(screen.getByRole('button',{name:'批量生成待处理项目'})).toBeEnabled();
+});
+
+it('does not restore a deleted task from a history request started during deletion',async()=>{
+ const api=fixture();const view=render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'删除'}));const dialog=await screen.findByRole('dialog');fireEvent.click(within(dialog).getByRole('checkbox'));
+ let finishDelete!:(value:{id:string;deleted:boolean})=>void;api.packaging.deleteTask.mockImplementationOnce(()=>new Promise(yes=>{finishDelete=yes;}));fireEvent.click(within(dialog).getByRole('button',{name:'确认删除记录'}));
+ let finishHistory!:(value:typeof task[])=>void;view.rerender(<DrawingTasksPage api={api as never} active={false}/>);api.packaging.listTasks.mockImplementationOnce(()=>new Promise(yes=>{finishHistory=yes;}));view.rerender(<DrawingTasksPage api={api as never}/>);await waitFor(()=>expect(api.packaging.listTasks).toHaveBeenCalledTimes(2));
+ await act(async()=>finishDelete({id:task.id,deleted:true}));expect(screen.queryByRole('button',{name:'查看记录'})).not.toBeInTheDocument();await act(async()=>finishHistory([task]));expect(screen.queryByRole('button',{name:'查看记录'})).not.toBeInTheDocument();
+});

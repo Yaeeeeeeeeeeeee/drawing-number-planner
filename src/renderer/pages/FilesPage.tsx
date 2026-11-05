@@ -120,6 +120,19 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const [navigationCounts, setNavigationCounts] = useState<PdfNavigationCounts | null>(null);
   const [unmatchedCount, setUnmatchedCount] = useState<number | null>(null);
   const navigationRequest = useRef(0);
+  const metadataRequest=useRef(0),settingsRoot=useRef('');const [metadataLoading,setMetadataLoading]=useState(false),[metadataErrors,setMetadataErrors]=useState<Record<string,string>>({}),[settingsLoaded,setSettingsLoaded]=useState(false);
+  const metadataFailure=(key:string,reason:unknown)=>setMetadataErrors(previous=>({...previous,[key]:reason instanceof Error?reason.message:'读取失败'}));
+  const metadataSuccess=(key:string)=>setMetadataErrors(previous=>{const next={...previous};delete next[key];return next;});
+  const refreshMetadata=async()=>{
+    const request=++metadataRequest.current;setMetadataLoading(true);
+    const [nextSettings,productItems,batchItems,usage]=await Promise.allSettled([api.getWorkspaceSettings(),api.listProducts({status:'all'}),api.listMaterialBatches({}),api.getDrawingNavigation?.()]);
+    if(request!==metadataRequest.current)return;
+    if(nextSettings.status==='fulfilled'){setSettings(nextSettings.value);setSettingsLoaded(true);const root=nextSettings.value.workspaceRoot??'';const previousRoot=settingsRoot.current;setRootInput(current=>current===previousRoot?root:current);settingsRoot.current=root;metadataSuccess('资料库设置');}else metadataFailure('资料库设置',nextSettings.reason);
+    if(productItems.status==='fulfilled'){setProducts(productItems.value);metadataSuccess('产品资料');}else metadataFailure('产品资料',productItems.reason);
+    if(batchItems.status==='fulfilled'){setBatches(batchItems.value);metadataSuccess('资料批次');}else metadataFailure('资料批次',batchItems.reason);
+    if(usage.status==='fulfilled'){setUsageBatches(usage.value?.batches??[]);metadataSuccess('图号导航');}else metadataFailure('图号导航',usage.reason);
+    setMetadataLoading(false);
+  };
   const refreshNavigation = async (values = filters) => {
     const request = ++navigationRequest.current;
     if (!api.getPdfFileNavigation) { setNavigationCounts(null); setUnmatchedCount(null); return; }
@@ -129,8 +142,8 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       plannerQueryCache.fetch(queryKey('pdf:counts', {cacheScope, values:unmatchedValues}), () => api.getPdfFileNavigation!(manualFilters(unmatchedValues))),
     ]);
     if (request !== navigationRequest.current) return;
-    setNavigationCounts(counts.status==='fulfilled'?counts.value:null);
-    setUnmatchedCount(unmatched.status==='fulfilled'?unmatched.value.total:null);
+    if(counts.status==='fulfilled'){setNavigationCounts(counts.value);metadataSuccess('目录统计');}else metadataFailure('目录统计',counts.reason);
+    if(unmatched.status==='fulfilled'){setUnmatchedCount(unmatched.value.total);metadataSuccess('未匹配统计');}else metadataFailure('未匹配统计',unmatched.reason);
   };
   const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
   const [scanIncomplete,setScanIncomplete]=useState(false);
@@ -168,7 +181,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     const key=queryKey('pdf:scope',{cacheScope,values,scope});
     currentQueryKey.current=key; loadingMore.current=false; exhaustedQuery.current=null; setLoadMoreError('');
     latestSearch.current = { values, scope, page: requestedPage };
-    const request = ++searchRequest.current; setLoading(true);
+    const request = ++searchRequest.current; setLoading(true);setError('');
     try {
       const result = await loadChunks(values,scope,requestedPage);
       if (request !== searchRequest.current) return;
@@ -198,19 +211,14 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     const request = ++searchRequest.current; setLoading(true); setError('');
     void refreshNavigation();
     void refreshLatestScan();
-    void api.getDrawingNavigation?.().then(result => { if (live) setUsageBatches(result.batches); }).catch(() => { if (live) setUsageBatches([]); });
-    void Promise.all([api.getWorkspaceSettings(), api.listProducts({ status: 'all' }).catch(() => []), api.listMaterialBatches({}).catch(() => [])])
-      .then(([nextSettings, productItems, batchItems]) => {
-        if (!live) return;
-        setSettings(nextSettings); setRootInput(nextSettings.workspaceRoot ?? ''); setProducts(productItems); setBatches(batchItems);
-      }).catch(reason => { if (live) setError(reason instanceof Error ? reason.message : '资料库设置加载失败'); });
+    void refreshMetadata();
     currentQueryKey.current=queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope});
     void loadChunks(latestSearch.current.values,latestSearch.current.scope,latestSearch.current.page).then(result => {
       if (!live || request !== searchRequest.current) return;
       setFiles(result.items); setTotal(result.total);
     }).catch(reason => { if (live && request === searchRequest.current) setError(reason instanceof Error ? reason.message : 'PDF 文件中心加载失败'); })
       .finally(() => { if (live && request === searchRequest.current) setLoading(false); });
-    return () => { live = false; searchRequest.current++; navigationRequest.current++; latestScanRequest.current++; };
+    return () => { live = false; searchRequest.current++; navigationRequest.current++; metadataRequest.current++; latestScanRequest.current++; };
   }, [api, active]);
 
   useEffect(() => {
@@ -295,7 +303,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     try {
       const [, batchItems] = await Promise.all([search(), api.listMaterialBatches({})]);
       setBatches(batchItems);
-      try { const usage = await api.getDrawingNavigation?.(); setUsageBatches(usage?.batches ?? []); } catch { setUsageBatches([]); }
+      try { const usage = await api.getDrawingNavigation?.(); setUsageBatches(usage?.batches ?? []);metadataSuccess('图号导航'); } catch(reason) { metadataFailure('图号导航',reason); }
     }
     catch (reason) { setError(`扫描已完成，列表刷新失败：${reason instanceof Error?reason.message:'请重新加载列表'}`); }
     finally { setScanning(false); }
@@ -428,7 +436,8 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     </>}
 
     </details>
-    {error && <p className="error-banner" role="alert">{error}</p>}{message && <p className="success-banner" role="status"><strong>{message}</strong></p>}
+    {metadataLoading&&<p role="status">加载 PDF 辅助资料…</p>}{Object.keys(metadataErrors).length>0&&<p role="alert" className="error-banner">PDF 辅助资料加载失败：{Object.entries(metadataErrors).map(([name,reason])=>`${name}：${reason}`).join("；")}<button type="button" onClick={()=>{void refreshMetadata();void refreshNavigation(latestSearch.current.values);}}>重试 PDF 辅助资料</button></p>}
+    {error && <p className="error-banner" role="alert">{error}<button type="button" onClick={()=>void search()}>重新加载 PDF</button></p>}{message && <p className="success-banner" role="status"><strong>{message}</strong></p>}
     {scanIncomplete&&<p className="files-stat-scope" role="status">本次扫描未完成；新增、变化、确认缺失和失败文件数尚未确定。</p>}
     {mock && scanning && <section className="scan-comparison" role="status"><span>正在模拟扫描 · 仅处理内存样例，不读取文件</span><button type="button" className="secondary-button" onClick={() => void api.listLocalTasks().then(tasks => { const task = tasks.find(item => item.status === 'running'); if (task) return api.cancelLocalTask(task.id); }).catch(reason => setError(String(reason)))}>取消模拟扫描</button></section>}
 
@@ -516,7 +525,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
           onClick={() => void confirmIndexClear()}>{clearingIndex ? '清空中…' : '确认清空资料库索引'}</button></div>
     </section>}
     {loading&&<p className="files-loading-status" role="status" aria-live="polite">正在加载 PDF 文件索引…</p>}
-    {!loading && !error && files.length === 0 && <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
+    {!loading && !error && !metadataLoading && !Object.keys(metadataErrors).length && settingsLoaded && files.length === 0 && <EmptyState symbol="P" title={settings.configured ? navigationScope.kind!=='all'||Object.keys(initialFilters).some(key=>latestSearch.current.values[key as keyof typeof initialFilters]!==initialFilters[key as keyof typeof initialFilters])?'没有符合条件的 PDF':'暂无 PDF 文件索引' : '请先设置资料根目录'}
       description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} />}
     {(files.length > 0 || loading) &&
       <DataTable tableId="pdf-files" showLayoutTools={false} virtualize virtualKey={queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope})} onEndReached={() => {if(loading)return false;void loadMore();return true;}} items={files} renderExpandedRow={item => expandedPathId === item.id

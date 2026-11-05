@@ -519,3 +519,28 @@ describe('PDF quick filters and scan scope',()=>{
     expect(screen.getByLabelText('资料批次筛选')).toHaveValue('');
   });
 });
+
+it('keeps successful PDF metadata and files when products fail, and retries without losing filters',async()=>{
+ const api=apiFixture(true);api.listProducts.mockRejectedValueOnce(new Error('产品资料离线'));render(<FilesPage api={api as never}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('产品资料离线');expect(await screen.findByText('02.0404.010.0401001-LOGO',{selector:'.file-primary'})).toBeVisible();
+ fireEvent.click(screen.getByText('文件筛选'));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'保留条件'}});
+ expect(screen.getByRole('option',{name:/20260309/})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'重试 PDF 辅助资料'}));
+ await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(screen.getByLabelText('文件关键词')).toHaveValue('保留条件');expect(screen.getByRole('button',{name:'产品 SKDZC100JP · ZC100'})).toBeVisible();
+});
+
+it('retains PDF catalog and counts after a failed refresh and retries without clearing root drafts',async()=>{
+ const api={...apiFixture(true),getPdfFileNavigation:vi.fn().mockResolvedValue({total:4,unassociatedProducts:0,categories:[],products:[],batches:[]}),getDrawingNavigation:vi.fn().mockResolvedValue({batches:[]})};
+ const view=render(<FilesPage api={api as never}/>);await screen.findByRole('button',{name:'产品 SKDZC100JP · ZC100'});
+ fireEvent.click(screen.getByText('详细信息'));const input=screen.getByDisplayValue('X:\\Library');fireEvent.change(input,{target:{value:'未保存的根目录'}});
+ view.rerender(<FilesPage api={api as never} active={false}/>);api.listProducts.mockRejectedValueOnce(new Error('目录离线'));api.listMaterialBatches.mockRejectedValueOnce(new Error('批次离线'));api.getDrawingNavigation.mockRejectedValueOnce(new Error('图号导航离线'));api.getPdfFileNavigation.mockRejectedValue(new Error('统计离线'));
+ view.rerender(<FilesPage api={api as never}/>);expect(await screen.findByRole('alert')).toHaveTextContent('目录离线');expect(screen.getByRole('button',{name:'产品 SKDZC100JP · ZC100'})).toBeVisible();expect(input).toHaveValue('未保存的根目录');expect(screen.getByText('PDF 4')).toBeVisible();
+ api.getPdfFileNavigation.mockResolvedValue({total:4,unassociatedProducts:0,categories:[],products:[],batches:[]});fireEvent.click(screen.getByRole('button',{name:'重试 PDF 辅助资料'}));await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(input).toHaveValue('未保存的根目录');
+});
+
+it('distinguishes an empty PDF index from filtered no-results and offers retry for failed index loads',async()=>{
+ const api=apiFixture(true);api.searchPdfFiles.mockResolvedValue({items:[],total:0,page:1,pageSize:100});render(<FilesPage api={api as never}/>);
+ expect(await screen.findByText('暂无 PDF 文件索引')).toBeVisible();fireEvent.click(screen.getByText('文件筛选'));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'不存在'}});fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));
+ expect(await screen.findByText('没有符合条件的 PDF')).toBeVisible();
+ api.searchPdfFiles.mockRejectedValueOnce(new Error('索引离线'));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'重试'}});fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));expect(await screen.findByRole('alert')).toHaveTextContent('索引离线');
+ fireEvent.click(screen.getByRole('button',{name:'重新加载 PDF'}));await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(screen.getByLabelText('文件关键词')).toHaveValue('重试');
+});

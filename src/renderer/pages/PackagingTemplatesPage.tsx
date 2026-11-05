@@ -23,9 +23,13 @@ export function PackagingTemplatesPage({api,active=true}:{api:PlannerApi;active?
     const request=++loadRequest.current;
     if(!packaging){setLoadError('当前服务尚未提供包材模板接口，请使用配套版本的本地服务。');setLoading(false);return;}
     if(!hasData)setLoading(true);setLoadError('');try{
-      const [next,products,projects,mains,brands]=await Promise.all([packaging.getCatalog(),api.listProducts({status:'all'}),api.listDictionaries('project_item'),api.listDictionaries('main_category'),api.listDictionaries('brand')]);
+      const results=await Promise.allSettled([packaging.getCatalog(),api.listProducts({status:'all'}),api.listDictionaries('project_item'),api.listDictionaries('main_category'),api.listDictionaries('brand')]);
       if(request!==loadRequest.current)return;
-      setCatalog(next);setLookups({products,projects,mains,brands});setHasData(true);
+      const [next,products,projects,mains,brands]=results;
+      if(next.status==='fulfilled'){setCatalog(next.value);setHasData(true);}
+      setLookups(previous=>({products:products.status==='fulfilled'?products.value:previous.products,projects:projects.status==='fulfilled'?projects.value:previous.projects,mains:mains.status==='fulfilled'?mains.value:previous.mains,brands:brands.status==='fulfilled'?brands.value:previous.brands}));
+      const failures=results.flatMap((result,index)=>result.status==='rejected'?[`${['模板与规则','产品','项目','类别','品牌'][index]}：${result.reason instanceof Error?result.reason.message:'读取失败'}`]:[]);
+      if(failures.length)throw new Error(failures.join('；'));
     }catch(e){if(request===loadRequest.current){setLoadError(e instanceof Error?e.message:'包材资料加载失败');if(throwOnError)throw e;}}finally{if(request===loadRequest.current)setLoading(false);}
   };
   const reload=()=>load(true);
@@ -46,7 +50,7 @@ export function PackagingTemplatesPage({api,active=true}:{api:PlannerApi;active?
           {key:'products',label:'适用范围',width:220,render:t=><>{t.brandIds.length?t.brandIds.map(id=>lookups.brands.find(b=>b.id===id)?.name??`品牌 #${id}`).join('、'):'全部品牌'}<small>{t.productIds.length?t.productIds.map(id=>lookups.products.find(p=>p.id===id)?.model??`产品 #${id}`).join('、'):'全部型号'}</small></>},
           {key:'mapping',label:'字段映射',width:100,render:t=>`${t.fields.filter(f=>f.sourceKey==='DRAWING_NO').length} 项图号`},{key:'status',label:'状态',width:85,render:t=>t.status==='active'?'启用':'停用'},
           {key:'actions',label:'操作',width:190,render:t=><div><div className="pkg-actions"><button type="button" disabled={busy} onClick={()=>setTemplateEditor(t)}>编辑 / 替换 AIT</button><button type="button" disabled={busy} onClick={async()=>{setBusy(true);setFeedback(null);try{const result=await packaging.inspectTemplate(t.id);const issues=result.issues??[];const errors=issues.filter(i=>i.severity==='error');setFeedback({id:t.id,error:errors.length>0,message:`${errors.length?'检查未通过':'本机模板检查完成'}。${issues.map(i=>i.message).join('；')} 对象：${result.fields.map(f=>`${f.objectName} ${f.matches} 个${f.editable?'可编辑':'不可编辑'}`).join('、')}。字体仅检查声明及打开后可观察到的字体，仍需人工核对原始字体。`});}catch(e){setFeedback({id:t.id,error:true,message:e instanceof Error?e.message:'检查失败'});}finally{setBusy(false);}}}>本机检查</button></div>{feedback?.id===t.id&&<small role={feedback.error?'alert':'status'} className={feedback.error?'pkg-error':''}>{feedback.message}</small>}</div>},
-        ]}/>{!catalog.templates.length&&<p className="pkg-empty">暂无 AIT 模板。上传 AIT，选择需要填入完整图号的文字对象。</p>}
+        ]}/>{catalog.templates.length>0&&!catalog.templates.some(visible)&&<p className="pkg-empty">没有符合筛选条件的 AIT 模板。</p>}{!catalog.templates.length&&<p className="pkg-empty">暂无 AIT 模板。上传 AIT，选择需要填入完整图号的文字对象。</p>}
       </section>
       <section role="tabpanel" id="pkg-panel-rules" aria-labelledby="pkg-tab-rules" hidden={tab!=='rules'}><div className="pkg-section-heading"><h2>模板匹配规则</h2><button type="button" onClick={()=>setRuleEditor(null)}>新增匹配规则</button></div>
         {ruleEditor!==false&&<RuleEditor key={ruleEditor?.id??'new-rule'} api={packaging} initial={ruleEditor??undefined} catalog={catalog} onSaved={async()=>{await reload();setRuleEditor(false);}} onCancel={()=>setRuleEditor(false)}/>}
@@ -54,7 +58,7 @@ export function PackagingTemplatesPage({api,active=true}:{api:PlannerApi;active?
           {key:'name',label:'规则名称',width:170,render:r=>r.name},{key:'template',label:'目标模板',width:170,render:r=>catalog.templates.find(t=>t.id===r.templateId)?.name??`模板 #${r.templateId}`},
           {key:'conditions',label:'尺寸条件',width:280,render:r=>r.conditions.map(c=>`${dimensionLabel(catalog.configs.find(config=>config.projectItemId===catalog.templates.find(t=>t.id===r.templateId)?.projectItemId)?.parameters??[],c.key)} ${{lt:'<',lte:'≤',gt:'>',gte:'≥',eq:'=',between:'介于'}[c.operator]} ${c.value}${c.operator==='between'?` 至 ${c.max}`:''}`).join('；')||'固定模板（无尺寸条件）'},
           {key:'swap',label:'长宽互换',width:100,render:r=>r.allowLengthWidthSwap?'允许':'不允许'},{key:'status',label:'状态',width:85,render:r=>r.status==='active'?'启用':'停用'},{key:'actions',label:'操作',width:85,render:r=><button type="button" onClick={()=>setRuleEditor(r)}>编辑规则</button>},
-        ]}/>{!catalog.rules.length&&<p className="pkg-empty">暂无匹配规则。多个模板符合条件时由用户明确选择。</p>}
+        ]}/>{catalog.rules.length>0&&!catalog.rules.some(r=>visible({...r,projectItemId:catalog.templates.find(t=>t.id===r.templateId)?.projectItemId}))&&<p className="pkg-empty">没有符合筛选条件的匹配规则。</p>}{!catalog.rules.length&&<p className="pkg-empty">暂无匹配规则。多个模板符合条件时由用户明确选择。</p>}
       </section>
       <section role="tabpanel" id="pkg-panel-config" aria-labelledby="pkg-tab-config" hidden={tab!=='config'}><div className="pkg-section-heading"><h2>项目生成设置</h2></div><ConfigEditor api={packaging} catalog={catalog} projects={lookups.projects} onSaved={reload}/></section>
     </>}

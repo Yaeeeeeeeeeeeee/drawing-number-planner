@@ -70,3 +70,66 @@ describe('mounted packaging page reactivation',()=>{
     fireEvent.click(screen.getByRole('button',{name:'重新加载'}));expect(await screen.findByRole('region',{name:'制图任务管理'})).toBeVisible();expect(api.packaging.getCatalog).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('task history and metadata feedback',()=>{
+  it('refreshes actual completed history on reactivation and ignores a late old history request',async()=>{
+    const api=fixture();const late=pending<typeof task[]>();api.packaging.listTasks.mockReturnValueOnce(late.promise);
+    const view=render(<DrawingTasksPage api={api as never}/>);
+    await screen.findByRole('region',{name:'制图任务管理'});
+    view.rerender(<DrawingTasksPage api={api as never} active={false}/>);
+    api.packaging.listTasks.mockResolvedValue([{...task,state:'completed',model:'最新历史'}]);
+    view.rerender(<DrawingTasksPage api={api as never} active/>);
+    expect(await screen.findByText('最新历史')).toBeVisible();
+    await act(async()=>late.resolve([task]));expect(screen.queryByText('T40',{selector:'strong'})).not.toBeInTheDocument();
+  });
+  it('refreshes an opened completed task while preserving its expanded dirty draft and scroll',async()=>{
+    const api=fixture();const view=render(<DrawingTasksPage api={api as never}/>);
+    fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));const row=await screen.findByRole('region',{name:`${item.fullCode} 铭牌`});
+    fireEvent.click(within(row).getByRole('button',{name:'设置 / 检查'}));fireEvent.change(within(row).getByRole('spinbutton'),{target:{value:'95'}});row.scrollTop=42;
+    view.rerender(<DrawingTasksPage api={api as never} active={false}/>);
+    api.packaging.getTask.mockResolvedValue({...task,state:'completed',items:[{...item,parameters:{width:81}}]});
+    view.rerender(<DrawingTasksPage api={api as never} active/>);
+    expect(await screen.findByText('已完成',{selector:'.pkg-task-counters span'})).toBeVisible();
+    expect(screen.getByRole('region',{name:`${item.fullCode} 铭牌`})).toBe(row);expect(row.scrollTop).toBe(42);expect(within(row).getByRole('spinbutton')).toHaveValue(95);
+  });
+  it('shows successful catalog with failed filters, keeps successful lookups and retries',async()=>{
+    const api=fixture();api.listDictionaries.mockImplementation(async(type:string)=>{if(type==='project_item')throw new Error('项目资料离线');return [];});
+    render(<PackagingTemplatesPage api={api as never}/>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('项目资料离线');
+    fireEvent.click(screen.getByRole('button',{name:'新增 AIT 模板'}));expect(screen.getByLabelText('SKU7 · T40 · SAMKYO')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('模板名称'),{target:{value:'保留输入'}});
+    api.listDictionaries.mockResolvedValue([]);fireEvent.click(screen.getByRole('button',{name:'重新加载'}));
+    await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(screen.getByLabelText('模板名称')).toHaveValue('保留输入');
+  });
+  it('distinguishes catalog filter no-results from true empty',async()=>{
+    const api=fixture();api.packaging.getCatalog.mockResolvedValue({...catalog(),templates:[{id:9,name:'已存模板',fileName:'a.ait',status:'active',projectItemId:3,mainCategoryId:2,productIds:[],brandIds:[],fields:[]}] } as never);
+    render(<PackagingTemplatesPage api={api as never}/>);await screen.findByText('已存模板');fireEvent.change(screen.getByLabelText('搜索'),{target:{value:'不存在'}});
+    expect(screen.getByText('没有符合筛选条件的 AIT 模板。')).toBeVisible();expect(screen.queryByText(/暂无 AIT 模板/)).not.toBeInTheDocument();
+  });
+  it('makes failed history retryable without claiming an empty history',async()=>{
+    const api=fixture();api.packaging.listTasks.mockRejectedValueOnce(new Error('历史离线'));render(<DrawingTasksPage api={api as never}/>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('历史离线');expect(screen.queryByText('暂无制图任务记录。')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'重试任务记录'}));expect(await screen.findByRole('button',{name:'查看记录'})).toBeVisible();
+  });
+});
+
+it('retains initial successful task lookups when catalog fails and a retry loses the products resource',async()=>{
+ const api=fixture();api.packaging.getCatalog.mockRejectedValueOnce(new Error('模板离线'));render(<DrawingTasksPage api={api as never}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('模板离线');api.listProducts.mockRejectedValueOnce(new Error('产品离线'));fireEvent.click(screen.getByRole('button',{name:'重新加载'}));
+ expect(await screen.findByRole('option',{name:'SKU7 · T40 · SAMKYO'})).toBeInTheDocument();expect(screen.getByRole('alert')).toHaveTextContent('产品离线');
+});
+
+it('keeps a newer open detail while still accepting other history rows from the activation refresh',async()=>{
+ const api=fixture();const view=render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));await screen.findByRole('region',{name:'当前制图任务'});
+ view.rerender(<DrawingTasksPage api={api as never} active={false}/>);const history=pending<typeof task[]>();api.packaging.listTasks.mockReturnValueOnce(history.promise);api.packaging.getTask.mockResolvedValue({...task,model:'最新详情'});
+ view.rerender(<DrawingTasksPage api={api as never}/>);await screen.findByRole('heading',{name:'SAMKYO · 最新详情'});
+ await act(async()=>history.resolve([{...task,model:'过期详情'},{...task,id:'other',model:'其他新历史',state:'completed'}]));
+ // Go back starts another refresh; keep it pending so this assertion observes the activation result.
+ api.packaging.listTasks.mockReturnValueOnce(new Promise(()=>{}));fireEvent.click(screen.getByRole('button',{name:'返回任务记录'}));
+ expect(screen.getByText('其他新历史',{selector:'strong'})).toBeVisible();expect(screen.getByText('最新详情',{selector:'strong'})).toBeVisible();expect(screen.queryByText('过期详情',{selector:'strong'})).not.toBeInTheDocument();
+});
+
+it('keeps last good history on manual refresh failure without reporting refresh success',async()=>{
+ const api=fixture();render(<DrawingTasksPage api={api as never}/>);await screen.findByRole('button',{name:'查看记录'});api.packaging.listTasks.mockRejectedValueOnce(new Error('手动刷新失败'));
+ fireEvent.click(screen.getByRole('button',{name:'刷新任务记录'}));expect(await screen.findByRole('alert')).toHaveTextContent('手动刷新失败');expect(screen.getByRole('button',{name:'查看记录'})).toBeVisible();expect(screen.queryByText('任务记录已刷新')).not.toBeInTheDocument();
+});

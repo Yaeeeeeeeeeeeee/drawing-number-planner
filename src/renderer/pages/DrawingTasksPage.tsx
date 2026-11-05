@@ -10,15 +10,19 @@ export function DrawingTasksPage({api,target,active=true}:{api:PlannerApi;target
   const [data,setData]=useState<{catalog:PackagingCatalog;lookups:PackagingLookups}|null>(null);
   const [error,setError]=useState('');const [loading,setLoading]=useState(true);
   const [automation,setAutomation]=useState<{message:string;blocked?:boolean}|null>(null);const [busy,setBusy]=useState(false);
-  const loadRequest=useRef(0);
+  const loadRequest=useRef(0);const retainedLookups=useRef<PackagingLookups>({products:[],projects:[],mains:[],brands:[]});
   const packaging=api.packaging;
   const load=async(throwOnError=false)=>{
     const request=++loadRequest.current;
     if(!packaging){setError('当前服务尚未提供制图任务接口，请使用配套版本的本地服务。');setLoading(false);return;}
     if(!data)setLoading(true);setError('');try{
-      const [catalog,products,projects,mains,brands]=await Promise.all([packaging.getCatalog(),api.listProducts({status:'all'}),api.listDictionaries('project_item'),api.listDictionaries('main_category'),api.listDictionaries('brand')]);
+      const results=await Promise.allSettled([packaging.getCatalog(),api.listProducts({status:'all'}),api.listDictionaries('project_item'),api.listDictionaries('main_category'),api.listDictionaries('brand')]);
       if(request!==loadRequest.current)return;
-      setData({catalog,lookups:{products,projects,mains,brands}});
+      const [catalog,products,projects,mains,brands]=results;
+      const previousLookups=retainedLookups.current;const lookups={products:products.status==='fulfilled'?products.value:previousLookups.products,projects:projects.status==='fulfilled'?projects.value:previousLookups.projects,mains:mains.status==='fulfilled'?mains.value:previousLookups.mains,brands:brands.status==='fulfilled'?brands.value:previousLookups.brands};retainedLookups.current=lookups;
+      setData(previous=>{const nextCatalog=catalog.status==='fulfilled'?catalog.value:previous?.catalog;return nextCatalog?{catalog:nextCatalog,lookups}:previous;});
+      const failures=results.flatMap((result,index)=>result.status==='rejected'?[`${['模板与规则','产品','项目','类别','品牌'][index]}：${result.reason instanceof Error?result.reason.message:'读取失败'}`]:[]);
+      if(failures.length)throw new Error(failures.join('；'));
     }catch(reason){if(request===loadRequest.current){setError(reason instanceof Error?reason.message:'任务资料加载失败');if(throwOnError)throw reason;}}finally{if(request===loadRequest.current)setLoading(false);}
   };
   useEffect(()=>{if(active)void load();return()=>{loadRequest.current++;};},[api,packaging,active]);
@@ -27,7 +31,7 @@ export function DrawingTasksPage({api,target,active=true}:{api:PlannerApi;target
     {loading&&<p role="status">加载任务资料…</p>}{error&&<div className="pkg-error" role="alert">{error}<button type="button" onClick={()=>void load()}>重新加载</button></div>}
     {data&&packaging&&<>
       {automation&&<div className="pkg-automation"><span>Illustrator：{automation.message}</span>{automation.blocked&&<button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{setAutomation(await packaging.reconcileAutomation());}catch(reason){setAutomation({...automation,message:reason instanceof Error?reason.message:'检查失败'});}finally{setBusy(false);}}}>检查上次本机操作是否已结束</button>}</div>}
-      <PackagingTasks api={api} catalog={data.catalog} lookups={data.lookups} target={target} onCatalogChanged={()=>load(true)}/>
+      <PackagingTasks active={active} api={api} catalog={data.catalog} lookups={data.lookups} target={target} onCatalogChanged={()=>load(true)}/>
     </>}
   </section>;
 }

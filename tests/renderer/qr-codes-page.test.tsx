@@ -136,3 +136,25 @@ it('refreshes file history when links change without a QR metadata timestamp cha
  api.getQrCode.mockResolvedValueOnce({...manual,files:[]});fireEvent.focus(window);
  await waitFor(()=>expect(api.qrManualHistory).toHaveBeenCalledTimes(2));
 });
+
+it('reports partial QR references, retains products and input and retries purposes',async()=>{
+ const api=apiFor([]);api.listQrPurposes.mockRejectedValueOnce(new Error('用途离线'));render(<QrCodesPage api={api as never}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('用途离线');expect(await screen.findByText('ZU70SD',{selector:'span'})).toBeVisible();
+ fireEvent.change(screen.getByLabelText('SKU / 型号'),{target:{value:'保留检索'}});fireEvent.click(screen.getByRole('button',{name:'重试辅助资料'}));
+ await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(screen.getByLabelText('SKU / 型号')).toHaveValue('保留检索');expect(screen.getByRole('option',{name:'说明书'})).toBeInTheDocument();
+});
+it('distinguishes complete QR failure from empty and retries the list',async()=>{
+ const api=apiFor([]);api.listProducts.mockResolvedValue([]);api.listQrCodes.mockRejectedValueOnce(new Error('二维码离线'));render(<QrCodesPage api={api as never}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('二维码离线');expect(screen.queryByText('没有符合筛选条件的二维码。')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'重试二维码'}));expect(await screen.findByText('暂无二维码或产品记录。')).toBeVisible();
+});
+
+it('orders reference refreshes and retains last good options when a newer refresh partly fails',async()=>{
+ const api=apiFor();const view=render(<QrCodesPage api={api as never}/>);await screen.findByRole('option',{name:'说明书'});
+ let resolve!:(value:{items:typeof purpose[]})=>void;view.rerender(<QrCodesPage api={api as never} active={false}/>);
+ api.listQrPurposes.mockImplementationOnce(()=>new Promise(yes=>{resolve=yes;}));view.rerender(<QrCodesPage api={api as never}/>);
+ view.rerender(<QrCodesPage api={api as never} active={false}/>);api.listQrPurposes.mockResolvedValue({items:[{...purpose,displayName:'最新用途'}]});view.rerender(<QrCodesPage api={api as never}/>);
+ await screen.findByRole('option',{name:'最新用途'});await act(async()=>resolve({items:[{...purpose,displayName:'过期用途'}]}));expect(screen.queryByRole('option',{name:'过期用途'})).not.toBeInTheDocument();
+ view.rerender(<QrCodesPage api={api as never} active={false}/>);api.listQrPurposes.mockRejectedValueOnce(new Error('刷新用途失败'));view.rerender(<QrCodesPage api={api as never}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('刷新用途失败');expect(screen.getByRole('option',{name:'最新用途'})).toBeInTheDocument();
+});
