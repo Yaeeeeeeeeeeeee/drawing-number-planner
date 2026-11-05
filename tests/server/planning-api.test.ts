@@ -76,3 +76,21 @@ it('reserves with an explicit version and exposes the same association in the sc
   const library=await app.inject({method:'GET',url:`/api/drawings?productId=${payload.productId}&appearanceVersionId=${version.id}`});expect(library.statusCode).toBe(200);expect(library.json().items).toEqual([expect.objectContaining({id:reserved.json().items[0].id,appearanceVersionId:version.id})]);
   const counts=await app.inject({method:'GET',url:'/api/drawings/navigation-counts'});expect(counts.json().appearances).toContainEqual({appearanceVersionId:version.id,count:1});
 });
+
+it('previews incomplete batch rows independently and confirms only current approved rows',async()=>{
+ const groups=[{...payload,rows:[payload.rows[0],{...payload.rows[0],clientId:'incomplete',projectItemId:0}]}];
+ const preview=await app.inject({method:'POST',url:'/api/planning/batch-preview',payload:{groups}});
+ expect(preview.statusCode).toBe(200);expect(preview.json().groups[0].rows[1]).toMatchObject({available:false,error:{code:'INVALID_PLAN'}});
+ const row=preview.json().groups[0].rows[0];
+ const reserved=await app.inject({method:'POST',url:'/api/planning/batch-reserve',payload:{confirmed:true,groups:[{...payload,rows:[{...payload.rows[0],expectedFullCode:row.fullCode,fingerprint:row.fingerprint}]}]}});
+ expect(reserved.statusCode).toBe(200);expect(reserved.json().results[0]).toMatchObject({outcome:'reserved',drawing:{id:expect.any(Number),origin:'planned',fullCode:row.fullCode}});
+ const unconfirmed=await app.inject({method:'POST',url:'/api/planning/batch-reserve',payload:{confirmed:false,groups}});expect(unconfirmed.statusCode).toBe(400);
+});
+it('lists real white bases and never creates a record to fill an empty list',async()=>{
+ const row=payload.rows[0];
+ const url=`/api/planning/white-bases?productId=${payload.productId}&projectItemId=${row.projectItemId}`;
+ expect((await app.inject({method:'GET',url})).json()).toEqual({items:[]});
+ const preview=await app.inject({method:'POST',url:'/api/planning/preview',payload});
+ const reserved=await app.inject({method:'POST',url:'/api/planning/reserve',payload:{...payload,rows:[{...row,expectedFullCode:preview.json().rows[0].fullCode}]}});
+ expect((await app.inject({method:'GET',url})).json().items).toEqual([expect.objectContaining({origin:'planned',id:reserved.json().items[0].id})]);
+});

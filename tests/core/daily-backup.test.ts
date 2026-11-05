@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -94,4 +94,36 @@ describe('daily first-launch backup', () => {
     expect(existsSync(older)).toBe(true);
     database.close();
   });
+});
+
+
+it('backs up validated planning drafts immutably with the daily database and prunes only owned companions',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'drawing-planner-draft-backup-'));
+ const databasePath=join(dir,'planner.db'),backups=join(dir,'backups');
+ const database=openDatabase(databasePath);database.exec('create table records(value text)');
+ const draft={version:1,revisions:{new:1},modes:{new:{revision:1,updatedAt:'2026-08-01T00:00:00.000Z',input:{step:2,groups:[]}}}};
+ writeFileSync(join(dir,'planning-drafts.json'),JSON.stringify(draft));
+ const first=ensureDailyBackup(database,databasePath,backups,new Date(2026,7,1,8));
+ if(first.status!=='created')throw new Error('expected created backup');
+ const companion=`${first.path}.planning-drafts.json`;
+ expect(JSON.parse(readFileSync(companion,'utf8'))).toMatchObject({kind:'planning-drafts-backup',drafts:draft});
+ const original=readFileSync(companion,'utf8');
+ draft.modes.new.input.step=4;writeFileSync(join(dir,'planning-drafts.json'),JSON.stringify(draft));
+ expect(ensureDailyBackup(database,databasePath,backups,new Date(2026,7,1,9)).status).toBe('skipped');
+ expect(readFileSync(companion,'utf8')).toBe(original);
+ const unrelated=join(backups,'daily-20260731-080000-000.db.planning-drafts.json');writeFileSync(unrelated,'user data');
+ for(let day=2;day<=31;day++)ensureDailyBackup(database,databasePath,backups,new Date(2026,7,day,8));
+ expect(existsSync(first.path)).toBe(false);expect(existsSync(companion)).toBe(false);
+ expect(readFileSync(unrelated,'utf8')).toBe('user data');
+ expect(readdirSync(backups).filter(name=>name.endsWith('.planning-drafts.json'))).toHaveLength(31);
+ database.close();
+},30000);
+it('reports invalid drafts before creating a daily database and preserves the invalid source',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'drawing-planner-invalid-draft-backup-'));
+ const databasePath=join(dir,'planner.db'),backups=join(dir,'backups');
+ const database=openDatabase(databasePath);database.exec('create table records(value text)');
+ writeFileSync(join(dir,'planning-drafts.json'),'{invalid');
+ expect(ensureDailyBackup(database,databasePath,backups,new Date(2026,7,1,8)).status).toBe('failed');
+ expect(readFileSync(join(dir,'planning-drafts.json'),'utf8')).toBe('{invalid');
+ expect(readdirSync(backups)).toEqual([]);database.close();
 });

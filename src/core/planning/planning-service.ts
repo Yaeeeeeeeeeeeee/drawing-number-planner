@@ -1,3 +1,4 @@
+import { BatchPlanningService } from './batch-planning-service.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { composeDrawingCode, composeDrawingPrefix, formatDisplayName } from './code-generator.js';
 import { PlanningError } from './planning-errors.js';
@@ -7,6 +8,18 @@ import type { PlannedRow, PlanningInput, PlanningPreview, ReservePlanningInput, 
 export class PlanningService {
   private readonly repository: PlanningRepository;
   constructor(private readonly database: PlannerDatabase) { this.repository = new PlanningRepository(database); }
+
+  previewBatch(input: import('./planning-types.js').BatchPlanningInput) {
+    return new BatchPlanningService(this.database, this).preview(input);
+  }
+
+  reserveBatch(input: import('./planning-types.js').BatchReservePlanningInput) {
+    return new BatchPlanningService(this.database, this).reserve(input);
+  }
+
+  listWhiteBases(input: import('./planning-types.js').PlanningWhiteBasesInput) {
+    return new BatchPlanningService(this.database, this).listWhiteBases(input);
+  }
 
   private validateInput(input: PlanningInput): void {
     if (input.rows.length < 1 || input.rows.length > 100) {
