@@ -1,0 +1,168 @@
+.drawing-library-page .drawing-code-inline {display:flex;gap:8px;align-items:center;flex-wrap:nowrap;min-width:0;}
+.drawing-library-page .drawing-code-inline h2 {overflow-wrap:anywhere;margin:0;}
+.drawing-library-page .drawing-code-inline>.link-button,.drawing-library-page .drawing-code-inline>h2 {min-width:0;overflow-wrap:anywhere;}
+.drawing-library-page .drawing-code-inline>div,.drawing-library-page .drawing-code-inline>span {display:inline-flex;}
+.drawing-library-page .drawing-code-inline>span:last-child,.drawing-library-page .drawing-code-inline>div {flex:none;}
+.drawing-library-page .drawing-detail-toolbar {display:flex;gap:8px;align-items:center;margin:10px 0;}
+.drawing-library-page .drawing-detail-attributes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.drawing-library-page .drawing-detail-columns {display:block;}
+.drawing-library-page .workspace-drawing-detail {width:auto;max-width:none;padding:16px;}
+.drawing-library-page .drawing-detail-section {margin:12px 0;padding:10px 0;}
+.drawing-library-page .drawing-detail-section summary {cursor:pointer;}
+.drawing-library-page .drawing-detail-section ul {padding-left:18px;}
+.drawing-library-page .drawing-detail-section small,.drawing-library-page td small {display:block;}
+.drawing-library-page .drawing-scope-title {font-size:18px;margin:0 0 12px;}
+.drawing-library-page .filter-grid {display:flex;flex-wrap:wrap;gap:10px;align-items:end;}
+.drawing-library-page .drawing-advanced-filters {flex-basis:100%;}
+.product-batch-navigation {display:grid;gap:8px;}
+.product-batch-navigation input {width:100%;min-width:0;}
+.product-batch-navigation button {display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px;border-radius:5px;overflow-wrap:anywhere;cursor:pointer;}
+.product-batch-navigation button[aria-current=page] {background:#e8e9eb;color:#25292e;font-weight:600;}
+.product-batch-navigation details>details {padding-left:10px;}
+.product-batch-navigation .product-batch-leaf {padding-left:18px;}
+.product-batch-navigation small {display:block;color:var(--text-muted,#677487);}
+.drawing-workspace .module-detail.module-drawer {width:min(520px,calc(100vw - 24px));max-width:600px;}
+@media(min-width:2200px) {.drawing-workspace .module-detail.module-drawer {width:560px;}}
+.drawing-library-page .module-list .table-wrap {overflow-x:auto;}
+.drawing-library-page .module-list table {min-width:940px;}
+.drawing-library-page .module-list th:last-child,.drawing-library-page .module-list td:last-child {position:sticky;right:0;background:#fff;white-space:nowrap;}
+.drawing-library-page .module-list th:last-child {background:#f6f6f6;}
+.product-batch-navigation > h2 {font-size:16px;margin:0 0 4px;}
+/* Screenshot feedback: copied state never participates in row geometry. */
+.drawing-library-page .drawing-copy-control {position:relative;display:inline-flex;flex:0 0 auto;align-items:center;line-height:1;}
+.drawing-library-page .drawing-copy-control > .copy-icon-button {display:inline-grid;place-items:center;flex:none;margin:0;vertical-align:middle;}
+.drawing-library-page .drawing-copy-error {position:absolute;top:100%;right:0;z-index:5;width:220px;padding:6px 8px;border:1px solid #d6d6d6;background:#fff;white-space:normal;color:#9b2c25;font-size:12px;line-height:1.4;}
+.drawing-library-page .module-list > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td) {text-align:center;vertical-align:middle;padding:10px 12px;}
+.drawing-library-page .module-list .drawing-code-inline {justify-content:center;gap:6px;}
+.drawing-library-page .module-list .drawing-code-inline > .link-button {white-space:nowrap;flex:none;}
+.drawing-library-page .module-list .drawing-origin-cell {display:inline-block;min-width:72px;white-space:nowrap;}
+.drawing-query-navigation {border-top:1px solid #e2e2e2;margin-top:8px;padding-top:12px;}
+.drawing-query-navigation > h3 {font-size:12px;color:#737373;margin:0 8px 4px;}
+.product-batch-orphans > button {padding-left:18px;}
+.drawing-library-page .drawing-list-heading {margin:0 0 14px;padding:0;min-width:0;}
+.drawing-library-page .drawing-list-heading > h2 {font-size:18px;font-weight:600;line-height:1.4;margin:0;}
+.drawing-library-page .drawing-list-heading > p {margin:4px 0 0;font-size:12px;line-height:1.5;color:#737373;}
+.drawing-library-page .drawing-search-bar {display:grid;grid-template-columns:minmax(180px,360px) minmax(120px,180px) minmax(120px,160px) auto auto;justify-content:start;align-items:end;gap:10px 12px;margin:0 0 12px;padding:0 0 14px;}
+.drawing-library-page .drawing-search-bar > label {min-width:0;}
+.drawing-library-page .drawing-search-bar > label :is(input,select) {width:100%;height:36px;}
+.drawing-library-page .drawing-search-bar > button {height:36px;min-height:36px;white-space:nowrap;}
+.drawing-library-page .drawing-search-bar > .drawing-advanced-filters {grid-column:1 / -1;}
+.drawing-workspace > .p4-workspace-grid > .panel-resize-handle::after {width:1px;left:4px;top:0;height:100%;background:#e4e4e4;}
+.drawing-workspace > .p4-workspace-grid > .panel-resize-handle:hover::after,.drawing-workspace > .p4-workspace-grid > .panel-resize-handle:focus-visible::after {background:#888;}
+@media(max-width:760px) {.drawing-library-page .drawing-search-bar {display:flex;flex-wrap:wrap;}.drawing-library-page .drawing-search-bar > label:first-child {flex:1 1 100%;}.drawing-library-page .drawing-search-bar > label {flex:1 1 130px;}}
+.drawing-library-page .drawing-category-project { display: grid; justify-items: center; gap: 4px; min-width: 0; }
+.drawing-library-page .drawing-category-badge { display: inline-block; max-width: 100%; padding: 1px 7px; border: 1px solid #d5dde6; border-radius: 4px; color: #526477; background: #eef2f6; font-size: 11px; line-height: 18px; overflow-wrap: anywhere; }
+.drawing-library-page .drawing-project-name { color: var(--ws-text, #252525); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+/* The list owns one scroll region; the query controls and pager stay in view. */
+.drawing-library-page .drawing-workspace .module-list {display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.drawing-library-page .drawing-workspace .module-list > :is(header,form,.batch-toolbar,.drawing-pagination) {flex:0 0 auto;}
+.drawing-library-page .drawing-workspace .module-list > .table-wrap {flex:1 1 auto;min-height:100px;overflow:auto;}
+.drawing-library-page .drawing-workspace .module-list > .table-wrap > table {width:100%;min-width:760px;table-layout:fixed;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td) {overflow-wrap:anywhere;padding:9px 8px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(1) {width:44px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(2) {width:224px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(3) {width:82px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(4) {width:auto;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(5) {width:64px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(6) {width:90px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(7) {width:100px;}
+.drawing-library-page .drawing-workspace .module-list th {position:sticky;top:0;z-index:2;background:#f6f6f6;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):last-child {position:sticky;right:0;background:#fff;z-index:1;box-shadow:-1px 0 #e8e8e8;}
+.drawing-library-page .drawing-workspace .module-list th:last-child {z-index:3;background:#f6f6f6;}
+.drawing-library-page .drawing-code-inline > :is(.link-button,h2) {font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;}
+.drawing-library-page .drawing-workspace .drawing-code-inline > .link-button {font-size:12px;letter-spacing:-.2px;}
+.drawing-library-page .drawing-copy-control > .copy-icon-button {width:24px;height:24px;min-height:24px;padding:3px;border:0;background:transparent;}
+.drawing-library-page .drawing-search-bar {grid-template-columns:minmax(160px,1fr) minmax(110px,150px) minmax(100px,130px) auto auto auto;gap:8px;}
+.drawing-library-page .drawing-pagination {flex:0 0 auto;margin-top:auto;padding:10px 0 0;min-height:44px;flex-wrap:wrap;}
+@media(max-width:1100px) {.drawing-library-page .drawing-search-bar {display:flex;flex-wrap:wrap;}.drawing-library-page .drawing-search-bar > label:first-child {flex:1 1 200px;}.drawing-library-page .drawing-search-bar > label {flex:1 1 110px;}}
+/* Product identity and appearance version columns share the compact table rhythm. */
+.drawing-library-page .table-wrap table th,.drawing-library-page .table-wrap table td{padding:12px;text-align:center;}
+.drawing-library-page .table-wrap table th:nth-child(2),.drawing-library-page .table-wrap table td:nth-child(2){text-align:left;}
+.drawing-library-page .table-wrap table tbody tr{height:52px;}
+.drawing-library-page .table-wrap table th{position:sticky;top:0;z-index:2;}
+.drawing-library-page .table-wrap table th:last-child,.drawing-library-page .table-wrap table td:last-child{position:sticky;right:0;background:var(--surface,#fff);}
+.drawing-association-editor,.drawing-association-preview{padding:12px;border:1px solid var(--border-color,#d9e0e7);border-radius:8px;margin:8px 0;}
+.drawing-association-editor{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.drawing-association-editor h3{width:100%;margin:0;}
+
+.drawing-library-page .drawing-workspace .module-list > .table-wrap > table{min-width:1060px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(3){width:154px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(4){width:90px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(5){width:120px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(6){width:114px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(7){width:100px;}
+.drawing-library-page .drawing-workspace .module-list :is(th,td):nth-child(8){width:110px;}
+.drawing-library-page .module-list > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td){padding:12px;}
+.drawing-library-page .module-list > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(2){text-align:left;}
+/* The drawer owns its layout; no legacy file/card or toolbar geometry applies here. */
+.drawing-library-tools {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;}
+.drawing-library-tools:empty {display:none;}
+.drawing-library-page .drawing-workspace .module-detail.module-drawer {width:min(640px,calc(100vw - 24px));max-width:680px;}
+.drawing-library-page .workspace-drawing-detail {padding:24px;min-width:0;}
+.drawing-library-page .drawing-detail-header {position:relative;padding:0 34px 20px 0;border-bottom:1px solid var(--ws-line);margin-bottom:24px;}
+.drawing-library-page .drawing-detail-header .drawing-code-inline {justify-content:flex-start;gap:8px;min-width:0;}
+.drawing-library-page .drawing-detail-header h2 {font-size:24px;line-height:1.4;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.4px;}
+.drawing-library-page .drawing-close-icon {position:absolute;right:0;top:0;display:grid;place-items:center;width:28px;height:28px;min-height:28px;padding:4px;border:0;border-radius:4px;background:transparent;}
+.drawing-library-page .drawing-close-icon:hover {background:var(--ws-hover);}
+.drawing-library-page .drawing-detail-badges {display:flex;align-items:center;gap:8px;margin-top:10px;}
+.drawing-library-page .drawing-detail-badges > span {display:inline-flex;align-items:center;min-height:24px;padding:2px 8px;border-radius:4px;font-size:12px;line-height:1.4;}
+.drawing-library-page .drawing-origin-label {background:#eee;color:#555;}
+.drawing-library-page .drawing-detail-header .detail-name {font-size:13px;font-weight:400;margin:10px 0 0;color:var(--ws-muted);}
+.drawing-library-page .workspace-drawing-detail .drawing-detail-group {margin:0 0 20px;padding:20px;border:0;border-radius:10px;min-width:0;}
+.drawing-library-page .drawing-detail-group:nth-of-type(1) {background:#f5f6f8;}
+.drawing-library-page .drawing-detail-group:nth-of-type(2) {background:#f0f5fa;}
+.drawing-library-page .drawing-detail-group:nth-of-type(3) {background:#f0f7f4;}
+.drawing-library-page .drawing-detail-group:nth-of-type(4) {background:#f7f5f9;}
+.drawing-library-page .drawing-detail-group > h3 {font-size:14px;font-weight:600;line-height:1.5;margin:0 0 16px;color:#292929;}
+.drawing-library-page .drawing-detail-group .drawing-detail-attributes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px;margin:0;}
+.drawing-library-page .drawing-detail-attributes :is(dt,dd) {font-size:13px;line-height:1.5;overflow-wrap:anywhere;}
+.drawing-library-page .drawing-detail-attributes dt {color:#626870;}
+.drawing-library-page .drawing-detail-attributes dd {margin:4px 0 0;color:#292929;font-weight:600;}
+.drawing-library-page .drawing-detail-group .drawing-detail-section {margin:16px 0 0;padding:16px 0 0;border:0;border-top:1px solid #dce3e9;border-radius:0;background:transparent;}
+.drawing-library-page .drawing-detail-group .drawing-file-section:first-of-type {margin-top:0;padding-top:0;border:0;}
+.drawing-library-page .drawing-detail-group .drawing-detail-section h3 {font-size:13px;font-weight:600;margin:0 0 10px;}
+.drawing-library-page .drawing-detail-group :is(p,li,summary,label) {font-size:13px;line-height:1.5;}
+.drawing-library-page .drawing-detail-group p {margin:6px 0;}
+.drawing-library-page .drawing-detail-group ul {margin:8px 0 0;padding:0;list-style:none;}
+.drawing-library-page .drawing-file-section > h3 {display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.drawing-library-page .drawing-file-presence {position:static;font-size:12px;white-space:nowrap;}
+.drawing-library-page .drawing-file-presence.present {color:#306747;}
+.drawing-library-page .drawing-file-presence.missing {color:#aa3a31;}
+.drawing-library-page .drawing-detail-group .drawing-file-row {--ws-control-height:30px;display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px;height:52px;min-height:48px;padding:8px 12px;box-sizing:border-box;background:#fff;border:1px solid #d9e3ed;border-radius:6px;margin:8px 0 0;}
+.drawing-library-page .drawing-file-identity {flex:1;min-width:0;width:auto;padding:0;}
+.drawing-library-page .drawing-file-name {display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;line-height:1.5;font-weight:500;}
+.drawing-library-page .drawing-file-row > button {flex-shrink:0;white-space:nowrap;margin:0;align-self:center;color:#425f7c;}
+.drawing-library-page .drawing-detail-group .drawing-detail-toolbar {display:flex;position:static;align-items:center;flex-wrap:wrap;gap:12px;padding:0;margin:0;border:0;background:transparent;}
+.drawing-library-page .drawing-detail-group .danger-zone {display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin-top:20px;padding:16px 0 0;border:0;border-top:1px solid #ded9e3;background:transparent;}
+.drawing-library-page .drawing-detail-group .danger-zone > :is(p,div) {flex-basis:100%;}
+.drawing-library-page .drawing-detail-group .text-button {min-height:28px;padding:4px 0;border:0;border-radius:0;background:transparent;font-size:13px;}
+.drawing-library-page .drawing-detail-group .danger-zone > .text-button.danger {padding:4px 0;border:0;background:transparent;}
+.drawing-library-page .drawing-detail-group .text-button:hover:not(:disabled) {text-decoration:underline;text-underline-offset:3px;background:transparent;}
+.drawing-library-page .drawing-business-summary {margin:0;}
+.drawing-library-page .drawing-business-summary > div {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;}
+.drawing-library-page .drawing-business-summary > div:first-child {padding-top:0;}
+.drawing-library-page .drawing-business-summary > div:last-child {padding-bottom:0;}
+.drawing-library-page .drawing-business-summary > div+div {border-top:1px solid #dce7e0;margin-top:12px;padding-top:16px;}
+.drawing-library-page .drawing-business-summary dt {color:#5f6b65;flex-shrink:0;}
+.drawing-library-page .drawing-business-summary dd {margin:0;text-align:right;font-size:13px;font-weight:500;}
+.drawing-library-page .drawing-business-status {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;}
+.drawing-library-page .drawing-business-status select {width:150px;min-width:0;}
+.drawing-association-editor {padding:12px;background:transparent;}
+.drawing-association-editor :is(input,select) {min-width:0;flex:1 1 150px;}
+.drawing-association-records {max-height:min(40vh,360px);overflow:auto;border-block:1px solid var(--ws-line);margin-block:8px;}
+.drawing-association-preview {min-height:0;flex-shrink:0;}
+.drawing-association-result {flex-shrink:0;}
+@media(min-width:2200px) {.drawing-library-page .drawing-workspace .module-detail.module-drawer {width:680px;}}
+@media(max-width:640px) {.drawing-library-page .workspace-drawing-detail {padding:16px;}.drawing-library-page .drawing-detail-header h2 {font-size:20px;}.drawing-library-page .workspace-drawing-detail .drawing-detail-group {padding:16px;}.drawing-library-page .drawing-detail-group .drawing-detail-attributes {gap:14px;}}
+
+.drawing-force-release{padding:10px 0;border-top:1px solid var(--border-color,#e2e8f0)}
+.drawing-force-release h4{margin:0 0 8px}
+.drawing-force-release .deletion-reference-list{margin:8px 0}
+
+.drawing-library-page .drawing-detail-group .drawing-batch-file-row {height:auto;min-height:62px;}
+.drawing-library-page .drawing-file-batch {display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:#536478;font-size:12px;}
+.drawing-library-page .drawing-batch-usage {font-size:11px;border:1px solid #d4dce4;border-radius:4px;padding:1px 5px;white-space:nowrap;}
+.drawing-library-page .drawing-batch-usage.current {color:#245e43;background:#e9f4ec;border-color:#bad7c3;}
+.drawing-library-page .drawing-batch-usage.historical {color:#6b7480;background:#f3f5f7;}
+.drawing-library-page .drawing-file-conflict {display:block;color:#8a5b16;font-size:12px;overflow-wrap:anywhere;}
+.drawing-library-page .drawing-index-note {display:block;color:#657286;font-size:11px;}

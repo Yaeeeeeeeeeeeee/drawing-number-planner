@@ -1,0 +1,14 @@
+{
+  "DrawingNumberPlanner-1.5.0-Windows-x64-Setup.exe": {
+    "bytes": 145169138,
+    "sha256": "dc9facc0ac45e2de673acfef2793f621dfaec95018d0848471a47f37bffda023"
+  },
+  "Verification-Windows-1.5.0.zip": {
+    "bytes": 9033354,
+    "sha256": "10e4a9aae33789c8b0c46b5f947918a9c0856e93ec953a7e6eb8539780d9289f"
+  },
+  "source": "096dabc1561164e7f3eed91c7800f52006cc7904",
+  "windowsRun": 41397786717,
+  "publicDownloadsVerified": true,
+  "noBusinessFilesBundledInReport": true
+}

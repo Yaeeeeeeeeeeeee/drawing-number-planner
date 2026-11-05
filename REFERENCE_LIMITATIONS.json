@@ -1,0 +1,30 @@
+[
+  {
+    "from": "docs/design-audit-three-skills-20261023.md",
+    "reference": "../work/design-audit-20261023/index.html",
+    "resolved": "work/design-audit-20261023/index.html",
+    "exists_in_workspace": true,
+    "reason": "excluded temporary/runtime/business-file reference"
+  },
+  {
+    "from": "docs/design-audit-three-skills-20261023.md",
+    "reference": "../work/design-audit-20261023/results.json",
+    "resolved": "work/design-audit-20261023/results.json",
+    "exists_in_workspace": true,
+    "reason": "excluded temporary/runtime/business-file reference"
+  },
+  {
+    "from": "docs/design-audit-three-skills-20261023.md",
+    "reference": "../work/design-audit-20261023/ui-ux-search.json",
+    "resolved": "work/design-audit-20261023/ui-ux-search.json",
+    "exists_in_workspace": true,
+    "reason": "excluded temporary/runtime/business-file reference"
+  },
+  {
+    "from": "docs/design-audit-three-skills-20261023.md",
+    "reference": "../work/design-audit-20261023.mjs",
+    "resolved": "work/design-audit-20261023.mjs",
+    "exists_in_workspace": true,
+    "reason": "excluded temporary/runtime/business-file reference"
+  }
+]

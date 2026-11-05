@@ -1,0 +1,1373 @@
+{
+  "audit_baseline_head": "45450c00e8a5acf9089adf47bcee0ecc3c71c616",
+  "application_version": "1.5.0",
+  "schema_version": 25,
+  "release_source": "096dabc1561164e7f3eed91c7800f52006cc7904",
+  "image_catalog": "project/UI_DESIGN_CATALOG.md",
+  "referenced_images": 187,
+  "existing_images": 187,
+  "missing_images": 0,
+  "missing_paths": [],
+  "image_total_bytes": 15707878,
+  "image_groups": {
+    "docs/p4-adaptive-visuals-20261015": 40,
+    "docs/p4-detail-feedback-visuals-20261016": 8,
+    "docs/p4-filter-visuals-20261016": 12,
+    "docs/p4-visual-evidence-20261015": 3,
+    "docs/screenshots/comprehensive-20261020": 4,
+    "docs/screenshots/comprehensive-windows-20261021": 10,
+    "docs/screenshots/p4-bom-edit-fix-20261016": 3,
+    "docs/screenshots/p4-bom-history-20261016": 7,
+    "docs/screenshots/p4-drawing-alignment-20261017": 18,
+    "docs/screenshots/p4-floating-navigation-20261019": 45,
+    "docs/screenshots/p4-integrated-20261017": 18,
+    "docs/screenshots/p4-pdf-navigation-20261019": 13,
+    "docs/screenshots/p4-products-list-20261016": 3,
+    "docs/screenshots/v1.5.0": 3
+  },
+  "images": [
+    {
+      "original_path": "docs/screenshots/v1.5.0/planning-windows-1920.png",
+      "package_path": "project/docs/screenshots/v1.5.0/planning-windows-1920.png",
+      "status": "present",
+      "bytes": 71542,
+      "sha256": "600e033d75f01a7de7d112368261c5f2302f0ea95c0f6a3a89ba3db8a63f7669"
+    },
+    {
+      "original_path": "docs/screenshots/v1.5.0/drawing-tasks-windows-1920.png",
+      "package_path": "project/docs/screenshots/v1.5.0/drawing-tasks-windows-1920.png",
+      "status": "present",
+      "bytes": 64276,
+      "sha256": "8e876da47beec882da80c41602ee10226ceba97f05376a5777c4fbce3aa79911"
+    },
+    {
+      "original_path": "docs/screenshots/v1.5.0/task-history-windows-1920.png",
+      "package_path": "project/docs/screenshots/v1.5.0/task-history-windows-1920.png",
+      "status": "present",
+      "bytes": 75905,
+      "sha256": "8f2d686686c6074f619dcc4eac41252289f705c8cffbb8d8aaa13b3c166ba3e0"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-add-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-add-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 30001,
+      "sha256": "bffc0995a5d1126aec649884b332e8b96c19e9f4ab1d655cc5f071f05c6ce222"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-add-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-add-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 51058,
+      "sha256": "11911f293179895d74ab860c61eeb28da9ebbafe67f5b6701b4f9785bf0d636e"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-add-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-add-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 56131,
+      "sha256": "725e25c0382826b3973e01f735ffc21485e3f6612aa7bb8d4d46b785236159a2"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-add-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-add-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 81783,
+      "sha256": "8427d8812b2e689c47db0c8260fc990f047d9c5a6a79f65150084fb0061f03ea"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-query-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-query-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 37479,
+      "sha256": "e5f766098bb3f3a80e0aa89d854f35a6173d879a6c61d48455702b846bebb813"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-query-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-query-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 59679,
+      "sha256": "0dbb2f7f01e07b8efb9fa81090b3518b508bf15e55078bd2028087e376572e2b"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-query-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-query-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 65456,
+      "sha256": "41f40865f5ffc56b009b1895ac1ef0facb1e9f6bd6382c4f02d04bab63f8f9a3"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/bom-query-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/bom-query-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 91057,
+      "sha256": "be3366030e052dbc566605cc3386a0cd5e7bea2d001c78d81e0e63f353f862e8"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/dictionary-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/dictionary-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 31260,
+      "sha256": "3affe0dc19edeb5438db97b71db09addbf98536b7d32e517b470d964de5bb82f"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/dictionary-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/dictionary-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 53182,
+      "sha256": "03e899442a2fb3e1779276a9dcb6c9ffc4b896586c0abcc01a9045c5a9c2652f"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/dictionary-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/dictionary-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 58384,
+      "sha256": "c2dfb77bbb250c2310a31914a0450926986b4e5b0f95991423a4f949c7da2819"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/dictionary-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/dictionary-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 83754,
+      "sha256": "701a2bbf22091c96183992dea8ed0ff2c13a969327e15fef1bdc9d01d6323eb4"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/drawings-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/drawings-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 38339,
+      "sha256": "7b0ffacf6f53efa24760823d78fa6be57d5f67969c7b26a3d50cd380392258a2"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/drawings-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/drawings-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 60109,
+      "sha256": "e0b498526c0b4996641f0470a4903ad3d1bbea4ed8b7fe8643b5af76a2d28fa8"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/drawings-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/drawings-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 65579,
+      "sha256": "d076cd8897c36670942a9b556385ba147a6923932d8ad1dd295dffd010ed11f3"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/drawings-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/drawings-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 91326,
+      "sha256": "a7ebcfefbd4d70431625bb7b4fe2a2101be93c8cfcbc6833ac51fcc2c7869c77"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/files-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/files-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 59739,
+      "sha256": "e97c07b899e477e91ef2c325337e1f6592d9529804c6769b7e2d3b815cb5fc6d"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/files-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/files-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 95193,
+      "sha256": "7767038e47adeb8d50596a5fa60a6277d238e242b5d4e0fe9d5e9439ca33e7cf"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/files-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/files-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 109526,
+      "sha256": "d8b6159c002759c28c8bb1616a3678065a33e5f6bd26dc89b68c16db2fd1671b"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/files-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/files-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 142896,
+      "sha256": "4e86702d65f0ece9b583a7148423e7ffa19edffde196fd4f76fe84934827a03b"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/migration-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/migration-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 33320,
+      "sha256": "3e62176355ac857f6392cc2c9182bd532e1304b8fb75fe9cfccce3f066173135"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/migration-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/migration-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 55209,
+      "sha256": "9a3dae0fdec77f52fb5dcce8d70c7015ada29db91dc58872fef6485963cbd176"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/migration-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/migration-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 60650,
+      "sha256": "434b0cae3967eac6e00240faf0454c32270bb73a83f742ea2448b390d0df5206"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/migration-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/migration-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 87280,
+      "sha256": "558cad4903b30358cb0bc5c801cb316e0d0b112a3908956323a676ac41428563"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/outbound-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/outbound-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 52061,
+      "sha256": "00ef8898f691b645b7f49e726456e8c1a869abe925c7449981e69c3f2ffc95ae"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/outbound-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/outbound-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 77064,
+      "sha256": "7be7059ea694b611861269a662053996ec0a2a10b389f177a28c5cacab670435"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/outbound-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/outbound-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 102312,
+      "sha256": "858202b17a77bd76785037eb059e6c3a25b507a009ac094deb0dfdaa08236815"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/outbound-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/outbound-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 139031,
+      "sha256": "ee77392c889c1af0804784bcff5ed1687d947b69bc0b126dc1213ed7a8823069"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/planning-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/planning-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 42584,
+      "sha256": "88e00c70fe7b1ca3d0011e0bca1e27b40ad073da32370795cb818d399db2d54c"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/planning-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/planning-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 71663,
+      "sha256": "c359f2269aface1a26ab2393d2bcef064ae397c2d1dbdef539f68ebc4a2f5734"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/planning-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/planning-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 76726,
+      "sha256": "141b75139d022236d15640fe8989a7dfea23bcfb6bf56f9dde94fac7403eb601"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/planning-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/planning-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 104330,
+      "sha256": "eaeec90b3252b14b32afcf8adaa7501efb3829a76ae448b1a2ef64e6a56b11a7"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/products-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/products-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 32865,
+      "sha256": "5196f9a82aadcc458bba9e7fe0aa16f14136c19c8942adb2cf7cc66d9511d653"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/products-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/products-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 55108,
+      "sha256": "55ec8a3439588c1c024499d5fb4c85491ea15f98cbf1b2cc21110ab34bb3b23c"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/products-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/products-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 60047,
+      "sha256": "479644253e4d4d87565ffeb4961802de74e3a19a1ee6c1a119bee744f445cc7f"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/products-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/products-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 85197,
+      "sha256": "c8542d4173b51cb9889ae0f3521bbe3abcccd495de3e23bff12f4d3aecb29b79"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/qr-1024-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/qr-1024-existing-empty.png",
+      "status": "present",
+      "bytes": 34101,
+      "sha256": "36a9976b5994b24303cdb41b0e0368da6e69d6e392343640b1300612c71dc4df"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/qr-1366-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/qr-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 56474,
+      "sha256": "6ee4144084595415cfae024f75ce9490f0778bc444db769acec4601da500f27a"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/qr-1920-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/qr-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 60755,
+      "sha256": "85564d8a24992351fbf8ef2e0843e2b74a4bb4ac326fd4efb42d8088bd96ec02"
+    },
+    {
+      "original_path": "docs/p4-adaptive-visuals-20261015/qr-3840-existing-empty.png",
+      "package_path": "project/docs/p4-adaptive-visuals-20261015/qr-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 86090,
+      "sha256": "3ef592dd14ac3a539460d4c8af98be0403fb2b3d1d45f869fb0be70ca6151b1d"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/outbound-1366-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/outbound-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 81057,
+      "sha256": "dfa0b637f02b989e9daa470f9ed8a539894645ec899fdeb29f30a1872689bcc0"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/outbound-1920-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/outbound-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 103449,
+      "sha256": "33972e3989528f589103e209ade2691d5c8cba838869129b01472f1b24e330f8"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/outbound-3840-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/outbound-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 134839,
+      "sha256": "6e2a8f3e12b4045c736490f13d3d0def316fbc53dca40e871d11fb7de464549b"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/outbound-720-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/outbound-720-existing-empty.png",
+      "status": "present",
+      "bytes": 38963,
+      "sha256": "308688a52df322df6bb6b7c0430fb4592d686af2c92e813db4489849842e76de"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/planning-1366-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/planning-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 70580,
+      "sha256": "156f946752db5282f2b1ffd71565dd4381cb813e462213333be9ba6c6eddeeff"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/planning-1920-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/planning-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 76828,
+      "sha256": "601c5decf3c795939d12a02802831294a80ebaaa70c0d0a79d3527bc7366757e"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/planning-3840-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/planning-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 104618,
+      "sha256": "5d8092c4477ffe2bd9ac3be9f145af13e8649ec476084be3c784be43144db9a3"
+    },
+    {
+      "original_path": "docs/p4-detail-feedback-visuals-20261016/planning-720-existing-empty.png",
+      "package_path": "project/docs/p4-detail-feedback-visuals-20261016/planning-720-existing-empty.png",
+      "status": "present",
+      "bytes": 35590,
+      "sha256": "e45c4488b2c0809458c9fd15a3d5bfd4de05fa5f3eca701b95906ccc0884e139"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/drawings-expanded-1366-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/drawings-expanded-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 75245,
+      "sha256": "e4e3e6b58512f62be6bf38f70d03607781aa424547f1837489cdb8e729de9ac5"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/drawings-expanded-1920-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/drawings-expanded-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 82002,
+      "sha256": "cb568f2cf996a5e9e6090d0dcab7e1fb1bce842a57cd0a8d43cb4bf2a02a6d81"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/drawings-expanded-3840-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/drawings-expanded-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 106447,
+      "sha256": "521d3100557f0d0591c65796e2678859325e2f8516aba20b4d256ec6ca6eb202"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/files-1366-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/files-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 94775,
+      "sha256": "c5d011395189c6478c90bef349c9614035f6088206cf07c3bb533fbb75fc47e6"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/files-1920-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/files-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 109943,
+      "sha256": "1969750abef103b3fb57f2fcc73128f3e25805caba755462a73f47f7295634b0"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/files-3840-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/files-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 143473,
+      "sha256": "3e099668a5bc6b25f4fe4a29142204271bc0d44e0f99499189a5bfc63fc41e24"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/outbound-1366-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/outbound-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 82012,
+      "sha256": "e8f400fc7deb21870ccfd007f170bcd9540144cd1c7f481c61fb7601b8eb064e"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/outbound-1920-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/outbound-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 105808,
+      "sha256": "3049d6c003d4f226da61d1bc20ad54a35507bf8ee36545ba0389777ee3d7b4f9"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/outbound-3840-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/outbound-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 138883,
+      "sha256": "bacde993c5cbace0a00f13d19331e26e46358ed9ee8309b91ba7dc8dfeb2daa6"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/qr-1366-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/qr-1366-existing-empty.png",
+      "status": "present",
+      "bytes": 58134,
+      "sha256": "c08c55cec5b18380fc4185bdbb22533c9310f0aa9601933a7aab49a732a528f8"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/qr-1920-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/qr-1920-existing-empty.png",
+      "status": "present",
+      "bytes": 62357,
+      "sha256": "45946fa05726cd1f10315a5bf01abac386a5380992b5177ecd6bb965a87b3088"
+    },
+    {
+      "original_path": "docs/p4-filter-visuals-20261016/qr-3840-existing-empty.png",
+      "package_path": "project/docs/p4-filter-visuals-20261016/qr-3840-existing-empty.png",
+      "status": "present",
+      "bytes": 88166,
+      "sha256": "425020125764963b7705b7d11d451a1564db1388455e82a25f5e96c707702550"
+    },
+    {
+      "original_path": "docs/p4-visual-evidence-20261015/drawing-details.png",
+      "package_path": "project/docs/p4-visual-evidence-20261015/drawing-details.png",
+      "status": "present",
+      "bytes": 230015,
+      "sha256": "88b59961ae8884ad4c54e685211e81c24910a909e956445fab3d9e1a34aa2d00"
+    },
+    {
+      "original_path": "docs/p4-visual-evidence-20261015/pdf-overlay-and-tree.png",
+      "package_path": "project/docs/p4-visual-evidence-20261015/pdf-overlay-and-tree.png",
+      "status": "present",
+      "bytes": 277155,
+      "sha256": "66c38d753b806f93eec51916084a8d935f3b9bc2888d3e332e0d4bb966476fc2"
+    },
+    {
+      "original_path": "docs/p4-visual-evidence-20261015/product-qr-direct.png",
+      "package_path": "project/docs/p4-visual-evidence-20261015/product-qr-direct.png",
+      "status": "present",
+      "bytes": 68980,
+      "sha256": "a166cf8528577ed7dd24ed05dde811a220e3a7800e093c538b11c38e5b263505"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-20261020/qr-manual-1366.png",
+      "package_path": "project/docs/screenshots/comprehensive-20261020/qr-manual-1366.png",
+      "status": "present",
+      "bytes": 92653,
+      "sha256": "fb3537c0566bc14cd4033796872bb9ed6b77e29196aa91e5b087e1d477f838ff"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-20261020/qr-manual-1920.png",
+      "package_path": "project/docs/screenshots/comprehensive-20261020/qr-manual-1920.png",
+      "status": "present",
+      "bytes": 134731,
+      "sha256": "f15962a3f9b07763a272d6df78e62128e90e8ee3dcba2e43ce9a6c8a0eaa6721"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-20261020/qr-manual-2560.png",
+      "package_path": "project/docs/screenshots/comprehensive-20261020/qr-manual-2560.png",
+      "status": "present",
+      "bytes": 156119,
+      "sha256": "7bfb701fbeb75350d23034e86c0c3f2b34f89850d508da99d62fe761d05d513c"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-20261020/qr-manual-3840.png",
+      "package_path": "project/docs/screenshots/comprehensive-20261020/qr-manual-3840.png",
+      "status": "present",
+      "bytes": 182143,
+      "sha256": "e5da7bdffce56ddba6d6f765e56de2fbb78e94030500f48485bc41f4d8a5629b"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/bom-1920.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/bom-1920.png",
+      "status": "present",
+      "bytes": 43641,
+      "sha256": "dbc830ee213a64428f6b50fc41988a8fa61decbd5d728d93e8320fc0d40a9f75"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/chinese-installer.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/chinese-installer.png",
+      "status": "present",
+      "bytes": 22413,
+      "sha256": "4813e750de223fb48c91b0d30cbd611dcbb56dee7b6e7e22ea4e26f73ce88d3e"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/drawings-1920.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/drawings-1920.png",
+      "status": "present",
+      "bytes": 68739,
+      "sha256": "5bbbf6396016096eae06c2cdd942abe7524770a683c8296429f9b97d22a4c7b3"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/outbound-1920.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/outbound-1920.png",
+      "status": "present",
+      "bytes": 78858,
+      "sha256": "a15f7fa071afe8078dca8a45a103b20ce9fb5d4ddd8f72abbfe655028a50b760"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/pdf-1920.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/pdf-1920.png",
+      "status": "present",
+      "bytes": 83649,
+      "sha256": "17f561bdfbc1acd066ece8399166b0e9554f4534e16b2b8b356724fafbf7ccea"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/products-1920.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/products-1920.png",
+      "status": "present",
+      "bytes": 49967,
+      "sha256": "5901676967a9552c0005b2e3a77438b2b8fdc162715b5cfd26c4ed6f4b030e93"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/qr-1920.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/qr-1920.png",
+      "status": "present",
+      "bytes": 42925,
+      "sha256": "b41afb4ec60f1527313f3f244c5a37762f81df2a0da31855da23bf443b32d8c3"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/qr-after-restart.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/qr-after-restart.png",
+      "status": "present",
+      "bytes": 37664,
+      "sha256": "acf4cf78ded08a798a96b7a14d41a3059963f8f9e1f1b0870e67208b5c53bf1c"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/qr-manual-validation.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/qr-manual-validation.png",
+      "status": "present",
+      "bytes": 49008,
+      "sha256": "dc4da41bd0edc78cd1150d34a1f6bbea215efc150bb18a9bc17a8b97510f02be"
+    },
+    {
+      "original_path": "docs/screenshots/comprehensive-windows-20261021/qr-replacement-validation.png",
+      "package_path": "project/docs/screenshots/comprehensive-windows-20261021/qr-replacement-validation.png",
+      "status": "present",
+      "bytes": 58419,
+      "sha256": "fe421399b7c7ef878abc4e2ee8f509e55c03c15bfe0685f9b8901a803c8c4173"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-edit-fix-20261016/developer-mock-1100.png",
+      "package_path": "project/docs/screenshots/p4-bom-edit-fix-20261016/developer-mock-1100.png",
+      "status": "present",
+      "bytes": 84312,
+      "sha256": "679e30de0e57d3e0f9c7958283588f539b79ce5bd9f5cdae77d732f28648f623"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-edit-fix-20261016/developer-mock-1920.png",
+      "package_path": "project/docs/screenshots/p4-bom-edit-fix-20261016/developer-mock-1920.png",
+      "status": "present",
+      "bytes": 111602,
+      "sha256": "deeef75c1aaed80c7d444ebcb3a909cc85d890d3269cacdc85f5e3435ccdad3f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-edit-fix-20261016/developer-mock-3840.png",
+      "package_path": "project/docs/screenshots/p4-bom-edit-fix-20261016/developer-mock-3840.png",
+      "status": "present",
+      "bytes": 262006,
+      "sha256": "60d8e36a833c793c88cc92a888ce59e4788fa55cedf3b5b3ab4ce2eac7975359"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-history-20261016/developer-mock-1100.png",
+      "package_path": "project/docs/screenshots/p4-bom-history-20261016/developer-mock-1100.png",
+      "status": "present",
+      "bytes": 73759,
+      "sha256": "aff651ece395ea4cbded822896b581098723db240ba8b854af822bba6d4ad688"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-history-20261016/developer-mock-1920.png",
+      "package_path": "project/docs/screenshots/p4-bom-history-20261016/developer-mock-1920.png",
+      "status": "present",
+      "bytes": 126664,
+      "sha256": "8443a32ac91110a58040f43a021614ebc5d19b34008eecdb7720c80576e9bd31"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-history-20261016/developer-mock-3840.png",
+      "package_path": "project/docs/screenshots/p4-bom-history-20261016/developer-mock-3840.png",
+      "status": "present",
+      "bytes": 260677,
+      "sha256": "ce188303d082310728255218a68fcecd2fcb857ca262dfc27636c174b7af6377"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-history-20261016/developer-mock-field-comparison.png",
+      "package_path": "project/docs/screenshots/p4-bom-history-20261016/developer-mock-field-comparison.png",
+      "status": "present",
+      "bytes": 90048,
+      "sha256": "6339ecb05326d4c08d5fd9086ea23cf5c1db42b088b2824392e92743931a24ae"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-history-20261016/existing-sample-1100.png",
+      "package_path": "project/docs/screenshots/p4-bom-history-20261016/existing-sample-1100.png",
+      "status": "present",
+      "bytes": 55061,
+      "sha256": "037e499235ac33f3ac3370af6f8a8a0a83efa1772b01310185540dc29ca82783"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-history-20261016/existing-sample-1920.png",
+      "package_path": "project/docs/screenshots/p4-bom-history-20261016/existing-sample-1920.png",
+      "status": "present",
+      "bytes": 101781,
+      "sha256": "88bcc6870c1fba09e07579b6e8b906e9d728e7d50db6bfd8631b877bce2e7e41"
+    },
+    {
+      "original_path": "docs/screenshots/p4-bom-history-20261016/existing-sample-3840.png",
+      "package_path": "project/docs/screenshots/p4-bom-history-20261016/existing-sample-3840.png",
+      "status": "present",
+      "bytes": 193042,
+      "sha256": "fba4428618917d9901b6050ff9f656f5088c161c86712efe17ed75b347f2aba4"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/after-copy-1100.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/after-copy-1100.png",
+      "status": "present",
+      "bytes": 85660,
+      "sha256": "9a44fca51949b4b3fdf7980d5007efa7e363ee7e16e914e0cdd20e6d45544448"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/after-copy-1920.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/after-copy-1920.png",
+      "status": "present",
+      "bytes": 125042,
+      "sha256": "2b0410ca807a68dbac2903e15ea6e22e6af773c5475302120d5933e6e7329c03"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/after-copy-3840.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/after-copy-3840.png",
+      "status": "present",
+      "bytes": 116597,
+      "sha256": "24bd2eb9feba3ddd610b601b02b65116171afa9c6aa5694f04f70b4c2e56bcb4"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/files-navigation-1100.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/files-navigation-1100.png",
+      "status": "present",
+      "bytes": 72385,
+      "sha256": "d3d12ebb7440270e55f89546d249e0fca8fea955d7e697332642ce2775adab55"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/files-navigation-1920.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/files-navigation-1920.png",
+      "status": "present",
+      "bytes": 108038,
+      "sha256": "7e51cc46dc60c822fefd9557efb0def3c03b282cecde462581999616951e0d58"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/files-navigation-3840.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/files-navigation-3840.png",
+      "status": "present",
+      "bytes": 141160,
+      "sha256": "119d0577279efd61e71d46e67bdf923a95461b1c4ab91598d9f46c7f03f3784f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/product-scope-1100.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/product-scope-1100.png",
+      "status": "present",
+      "bytes": 74428,
+      "sha256": "0be4bc2e4854cd2bba8fcbfa35e70fccfba857524dbada66bcf81b92df084a1c"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/product-scope-1920.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/product-scope-1920.png",
+      "status": "present",
+      "bytes": 112445,
+      "sha256": "c548e71a1e01b40eb39cb9ab3324bbdcc8189eaad1d717d0a39f1904ddb84820"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/product-scope-3840.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/product-scope-3840.png",
+      "status": "present",
+      "bytes": 141935,
+      "sha256": "433dcb707f9d3f8d686f190741767a4ea1a03da32311bc876afade9f3892a2fc"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/products-centered-1100.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/products-centered-1100.png",
+      "status": "present",
+      "bytes": 46616,
+      "sha256": "6365673984c88205db8264ab97feb423927913390ee76069ad4722b92681a110"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/products-centered-1920.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/products-centered-1920.png",
+      "status": "present",
+      "bytes": 76562,
+      "sha256": "5bae10b80cfc8d20f9e674670a30fc765cd47d2d3b4f69c0d416f6a4df30e96c"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/products-centered-3840.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/products-centered-3840.png",
+      "status": "present",
+      "bytes": 101823,
+      "sha256": "88b1b690f35da0d9aeca84ecd14f9e66860fae0e85e13e6dcf7a71e32b93f30f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/qr-no-count-1100.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/qr-no-count-1100.png",
+      "status": "present",
+      "bytes": 50199,
+      "sha256": "1140339df463bc01b77c3c468da93afa2c03d37be1ca4d079afe806b89e54c5a"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/qr-no-count-1920.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/qr-no-count-1920.png",
+      "status": "present",
+      "bytes": 79314,
+      "sha256": "18c5b32f694a9d153982580282c49180a60e7d50dcea258c8c4c670ffbb1b1dc"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/qr-no-count-3840.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/qr-no-count-3840.png",
+      "status": "present",
+      "bytes": 106336,
+      "sha256": "303aabccf9d4c8e2cf6bfcc8af98689362214e7abc3fed02c9b4dd29b8f805b5"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/recovery-compact-1100.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/recovery-compact-1100.png",
+      "status": "present",
+      "bytes": 64958,
+      "sha256": "340f1b1c75720097f22ca82315066d179ed56fec4f5eaab6e6855d56221b9d2f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/recovery-compact-1920.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/recovery-compact-1920.png",
+      "status": "present",
+      "bytes": 90248,
+      "sha256": "ea8db17eee5c858cc54b2c359d2ce18267326d7ef5d8937695e62ea552a22201"
+    },
+    {
+      "original_path": "docs/screenshots/p4-drawing-alignment-20261017/recovery-compact-3840.png",
+      "package_path": "project/docs/screenshots/p4-drawing-alignment-20261017/recovery-compact-3840.png",
+      "status": "present",
+      "bytes": 117973,
+      "sha256": "46a6a32f988d71d4856c6ba00ed44640d71e5c959aac904aeebe198ffba31b92"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/batch-labels-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/batch-labels-1920.png",
+      "status": "present",
+      "bytes": 32806,
+      "sha256": "675c60c9c90405b0d8516bc4d3e96c675c7614932f2d0bbe0b893534086c22a8"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-parent-project-actions-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-parent-project-actions-1920.png",
+      "status": "present",
+      "bytes": 69939,
+      "sha256": "bca610cecd5b7f002099d4bd8e0db9dcf48dcf93196865f510dec1c3508fdaf9"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1023.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1023.png",
+      "status": "present",
+      "bytes": 58021,
+      "sha256": "332ebdac0a1823728e4e16febbdbe85f9c57fbfc2fcbf4e53e3620791b4132de"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1024.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1024.png",
+      "status": "present",
+      "bytes": 75847,
+      "sha256": "360b92a629c83e960435b725d023140b5062997285cadd3972e9f3aa0ec0c2da"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1100.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1100.png",
+      "status": "present",
+      "bytes": 76569,
+      "sha256": "3a2c66013029888d15389822ff8367833c1387064d3efd19525f0e24d5dfeb7f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-1920.png",
+      "status": "present",
+      "bytes": 86898,
+      "sha256": "8664a7e067bd2e80fabac78bd27757665481efad6d1a8c558757a491e5908385"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-3840.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-3840.png",
+      "status": "present",
+      "bytes": 115345,
+      "sha256": "8af55f8d4f47524448f3046d7d8c6389991f3d52f45aafd65c636b1207d86ca8"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-720.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-permanent-delete-720.png",
+      "status": "present",
+      "bytes": 51962,
+      "sha256": "bfaf3f09411f848dc64f190ef9ef7317cf4448f48a3d6e5820b3e31e200c4172"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1023.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1023.png",
+      "status": "present",
+      "bytes": 41599,
+      "sha256": "4a4c64b9d24392bf26fc03d2012d85fbc27176edeb34293be9e209b19547f6d8"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1024.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1024.png",
+      "status": "present",
+      "bytes": 58695,
+      "sha256": "dc55c89e26d5a41a5f01a94a359f670ee86e376063bc0fb0238bf4e1a3f3aab5"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1100.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1100.png",
+      "status": "present",
+      "bytes": 59585,
+      "sha256": "97e7899478776ba23d1eb07d6849a4f8df2aa4a620b427c838cd60ceac0f7e66"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-1920.png",
+      "status": "present",
+      "bytes": 69094,
+      "sha256": "63aa7985964c09008600018bbe88fcc42f4886cea39c8fc0732fcc740842beb4"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-3840.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-3840.png",
+      "status": "present",
+      "bytes": 95339,
+      "sha256": "3387ca7f004784dfd039ac1b197e9666510d23e99bc8dc7a2e8fd91ce4791ce9"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-720.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/dictionary-restored-edit-720.png",
+      "status": "present",
+      "bytes": 36815,
+      "sha256": "512df5fe3440b0a5af09843bcf2e43b73748eadb4fe5876e27101053ac8f49b7"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/drawing-category-closeup.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/drawing-category-closeup.png",
+      "status": "present",
+      "bytes": 5427,
+      "sha256": "61b6d04bf2e776b3a27c9d2218febd3fb828dae5b01ea342b65a31269232ac2a"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1023.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1023.png",
+      "status": "present",
+      "bytes": 57419,
+      "sha256": "9f99a996187954ec014b122e8d31994acceb7c3fd059009904559147d9d31cd2"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1024.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1024.png",
+      "status": "present",
+      "bytes": 68992,
+      "sha256": "5a5b56a1496edf6d2596c0728cb9f35b0e7883dade70f7bde38feeec2e5119bb"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1100.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1100.png",
+      "status": "present",
+      "bytes": 71216,
+      "sha256": "dba3f341185798a91f7696060770c07573665400b27ef5ba9a3c156e4bba05cf"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-1920.png",
+      "status": "present",
+      "bytes": 99289,
+      "sha256": "234625a5fdc3ad518f65a7a97582c06b4f1b84ce82bcda946d4786e14ad946c1"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-3840.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-3840.png",
+      "status": "present",
+      "bytes": 127016,
+      "sha256": "98fe95b84cf887e45dc3cb1c0ac3d1a06f64445e9de62549fdbf81789d5a0d5f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-720.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/drawing-source-category-720.png",
+      "status": "present",
+      "bytes": 45713,
+      "sha256": "ae46c4fea07e2d221aa91e183222206a7016206d444f0a0bb5a9f7ed159a4189"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1023.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1023.png",
+      "status": "present",
+      "bytes": 35471,
+      "sha256": "79ba8fa94fa0421f807bbbbe109779c0d1ae2a0824b6a28af0adfe74f75bb470"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1024.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1024.png",
+      "status": "present",
+      "bytes": 34079,
+      "sha256": "02f512be61f4e3c62f2f8d15ed0bb595dcd0c27ed161842e8988fe7d45e53c92"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1100.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1100.png",
+      "status": "present",
+      "bytes": 35828,
+      "sha256": "2366cf6f656c7dcad8a458f54fa2d859db971e316b497bcf82e659cfd97a0554"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-closed-1920.png",
+      "status": "present",
+      "bytes": 40600,
+      "sha256": "58669056877ff7ac4c5af8d728640d5b6f28569da3f192aef0edfe57266f4114"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-closed-3840.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-closed-3840.png",
+      "status": "present",
+      "bytes": 64611,
+      "sha256": "f818e3ce45a23b7bbaada592524360f0d2b110e7af34bf3e9950004534eea736"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-closed-720.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-closed-720.png",
+      "status": "present",
+      "bytes": 32508,
+      "sha256": "cae658cbbd74d3511018bd49ba3475b08297131abc32ee2fbe257d0690f156db"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-open-1023.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-open-1023.png",
+      "status": "present",
+      "bytes": 46913,
+      "sha256": "d2364d1390e889cd12e2e8f882acfd4e5b1a546b6a966a984ee61da63b5f23ef"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-open-1024.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-open-1024.png",
+      "status": "present",
+      "bytes": 54786,
+      "sha256": "424943d97b76beb4998615871ed07fc4cd3c484ad00f421d8eedd59721a2ec40"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-open-1100.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-open-1100.png",
+      "status": "present",
+      "bytes": 55255,
+      "sha256": "b5191e8bdb2878a6ba39cdfc6a7ee827bc6c08ef7f9d77b4626db3cd9f406396"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-open-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-open-1920.png",
+      "status": "present",
+      "bytes": 61340,
+      "sha256": "9d466acf8188f04d948e80345fa3a5d45af51036589baea8e6d97974a1414605"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-open-3840.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-open-3840.png",
+      "status": "present",
+      "bytes": 87474,
+      "sha256": "f49b575327efe1d0c888c32de9cb04353ae4ea816e68200939adee71e4ece469"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/navigation-open-720.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/navigation-open-720.png",
+      "status": "present",
+      "bytes": 39552,
+      "sha256": "1e27073b3c173cd813c8da26c89e67467d0292b544acb64a63cf87f041ba0748"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1023.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1023.png",
+      "status": "present",
+      "bytes": 65332,
+      "sha256": "a8d24d3bd0e1b4f7eddaa4f7c36152d5dab8980cf5400a6a94d50be6d587e384"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1024.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1024.png",
+      "status": "present",
+      "bytes": 82112,
+      "sha256": "5cde2fdea4335f942a29a84f5d8eb0f80e55253a960b28af76ebfbfe6f12c204"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1100.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1100.png",
+      "status": "present",
+      "bytes": 84540,
+      "sha256": "198bd3823cfa36a27aa76af0bb84a43544528835a0f2c2f885796c827b2ef2e4"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-1920.png",
+      "status": "present",
+      "bytes": 115117,
+      "sha256": "e99ba199a082fd3f1d12d4bc620acf5ab82c5b96b4bb6448ce76b4bf80e4eaab"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-3840.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-3840.png",
+      "status": "present",
+      "bytes": 146738,
+      "sha256": "b57816d342da0df1f3c6bd5ffd5268ee496ddd3ff42d7020586cd8b5b1e34e1c"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-720.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-buttons-720.png",
+      "status": "present",
+      "bytes": 52754,
+      "sha256": "92da35a153a92416ba6ad0f6b2ee6e6efd3ce6bbc0778a886155ec8374bb3b78"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1023.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1023.png",
+      "status": "present",
+      "bytes": 70850,
+      "sha256": "6557f333619187b103d0476b30c868ae763e1ac52bb4ecb2bc64c115864af588"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1024.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1024.png",
+      "status": "present",
+      "bytes": 88154,
+      "sha256": "f998bcf08f197d5a0d65c912da09a324425f4cf70532a7939b893eec6174268e"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1100.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1100.png",
+      "status": "present",
+      "bytes": 89716,
+      "sha256": "2ad456d64b22f0a0321ce63b9388d5c466b210a59a48c75b8448ae73ac777403"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1920.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-1920.png",
+      "status": "present",
+      "bytes": 126019,
+      "sha256": "09b41703d5ac5d10bf34860cc068838454ffd83fbf9c9e86c98ed588c27887de"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-3840.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-3840.png",
+      "status": "present",
+      "bytes": 159554,
+      "sha256": "ff39162e9584efdda08018238222cfb25fd05177db6be3086cbc5851b58351e5"
+    },
+    {
+      "original_path": "docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-720.png",
+      "package_path": "project/docs/screenshots/p4-floating-navigation-20261019/product-cleanup-review-720.png",
+      "status": "present",
+      "bytes": 61307,
+      "sha256": "b0295aeb19fe254301af652cd6f4696de0451ab3ce7e348c58865948dbf37c5d"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/contact-editor-1100.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/contact-editor-1100.png",
+      "status": "present",
+      "bytes": 43748,
+      "sha256": "965d8a48eac1a69073e2b77b73bb897c6ec80dab203617bec8f8bbeb7298aeae"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/contact-editor-1920.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/contact-editor-1920.png",
+      "status": "present",
+      "bytes": 73009,
+      "sha256": "13b3327e8163eabe7f7f424a6ba753dd1fd9ce9769926eabf371019ec813970b"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/contact-editor-3840.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/contact-editor-3840.png",
+      "status": "present",
+      "bytes": 99368,
+      "sha256": "d4e929f255ce869a0281b44cd9fab94c6fce6523e9df1583f8130355180816c9"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/drawing-detail-1100.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/drawing-detail-1100.png",
+      "status": "present",
+      "bytes": 77706,
+      "sha256": "58f92cacf4ab1f2b95d787068752e242a0aa10ca6bbd9fd6a3518ecdf3ca01df"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/drawing-detail-1920.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/drawing-detail-1920.png",
+      "status": "present",
+      "bytes": 139431,
+      "sha256": "d351ba69051d5d346d3cb027c5824d9d619d40d907d961dcf337d32f9eea68e1"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/drawing-detail-3840.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/drawing-detail-3840.png",
+      "status": "present",
+      "bytes": 172756,
+      "sha256": "040a56ff1c3d86026afb11324f0483d07df6d79d7a84a4b9da7b1da2b5a6426a"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-联系人-1100.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-联系人-1100.png",
+      "status": "present",
+      "bytes": 33965,
+      "sha256": "0a1004c488ce2609364e2e917dba93704f0431fc23e96b1dece46e16b172b76b"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-联系人-1920.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-联系人-1920.png",
+      "status": "present",
+      "bytes": 62310,
+      "sha256": "4bf3afa02fe06256da5dcfb5f4f91b08125cf16c0a98c851f95f6ca9e00b47c9"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-联系人-3840.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-联系人-3840.png",
+      "status": "present",
+      "bytes": 88173,
+      "sha256": "da3ee2a653fd09e7a3292c40873c79f1e97a64eed0c2125f2a0ef29a851b73da"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-邮件模板-1100.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-邮件模板-1100.png",
+      "status": "present",
+      "bytes": 30379,
+      "sha256": "b07229f6652a89e4b51664565af828865ce797be2ecea27cd93c6623ed163ee3"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-邮件模板-1920.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-邮件模板-1920.png",
+      "status": "present",
+      "bytes": 57467,
+      "sha256": "78efe3c22fd644df111619dde773a6606eee46348e192799587959be0a8920a7"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-邮件模板-3840.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-邮件模板-3840.png",
+      "status": "present",
+      "bytes": 82676,
+      "sha256": "81afc3a53ae9b9fee1e8edc5a5e7dc5b92f6f41a2a9b13d70e884176e283e69f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-邮件签名-1100.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-邮件签名-1100.png",
+      "status": "present",
+      "bytes": 29306,
+      "sha256": "741b0a30dc8fbf7a137fb250e5c7c1171609048085685b80e320337bb5f10db0"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-邮件签名-1920.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-邮件签名-1920.png",
+      "status": "present",
+      "bytes": 56496,
+      "sha256": "baeba7d3342f984810c4c867aeb2949f51bfeab29c366d60f6fcf16b58d05623"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/mail-邮件签名-3840.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/mail-邮件签名-3840.png",
+      "status": "present",
+      "bytes": 81605,
+      "sha256": "73bda73ba60c0cee6b9f065fc68814114d1ad01df0ad05f976362cefda3beac4"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/workbench-1100.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/workbench-1100.png",
+      "status": "present",
+      "bytes": 59979,
+      "sha256": "3adede90cc43fdb292f1276683806b29607df6af93c27b8e6cc84c12545f51d0"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/workbench-1920.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/workbench-1920.png",
+      "status": "present",
+      "bytes": 88663,
+      "sha256": "27e87aeeee726c1f3cc57e14016e5a7c30911760ce15c128259857b66a11fadc"
+    },
+    {
+      "original_path": "docs/screenshots/p4-integrated-20261017/workbench-3840.png",
+      "package_path": "project/docs/screenshots/p4-integrated-20261017/workbench-3840.png",
+      "status": "present",
+      "bytes": 118120,
+      "sha256": "88ab5d55a2d036fa59eaaeb538008f7ceb660f4e6dd2056f418befcd79df3f40"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/drawing-pdf-side-by-side-1920.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/drawing-pdf-side-by-side-1920.png",
+      "status": "present",
+      "bytes": 115401,
+      "sha256": "c6d39f5e0725a89100e9847bf282a9ac3c7bb2eabe09674dea1457417b009585"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/drawings-empty-1920.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/drawings-empty-1920.png",
+      "status": "present",
+      "bytes": 74776,
+      "sha256": "8aab855d9ca27258985dbe9945f114179cac11f4a199a8a5af23af17e41d7fb1"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/drawings-empty-800.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/drawings-empty-800.png",
+      "status": "present",
+      "bytes": 35806,
+      "sha256": "d0d78797e37acda51844a8e95d09a7bb71054ccfd13950ddadba060a1e07b867"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/drawings-shared-1920.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/drawings-shared-1920.png",
+      "status": "present",
+      "bytes": 101043,
+      "sha256": "8080dd9d51610c3d62eed33ebc3949bdf5993772f2dbde2abeb7f21ddbeb031f"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-empty-1920.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-empty-1920.png",
+      "status": "present",
+      "bytes": 92156,
+      "sha256": "4ad965bd90d1513c9815744d012c6e518e1a645e566df977c1c596ac49de3908"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-empty-800.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-empty-800.png",
+      "status": "present",
+      "bytes": 48617,
+      "sha256": "09529551ee320c5c9fb5a422709d64cf1f05d50880798716bfa2d0cf4bb3ec13"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-1280.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-1280.png",
+      "status": "present",
+      "bytes": 109793,
+      "sha256": "df7ac1f0423cfaa9bfda591cd54849357e2907897983ba7c9cae03a85396abc0"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-1920.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-1920.png",
+      "status": "present",
+      "bytes": 159123,
+      "sha256": "cdb6376cde94df9aa023feab516cb01f2fd72c58c58960a301a0e2e051c8d74b"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-2560.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-2560.png",
+      "status": "present",
+      "bytes": 176455,
+      "sha256": "b4bc37b401ee319b063f7ead084d4c16dae5d17f250f15ddbf6fd93f84e04746"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-3840.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-3840.png",
+      "status": "present",
+      "bytes": 202832,
+      "sha256": "69f0a9d19eef1e2a826b2e2604761f991b18c375c0fd79cb1e81fdb80ed67d55"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-800.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-navigation-800.png",
+      "status": "present",
+      "bytes": 65457,
+      "sha256": "48d1f4c6d34259c3b4e3656b361be9c0d0ee33e025090635ff7cde7465e109a4"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/pdf-shared-1920.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/pdf-shared-1920.png",
+      "status": "present",
+      "bytes": 158300,
+      "sha256": "800c7bbf89a7c7689e47537c5c0730199bfbafbad412a0d0933b1b7f20c2ac8e"
+    },
+    {
+      "original_path": "docs/screenshots/p4-pdf-navigation-20261019/product-bulk-confirmation-40.png",
+      "package_path": "project/docs/screenshots/p4-pdf-navigation-20261019/product-bulk-confirmation-40.png",
+      "status": "present",
+      "bytes": 143127,
+      "sha256": "e287df81d777fb9bde916016278cd1ea6c3cc19eeea15669c2383314c698d7a3"
+    },
+    {
+      "original_path": "docs/screenshots/p4-products-list-20261016/api-fixture-1100.png",
+      "package_path": "project/docs/screenshots/p4-products-list-20261016/api-fixture-1100.png",
+      "status": "present",
+      "bytes": 44390,
+      "sha256": "c1340f0f72c90c442b5401f69513b838764e8c265655e605681383966b4197ae"
+    },
+    {
+      "original_path": "docs/screenshots/p4-products-list-20261016/api-fixture-1920.png",
+      "package_path": "project/docs/screenshots/p4-products-list-20261016/api-fixture-1920.png",
+      "status": "present",
+      "bytes": 68173,
+      "sha256": "97813ced533be4940ac1f5c99e15c93c241e1554a4bd59faa73be60f1b9c71d0"
+    },
+    {
+      "original_path": "docs/screenshots/p4-products-list-20261016/api-fixture-3840.png",
+      "package_path": "project/docs/screenshots/p4-products-list-20261016/api-fixture-3840.png",
+      "status": "present",
+      "bytes": 95636,
+      "sha256": "a61f224cc27ad45b1c9c6e24e5f58860713a9b0fb55509807c7d0b0ea5791212"
+    }
+  ],
+  "relative_reference_exclusions": [
+    {
+      "from": "docs/design-audit-three-skills-20261023.md",
+      "reference": "../work/design-audit-20261023/index.html",
+      "resolved": "work/design-audit-20261023/index.html",
+      "exists_in_workspace": true,
+      "reason": "excluded temporary/runtime/business-file reference"
+    },
+    {
+      "from": "docs/design-audit-three-skills-20261023.md",
+      "reference": "../work/design-audit-20261023/results.json",
+      "resolved": "work/design-audit-20261023/results.json",
+      "exists_in_workspace": true,
+      "reason": "excluded temporary/runtime/business-file reference"
+    },
+    {
+      "from": "docs/design-audit-three-skills-20261023.md",
+      "reference": "../work/design-audit-20261023/ui-ux-search.json",
+      "resolved": "work/design-audit-20261023/ui-ux-search.json",
+      "exists_in_workspace": true,
+      "reason": "excluded temporary/runtime/business-file reference"
+    },
+    {
+      "from": "docs/design-audit-three-skills-20261023.md",
+      "reference": "../work/design-audit-20261023.mjs",
+      "resolved": "work/design-audit-20261023.mjs",
+      "exists_in_workspace": true,
+      "reason": "excluded temporary/runtime/business-file reference"
+    }
+  ],
+  "application_run": false,
+  "tests_run": false,
+  "git_commit_or_push": false,
+  "candidate_documents_pending_user_confirmation": true
+}

@@ -1,0 +1,4 @@
+import {it,expect,vi} from 'vitest';
+import {acquireDesktopInstance} from '../../src/main/single-instance';
+it('refuses a second process before service startup and leaves the existing window callback untouched',()=>{const app={requestSingleInstanceLock:vi.fn(()=>false),quit:vi.fn(),on:vi.fn()};const focus=vi.fn();expect(acquireDesktopInstance(app,focus)).toBe(false);expect(app.quit).toHaveBeenCalledOnce();expect(app.on).not.toHaveBeenCalled();expect(focus).not.toHaveBeenCalled();});
+it('keeps the first process and focuses its original window when another launch is requested',()=>{const app={requestSingleInstanceLock:vi.fn(()=>true),quit:vi.fn(),on:vi.fn()};const focus=vi.fn();expect(acquireDesktopInstance(app,focus)).toBe(true);expect(app.quit).not.toHaveBeenCalled();expect(app.on).toHaveBeenCalledWith('second-instance',focus);app.on.mock.calls[0][1]();expect(focus).toHaveBeenCalledOnce();});

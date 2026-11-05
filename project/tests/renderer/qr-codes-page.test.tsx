@@ -1,0 +1,138 @@
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {StrictMode} from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { QrCodesPage } from '../../src/renderer/pages/QrCodesPage';
+const purpose={id:1,key:'user_manual',englishName:'User Manual',displayName:'说明书',status:'active',defaultForAll:true,productCategories:[]};
+const warranty={...purpose,id:2,key:'warranty',englishName:'Warranty',displayName:'售后'};
+const product={id:3,sku:'SKU-Q1',model:'ZU70SD',productCategory:'冰柜',status:'active'};
+const manual={id:11,productId:3,canonicalProductId:3,sku:'SKU-Q1',model:'ZU70SD',productCategory:'冰柜',purposeId:1,key:'user_manual',englishName:'User Manual',displayName:'说明书',purposeStatus:'active',name:'ZU70SD 使用说明',targetUrl:'https://qrs.ly/c2hg2h8',status:'active',createdAt:'2026-09-01T00:00:00Z',updatedAt:'2026-09-02T00:00:00Z',files:[{id:81,externalFileId:'b66ac16d-4fd8-4ae6-9c28-974b67179dcb',relativePath:'C:\\Users\\Public\\ZU70SD-User Manual（c2hg2h8）.pdf',fileName:'ZU70SD-User Manual（c2hg2h8）.pdf',mimeType:'application/pdf',isPresent:true,matchStatus:'matched',detectedIdentifier:null}],pendingFiles:[]};
+function apiFor(items:unknown[]=[manual]) {return {listQrCodes:vi.fn().mockResolvedValue({items}),listProducts:vi.fn().mockResolvedValue([product]),listQrPurposes:vi.fn().mockResolvedValue({items:[purpose,warranty]}),getQrCode:vi.fn().mockResolvedValue(manual),updateQrCode:vi.fn().mockResolvedValue(manual),activateQrCode:vi.fn().mockResolvedValue(manual),deactivateQrCode:vi.fn().mockResolvedValue({...manual,status:'inactive'}),deleteQrCode:vi.fn().mockResolvedValue({deleted:true}),qrManualPreview:vi.fn().mockResolvedValue({previewId:'preview',fileName:manual.files[0].fileName,path:manual.files[0].relativePath,tail:'c2hg2h8',issues:[],revision:'revision'}),qrManualCommit:vi.fn().mockResolvedValue(manual),qrManualHistory:vi.fn().mockResolvedValue({revision:'revision',items:[]}),qrManualUnlink:vi.fn().mockResolvedValue({...manual,files:[]})};}
+function desktop(){const result={token:'picker-token',fileName:manual.files[0].fileName,path:manual.files[0].relativePath};const bridge={qrManualSelectFile:vi.fn().mockResolvedValue(result),qrManualAction:vi.fn().mockResolvedValue({ok:true})};Object.defineProperty(window,'plannerDesktop',{configurable:true,value:bridge});return bridge;}
+async function expand(){fireEvent.click(await screen.findByRole('button',{name:'展开 ZU70SD 的二维码用途'}));return document.querySelector('.qr-manual-subtable') as HTMLElement;}
+afterEach(()=>{Object.defineProperty(window,'plannerDesktop',{configurable:true,value:undefined});localStorage.clear();});
+describe('manual QR page',()=>{
+ it('keeps every independent legacy file action outside a shared two-line clamp',async()=>{
+  const files=[1,2,3].map((id)=>({...manual.files[0],id,externalFileId:`file-${id}`,fileName:`ZU70SD-User Manual-very-long-${id}（c2hg2h8）.pdf`}));
+  render(<QrCodesPage api={apiFor([{...manual,files}]) as never}/>);const sub=await expand();
+  const buttons=within(sub).getAllByRole('button',{name:/ZU70SD-User Manual-very-long/});
+  expect(buttons).toHaveLength(3);for(const button of buttons){expect(button.closest('.table-cell-two-lines')).toBeNull();expect(button).toBeEnabled();}
+ });
+ it('moves nested purpose headers with their cells while preserving independent outer columns',async()=>{
+  render(<QrCodesPage api={apiFor() as never}/>);const sub=await expand();
+  const table=within(sub).getByRole('table');const outer=document.querySelector('.qr-main-table table')!;
+  const before=Array.from(outer.querySelectorAll(':scope > thead > tr > th')).map(c=>c.getAttribute('data-column-key'));
+  fireEvent.keyDown(within(table).getByRole('columnheader',{name:'关联文件'}),{altKey:true,key:'ArrowLeft'});
+  expect(table.querySelector('thead th')).toHaveAttribute('data-column-key','fileName');
+  const first=table.querySelector('tbody tr td')!;expect(first).toHaveAttribute('data-column-key','fileName');
+  expect(within(first as HTMLElement).getByRole('button',{name:/ZU70SD/})).toBeInTheDocument();
+  expect(Array.from(outer.querySelectorAll(':scope > thead > tr > th')).map(c=>c.getAttribute('data-column-key'))).toEqual(before);
+ });
+ it('traps keyboard focus in the manual dialog and Escape cancels without saving, restoring the opener',async()=>{
+  const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();const opener=within(sub).getByRole('button',{name:'更换文件'});opener.focus();fireEvent.click(opener);
+  const dialog=screen.getByRole('dialog');await waitFor(()=>expect(dialog.contains(document.activeElement)).toBe(true));
+  expect(document.querySelector('.qr-page:not(.qr-manual-modal-root)')?.closest('[inert]')).not.toBeNull();
+  const cancel=within(dialog).getByRole('button',{name:'取消'});cancel.focus();fireEvent.keyDown(cancel,{key:'Tab'});expect(dialog.contains(document.activeElement)).toBe(true);expect(document.activeElement).not.toBe(cancel);
+  fireEvent.keyDown(document.activeElement!,{key:'Tab',shiftKey:true});expect(cancel).toHaveFocus();
+  fireEvent.keyDown(cancel,{key:'Escape'});await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());expect(opener).toHaveFocus();expect(opener.closest('[inert]')).toBeNull();expect(api.qrManualCommit).not.toHaveBeenCalled();
+ });
+ it('does not dismiss or restore background focus while a native file selection is pending',async()=>{
+  const bridge=desktop();let finish!:(value:null)=>void;bridge.qrManualSelectFile.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+  const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));fireEvent.keyDown(dialog,{key:'Escape'});expect(dialog).toBeInTheDocument();finish(null);await waitFor(()=>expect(within(dialog).getByRole('button',{name:'取消'})).not.toBeDisabled());
+  fireEvent.keyDown(dialog,{key:'Escape'});await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());expect(api.qrManualCommit).not.toHaveBeenCalled();
+ });
+ it('removes independent appearance selection but preserves the legacy record scope during replacement',async()=>{
+  desktop();const code={...manual,appearanceVersionId:47},api=apiFor([code]);render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');
+  expect(within(dialog).queryByLabelText('手动二维码外观版本')).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));
+  await waitFor(()=>expect(api.qrManualPreview).toHaveBeenCalledWith(expect.objectContaining({qrCodeId:11,appearanceVersionId:47})));
+ });
+ it('starts a new manual QR at product scope even when a legacy version navigation target exists',async()=>{
+  desktop();const api=apiFor([]);render(<QrCodesPage api={api as never} versionTarget={{productId:3,appearanceVersionId:47}}/>);const sub=await expand();fireEvent.click(within(sub).getAllByRole('button',{name:'新增用途'})[0]);const dialog=screen.getByRole('dialog');
+  expect(within(dialog).queryByLabelText('手动二维码外观版本')).not.toBeInTheDocument();fireEvent.change(within(dialog).getByLabelText('手动二维码网址'),{target:{value:manual.targetUrl}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));
+  await waitFor(()=>expect(api.qrManualPreview).toHaveBeenCalledWith(expect.objectContaining({appearanceVersionId:null,productId:3})));
+ });
+
+ it('renders seven product-purpose columns without counters or paging and five compact subcolumns',async()=>{
+  render(<QrCodesPage api={apiFor() as never}/>);const sub=await expand();
+  expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.textContent)).toEqual(['SKU','型号','产品类别','说明书','售后卡','菜谱','操作']);
+  expect(within(sub).getAllByRole('columnheader').map(h=>h.textContent)).toEqual(['用途','关联文件','网址','业务状态','操作']);
+  expect(screen.getAllByRole('columnheader').slice(0,7).map(h=>h.style.textAlign)).toEqual(Array(7).fill('center'));
+  expect(within(sub).getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(['center','left','center','center','center']);
+  expect(screen.queryByText('待人工确认')).not.toBeInTheDocument();expect(screen.queryByText('扫描匹配状态')).not.toBeInTheDocument();expect(within(sub).getByText('未配置')).toBeVisible();expect(screen.queryByLabelText('二维码每页数量')).not.toBeInTheDocument();expect(screen.queryByText('下一页')).not.toBeInTheDocument();
+ });
+ it('windows the scrollable product list without rendering thousands of rows or a pager',async()=>{
+  const api=apiFor([]);api.listProducts.mockResolvedValue(Array.from({length:1000},(_,index)=>({...product,id:index+1,sku:`SKU-${index}`,model:`M${index}`})));render(<QrCodesPage api={api as never}/>);await screen.findByRole('button',{name:'展开 M0 的二维码用途'});
+  const table=document.querySelector('.qr-main-table .table-wrap') as HTMLElement;expect(within(table).getAllByRole('row').length).toBeLessThan(60);expect(screen.queryByRole('button',{name:'展开 M999 的二维码用途'})).not.toBeInTheDocument();
+  table.scrollTop=44000;fireEvent.scroll(table);await screen.findByRole('button',{name:'展开 M999 的二维码用途'});expect(within(table).getAllByRole('row').length).toBeLessThan(60);expect(screen.queryByText('下一页')).not.toBeInTheDocument();
+ });
+ it('displays simplified filename and actual stored URL, with full original path in tooltip',async()=>{
+  const bridge=desktop();render(<QrCodesPage api={apiFor() as never}/>);const sub=await expand();const file=within(sub).getByRole('button',{name:'ZU70SD-User Manual'});expect(file).toHaveAttribute('title',`${manual.files[0].fileName}\n${manual.files[0].relativePath}`);expect(within(sub).getByRole('link')).toHaveAttribute('href',manual.targetUrl);fireEvent.click(file);await waitFor(()=>expect(bridge.qrManualAction).toHaveBeenCalledWith('open',{fileId:manual.files[0].externalFileId}));
+ });
+ it('counts actual historical records across versions once in one canonical product row',async()=>{
+  const api=apiFor([manual,{...manual,id:12,productId:7,canonicalProductId:3,appearanceVersionId:2,files:[]}]);render(<QrCodesPage api={api as never}/>);const sub=await expand();expect(screen.getAllByRole('button',{name:'收起 ZU70SD 的二维码用途'})).toHaveLength(1);expect(within(sub).getAllByRole('button',{name:/查看 ZU70SD 使用说明/})).toHaveLength(2);expect(screen.queryByText('1/2')).not.toBeInTheDocument();
+ });
+ it('does not infer a URL from the PDF and rejects unsafe stored links',async()=>{
+  render(<QrCodesPage api={apiFor([{...manual,targetUrl:'javascript:alert(1)'}]) as never}/>);const sub=await expand();expect(within(sub).queryByRole('link')).not.toBeInTheDocument();expect(within(sub).getAllByText('—')).toHaveLength(3);
+ });
+ it('cancel after native selection performs no persistence and leaves current record intact',async()=>{
+  const bridge=desktop(),api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await waitFor(()=>expect(bridge.qrManualSelectFile).toHaveBeenCalledOnce());expect(await within(dialog).findByText(manual.files[0].fileName)).toBeVisible();fireEvent.click(within(dialog).getByRole('button',{name:'取消'}));expect(api.qrManualCommit).not.toHaveBeenCalled();expect(api.qrManualPreview).not.toHaveBeenCalled();expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+ });
+ it('requires preview and sends native capability instead of renderer path to commit',async()=>{
+  desktop();const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');expect(within(dialog).getByRole('button',{name:'确认关联'})).toBeDisabled();fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));await within(dialog).findByText('型号、用途、网址尾码与PDF内容校验通过。');expect(api.qrManualPreview).toHaveBeenCalledWith(expect.objectContaining({token:'picker-token',qrCodeId:11,name:manual.name,targetUrl:manual.targetUrl}));expect(api.qrManualPreview.mock.calls[0][0]).not.toHaveProperty('path');fireEvent.click(within(dialog).getByRole('button',{name:'确认关联'}));await waitFor(()=>expect(api.qrManualCommit).toHaveBeenCalledWith('preview',undefined));
+ });
+ it('retains selected filename after failed save and requires reasoned explicit exception',async()=>{
+  desktop();const api=apiFor();api.qrManualPreview.mockResolvedValue({...await api.qrManualPreview(),issues:['文件尾码与网址不一致']});api.qrManualCommit.mockRejectedValue(new Error('文件在预检后改变'));
+  render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));await within(dialog).findByText(/校验不一致/);const confirm=within(dialog).getByRole('button',{name:'确认关联'});expect(confirm).toBeDisabled();fireEvent.change(within(dialog).getByLabelText('例外关联理由'),{target:{value:'已核对历史文件差异'}});fireEvent.click(within(dialog).getByRole('checkbox'));fireEvent.click(confirm);await within(dialog).findByText('文件在预检后改变');expect(within(dialog).getByText(manual.files[0].fileName)).toBeVisible();expect(api.qrManualCommit).toHaveBeenCalledWith('preview',{confirmed:true,reason:'已核对历史文件差异'});
+ });
+ it('retains table header and expanded row while refresh is pending without a pager',async()=>{
+  const api=apiFor();render(<QrCodesPage api={api as never}/>);await expand();let resolve!:(value:unknown)=>void;api.listQrCodes.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));const header=screen.getByRole('columnheader',{name:'SKU'}),sub=document.querySelector('.qr-manual-subtable');fireEvent.click(screen.getByRole('button',{name:'筛选'}));expect(screen.getByRole('columnheader',{name:'SKU'})).toBe(header);expect(document.querySelector('.qr-manual-subtable')).toBe(sub);resolve({items:[manual]});await waitFor(()=>expect(screen.getByRole('button',{name:'筛选'})).not.toBeDisabled());expect(screen.queryByLabelText('二维码每页数量')).not.toBeInTheDocument();
+ });
+});
+
+it('keeps expansion while hidden and avoids hidden focus requests, then refreshes the list once on return',async()=>{
+ const api=apiFor();const view=render(<QrCodesPage api={api as never} active/>);await expand();
+ view.rerender(<QrCodesPage api={api as never} active={false}/>);fireEvent.focus(window);
+ expect(api.listQrCodes).toHaveBeenCalledTimes(1);
+ view.rerender(<QrCodesPage api={api as never} active/>);
+ await waitFor(()=>expect(api.listQrCodes).toHaveBeenCalledTimes(2));
+ expect(screen.getByRole('button',{name:'收起 ZU70SD 的二维码用途'})).toBeVisible();
+ expect(api.listProducts).toHaveBeenCalledTimes(2);expect(api.listQrPurposes).toHaveBeenCalledTimes(2);
+});
+it('does not repeat reference reads when navigating between product scopes and rejects an old detail response',async()=>{
+ const api=apiFor();let resolve!:(value:typeof manual)=>void;api.getQrCode.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
+ const view=render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'查看 ZU70SD 使用说明'}));
+ view.rerender(<QrCodesPage api={api as never} productTarget={{productId:9,purposeKey:'recipe'} as never}/>);
+ resolve(manual);await waitFor(()=>expect(api.listQrCodes).toHaveBeenCalledTimes(2));
+ expect(screen.getByRole('heading',{name:'二维码管理'})).toBeVisible();expect(screen.queryByLabelText('二维码名称')).toBeNull();
+ expect(api.listProducts).toHaveBeenCalledTimes(1);expect(api.listQrPurposes).toHaveBeenCalledTimes(1);
+});
+
+it('coalesces consecutive focus events while the same list refresh is pending',async()=>{
+ const api=apiFor();render(<QrCodesPage api={api as never}/>);await expand();
+ let finish!:(result:{items:typeof manual[]})=>void;api.listQrCodes.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ act(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('focus'));});
+ expect(api.listQrCodes).toHaveBeenCalledTimes(2);
+ await act(async()=>{finish({items:[manual]});});
+});
+it('ignores a pending focus detail result after the user returns to the list',async()=>{
+ const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'查看 ZU70SD 使用说明'}));
+ await screen.findByLabelText('二维码名称');let finish!:(code:typeof manual)=>void;api.getQrCode.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ fireEvent.focus(window);fireEvent.click(screen.getByRole('button',{name:'返回列表'}));await act(async()=>{finish(manual);});
+ expect(screen.getByRole('heading',{name:'二维码管理'})).toBeVisible();
+});
+
+it('completes its initial list load when development StrictMode repeats effect setup',async()=>{
+ const api=apiFor();render(<StrictMode><QrCodesPage api={api as never}/></StrictMode>);const sub=await expand();
+ expect(await within(sub).findByRole('button',{name:'ZU70SD-User Manual'})).toBeVisible();expect(screen.getByRole('button',{name:'筛选'})).toBeEnabled();
+});
+
+it('refreshes file history when links change without a QR metadata timestamp change',async()=>{
+ const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'查看 ZU70SD 使用说明'}));
+ await waitFor(()=>expect(api.qrManualHistory).toHaveBeenCalledTimes(1));
+ fireEvent.focus(window);await waitFor(()=>expect(api.getQrCode).toHaveBeenCalledTimes(2));expect(api.qrManualHistory).toHaveBeenCalledTimes(1);
+ await waitFor(()=>expect(screen.getByRole('button',{name:'保存二维码信息'})).toBeEnabled());
+ api.getQrCode.mockResolvedValueOnce({...manual,files:[]});fireEvent.focus(window);
+ await waitFor(()=>expect(api.qrManualHistory).toHaveBeenCalledTimes(2));
+});

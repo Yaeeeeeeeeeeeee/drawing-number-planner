@@ -1,0 +1,91 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import { createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from '../../src/main/open-file-location';
+
+describe('desktop open-file handler', () => {
+  const observed = { kind: 'drawing-file', origin: 'historical', recordId: 3,
+    relativePath: '冰柜/SKD-ZU70SD/02.未转曲源文件/02.0305.010.0201001-铭牌.pdf' };
+  it('reveals an unindexed drawing file only after the service revalidates its exact identity', async () => {
+    const resolvePdfFilePath = vi.fn().mockReturnValue('C:\\library\\validated.pdf');
+    const showItemInFolder = vi.fn();
+    await expect(createShowFileInFolderHandler({ resolvePdfFilePath, showItemInFolder })({}, observed)).resolves.toEqual({ ok: true });
+    expect(resolvePdfFilePath).toHaveBeenCalledWith(observed);
+    expect(showItemInFolder).toHaveBeenCalledWith('C:\\library\\validated.pdf');
+  });
+  it('does not reveal a drawing file rejected by fresh observation', async () => {
+    const showItemInFolder = vi.fn();
+    const handler = createShowFileInFolderHandler({ resolvePdfFilePath: () => {
+      throw Object.assign(new Error('文件不再可用'), { code: 'PDF_FILE_UNAVAILABLE' });
+    }, showItemInFolder });
+    await expect(handler({}, observed)).resolves.toEqual({ ok: false, error: { code: 'PDF_FILE_UNAVAILABLE', message: '文件不再可用' } });
+    expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+  it.each([
+    { ...observed, origin: 'other' }, { ...observed, recordId: 0 },
+    { ...observed, relativePath: '../outside.pdf' },
+    { ...observed, relativePath: 'C:\\outside.pdf' },
+    { ...observed, relativePath: '/outside.pdf' },
+    { ...observed, relativePath: '' },
+  ])('rejects malformed drawing requests before service or shell: %j', async (request) => {
+    const resolvePdfFilePath = vi.fn(), showItemInFolder = vi.fn();
+    const result = await createShowFileInFolderHandler({ resolvePdfFilePath, showItemInFolder })({}, request);
+    expect(result.ok).toBe(false);
+    expect(resolvePdfFilePath).not.toHaveBeenCalled(); expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+  it('reveals a validated BOM asset without accepting a renderer-supplied path', async () => {
+    const resolveBomAssetPath = vi.fn().mockReturnValue('C:\\library\\_图号规划器\\BOM附件\\image.png');
+    const showItemInFolder = vi.fn();
+    const handler = createShowBomAssetInFolderHandler({ resolveBomAssetPath, showItemInFolder });
+
+    await expect(handler({}, 31)).resolves.toEqual({ ok: true });
+    expect(resolveBomAssetPath).toHaveBeenCalledWith(31);
+    expect(showItemInFolder).toHaveBeenCalledWith('C:\\library\\_图号规划器\\BOM附件\\image.png');
+  });
+  it.each([0, -1, 1.2, '2', undefined])('rejects invalid BOM asset IDs before resolving: %s', async (id) => {
+    const resolveBomAssetPath = vi.fn(); const showItemInFolder = vi.fn();
+    const handler = createShowBomAssetInFolderHandler({ resolveBomAssetPath, showItemInFolder });
+
+    await expect(handler({}, id)).resolves.toEqual({ ok: false,
+      error: { code: 'INVALID_BOM_ASSET_ID', message: 'BOM 附件索引无效' } });
+    expect(resolveBomAssetPath).not.toHaveBeenCalled(); expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+  it('does not open Explorer when the BOM asset resolver reports a missing file', async () => {
+    const error = Object.assign(new Error('BOM 附件当前不可用'), { code: 'BOM_ASSET_UNAVAILABLE' });
+    const showItemInFolder = vi.fn();
+    const handler = createShowBomAssetInFolderHandler({
+      resolveBomAssetPath: vi.fn(() => { throw error; }), showItemInFolder,
+    });
+
+    await expect(handler({}, 31)).resolves.toEqual({ ok: false,
+      error: { code: 'BOM_ASSET_UNAVAILABLE', message: 'BOM 附件当前不可用' } });
+    expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+  it('passes only the PDF index ID to the resolver and invokes the shell after successful validation', async () => {
+    const resolvePdfFilePath = vi.fn().mockReturnValue('C:\\library\\inside.pdf');
+    const showItemInFolder = vi.fn();
+    const handler = createShowFileInFolderHandler({ resolvePdfFilePath, showItemInFolder });
+
+    await expect(handler({}, 42)).resolves.toEqual({ ok: true });
+    expect(resolvePdfFilePath).toHaveBeenCalledWith(42);
+    expect(showItemInFolder).toHaveBeenCalledWith('C:\\library\\inside.pdf');
+  });
+
+  it('does not invoke the shell when validation fails and returns a structured user-facing error', async () => {
+    const error = Object.assign(new Error('文件已不存在，请重新扫描资料库'), { code: 'PDF_FILE_UNAVAILABLE' });
+    const showItemInFolder = vi.fn();
+    const handler = createShowFileInFolderHandler({ resolvePdfFilePath: vi.fn(() => { throw error; }), showItemInFolder });
+
+    await expect(handler({}, 42)).resolves.toEqual({ ok: false,
+      error: { code: 'PDF_FILE_UNAVAILABLE', message: '文件已不存在，请重新扫描资料库' } });
+    expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.2, '2', undefined])('rejects non-positive integer IDs before resolving: %s', async (id) => {
+    const resolvePdfFilePath = vi.fn(); const showItemInFolder = vi.fn();
+    const handler = createShowFileInFolderHandler({ resolvePdfFilePath, showItemInFolder });
+
+    await expect(handler({}, id)).resolves.toEqual({ ok: false,
+      error: { code: 'INVALID_PDF_FILE_ID', message: 'PDF 文件索引无效' } });
+    expect(resolvePdfFilePath).not.toHaveBeenCalled(); expect(showItemInFolder).not.toHaveBeenCalled();
+  });
+});

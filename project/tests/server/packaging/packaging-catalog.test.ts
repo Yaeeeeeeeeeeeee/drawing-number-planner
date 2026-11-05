@@ -1,0 +1,17 @@
+// @vitest-environment node
+import { rmSync } from 'node:fs';
+import Fastify from 'fastify';
+import { expect, it } from 'vitest';
+import { setup } from '../../core/packaging/catalog-fixture';
+import { registerPackagingCatalogRoutes } from '../../../src/server/routes/packaging-catalog';
+function multipart(fields:Record<string,string>,fileName='template.ait',content='AIT original'){const boundary='catalog-test-boundary';let body='';for(const[key,value]of Object.entries(fields))body+=`--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`;body+=`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n${content}\r\n--${boundary}--\r\n`;return{headers:{'content-type':`multipart/form-data; boundary=${boundary}`},payload:Buffer.from(body)};}
+it('serves actual catalog CRUD and immutable replacement through multipart and validates bad JSON IDs',async()=>{const f=setup(),app=Fastify();try{registerPackagingCatalogRoutes(app,f.service);const input={name:'Box',mainCategoryId:f.main,projectItemId:f.project,brandIds:[f.brand],productIds:[f.first],fields:[],requiredFonts:[],status:'active'};
+ const created=await app.inject({method:'POST',url:'/api/packaging/templates',...multipart({metadata:JSON.stringify(input)})});expect(created.statusCode).toBe(201);const template=created.json();expect(template.id).toBeGreaterThan(0);expect(template.assetRelativePath).not.toMatch(/^\//);
+ const changed=await app.inject({method:'PUT',url:`/api/packaging/templates/${template.id}`,payload:{...input,name:'Edited'}});expect(changed.statusCode).toBe(200);expect(changed.json().name).toBe('Edited');
+ const replaced=await app.inject({method:'POST',url:`/api/packaging/templates/${template.id}/file`,...multipart({},'replacement.ait','new')});expect(replaced.statusCode).toBe(200);expect(replaced.json().sha256).not.toBe(template.sha256);
+ const config={projectItemId:f.project,mode:'manual',parameters:[{key:'paper',label:'Paper',type:'text',required:false}]};expect((await app.inject({method:'POST',url:'/api/packaging/configs',payload:config})).statusCode).toBe(200);
+ const dimension={name:'A4',projectItemId:f.project,scope:'specific',productIds:[f.first],parameters:{paper:'A4'},isDefault:true,status:'active'};const saved=await app.inject({method:'POST',url:'/api/packaging/dimensions',payload:dimension});expect(saved.statusCode).toBe(200);expect((await app.inject({method:'POST',url:'/api/packaging/dimensions',payload:{...dimension,id:saved.json().id,name:'A5'}})).json().name).toBe('A5');
+ expect((await app.inject({method:'POST',url:'/api/packaging/rules',payload:{name:'Page',templateId:template.id,conditions:[],allowLengthWidthSwap:false,status:'active'}})).statusCode).toBe(200);
+ const catalog=(await app.inject('/api/packaging/catalog')).json();expect(catalog.templates).toHaveLength(1);expect(catalog.configs).toEqual([config]);expect(catalog.dimensions).toHaveLength(1);expect(catalog.rules).toHaveLength(1);
+ expect((await app.inject({method:'POST',url:'/api/packaging/templates',...multipart({metadata:'not JSON'})})).statusCode).toBe(400);expect((await app.inject({method:'POST',url:'/api/packaging/dimensions',payload:{...dimension,id:'bad'}})).statusCode).toBe(400);expect((await app.inject({method:'PUT',url:'/api/packaging/templates/99999',payload:input})).statusCode).toBe(404);
+ }finally{await app.close();f.db.close();rmSync(f.dir,{recursive:true,force:true});}});

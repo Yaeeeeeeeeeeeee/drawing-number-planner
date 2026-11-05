@@ -1,0 +1,655 @@
+{
+  "revision": "34bf3360f25a019f0124acf9fbd398993e6f7bba",
+  "fixtureOnly": true,
+  "physicalDpi": "Physical 4K/DPI and cross-monitor checks require local acceptance.",
+  "screenshots": [
+    {
+      "file": "Windows-综合改版-产品档案-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    }
+  ],
+  "viewports": [
+    {
+      "requested": {
+        "width": 3840,
+        "height": 2160
+      },
+      "actual": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 2560,
+        "height": 1440
+      },
+      "actual": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 1920,
+        "height": 1080
+      },
+      "actual": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 1366,
+        "height": 768
+      },
+      "actual": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 720,
+        "height": 600
+      },
+      "actual": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    }
+  ],
+  "native": {
+    "isolated": true,
+    "sandbox": true,
+    "nodeIntegration": false,
+    "recovery": true
+  },
+  "rendererErrors": [],
+  "oldV15Upgrade": {
+    "originalDirectoryRetained": true,
+    "settingsBytesPreserved": true,
+    "oldRowsAndSnapshotsPreserved": true,
+    "realMigrationBackupValidated": true,
+    "walAndRollback": {
+      "walCommittedRowInBackup": true,
+      "v15To17FailureRollsBackSchemaAndRows": true,
+      "backupBeforeMigration": true
+    }
+  },
+  "restartPreservesDatabase": true,
+  "qrModalLayouts": [
+    {
+      "label": "QR首次关联",
+      "stage": "before-native-picker",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 106.328125,
+        "width": 720,
+        "height": 468.34375,
+        "right": 864,
+        "bottom": 574.671875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    },
+    {
+      "label": "QR首次关联",
+      "stage": "validated-before-screenshot",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 27.578125,
+        "width": 720,
+        "height": 625.84375,
+        "right": 864,
+        "bottom": 653.421875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    },
+    {
+      "label": "QR替换",
+      "stage": "before-native-picker",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 97.828125,
+        "width": 720,
+        "height": 485.34375,
+        "right": 864,
+        "bottom": 583.171875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    },
+    {
+      "label": "QR替换",
+      "stage": "validated-before-screenshot",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 19.078125,
+        "width": 720,
+        "height": 642.84375,
+        "right": 864,
+        "bottom": 661.921875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    }
+  ],
+  "nativeQrPdfPicker": {
+    "actualNativeDialog": true,
+    "rendererSelectionPreviewCommit": true,
+    "fullWidthFilename": true,
+    "firstFileHash": "35cf4239236ae0a094bad14c55daf59de9b20eec74341f44d2068a25daddd63c",
+    "replacementFileHash": "30bedb57b0897579d1e9757d3cc88ce22077294bbb3a4ee9d91cc3cbe94d9125",
+    "restartPreservesLinkAndMetadata": true,
+    "replacementPreservesMetadataAndHistory": true,
+    "unlinkPreservesFilesAndAudit": true,
+    "oldV15RowsPreserved": true,
+    "qrCodeId": 8,
+    "unlinkSurvivesRestart": true
+  },
+  "freshBusinessTablesEmpty": true,
+  "freshRestartPreservesDatabase": true
+}

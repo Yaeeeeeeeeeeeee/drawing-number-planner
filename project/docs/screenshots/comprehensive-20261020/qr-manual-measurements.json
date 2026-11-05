@@ -1,0 +1,170 @@
+[
+  {
+    "width": 1366,
+    "columns": [
+      {
+        "text": "用途",
+        "width": 134.015625,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "关联文件",
+        "width": 278.375,
+        "padding": "12px",
+        "align": "left"
+      },
+      {
+        "text": "网址",
+        "width": 288.6875,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "业务状态",
+        "width": 134.015625,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "操作",
+        "width": 195.90625,
+        "padding": "12px",
+        "align": "center"
+      }
+    ],
+    "heights": [
+      46,
+      46,
+      46,
+      46
+    ],
+    "overflow": false
+  },
+  {
+    "width": 1920,
+    "columns": [
+      {
+        "text": "用途",
+        "width": 206.046875,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "关联文件",
+        "width": 427.9375,
+        "padding": "12px",
+        "align": "left"
+      },
+      {
+        "text": "网址",
+        "width": 443.796875,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "业务状态",
+        "width": 206.046875,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "操作",
+        "width": 301.171875,
+        "padding": "12px",
+        "align": "center"
+      }
+    ],
+    "heights": [
+      46,
+      46,
+      46,
+      46
+    ],
+    "overflow": false
+  },
+  {
+    "width": 2560,
+    "columns": [
+      {
+        "text": "用途",
+        "width": 289.25,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "关联文件",
+        "width": 600.75,
+        "padding": "12px",
+        "align": "left"
+      },
+      {
+        "text": "网址",
+        "width": 623,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "业务状态",
+        "width": 289.25,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "操作",
+        "width": 422.75,
+        "padding": "12px",
+        "align": "center"
+      }
+    ],
+    "heights": [
+      46,
+      46,
+      46,
+      46
+    ],
+    "overflow": false
+  },
+  {
+    "width": 3840,
+    "columns": [
+      {
+        "text": "用途",
+        "width": 455.640625,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "关联文件",
+        "width": 946.34375,
+        "padding": "12px",
+        "align": "left"
+      },
+      {
+        "text": "网址",
+        "width": 981.390625,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "业务状态",
+        "width": 455.640625,
+        "padding": "12px",
+        "align": "center"
+      },
+      {
+        "text": "操作",
+        "width": 665.984375,
+        "padding": "12px",
+        "align": "center"
+      }
+    ],
+    "heights": [
+      46,
+      46,
+      46,
+      46
+    ],
+    "overflow": false
+  }
+]

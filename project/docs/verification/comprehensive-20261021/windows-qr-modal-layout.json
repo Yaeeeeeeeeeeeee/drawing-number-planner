@@ -1,0 +1,125 @@
+{
+  "revision": "34bf3360f25a019f0124acf9fbd398993e6f7bba",
+  "items": [
+    {
+      "label": "QR首次关联",
+      "stage": "before-native-picker",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 106.328125,
+        "width": 720,
+        "height": 468.34375,
+        "right": 864,
+        "bottom": 574.671875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    },
+    {
+      "label": "QR首次关联",
+      "stage": "validated-before-screenshot",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 27.578125,
+        "width": 720,
+        "height": 625.84375,
+        "right": 864,
+        "bottom": 653.421875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    },
+    {
+      "label": "QR替换",
+      "stage": "before-native-picker",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 97.828125,
+        "width": 720,
+        "height": 485.34375,
+        "right": 864,
+        "bottom": 583.171875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    },
+    {
+      "label": "QR替换",
+      "stage": "validated-before-screenshot",
+      "position": "fixed",
+      "backdrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1008,
+        "height": 681,
+        "right": 1008,
+        "bottom": 681
+      },
+      "modal": {
+        "x": 144,
+        "y": 19.078125,
+        "width": 720,
+        "height": 642.84375,
+        "right": 864,
+        "bottom": 661.921875
+      },
+      "viewport": {
+        "width": 1008,
+        "height": 681
+      },
+      "documentScroll": {
+        "top": 0,
+        "left": 0
+      },
+      "workspaceScroll": 0
+    }
+  ]
+}

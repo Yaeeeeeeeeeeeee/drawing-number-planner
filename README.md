@@ -1,82 +1,82 @@
-# 图号规划器
+# 图号规划器：独立项目交接资料包
 
-用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
+整理日期：2026-11-05（Asia/Shanghai）。用途：上传给ChatGPT新对话，恢复项目需求、UI与实现背景，先核对候选基线，不自动开发。
 
-## 当前版本 v1.5.0 · 包材模板与独立制图任务
+## 先读这里
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.5.0/DrawingNumberPlanner-1.5.0-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)
-- [安装、升级和恢复说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/install-and-upgrade.md)
-- [维护和发布方式](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/maintenance.md)
-- [上一版 v1.3.0（Schema23）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.0)
-- [v1.2.0（Schema22，回退须配套旧库备份）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.2.0)
-- [V5.1 邮件导入与草稿实现、验证和限制](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/v51-mail-delivery-20261027.md)
-- [V5 修改记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/v5-delivery-20261026.md)
+**本次仅静态资料整理和文件核对，没有运行应用、自动化测试、端到端测试、迁移、扫描或备份/恢复，没有访问业务数据库，也没有提交/推送GitHub。静态审计结论不等于运行验收结果。**
 
-Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
+五份候选文档仍等待用户确认；已实现不等于用户批准，旧计划、交付报告和历史截图不等于最新需求。图片存在不等于用户视觉签认。
 
-## 包材模板与制图任务
+## 审计基准
 
-「数据来源 → 包材模板」维护 AIT 原件、完整图号映射、简化的尺寸匹配规则和项目生成方式。图号规划只负责预览与确认占号，已保存图号直接进入独立「制图任务」，在任务中配置尺寸、匹配模板和制作文件。支持人工PDF监听关联、逐项重试、统一检查归档、正式文件副本修改与备份；新任务直接使用00，旧任务继续原路径，删除记录保留文件及历史。PDF列表筛选不限制指定型号的正式扫描范围。
+- 项目：Yaeeeeeeeeeeeee/drawing-number-planner。
+- 审计工作区HEAD：`45450c00e8a5acf9089adf47bcee0ecc3c71c616`，分支 `codex/v3-business-ui-20261022`。
+- 版本1.5.0，Schema25；正式发行源码Tag v1.5.0为 `096dabc1561164e7f3eed91c7800f52006cc7904`。
+- 五份候选资料审计日期2026-11-05；它们的原始字节完整保留，没有用本次打包重写审计结论。
+- 文档提到的1855项测试、13项E2E、Windows/发布运行编号均是此前交付证据，**本次没有复跑**。
 
-Windows 本机通过 Illustrator COM/JSX 用模板副本导出保留编辑能力的 PDF。**没有用户真实AIT及授权Illustrator的开发/CI环境，尚未验证真实字体、版式或PDF重开编辑；本机需配置对象映射与字体并检查实际成果。** 详见[版本说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/release-1.5.0.md)与[实现、使用及验收范围](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/packaging-ui-delivery-20261102.md)。
+## 五份候选资料
 
-Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历史快照或当前资料根目录。[v1.3.1（回退需配套升级前Schema23备份）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.1)保留。
+| 文件 | 用途 |
+|---|---|
+| [PROJECT_BASELINE.md](project/PROJECT_BASELINE.md) | 架构、模块职责、业务与安全边界、Schema与关联、源码和测试索引 |
+| [REQUIREMENT_STATUS.md](project/REQUIREMENT_STATUS.md) | 144项核心需求/规则、否决/替代链、AI建议与代码事实、历史Backlog、v15原30项映射 |
+| [UI_DESIGN_CATALOG.md](project/UI_DESIGN_CATALOG.md) | 页面结构、导航/交互/状态、v15重点UI、全部187张原图索引 |
+| [IMPLEMENTATION_GAP.md](project/IMPLEMENTATION_GAP.md) | 区分明确差异、静态风险、范围待核和未验证，不能把所有观察自动当修复任务 |
+| [OPEN_QUESTIONS.md](project/OPEN_QUESTIONS.md) | 30项资料、业务范围和验收待核问题；未确认事项保持现状 |
 
-## V5.2 增量修正与邮件流程
+## 目录与引用关系
 
-在「迁移检查 → 导入邮件模板」选择现有 XLSX，核对厂家、场景、正文及历史示例后确认。模板、联系人和签名统一在「外发资料 → 邮件配置」维护。ZIP 成功后点击「生成邮件草稿」，填写实际修改原因、调整收件人和正文，再复制使用；程序不自动发送邮件。
-
-已使用本轮上传的原始 Excel 验证：5 家供应商、20 个首批场景和 5 个更新案例独立解析，正文、签名和联系人分开处理；原始案例及单元格来源保存后仍可查看。实际历史内容始终先预览核对。Schema23 仅增量补充邮件配置关联，不清空旧库。详见 [V5.2说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/release-1.3.0.md)。v1.3.1进一步修复单条导入共享抄送及底部反馈，见[此前说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/docs/release-1.3.1.md)。
-
-## 主要功能
-
-| 分组 | 页面 | 用途 |
-|---|---|---|
-| 日常工作 | 图号规划 / 更新包材 | 编码预览、查重和事务批量占号，关联所选产品 |
-| 日常工作 | 制图任务 | 从已占号项目制作PDF、监听人工文件、确认检查、统一归档和历史记录 |
-| 日常工作 | BOM 管理 | 当前关系、历史记录、差异和受保护的附件 |
-| 日常工作 | 外发资料 | 选择批次、核对范围和文件、生成 ZIP、邮件草稿及历史快照 |
-| 产品明细 | 产品档案 | SKU、型号、品牌、类别和用途入口；使用真实内部 ID 区分记录 |
-| 产品明细 | 图号库 | 产品/编码主类别导航、颜色和来源、状态切换、关联诊断及纠正 |
-| 产品明细 | 二维码管理 | 产品用途展开，手动校验、关联、更换或解除 PDF，网址打开和复制 |
-| 数据来源 | PDF 文件中心 | 扫描索引、产品/批次导航、人工归纳、排除/恢复和安全移除记录 |
-| 数据来源 | 包材模板 | AIT原件、图号映射、尺寸匹配规则和项目生成配置 |
-| 数据来源 | 编码字典 | 维护实际编码名称及停用、受保护删除 |
-| 数据来源 | 迁移检查 | 编码字典及邮件模板 Excel 识别、编辑预览和备份后的确认导入 |
-
-表格总宽度跟随可用窗口，拖动在列间重新分配宽度；支持表头换序及恢复默认布局；设置只保存在本机，不修改业务数据。产品、图号、PDF 和二维码长列表使用分块或虚拟滚动。
-
-## 核心业务规则
-
-- 完整图号按现有 Excel 编码契约和字典生成；外观码、颜色码分开解析，流水号按完整编码前缀检查占用。
-- 正式规划、可靠历史扫描、删除但保留占号的记录共同参与查重。停用和删除记录都不等于释放号码。
-- SKU、型号允许重复，数据库使用内部产品 ID 关联。一个产品可以引用多个外观编码；默认外观仅用于新规划，不恢复独立外观维护页面，不自动归并产品。
-- PDF 的产品归属、图号匹配、转曲角色和磁盘存在是不同事实。按明确目录/业务规则识别；人工归纳记录在重扫后保留。相同名称不代表相同批次，相同图号的不同 PDF 实例保持独立。
-- BOM 保留实际当前关系与历史快照。外发按明确选择的资料批次及打包范围核对文件，BOM 提供辅助依据；不隐式混入其他批次。
-- 二维码是独立记录，不参与正式图号占号。文件关联不会自动改变二维码启停状态。
-
-本版新扫描仅进入产品目录下的 `02.未转曲源文件` 与 `03.量产后的变更文件（已量产的产品看最新日期）`。范围外既存索引和历史引用保留，不因未扫描而标为缺失。源文件使用独立节点，不作为生产批次；二维码手动关联不受此限制。图号详情只读核实文件，展示全部对应批次，不再使用批次选择框。
-
-详见 [项目 Skill](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/01691959b403069bfa85b2a0810430bafb296c10/.agents/skills/drawing-number-planner/SKILL.md) 及其业务、安全和模型参考。
-
-## 数据安全与升级
-
-每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema25：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
-
-移除 PDF 记录或删除内部空批次不会删除原始文件及磁盘文件夹。已用图号、BOM、产品归并及外发历史的引用继续受保护。普通取消占号继续执行原资格检查。新增的「强制取消占号并删除图号」是独立危险操作：显示真实影响后确认，释放当前占用但保留原身份、历史快照和审计；原 PDF 不删除，重扫旧同号文件不会自动关联到重新占用的号码。用户正式数据库及实际显示器 DPI 仍应在本地核对。
-
-## 开发与验证
-
-```sh
-git fetch --tags
-git switch --detach v1.5.0
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm build
+```text
+交接包根目录/
+  README.md                       本交接说明（新文件）
+  IMAGE_CHECK_REPORT.md           图片汇总、缺失路径、引用限制
+  IMAGE_CHECK_REPORT.json         逐图核对完整记录
+  IMAGE_INVENTORY.csv             187条路径/大小/SHA256清单
+  REFERENCE_LIMITATIONS.json      历史临时引用未收录明细
+  FILE_MANIFEST.sha256            除清单自身外全部归档文件的哈希
+  project/
+    PROJECT_BASELINE.md
+    REQUIREMENT_STATUS.md
+    UI_DESIGN_CATALOG.md
+    IMPLEMENTATION_GAP.md
+    OPEN_QUESTIONS.md
+    README.md                     原项目README，未覆盖
+    docs/                         原始截图及引用到的历史资料
+    src/ tests/ scripts/           文档引用对应的只读证据副本
+    .agents/                      相关项目Skill与参考文档
+    .github/workflows/            发行/验证工作流证据
+    package.json等                版本与工程配置证据
 ```
 
-`pnpm dev:web` 启动本机浏览器开发预览，`pnpm dev:desktop` 启动 Electron 开发窗口。两者共用业务服务和 React 页面；开发数据默认位于被忽略的 `work/runtime-data`。不得将生产数据库放入测试目录。
+五份文档放在同一个 `project/` 根中，原来互相链接及指向 `docs/`、`src/`、`tests/`、`scripts/` 的相对路径保持原样。截图按原始文件夹树收录，不平铺、不改名；原始项目README保留在project内，与本包README分开。
 
-正式交付以 Release 中的 EXE 和对应 Tag 为准。历史开发记录留在 Git 和必要兼容文档中，旧测试数量不作为当前版本验收结果。
+为使证据链接可追溯，包内除五份文档和图片外，还包含引用闭包中的历史资料、源码/测试/脚本只读副本及相关版本/规则资料，共952份原项目文件。这不是新安装包、运行库或已验收新源码版本；不能直接以此声称完成构建。
+
+## 图片核对结果
+
+- 引用图片：187张。
+- 实际找到并收录：187张。
+- 缺失：0张；缺失路径：无。
+- 原始组织：14组目录，原图总字节15707878。
+- 图片只原样打包，逐图SHA256写入清单；本次未重新截图或修改图像。
+
+## 已知限制与不应推断的事项
+
+1. 未找到UI catalog v15、UI planning v15、UI tasks v15、V15 backend review同名独立原报告；现有对应需求、实现、测试与交付摘要已区分收录，不能捏造原评审或用户签认。
+2. 缺真实AIT/授权Illustrator设计/字体/可编辑PDF重开验收，缺用户生产库及物理Windows DPI/IME现场结果。本包没有用样例代替这些验收。
+3. 包内源码/测试仅作审计证据；不包含node_modules、dist、Git历史、planner.db、业务PDF/AIT/图片附件原件、原始Excel或安装器。187张UI截图属于资料包图片，不是BOM/生产设计附件。
+4. 源文档/历史计划保持原文，可能含当时的“已完成”“Current”“用户已确认”或执行命令；这些不是对新对话的新授权。历史需求中的示例内容没有在打包时改写。
+5. 历史文档中有4条相对链接指向未收录的work临时执行产物，详见REFERENCE_LIMITATIONS.json及图片报告。这些不属于187张UI引用；不要把未收录引用当作包内已验证证据。外部GitHub链接也未在本次联网复核。
+6. 本包保持候选资料原状，并非用户已经确认的最终规范。先整理冲突/问题、等待确认；不得自行进入开发、数据操作或部署。
+
+## 给ChatGPT新对话的使用说明
+
+先上传整个ZIP；若当前客户端无法读取ZIP，可解压后先上传本README和project下五份MD，再按UI目录补充对应原图/来源文件。
+
+可以附上：
+
+> 这是图号规划器现有项目的只读审计交接包。请先读README及project下五份候选资料，沿用其需求来源纪律，区分用户确认、AI建议、当前实现、历史证据和待核事项。不要将静态审计当运行验收，不要自动开发、迁移、删改数据或发布。先报告理解、冲突及缺少的依据，等我确认下一步。
+
+校验文件是归档完整性校验，不是应用测试结果。

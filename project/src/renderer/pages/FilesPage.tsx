@@ -1,0 +1,564 @@
+import type { FileScanRunView } from '../../core/files/file-types';
+import { ListChecks, Square, FolderInput, CircleOff, RotateCcw, Trash2 } from 'lucide-react';
+import { isSourcePdfPath } from '../../core/files/material-directory-policy';
+import type { AppearanceApi } from '../data/appearance-client';
+import { plannerQueryCache, queryKey } from '../data/query-cache';
+import type { MaterialBatchDeletionPreview, PdfManagementApi, PdfManagementPreview } from '../data/pdf-management-client';
+import './files-management.css';
+import './v4-files.css';
+import { PdfClassificationDialog } from '../components/PdfClassificationDialog';
+import { resetTableLayouts } from '../components/useTableLayout';
+import { PdfProductBatchNavigation, type PdfNavigationScope, type PdfNavigationCounts } from '../components/PdfProductBatchNavigation';
+import './drawing-library.css';
+import { CopyButton } from '../components/CopyButton';
+import { PageHeader } from '../components/PageHeader';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { materialBatchLabel } from '../../core/files/material-batch-label';
+
+import { ModuleWorkspace } from '../components/ModuleWorkspace';
+import { DataTable } from '../components/DataTable';
+import { EmptyState } from '../components/EmptyState';
+import type { DrawingNavigationBatchView, FileIndexClearPreviewView, FileScanChangesView, MaterialBatchView, PdfFileView, PdfScanSummaryView, PlannerApi, ProductView, WorkspaceSettingsView } from '../data/client';
+import { openIndexedPdfLocation } from '../desktop-files';
+import { createFilesMockApi, filesScenarios, initialFilesScenario, isFilesMockEnabled, type FilesScenario } from './files-mock';
+
+const apiScopes = new WeakMap<object, number>();
+let nextApiScope = 0;
+function apiScope(api: object): number { let id = apiScopes.get(api); if (id === undefined) {id = ++nextApiScope; apiScopes.set(api, id);} return id; }
+const initialFilters = { keyword: '', matchStatus: '', conversionType: '', presence: 'all', managementState: 'included', materialBatchId:'', modifiedFrom:'', modifiedTo:'' };
+export interface DrawingPdfNavigationTarget { productId?: number; appearanceVersionId?: number; materialBatchId?: number; fullCode?: string; }
+function targetScope(target?: DrawingPdfNavigationTarget | null): PdfNavigationScope {
+  if (target?.materialBatchId) return {kind:'batch',productId:target.productId,batchId:target.materialBatchId};
+  return target?.productId ? {kind:'product',productId:target.productId} : {kind:'all'};
+}
+
+function scanScopeLabel(scope:FileScanRunView['scope'],prefix='本次扫描范围'):string {
+  return scope?.kind==='products'?`${prefix}：产品目录 · ${scope.productDirectories.join('、')}`:`${prefix}：整个资料库`;
+}
+
+function FilePath({ path, name, onClose }: { path: string; name: string; onClose?: () => void }) {
+  const [feedback, setFeedback] = useState('');
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(path);
+      setFeedback('已复制');
+    } catch { setFeedback('复制不可用，请选中完整路径复制'); }
+  };
+  return <div className="files-path-row"><span className="files-path-full">{path}</span>
+      <div className="files-path-actions"><CopyButton label="复制路径" type="button" className="text-button" aria-label={`复制 ${name} 的完整相对路径`} onClick={() => void copy()} />
+      {onClose && <button type="button" className="text-button" onClick={onClose}>收起路径</button>}
+      {feedback && <small role="status">{feedback}</small>}</div>
+  </div>;
+}
+
+function FileBatch({ item, batches }: { item: PdfFileView; batches: MaterialBatchView[] }) {
+  const batch = batches.find(value => value.id === item.materialBatchId);
+  const state=batch?.currentState;
+  if(isSourcePdfPath(item.relativePath)) return <span className="muted-text">—</span>;
+  return state==='current'||state==='historical'?<span className={`files-batch ${state}`}><small className="files-status">{state==='current'?'当前批次':'历史批次'}</small></span>:<span className="muted-text">—</span>;
+}
+
+function manualFilters(values:typeof initialFilters) {
+  const {materialBatchId,modifiedFrom,modifiedTo,...other}=values;
+  return {...other,...(materialBatchId?{materialBatchId:Number(materialBatchId)}:{}),
+    ...(modifiedFrom?{modifiedFrom:new Date(`${modifiedFrom}T00:00:00.000`).toISOString()}:{}),
+    ...(modifiedTo?{modifiedTo:new Date(`${modifiedTo}T23:59:59.999`).toISOString()}:{}),
+  };
+}
+function searchInput(values: typeof initialFilters, page: number, scope: PdfNavigationScope = {kind: 'all'}, pageSize = 100) {
+  return { ...manualFilters(values), ...(scope.productId ? { productId: scope.productId } : {}),
+    ...(scope.batchId ? values.materialBatchId?{navigationMaterialBatchId:scope.batchId}:{materialBatchId:scope.batchId} : {}),
+    ...(scope.appearanceVersionId ? {appearanceVersionId:scope.appearanceVersionId} : {}),
+    ...(scope.kind === 'source' ? {materialSource:'true'} : {}),
+    ...(scope.kind === 'category' ? { productCategory: scope.category } : {}),
+    ...(scope.kind === 'unassociated' ? { unassociatedProduct: 'true' } : {}), page, pageSize };
+}
+
+export function FilesPage({ api, initialTarget, active = true }: { api: PlannerApi; initialTarget?: DrawingPdfNavigationTarget | null; active?: boolean }) {
+  const mock = isFilesMockEnabled();
+  const [scenario, setScenario] = useState<FilesScenario>(initialFilesScenario);
+  const mockApi = useMemo(() => createFilesMockApi(scenario), [scenario]);
+  return <>
+    {mock && <section className="info-banner files-preview" aria-label="PDF 开发预览"><span><strong>开发预览 Mock</strong> · 仅内存数据，扫描、清理、任务与定位均已隔离。移除 ?mock=files 退出。</span>
+      <label>压力场景<select aria-label="PDF 压力场景" value={scenario} onChange={event => setScenario(event.target.value as FilesScenario)}>{Object.entries(filesScenarios).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></section>}
+    <FilesWorkspace key={mock ? scenario : 'live'} api={mock ? mockApi : api} mock={mock} initialTarget={initialTarget} active={active} />
+  </>;
+}
+
+function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi & PdfManagementApi & AppearanceApi; mock: boolean; initialTarget?: DrawingPdfNavigationTarget | null; active: boolean }) {
+  const classificationAvailable = !mock && Boolean(api.previewPdfClassification && api.applyPdfClassification);
+  const cacheScope = apiScope(api);
+  const localMutation = useRef(0);
+  const locally = async <T,>(operation: () => Promise<T>): Promise<T> => {
+    localMutation.current++;
+    try { return await operation(); } finally { localMutation.current--; }
+  };
+  const pageSize = 100;
+  const loadingMore = useRef(false);
+  const exhaustedQuery = useRef<string|null>(null);
+  const [loadMoreError,setLoadMoreError]=useState('');
+  const currentQueryKey = useRef('');
+  const [managementPreview, setManagementPreview] = useState<PdfManagementPreview | null>(null);
+  const [managementPhrase, setManagementPhrase] = useState('');
+  const [managementBusy, setManagementBusy] = useState(false);
+  const [batchDeletion, setBatchDeletion] = useState<MaterialBatchDeletionPreview | null>(null);
+  const [renameBatch, setRenameBatch] = useState<MaterialBatchView | null>(null);
+  const [batchName, setBatchName] = useState('');
+  const [classifying, setClassifying] = useState(false);
+  const [showScanDetails, setShowScanDetails] = useState(false);
+  const [expandedPathId, setExpandedPathId] = useState<number | null>(null);
+  const [settings, setSettings] = useState<WorkspaceSettingsView>({ workspaceRoot: null, configured: false, available: false });
+  const [rootInput, setRootInput] = useState(''); const [files, setFiles] = useState<PdfFileView[]>([]);
+  const [products, setProducts] = useState<ProductView[]>([]);
+  const [batches, setBatches] = useState<MaterialBatchView[]>([]);
+  const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState(() => initialTarget ? {...initialFilters, keyword: initialTarget.fullCode ?? ''} : initialFilters);
+  const [navigationScope, setNavigationScope] = useState<PdfNavigationScope>(() => targetScope(initialTarget));
+  const processedTarget = useRef(JSON.stringify(initialTarget));
+  const latestSearch = useRef({ values: filters, scope: navigationScope, page: 1 });
+  const [usageBatches, setUsageBatches] = useState<DrawingNavigationBatchView[]>([]);
+  const [navigationCounts, setNavigationCounts] = useState<PdfNavigationCounts | null>(null);
+  const [unmatchedCount, setUnmatchedCount] = useState<number | null>(null);
+  const navigationRequest = useRef(0);
+  const refreshNavigation = async (values = filters) => {
+    const request = ++navigationRequest.current;
+    if (!api.getPdfFileNavigation) { setNavigationCounts(null); setUnmatchedCount(null); return; }
+    const unmatchedValues = {...values, matchStatus:'unmatched'};
+    const [counts, unmatched] = await Promise.allSettled([
+      plannerQueryCache.fetch(queryKey('pdf:counts', {cacheScope, values}), () => api.getPdfFileNavigation!(manualFilters(values))),
+      plannerQueryCache.fetch(queryKey('pdf:counts', {cacheScope, values:unmatchedValues}), () => api.getPdfFileNavigation!(manualFilters(unmatchedValues))),
+    ]);
+    if (request !== navigationRequest.current) return;
+    setNavigationCounts(counts.status==='fulfilled'?counts.value:null);
+    setUnmatchedCount(unmatched.status==='fulfilled'?unmatched.value.total:null);
+  };
+  const [summary, setSummary] = useState<PdfScanSummaryView | null>(null);
+  const [scanIncomplete,setScanIncomplete]=useState(false);
+  const [latestScan,setLatestScan]=useState<FileScanRunView|null>(null);
+  const latestScanRequest=useRef(0);
+  const observedScanId=useRef<number|null>(null);
+  const currentScan:FileScanRunView|null=latestScan&&(!summary||latestScan.id>summary.scanId)?latestScan:summary?{...summary.comparison,id:summary.scanId,currentTotal:summary.currentTotal,completedAt:summary.scannedAt}:latestScan;
+  const productScan=currentScan?.scope?.kind==='products';
+  const currentSummary=summary?.scanId===currentScan?.id?summary:null;
+  const [scanChanges, setScanChanges] = useState<FileScanChangesView | null>(null);
+  const [showChanges, setShowChanges] = useState(false);
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]); const [pendingCleanupIds, setPendingCleanupIds] = useState<number[] | null>(null);
+  const [cleaning, setCleaning] = useState(false);
+  const [indexClearPreview, setIndexClearPreview] = useState<FileIndexClearPreviewView | null>(null);
+  const [indexClearConfirming, setIndexClearConfirming] = useState(false); const [indexClearPhrase, setIndexClearPhrase] = useState('');
+  const [clearingIndex, setClearingIndex] = useState(false);
+  const [loadingChanges, setLoadingChanges] = useState(false);
+  const [error, setError] = useState(''); const [message, setMessage] = useState(''); const searchRequest = useRef(0);
+
+  const refreshLatestScan=async()=>{
+    if(!api.getLatestFileScan)return;const request=++latestScanRequest.current;
+    try{const next=await api.getLatestFileScan();if(request!==latestScanRequest.current)return;setLatestScan(next);if(observedScanId.current!==next?.id){observedScanId.current=next?.id??null;setScanChanges(null);setShowChanges(false);}}
+    catch(reason){if(request===latestScanRequest.current)setError(reason instanceof Error?reason.message:'最近扫描记录加载失败');}
+  };
+
+  const loadChunks = async (values:typeof initialFilters, scope:PdfNavigationScope, through:number) => {
+    const results=await Promise.all(Array.from({length:through},(_,index)=>{
+      const input=searchInput(values,index+1,scope,pageSize);
+      return plannerQueryCache.fetch(queryKey('pdf:list',{cacheScope,...input}),()=>api.searchPdfFiles(input));
+    }));
+    return {items:[...new Map(results.flatMap(result=>result.items).map(item=>[item.id,item])).values()],total:results.at(-1)?.total??0,page:through};
+  };
+  const search = async (values = latestSearch.current.values, requestedPage = 1, scope = latestSearch.current.scope) => {
+    const key=queryKey('pdf:scope',{cacheScope,values,scope});
+    currentQueryKey.current=key; loadingMore.current=false; exhaustedQuery.current=null; setLoadMoreError('');
+    latestSearch.current = { values, scope, page: requestedPage };
+    const request = ++searchRequest.current; setLoading(true);
+    try {
+      const result = await loadChunks(values,scope,requestedPage);
+      if (request !== searchRequest.current) return;
+      setFiles(result.items); setSelectedIds(current=>current.filter(id=>result.items.some(file=>file.id===id))); setTotal(result.total); latestSearch.current.page=result.page;
+      void refreshNavigation(values);
+    } catch (reason) {if(request===searchRequest.current)setError(reason instanceof Error?reason.message:'PDF 文件加载失败');}
+    finally {if(request===searchRequest.current)setLoading(false);}
+  };
+  const loadMore = async () => {
+    if (loading||loadingMore.current||files.length>=total||exhaustedQuery.current===currentQueryKey.current) return;
+    loadingMore.current=true;setLoadMoreError('');const request=searchRequest.current;const key=currentQueryKey.current;
+    const latest=latestSearch.current;const next=latest.page+1;const input=searchInput(latest.values,next,latest.scope,pageSize);
+    try {
+      const result=await plannerQueryCache.fetch(queryKey('pdf:list',{cacheScope,...input}),()=>api.searchPdfFiles(input));
+      if(request!==searchRequest.current||key!==currentQueryKey.current)return;
+      const newIds=result.items.filter(item=>!files.some(existing=>existing.id===item.id));
+      if(result.page!==next||newIds.length===0)exhaustedQuery.current=key;
+      setFiles(current=>[...new Map([...current,...result.items].map(item=>[item.id,item])).values()]);
+      setTotal(result.total);latestSearch.current.page=result.page;
+    } catch(reason){if(request===searchRequest.current)setLoadMoreError(reason instanceof Error?reason.message:'更多文件加载失败');}
+    finally{if(request===searchRequest.current)loadingMore.current=false;}
+  };
+
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    const request = ++searchRequest.current; setLoading(true); setError('');
+    void refreshNavigation();
+    void refreshLatestScan();
+    void api.getDrawingNavigation?.().then(result => { if (live) setUsageBatches(result.batches); }).catch(() => { if (live) setUsageBatches([]); });
+    void Promise.all([api.getWorkspaceSettings(), api.listProducts({ status: 'all' }).catch(() => []), api.listMaterialBatches({}).catch(() => [])])
+      .then(([nextSettings, productItems, batchItems]) => {
+        if (!live) return;
+        setSettings(nextSettings); setRootInput(nextSettings.workspaceRoot ?? ''); setProducts(productItems); setBatches(batchItems);
+      }).catch(reason => { if (live) setError(reason instanceof Error ? reason.message : '资料库设置加载失败'); });
+    currentQueryKey.current=queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope});
+    void loadChunks(latestSearch.current.values,latestSearch.current.scope,latestSearch.current.page).then(result => {
+      if (!live || request !== searchRequest.current) return;
+      setFiles(result.items); setTotal(result.total);
+    }).catch(reason => { if (live && request === searchRequest.current) setError(reason instanceof Error ? reason.message : 'PDF 文件中心加载失败'); })
+      .finally(() => { if (live && request === searchRequest.current) setLoading(false); });
+    return () => { live = false; searchRequest.current++; navigationRequest.current++; latestScanRequest.current++; };
+  }, [api, active]);
+
+  useEffect(() => {
+    if (!active || processedTarget.current === JSON.stringify(initialTarget)) return;
+    processedTarget.current = JSON.stringify(initialTarget);
+    const scope = targetScope(initialTarget); const values = {...initialFilters, keyword:initialTarget?.fullCode ?? ''};
+    setFilters(values); setNavigationScope(scope); setSelectedIds([]); void search(values, 1, scope);
+  }, [initialTarget, active]);
+
+  useEffect(() => {
+    const refresh = () => { if (!active || localMutation.current > 0) return; plannerQueryCache.invalidate('pdf:'); void search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope);void refreshLatestScan(); };
+    window.addEventListener('planner:data-changed', refresh);
+    return () => window.removeEventListener('planner:data-changed', refresh);
+  }, [api, pageSize, active]);
+
+  const previewManagement = async (ids: number[], action: 'clear' | 'ignore' | 'restore') => {
+    if (!api.previewPdfManagement) return;
+    setManagementBusy(true); setError(''); setManagementPhrase('');
+    try { setManagementPreview(await locally(() => api.previewPdfManagement!({ids, action}))); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '预览失败'); }
+    finally { setManagementBusy(false); }
+  };
+  const applyManagement = async () => {
+    if (!managementPreview || !api.applyPdfManagement) return;
+    setManagementBusy(true); setError('');
+    try { const result = await locally(() => api.applyPdfManagement!({ids:managementPreview.ids, action:managementPreview.action, fingerprint:managementPreview.fingerprint, confirmation:managementPhrase}));
+      plannerQueryCache.invalidate('pdf:'); setManagementPreview(null); setSelectedIds([]);
+      setMessage(`已处理 ${result.changed} 条 PDF，保留 ${result.blocked.length} 条受保护记录`);
+      await Promise.all([search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope),api.listMaterialBatches({}).then(setBatches)]);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '操作失败'); }
+    finally { setManagementBusy(false); }
+  };
+  const previewBatchDeletion = async (batch:MaterialBatchView) => {
+    if (!api.previewMaterialBatchDeletion) return;
+    setManagementBusy(true);setError('');setMessage('');
+    try {setBatchDeletion(await api.previewMaterialBatchDeletion(batch.id));}
+    catch(reason){setError(reason instanceof Error?reason.message:'批次预检失败');}
+    finally{setManagementBusy(false);}
+  };
+  const confirmBatchDeletion = async () => {
+    if (!batchDeletion?.allowed || !api.deleteMaterialBatch) return;
+    setManagementBusy(true);setError('');
+    try {
+      await locally(()=>api.deleteMaterialBatch!(batchDeletion.id,{fingerprint:batchDeletion.fingerprint,confirmation:'删除批次'}));
+      plannerQueryCache.invalidate('pdf:');
+      const current=latestSearch.current;
+      const nextValues=current.values.materialBatchId===String(batchDeletion.id)?{...current.values,materialBatchId:''}:current.values;
+      setFilters(values=>values.materialBatchId===String(batchDeletion.id)?{...values,materialBatchId:''}:values);
+      const nextScope:PdfNavigationScope=current.scope.kind==='batch'&&current.scope.batchId===batchDeletion.id
+        ? current.scope.productId?{kind:'product',productId:current.scope.productId}:{kind:'all'}:current.scope;
+      setBatchDeletion(null);setNavigationScope(nextScope);
+      if(nextScope!==current.scope)setSelectedIds([]);
+      setMessage('已删除批次记录');
+      setBatches(await api.listMaterialBatches({}));
+      await search(nextValues,nextScope===current.scope?current.page:1,nextScope);await refreshNavigation(nextValues);
+    } catch(reason){setError(reason instanceof Error?reason.message:'删除批次失败');}
+    finally{setManagementBusy(false);}
+  };
+  const saveBatchName = async () => {
+    if (!renameBatch || !api.renameMaterialBatch) return;
+    setManagementBusy(true); setError('');
+    try { await locally(() => api.renameMaterialBatch!(renameBatch.id, {displayName:batchName,revision:renameBatch.displayRevision}));
+      plannerQueryCache.invalidate('pdf:'); setBatches(await api.listMaterialBatches({})); setRenameBatch(null);
+      await search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '改名失败'); }
+    finally { setManagementBusy(false); }
+  };
+
+  const saveRoot = async () => {
+    if (!rootInput.trim()) return; setSaving(true); setError(''); setMessage('');
+    try { const saved = await api.updateWorkspaceSettings(rootInput.trim()); setSettings(saved); setRootInput(saved.workspaceRoot ?? rootInput);
+      setMessage('资料根目录已保存'); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '资料根目录保存失败'); }
+    finally { setSaving(false); }
+  };
+  const scan = async (productId?:number) => {
+    setScanning(true); setError(''); setMessage('');setScanIncomplete(false);
+    try {
+      const result = await locally(() => productId&&api.packaging?.scanProduct?api.packaging.scanProduct(productId):api.scanPdfFiles()); plannerQueryCache.invalidate('pdf:'); setSummary(result);setLatestScan({...result.comparison,id:result.scanId,currentTotal:result.currentTotal,completedAt:result.scannedAt});observedScanId.current=result.scanId; setScanChanges(null); setShowChanges(false); setMessage(productId?'当前型号扫描完成':'资料库扫描完成');
+    }
+    catch (reason) {setScanIncomplete(true);setError(`扫描未完成：${reason instanceof Error?reason.message:'资料库扫描失败'}`);setScanning(false);return;}
+    try {
+      const [, batchItems] = await Promise.all([search(), api.listMaterialBatches({})]);
+      setBatches(batchItems);
+      try { const usage = await api.getDrawingNavigation?.(); setUsageBatches(usage?.batches ?? []); } catch { setUsageBatches([]); }
+    }
+    catch (reason) { setError(`扫描已完成，列表刷新失败：${reason instanceof Error?reason.message:'请重新加载列表'}`); }
+    finally { setScanning(false); }
+  };
+  const viewChanges = async () => {
+    if (!currentScan) return;
+    if (scanChanges) { setShowChanges((visible) => !visible); return; }
+    setLoadingChanges(true); setError('');
+    try { setScanChanges(await api.getFileScanChanges(currentScan.id)); setShowChanges(true); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '扫描变化加载失败'); }
+    finally { setLoadingChanges(false); }
+  };
+  const applyFilters=(values:typeof initialFilters)=>{if(values.modifiedFrom&&values.modifiedTo&&values.modifiedFrom>values.modifiedTo){setError('文件变更日期的结束日期不能早于开始日期');return;}setError('');setFilters(values);void search(values,1);};
+  const submit = (event: FormEvent) => { event.preventDefault();applyFilters(filters); };
+  const setFilter = (key: keyof typeof filters, value: string) => setFilters((current) => ({ ...current, [key]: value }));
+  const missingOnPage = files.filter((file) => !file.isPresent);
+  const toggleSelection = (id: number) => setSelectedIds((current) => current.includes(id)
+    ? current.filter((selected) => selected !== id) : [...current, id]);
+  const requestCleanup = (ids: number[]) => {
+    if (!ids.length) return;
+    setError(''); setMessage(''); setPendingCleanupIds([...new Set(ids)]);
+  };
+  const confirmCleanup = async () => {
+    if (!pendingCleanupIds) return;
+    const ids = pendingCleanupIds; setCleaning(true); setError('');
+    try {
+      const result = await locally(() => api.cleanupPdfFiles(ids)); plannerQueryCache.invalidate('pdf:');
+      setSelectedIds((current) => current.filter((id) => !ids.includes(id)));
+      setPendingCleanupIds(null); setMessage(`已清理 ${result.cleaned} 条缺失 PDF 索引记录`);
+      await search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'PDF 索引清理失败'); }
+    finally { setCleaning(false); }
+  };
+  const requestIndexClear = async () => {
+    setError(''); setMessage(''); setClearingIndex(true);
+    try { setIndexClearPreview(await api.getFileIndexClearPreview()); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引信息加载失败'); }
+    finally { setClearingIndex(false); }
+  };
+  const cancelIndexClear = () => { if (!clearingIndex) { setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); } };
+  const refreshAfterIndexClear = async (nextFilters: typeof filters) => {
+    latestSearch.current = {values: nextFilters, scope: {kind:'all'}, page:1};
+    const request = ++searchRequest.current; setLoading(true);
+    try {
+      const [result, batchItems] = await Promise.all([
+        api.searchPdfFiles(searchInput(nextFilters, 1, {kind: 'all'}, pageSize)), api.listMaterialBatches({}),
+      ]);
+      if (request !== searchRequest.current) return;
+      setFiles(result.items); setTotal(result.total); setBatches(batchItems);
+    } catch (reason) {
+      if (request === searchRequest.current) {
+        const detail = reason instanceof Error ? reason.message : '请重新加载列表';
+        setError(`索引已清空，但列表刷新失败：${detail}`);
+      }
+    } finally { if (request === searchRequest.current) setLoading(false); }
+  };
+  const confirmIndexClear = async () => {
+    if (indexClearPhrase !== '清空资料库索引') return;
+    setClearingIndex(true); setError('');
+    try {
+      plannerQueryCache.invalidate('pdf:');
+      const result = await locally(() => api.clearFileIndex(indexClearPhrase)); plannerQueryCache.invalidate('pdf:');
+      const nextFilters = { ...filters,materialBatchId:'' }; setNavigationScope({kind:'all'});
+      setIndexClearPreview(null); setIndexClearConfirming(false); setIndexClearPhrase(''); setSelectedIds([]); setPendingCleanupIds(null);
+      setExpandedPathId(null);
+      setFilters(nextFilters);
+      setFiles([]); setTotal(0); setBatches([]); setUsageBatches([]);
+      setSummary(null);setLatestScan(null);observedScanId.current=null; setScanChanges(null); setShowChanges(false);setScanIncomplete(false);
+      setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.qrCodeFiles} 条二维码索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
+      await refreshAfterIndexClear(nextFilters); void refreshNavigation(nextFilters);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引失败'); }
+    finally { setClearingIndex(false); }
+  };
+  const openLocation = async (id: number) => {
+    setError(''); setMessage('');
+    if (mock) { setMessage('Mock：文件定位已隔离，不访问桌面或磁盘文件。'); return; }
+    const result = await openIndexedPdfLocation(id);
+    if (!result.ok) setError(result.error?.message ?? '打开文件位置失败');
+  };
+
+  const selectedFiles=files.filter(file=>selectedIds.includes(file.id));
+  const excludableIds=selectedFiles.filter(file=>!file.managementState||file.managementState==='included').map(file=>file.id);
+  const restorableIds=selectedFiles.filter(file=>file.managementState==='ignored'||file.managementState==='needs_review').map(file=>file.id);
+  const navigation = ({collapseControl}: {collapseControl: ReactNode}) => <PdfProductBatchNavigation collapseControl={collapseControl} products={products} onDeleteBatch={api.previewMaterialBatchDeletion && api.deleteMaterialBatch ? batch=>void previewBatchDeletion(batch):undefined} onRenameBatch={api.renameMaterialBatch ? batch => {setRenameBatch(batch);setBatchName(batch.name);} : undefined} batches={batches} counts={navigationCounts} usageBatches={usageBatches} scope={navigationScope}
+    onSelect={scope => { setNavigationScope(scope); setSelectedIds([]); setError(''); setMessage(''); void search(latestSearch.current.values, 1, scope); }}
+    filters={<form className="filter-bar files-filter" onSubmit={submit}>
+      <label><span>文件关键词</span><input aria-label="文件关键词" value={filters.keyword} onChange={(event) => setFilter('keyword', event.target.value)} /></label>
+      <label><span>匹配状态</span><select aria-label="匹配状态" value={filters.matchStatus} onChange={(event) => setFilter('matchStatus', event.target.value)}>
+        <option value="">全部</option><option value="matched">已匹配</option><option value="pending">待确认</option><option value="unmatched">未匹配</option><option value="conflict">冲突</option></select></label>
+      <label><span>转曲类型</span><select aria-label="转曲类型" value={filters.conversionType} onChange={(event) => setFilter('conversionType', event.target.value)}>
+        <option value="">全部</option><option value="source">转曲前</option><option value="outlined">转曲后</option></select></label>
+      <label><span>存在状态</span><select aria-label="存在状态" value={filters.presence} onChange={(event) => setFilter('presence', event.target.value)}>
+        <option value="present">当前存在</option><option value="missing">已缺失</option><option value="all">全部</option></select></label>
+      <label><span>纳入范围</span><select aria-label="纳入范围" value={filters.managementState} onChange={event => setFilter('managementState', event.target.value)}><option value="included">正常纳入</option><option value="ignored">暂不纳入</option><option value="needs_review">内容变化待复核</option><option value="all">全部索引</option></select></label>
+      <label><span>资料批次</span><select aria-label="资料批次筛选" value={filters.materialBatchId} onChange={event=>setFilter('materialBatchId',event.target.value)}><option value="">全部批次</option>{batches.map(batch=><option key={batch.id} value={batch.id}>{batch.model?`${batch.model} · `:''}{batch.displayName??materialBatchLabel(batch.name)}</option>)}</select></label>
+      <label><span>文件变更日期从</span><input type="date" aria-label="文件变更日期从" max={filters.modifiedTo||undefined} value={filters.modifiedFrom} onChange={event=>setFilter('modifiedFrom',event.target.value)}/></label>
+      <label><span>文件变更日期至</span><input type="date" aria-label="文件变更日期至" min={filters.modifiedFrom||undefined} value={filters.modifiedTo} onChange={event=>setFilter('modifiedTo',event.target.value)}/></label>
+      <button className="primary-button" type="submit" disabled={loading || scanning}>{loading ? '加载中…' : '筛选 PDF'}</button>
+    </form>} />;
+  return <section className="page-surface page-enter files-page">
+    <div className="page-sticky-controls"><PageHeader title="PDF 文件中心" description="按产品与资料批次管理 PDF 文件。">
+      <span className="record-count">{total} 个索引文件</span></PageHeader>
+    <div className="files-scan-toolbar"><span className="files-root-path" title={settings.workspaceRoot??''}>{settings.workspaceRoot??'尚未设置资料根目录'}</span><span>PDF {navigationCounts?.total??total}</span><span>未匹配 {unmatchedCount??'—'}</span><button className="text-button" type="button" aria-expanded={showScanDetails} onClick={()=>setShowScanDetails(!showScanDetails)}>详细信息</button><button className="text-button" type="button" onClick={()=>{resetTableLayouts('pdf-files');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button>{api.packaging?.scanProduct&&<button type="button" disabled={saving||scanning||!settings.configured||!settings.available||!navigationScope.productId} onClick={()=>void scan(navigationScope.productId)}>扫描当前型号</button>}<button className="primary-button" type="button" disabled={saving||scanning||!settings.configured||!settings.available} onClick={()=>void scan()}>{scanning?'扫描中…':'扫描资料库'}</button></div></div>
+    <details className="files-scan-details" open={showScanDetails}>
+    <section className="workspace-strip" aria-label="资料根目录设置">
+      <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
+        placeholder="请输入本机资料库目录" onChange={(event) => { setRootInput(event.target.value); setMessage(''); setError(''); }} /></label>
+      <button className="secondary-button" type="button" disabled={saving || scanning || !rootInput.trim()} onClick={() => void saveRoot()}>{saving ? '保存中…' : '保存根目录'}</button>
+    </section>
+    {currentScan && <>
+      <section className="scan-summary" aria-label="当前资料库状态"><strong>{scanIncomplete?'上次完成扫描统计':productScan?'产品范围索引统计':'当前索引统计'}</strong><span>{currentScan.currentTotal} {productScan?'个所选产品范围 PDF 索引':mock ? '个索引文件（PDF / 二维码）' : '个本次扫描 PDF 索引'}</span><span className="files-stat-scope">{scanScopeLabel(currentScan.scope)}</span>
+        {currentSummary&&<>
+        <span className="files-stat-scope">PDF：{currentSummary.total} 个{productScan?'所选产品范围扫描文件':'本次扫描文件'}</span>
+        <span>{currentSummary.matched} 已匹配</span><span>{currentSummary.pending} 待确认</span>
+        <span>{currentSummary.historicalRegistered} 个历史图号已登记</span><span>{currentSummary.unmatched} 未匹配</span>
+        <span>{currentSummary.conflict} 冲突</span><span>{currentSummary.source} 转曲前</span><span>{currentSummary.outlined} 转曲后</span></>}</section>
+      <section className="scan-comparison" aria-label="与上一次扫描相比"><div><strong>{productScan?'本次产品范围变化（PDF）':mock ? '本次扫描变化（PDF / 二维码）' : '本次扫描变化（PDF）'}</strong>
+        <span>{currentScan.added} 新增</span><span>{currentScan.missing} 确认缺失</span>
+        <span>{currentScan.moved} 路径变化</span><span>{currentScan.changed} 内容变化</span>
+        <span>{currentScan.unchanged} 无变化</span>{currentSummary&&<span>0 扫描失败</span>}</div>
+        <button className="text-button" type="button" disabled={loadingChanges} aria-expanded={showChanges}
+          aria-controls="scan-change-details" onClick={() => void viewChanges()}>{loadingChanges ? '加载变化中…' : showChanges ? '收起本次变化' : '查看本次变化'}</button></section>
+      {showChanges && scanChanges && <section id="scan-change-details" className="scan-change-details" aria-label="本次扫描变化详情">
+        <p className="files-stat-scope">{scanScopeLabel((scanChanges.scan as FileScanRunView).scope??currentScan.scope,'变化范围')}</p>
+        {([['新增', scanChanges.changes.added], ['删除/缺失', scanChanges.changes.missing], ['变化', scanChanges.changes.changed]] as const)
+          .map(([label, items]) => <div className="scan-change-group" key={label}><strong>{label}</strong>
+            {items.length ? <ul>{items.map((item) => <li key={`${label}-${item.id}`}><span>{item.indexKind === 'qr' ? '二维码' : 'PDF'} · {item.fileName}</span><small className="mono">{item.relativePath}{item.previousRelativePath ? ` ← ${item.previousRelativePath}` : ''}</small></li>)}</ul>
+              : <p className="muted-text">无</p>}</div>)}
+      </section>}
+    </>}
+
+    </details>
+    {error && <p className="error-banner" role="alert">{error}</p>}{message && <p className="success-banner" role="status"><strong>{message}</strong></p>}
+    {scanIncomplete&&<p className="files-stat-scope" role="status">本次扫描未完成；新增、变化、确认缺失和失败文件数尚未确定。</p>}
+    {mock && scanning && <section className="scan-comparison" role="status"><span>正在模拟扫描 · 仅处理内存样例，不读取文件</span><button type="button" className="secondary-button" onClick={() => void api.listLocalTasks().then(tasks => { const task = tasks.find(item => item.status === 'running'); if (task) return api.cancelLocalTask(task.id); }).catch(reason => setError(String(reason)))}>取消模拟扫描</button></section>}
+
+    <ModuleWorkspace fileWorkspace resizable hideLayoutReset navigation={navigation} detailLabel="" onCloseDetail={() => {}}>
+    <div className="files-scan-toolbar" role="group" aria-label="PDF 快捷筛选">{[['全部','','all'],['仅源文件','source','all'],['仅转曲后','outlined','all'],['仅缺失','','missing']].map(([label,conversionType,presence])=><button key={label} type="button" className={latestSearch.current.values.conversionType===conversionType&&latestSearch.current.values.presence===presence?'primary-button':'secondary-button'} aria-pressed={latestSearch.current.values.conversionType===conversionType&&latestSearch.current.values.presence===presence} disabled={loading||scanning} onClick={()=>applyFilters({...filters,conversionType,presence})}>{label}</button>)}</div>
+    <p className="files-stat-scope">列表筛选不限制扫描；当前型号扫描包含源文件和全部量产批次。</p>
+    {(api.previewPdfManagement || classificationAvailable) && <section className="file-cleanup-toolbar files-management-toolbar" aria-label="PDF 索引管理">
+      <div className="files-selection-actions" role="group" aria-label="文件选择与归纳">
+        <button aria-label="全选" title="全选" className="files-management-icon secondary-button" disabled={managementBusy || !files.length} onClick={() => setSelectedIds(files.map(file => file.id))}><ListChecks size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="取消选择" title="取消选择" className="files-management-icon secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => setSelectedIds([])}><Square size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="人工归纳" title="人工归纳" className="files-management-icon secondary-button" disabled={!classificationAvailable || managementBusy || !selectedIds.length} onClick={()=>setClassifying(true)}><FolderInput size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <span className="files-selection-count">已选 {selectedIds.length} 条</span>
+      </div>
+      <div className="files-record-actions" role="group" aria-label="文件纳入与记录">
+        <button aria-label="排除所选文件" title="排除所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !excludableIds.length} onClick={()=>void previewManagement(excludableIds,'ignore')}><CircleOff size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="恢复所选文件" title="恢复所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !restorableIds.length} onClick={()=>void previewManagement(restorableIds,'restore')}><RotateCcw size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="移除文件记录" title="移除文件记录" className="files-management-icon secondary-button files-remove-record" disabled={!api.previewPdfManagement || managementBusy || !selectedIds.length} onClick={()=>void previewManagement(selectedIds,'clear')}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+      </div>
+    </section>}
+    {classifying && <PdfClassificationDialog api={{previewPdfClassification:input=>api.previewPdfClassification!(input),applyPdfClassification:input=>locally(()=>api.applyPdfClassification!(input))}} ids={selectedIds} products={products} batches={batches} onClose={()=>setClassifying(false)} onSaved={async (updated,conflictCount=0)=>{
+      plannerQueryCache.invalidate(); setClassifying(false); setSelectedIds([]); setMessage(`已归纳 ${updated} 条 PDF${conflictCount?`；${conflictCount} 条图号关联冲突保留原归属`:``}`);
+      const resources=await Promise.allSettled([api.listProducts({status:'all'}),api.listMaterialBatches({}),api.getDrawingNavigation?.()]);
+      const [productItems,batchItems,usage]=resources;
+      if(productItems.status==='fulfilled')setProducts(productItems.value);
+      if(batchItems.status==='fulfilled')setBatches(batchItems.value);
+      if(usage.status==='fulfilled')setUsageBatches(usage.value?.batches??[]);
+      await search(latestSearch.current.values,latestSearch.current.page,latestSearch.current.scope); await refreshNavigation(latestSearch.current.values);
+      const failures=resources.flatMap(result=>result.status==='rejected'?[result.reason instanceof Error?result.reason.message:'目录刷新失败']:[]);
+      if(failures.length)setError(`归纳已保存；${failures.join('；')}。可重新进入页面重试目录加载。`);
+    }}/>}
+    {managementPreview && <section className="file-cleanup-confirmation" role="dialog" aria-label="PDF 管理预览">
+      <strong>{managementPreview.confirmation} · 可处理 {managementPreview.allowed} 条，保留 {managementPreview.blocked} 条</strong>
+      <p>原始 PDF、二维码、批次身份、历史图号和既有业务引用保持保留。恢复纳入只更改纳入决定。</p>
+      <ul>{managementPreview.entries.map(entry => <li key={entry.id}>{entry.relativePath}：{entry.reason ?? '可处理'}</li>)}</ul>
+      <label>输入“{managementPreview.confirmation}”<input aria-label="PDF 管理确认短语" value={managementPhrase} onChange={event => setManagementPhrase(event.target.value)} /></label>
+      <button className="secondary-button" disabled={managementBusy} onClick={() => setManagementPreview(null)}>取消</button>
+      <button className="primary-button" disabled={managementBusy || managementPhrase !== managementPreview.confirmation || !managementPreview.allowed} onClick={() => void applyManagement()}>确认处理</button>
+    </section>}
+    {batchDeletion && <section className="file-cleanup-confirmation" role="dialog" aria-label="删除批次">
+      <strong>删除批次“{batchDeletion.name}”</strong>
+      <p>仅删除内部批次记录。磁盘文件和文件夹保持保留；目录内 PDF 再次被扫描时，会重新建立批次记录。</p>
+      {batchDeletion.reason && <p role="alert">{batchDeletion.reason}</p>}
+      <button className="secondary-button" disabled={managementBusy} onClick={()=>setBatchDeletion(null)}>取消</button>
+      <button className="secondary-button danger" disabled={managementBusy||!batchDeletion.allowed} onClick={()=>void confirmBatchDeletion()}>确认删除批次</button>
+    </section>}
+    {renameBatch && <section className="file-cleanup-confirmation" role="dialog" aria-label="批次显示名称">
+      <strong>修改批次显示名称</strong><p title={renameBatch.relativePath}>{renameBatch.relativePath}</p>
+      <input aria-label="批次显示名称" maxLength={200} value={batchName} onChange={event => setBatchName(event.target.value)} />
+      <button className="secondary-button" disabled={managementBusy} onClick={() => setRenameBatch(null)}>取消</button>
+      <button className="primary-button" disabled={managementBusy || !batchName.trim()} onClick={() => void saveBatchName()}>保存显示名称</button>
+    </section>}
+    {!api.previewPdfManagement && missingOnPage.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
+      <span>已加载 {missingOnPage.length} 条缺失索引记录</span>
+      <div>
+        <button className="secondary-button" type="button" disabled={cleaning}
+          onClick={() => setSelectedIds(missingOnPage.map((file) => file.id))}>全选已加载缺失记录</button>
+        <button className="secondary-button" type="button" disabled={cleaning || selectedIds.length === 0}
+          onClick={() => setSelectedIds([])}>取消选择</button>
+        <button className="text-button danger" type="button" disabled={cleaning || selectedIds.length === 0}
+          onClick={() => requestCleanup(selectedIds)}>清理已选索引记录 ({selectedIds.length})</button>
+      </div>
+    </section>}
+    {pendingCleanupIds && <section className="file-cleanup-confirmation" role="dialog" aria-label="确认清理 PDF 索引记录">
+      <strong>请再次确认清理 {pendingCleanupIds.length} 条缺失 PDF 索引记录</strong>
+      <p>此操作只清理数据库索引记录，不会删除磁盘文件，也不会释放历史图号。</p>
+      <div><button className="secondary-button" type="button" disabled={cleaning} onClick={() => setPendingCleanupIds(null)}>取消</button>
+        <button className="primary-button" type="button" disabled={cleaning} onClick={() => void confirmCleanup()}>{cleaning ? '清理中…' : '确认清理索引记录'}</button></div>
+    </section>}
+    {indexClearPreview && !indexClearConfirming && <section className="file-cleanup-confirmation" role="dialog" aria-label="确认清空资料库索引">
+      <strong>清空资料库索引</strong>
+      <p>资料根目录：{indexClearPreview.workspaceRoot ?? '未配置'}</p>
+      <ul><li>PDF 索引：{indexClearPreview.counts.pdfFiles}</li><li>二维码索引：{indexClearPreview.counts.qrCodeFiles}</li><li>资料批次：{indexClearPreview.counts.materialBatches}</li>
+        <li>扫描变化：{indexClearPreview.counts.scanChanges}</li><li>扫描记录：{indexClearPreview.counts.scanRuns}</li></ul>
+      <p>不会删除 {indexClearPreview.workspaceRoot ?? '当前资料根目录'} 中的任何实际文件。</p>
+      <div><button className="secondary-button" type="button" disabled={clearingIndex} onClick={cancelIndexClear}>取消</button>
+        <button className="primary-button" type="button" disabled={clearingIndex} onClick={() => setIndexClearConfirming(true)}>继续</button></div>
+    </section>}
+    {indexClearPreview && indexClearConfirming && <section className="file-cleanup-confirmation" role="dialog" aria-label="最终确认清空资料库索引">
+      <strong>请输入“清空资料库索引”以继续</strong>
+      <p>不会删除 {indexClearPreview.workspaceRoot ?? '当前资料根目录'} 中的任何实际文件，也不会释放历史图号。</p>
+      <label><span>确认短语</span><input aria-label="确认短语" value={indexClearPhrase} disabled={clearingIndex}
+        onChange={(event) => setIndexClearPhrase(event.target.value)} /></label>
+      <div><button className="secondary-button" type="button" disabled={clearingIndex} onClick={cancelIndexClear}>取消</button>
+        <button className="primary-button" type="button" disabled={clearingIndex || indexClearPhrase !== '清空资料库索引'}
+          onClick={() => void confirmIndexClear()}>{clearingIndex ? '清空中…' : '确认清空资料库索引'}</button></div>
+    </section>}
+    {loading&&<p className="files-loading-status" role="status" aria-live="polite">正在加载 PDF 文件索引…</p>}
+    {!loading && !error && files.length === 0 && <EmptyState symbol="P" title={settings.configured ? '没有符合条件的 PDF' : '请先设置资料根目录'}
+      description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} />}
+    {(files.length > 0 || loading) &&
+      <DataTable tableId="pdf-files" showLayoutTools={false} virtualize virtualKey={queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope})} onEndReached={() => {if(loading)return false;void loadMore();return true;}} items={files} renderExpandedRow={item => expandedPathId === item.id
+        ? <div id={`file-path-${item.id}`}><FilePath path={item.relativePath} name={item.fileName} onClose={() => {
+          setExpandedPathId(null);
+          document.getElementById(`file-path-toggle-${item.id}`)?.focus();
+        }} /></div> : null} columns={[
+        { key: 'select', label: '选择', width: 48, minWidth: 48, locked: 'start', render: (item) => <input type="checkbox"
+          aria-label={`选择 ${item.fileName}`} checked={selectedIds.includes(item.id)} disabled={cleaning || (!api.previewPdfManagement && !classificationAvailable && item.isPresent)}
+          onChange={() => toggleSelection(item.id)} /> },
+        { key: 'name', label: '文件名', width: 250, minWidth: 150, align: 'center', render: (item) => <span className="file-primary files-name-clamp" title={item.fileName}>{item.fileName.replace(/\.pdf$/i, '')}</span> },
+        { key: 'batch', label: '资料批次', width: 150, minWidth: 110, align:'center', render: (item) => isSourcePdfPath(item.relativePath) ? <span className="files-source-label">未转曲源文件</span> : <span title={`${item.materialBatchName ?? '未归入批次'} · ID ${item.materialBatchId ?? '—'} · ${batches.find(batch => batch.id === item.materialBatchId)?.relativePath ?? item.relativePath}`} className="files-batch-code">{item.materialBatchName ? (batches.find(batch => batch.id === item.materialBatchId)?.displayName ?? materialBatchLabel(item.materialBatchName)) : '未归入批次'}</span> },
+        { key: 'batchStatus', label: '批次状态',width:86,minWidth:80,align:'center', render: (item) => <FileBatch item={item} batches={batches} /> },
+        { key: 'product', label: '产品',width:130,minWidth:110,align:'center', render: (item) => item.productId ? <span className="file-product"><strong>{item.productCategory} · {item.model}</strong><small>SKU：{item.sku ?? '待补录'}</small></span> : <span className="muted-text">待关联</span> },
+        { key: 'drawing', label: '匹配图号',width:190,minWidth:160,align:'center', render: (item) => item.fullCode ? <span className="file-match matched">
+          <span className="code-cell" title={item.fullCode}>{item.fullCode}</span>
+          {item.classificationWarning && <span className="file-warning">{item.classificationWarning === 'conversion-conflict'
+            ? '目录与文件名的转曲标记冲突' : item.classificationWarning}</span>}
+        </span>
+          : item.matchStatus === 'pending' ? <span className="file-match pending">
+            <span className="code-cell">{item.detectedCodes.join(' / ')}</span>
+            {item.classificationWarning && <small className="files-match-reason">{item.classificationWarning}</small>}
+          </span>
+            : <span className="muted-text">—</span> },
+        { key: 'matchStatus', label: '匹配状态',width:92,minWidth:88,align:'center', render: item => <span title={item.classificationWarning ?? undefined} className={`file-match ${item.fullCode ? 'matched' : item.matchStatus}`}>
+          <span className="files-match-badge">{item.fullCode ? '已匹配' : item.matchStatus === 'pending' ? '待确认' : item.matchStatus === 'conflict' ? '多图号冲突' : '未匹配'}</span></span> },
+        { key: 'conversion', label: '类型',width:78,minWidth:72,align:'center', render: (item) => <span className={`conversion-label ${item.conversionType}`}>{item.conversionType === 'outlined' ? '转曲后' : '转曲前'}</span> },
+        { key: 'presence', label: '文件状态',width:90,minWidth:80,align:'center', render: (item) => <span className={`presence-label ${item.isPresent ? 'present' : 'missing'}`}>{item.managementState === 'ignored' ? '暂不纳入' : item.managementState === 'needs_review' ? '待复核' : item.presenceMessage ?? (item.isPresent ? '存在' : '缺失')}</span> },
+        { key: 'actions', label: '操作', width: 160, minWidth: 154, locked: 'end', render: (item) => <div className="file-row-actions">
+          <button id={`file-path-toggle-${item.id}`} type="button" className="files-path-button" aria-label={`查看 ${item.fileName} 的完整相对路径`}
+            aria-expanded={expandedPathId === item.id} aria-controls={`file-path-${item.id}`}
+            onClick={() => setExpandedPathId(expandedPathId === item.id ? null : item.id)}>{expandedPathId === item.id ? '收起路径' : '查看路径'}</button>
+          <button className="text-button" type="button" disabled={item.presenceStatus ? !['present','index-stale'].includes(item.presenceStatus) : !item.isPresent}
+            aria-label={`打开 ${item.fileName} 的位置`} onClick={() => void openLocation(item.id)}>打开位置</button>
+
+        </div> },
+      ]} />}
+    <div className="files-load-summary" role="status">已加载 {files.length} / {total} 条{loadMoreError&&<span role="alert"> · {loadMoreError} <button className="text-button" onClick={()=>void loadMore()}>重试加载</button></span>}</div>
+    </ModuleWorkspace>
+    {!api.previewPdfManagement && <details className="files-index-maintenance"><summary>索引维护</summary><section className="file-cleanup-toolbar" aria-label="资料库索引清空">
+      <div><strong>清空资料库索引</strong><p>仅清除无业务引用的 PDF 索引；存在关联时阻止全量清除。二维码、批次和扫描历史保留。</p></div>
+      <button className="text-button danger" type="button" disabled={scanning || clearingIndex || !settings.configured} onClick={() => void requestIndexClear()}>清空资料库索引</button>
+    </section></details>}
+  </section>;
+}

@@ -1,0 +1,21 @@
+{
+  "applicationCommit": "34bf3360f25a019f0124acf9fbd398993e6f7bba",
+  "workflowRun": 39636465335,
+  "job": 119348500070,
+  "conclusion": "success",
+  "installerArtifact": 12362011165,
+  "installerZipBytes": 144555309,
+  "installerZipSha256": "760eac2658e7a0abd6d942b2b546e9b5182c36aa3ef6bc1ee0ccfe36969cccea",
+  "verificationArtifact": 12363175092,
+  "portableArtifact": 12361946320,
+  "retainedUntil": "2026-11-04",
+  "fullTests": {
+    "files": 152,
+    "passed": 1270,
+    "failed": 0,
+    "startedAt": "2026-10-21T16:35:43Z",
+    "durationSeconds": 249.38
+  },
+  "originalUserDatabaseAccessed": false,
+  "physicalDpiVerified": false
+}

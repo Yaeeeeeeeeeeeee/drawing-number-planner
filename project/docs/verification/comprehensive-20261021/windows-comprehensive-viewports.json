@@ -1,0 +1,497 @@
+{
+  "revision": "34bf3360f25a019f0124acf9fbd398993e6f7bba",
+  "viewports": [
+    {
+      "requested": {
+        "width": 3840,
+        "height": 2160
+      },
+      "actual": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 2560,
+        "height": 1440
+      },
+      "actual": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 1920,
+        "height": 1080
+      },
+      "actual": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 1366,
+        "height": 768
+      },
+      "actual": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    },
+    {
+      "requested": {
+        "width": 720,
+        "height": 600
+      },
+      "actual": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      },
+      "scope": "Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "Windows-综合改版-产品档案-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-3840.png",
+      "png": {
+        "width": 3840,
+        "height": 2160
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 2160,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-2560.png",
+      "png": {
+        "width": 2560,
+        "height": 1440
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1440,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-1920.png",
+      "png": {
+        "width": 1920,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-1366.png",
+      "png": {
+        "width": 1366,
+        "height": 768
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-产品档案-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-图号库-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-PDF文件中心-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-二维码管理-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-BOM管理-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    },
+    {
+      "file": "Windows-综合改版-外发资料-720.png",
+      "png": {
+        "width": 720,
+        "height": 600
+      },
+      "viewport": {
+        "width": 720,
+        "height": 600,
+        "devicePixelRatio": 1,
+        "screenWidth": 1024,
+        "screenHeight": 768
+      }
+    }
+  ]
+}
