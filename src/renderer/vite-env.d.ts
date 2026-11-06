@@ -10,6 +10,7 @@ interface PlannerDesktop {
   terminateTask?(): Promise<DesktopRecoveryResult>;
   reloadRenderer?(): Promise<DesktopRecoveryResult>;
   restartService?(): Promise<DesktopRecoveryResult>;
+  reselectDatabase?(): Promise<DesktopRecoveryResult>;
   relaunchApp?(): Promise<DesktopRecoveryResult>;
   onServiceRestarted?(callback: () => void): () => void;
 }

@@ -7,6 +7,7 @@ import { runInNewContext } from 'node:vm';
 import { afterEach, it, expect, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { initializeEmptyAcceptanceDatabase } from '../../scripts/initialize-empty-acceptance.js';
+import * as databaseSafety from '../../src/main/database-validation';
 import { openDatabase } from '../../src/db/database';
 
 const require = createRequire(import.meta.url);
@@ -21,6 +22,7 @@ afterEach(() => {
 
 function createHistoryFolder(old: string) {
   mkdirSync(join(old, 'backups'), { recursive: true });
+  initializeEmptyAcceptanceDatabase(join(old, 'planner.db'));
   const database = new Database(join(old, 'planner.db'));
   try { database.exec("CREATE TABLE history(value TEXT); INSERT INTO history VALUES ('historybytes');"); }
   finally { database.close(); }
@@ -39,6 +41,7 @@ function fixture() {
   createHistoryFolder(old);
   const input = {
     appData,
+    databaseSafety,
     chooseMode: async () => 'existing',
     chooseDatabase: async () => join(old, 'planner.db'),
     initializeDatabase: initializeEmptyAcceptanceDatabase,
@@ -180,7 +183,7 @@ it.each(['header-only', 'corrupt-contents', 'damaged-data-page'])(
     let bytes = Buffer.from('SQLite format 3\0' + (corruption === 'corrupt-contents' ? 'corrupt contents' : ''));
     if (corruption === 'damaged-data-page') {
       bytes = readFileSync(file);
-      // The history table lives on page 2; its b-tree page type must be 0x0d.
+      // Damage a database page while retaining the SQLite header.
       bytes[4096] = 0x7f;
     }
     writeFileSync(file, bytes);
@@ -208,6 +211,7 @@ it.each([true, false])('production entry reads the installer marker outside reso
   const errors: string[] = [];
   const electron = {
     app: {
+      requestSingleInstanceLock: () => true,
       whenReady: async () => {},
       getPath: () => input.appData,
       quit: () => {},
@@ -221,10 +225,32 @@ it.each([true, false])('production entry reads the installer marker outside reso
   await runInNewContext(readFileSync(new URL('../../scripts/production-entry.cjs', import.meta.url), 'utf8'), {
     __dirname: appDirectory,
     console: { info: () => {}, error: () => {} },
-    require: (name: string) => name === 'electron' ? electron : name === './production-profile.cjs' ? { prepareProductionProfile } : require(name),
+    require: (name: string) => name === 'electron' ? electron : name === './production-profile.cjs' ? { prepareProductionProfile: (input: any) => prepareProductionProfile({...input,databaseSafety}) } : name === './initialize-empty-acceptance.cjs' ? {initializeEmptyAcceptanceDatabase,...databaseSafety} : require(name),
   });
   expect(prompts).toBe(installed ? 1 : 0);
   expect(reused).toBe(installed ? undefined : old);
   expect(errors).toEqual(installed ? [] : ['test stopped before loading main']);
   expectOldPreserved(old);
+});
+
+it('refuses a second desktop instance before a profile can be selected or migrated', async () => {
+  const prepare = vi.fn(async () => null), ready = vi.fn(async () => {}), quit = vi.fn();
+  await runInNewContext(readFileSync(new URL('../../scripts/production-entry.cjs', import.meta.url), 'utf8'), {
+    __dirname: '/unused',
+    require: (name: string) => name === 'electron'
+      ? {app:{requestSingleInstanceLock:()=>false, whenReady:ready, quit, getPath:()=>'/unused'}, dialog:{showErrorBox:vi.fn()}}
+      : name === './production-profile.cjs' ? {prepareProductionProfile:prepare} : require(name),
+  });
+  expect(quit).toHaveBeenCalledOnce(); expect(ready).not.toHaveBeenCalled(); expect(prepare).not.toHaveBeenCalled();
+});
+
+it('keeps native retry available after a startup profile failure before any renderer exists', async () => {
+  const attempts:boolean[] = [], quit=vi.fn(), retry=vi.fn(async()=>({response:0}));
+  await runInNewContext(readFileSync(new URL('../../scripts/production-entry.cjs', import.meta.url), 'utf8'), {
+    __dirname:'/unused', console:{info(){},error(){}},
+    require:(name:string)=>name==='electron'
+      ? {app:{requestSingleInstanceLock:()=>true,whenReady:async()=>{},getPath:()=>'/unused',quit},dialog:{showMessageBox:retry,showErrorBox:vi.fn()}}
+      : name==='./production-profile.cjs' ? {prepareProductionProfile:async(input:{forceSelection:boolean})=>{attempts.push(input.forceSelection);if(attempts.length===1)throw Error('rehearsal rejected');return null;}} : require(name),
+  });
+  expect(attempts).toEqual([false,true]); expect(retry).toHaveBeenCalledOnce(); expect(quit).toHaveBeenCalledOnce();
 });

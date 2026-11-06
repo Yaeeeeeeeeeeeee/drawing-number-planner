@@ -3,7 +3,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
 /** Ask once per installation, then reuse the chosen database. Never reset old data. */
-async function prepareProductionProfile({ appData, installationId, chooseMode, chooseDatabase, initializeDatabase }) {
+async function prepareProductionProfile({ appData, installationId, chooseMode, chooseDatabase, initializeDatabase, databaseSafety, forceSelection = false, beforeSwitch, verifyStartup, currentDataDir }) {
   const home = path.join(appData, 'DrawingNumberPlanner');
   const config = path.join(home, 'profile.json');
   const rejectLink = file => {
@@ -19,21 +19,10 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     try { fs.readSync(fd, header, 0, 16, 0); }
     finally { fs.closeSync(fd); }
     if (header.toString('ascii') !== 'SQLite format 3\0') throw Error('所选文件不是有效的 SQLite 数据库。');
-    // A retained signature alone does not prove a usable database. Read the
-    // schema/pages without migrating or writing the selected database.
-    let database;
-    try {
-      const Database = require('better-sqlite3');
-      database = new Database(file, { readonly: true, fileMustExist: true });
-      const result = database.pragma('quick_check', { simple: true });
-      if (result !== 'ok') throw Error(String(result));
-    } catch (error) {
-      throw Error(`所选数据库无法读取或已损坏：${error.message}。不会修改原文件。`);
-    } finally {
-      if (database) database.close();
-    }
+    safety.validateProductionDatabase(file);
   };
 
+  const safety = databaseSafety ?? require('./initialize-empty-acceptance.cjs');
   rejectLink(home);
   rejectLink(config);
   let saved;
@@ -43,7 +32,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
       throw Error('保存的数据目录无效，不会创建替代空库。');
     }
     // Portable packages have no installation marker and keep the stable profile.
-    if (!installationId || saved.installationId === installationId) {
+    if (!forceSelection && (!installationId || saved.installationId === installationId)) {
       rejectLink(saved.dataDir);
       validateDatabase(path.join(saved.dataDir, 'planner.db'));
       return fs.realpathSync.native(saved.dataDir);
@@ -52,17 +41,33 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
 
   const mode = await chooseMode();
   if (mode === 'cancel') return null;
+  const protectCurrent = async () => {
+    if (beforeSwitch) await beforeSwitch();
+    const current = currentDataDir ?? saved?.dataDir;
+    if (current) {
+      rejectLink(current);
+      rejectLink(path.join(current, 'planner.db'));
+      // Missing/corrupt current databases cannot supply a verified backup.
+      // Preserve the profile and let native recovery/reselection be retried.
+      safety.backupProductionDatabase(current);
+    }
+  };
   let data;
   if (mode === 'existing') {
-    const file = await chooseDatabase();
+    let file = await chooseDatabase();
     if (!file) return null;
+    rejectLink(file);
+    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'planner.db');
     if (path.basename(file).toLowerCase() !== 'planner.db') {
       throw Error('请选择旧版数据目录中的 planner.db，保留 settings.json 和 backups 等原文件。');
     }
     rejectLink(path.dirname(file));
     validateDatabase(file);
     data = fs.realpathSync.native(path.dirname(file));
+    await protectCurrent();
+    await safety.prepareExistingProductionDatabase(file);
   } else if (mode === 'fresh') {
+    await protectCurrent();
     fs.mkdirSync(home, { recursive: true });
     const defaultData = path.join(home, 'data');
     rejectLink(defaultData);
@@ -80,6 +85,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     }
   } else throw Error('数据目录选择无效');
 
+  if (verifyStartup) await verifyStartup(data);
   fs.mkdirSync(home, { recursive: true });
   const next = { ...saved, dataDir: data };
   if (installationId) next.installationId = installationId;

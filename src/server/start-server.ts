@@ -72,6 +72,7 @@ export interface RunningServer {
   resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
   setOutboundOutputRoot(path: string): string;
   resolveOutboundPackagePath(id: unknown, partNumber?: unknown): string;
+  prepareDatabaseSwitch(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -102,6 +103,14 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       if (backup.status === 'failed') console.error(`[backup] ${backup.error}`);
     }
     server = Fastify({ logger: false, forceCloseConnections: true });
+    let switchingDatabase = false;
+    const activeRequests = new Set<string>();
+    server.addHook('onRequest', async (request:FastifyRequest, reply:FastifyReply) => {
+      if (switchingDatabase) return reply.code(503).send({error:{code:'DATABASE_SWITCHING',message:'数据库切换准备中，请稍后重试'}});
+      activeRequests.add(request.id);
+    });
+    server.addHook('onResponse', async (request:FastifyRequest) => { activeRequests.delete(request.id); });
+    server.addHook('onRequestAbort', async (request:FastifyRequest) => { activeRequests.delete(request.id); });
   server.addHook('onResponse',(request:FastifyRequest,reply:FastifyReply,done:HookHandlerDoneFunction)=>{
     if(reply.statusCode<300&&((request.method==='PUT'&&request.url==='/api/files/settings')
       ||request.method==='POST'&&(['/api/packaging/tasks','/api/packaging/create-temporary-directories'].includes(request.url)||/^\/api\/packaging\/tasks\/[^/]+\/delete$/u.test(request.url))))packagingMonitor?.refresh();
@@ -165,6 +174,15 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     }
 
     return {
+      prepareDatabaseSwitch: async () => {
+        // Private parent/child IPC only. No HTTP route or renderer-supplied token.
+        const busy = () => activeRequests.size > 0 || tasks.list().some(task => ['queued','running','finalizing'].includes(task.status))
+          || Boolean(packagingTasks?.hasOperations()) || Boolean(packagingTasks?.hasUnsettledAutomation());
+        if (switchingDatabase || busy()) throw Object.assign(new Error('文件生成、归档、索引或 Illustrator 操作尚未结束，请完成后再切换数据库'),{code:'DATABASE_SWITCH_BUSY'});
+        // Close the request gate synchronously before yielding so no new work races the check.
+        switchingDatabase = true;
+        await packagingMonitor?.close();
+      },
       qrManualAction: (action, input) => {
         if (!input || typeof input !== 'object') throw new Error('INVALID_QR_MANUAL_INPUT');
         const data = input as Record<string, unknown>;

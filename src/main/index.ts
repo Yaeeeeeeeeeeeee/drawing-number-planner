@@ -1,6 +1,9 @@
 import { acquireDesktopInstance } from './single-instance.js';
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import * as databaseSafety from './database-validation.js';
+import { performDatabaseReselection, createTrustedRecoveryHandler } from './database-reselection.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -103,6 +106,7 @@ async function serviceRequest<T>(path: string, init: RequestInit = {}): Promise<
 function installRecoveryControls(): void {
   if (!localService || !mainWindow) return;
   recoveryController = new RecoveryController({
+    reselectDatabase,
     serviceHealth: () => localService!.health(),
     restartService: () => localService!.restart(),
     listTasks: async () => (await serviceRequest<{ tasks: RecoverableTask[] }>('/api/tasks')).tasks,
@@ -135,6 +139,8 @@ function installRecoveryControls(): void {
       { label: '重启本地服务', click: () => invoke('restartService') },
       { type: 'separator' },
       { label: '完整恢复应用', click: () => invoke('relaunchApp') },
+      { type: 'separator' },
+      { label: '重新选择数据库', click: () => invoke('reselectDatabase') },
     ] },
   ] }]));
   const result = async (action: keyof typeof actions) => {
@@ -142,14 +148,69 @@ function installRecoveryControls(): void {
     catch (error) { return { ok: false, error: { code: typeof error === 'object' && error && 'code' in error ? String(error.code) : 'RECOVERY_FAILED',
       message: error instanceof Error ? error.message : '恢复操作失败' } }; }
   };
-  ipcMain.removeHandler('planner:recovery-status');
-  ipcMain.removeHandler('planner:recovery-terminate-task'); ipcMain.removeHandler('planner:recovery-reload-renderer');
-  ipcMain.removeHandler('planner:recovery-restart-service'); ipcMain.removeHandler('planner:recovery-relaunch-app');
-  ipcMain.handle('planner:recovery-status', () => recoveryController!.status());
-  ipcMain.handle('planner:recovery-terminate-task', () => result('terminateTask'));
-  ipcMain.handle('planner:recovery-reload-renderer', () => result('reloadRenderer'));
-  ipcMain.handle('planner:recovery-restart-service', () => result('restartService'));
-  ipcMain.handle('planner:recovery-relaunch-app', () => result('relaunchApp'));
+  const trusted = (event: unknown) => {
+    const sender = event as Electron.IpcMainInvokeEvent;
+    return Boolean(mainWindow && sender.sender === mainWindow.webContents && sender.senderFrame === mainWindow.webContents.mainFrame);
+  };
+  for (const [channel, action] of [
+    ['status', () => recoveryController!.status()],
+    ['terminate-task', () => result('terminateTask')], ['reload-renderer', () => result('reloadRenderer')],
+    ['restart-service', () => result('restartService')], ['relaunch-app', () => result('relaunchApp')],
+    ['reselect-database', () => result('reselectDatabase')],
+  ] as const) {
+    ipcMain.removeHandler(`planner:recovery-${channel}`);
+    ipcMain.handle(`planner:recovery-${channel}`, createTrustedRecoveryHandler(trusted, action));
+  }
+}
+
+async function reselectDatabase(): Promise<{ok:true;cancelled:boolean}> {
+  if (!localService || !mainWindow) throw new Error('桌面尚未准备好');
+  const oldService = localService;
+  const oldData = app.getPath('userData');
+  const devUrl = process.argv.find(argument => argument.startsWith('--dev-server-url='))?.slice('--dev-server-url='.length);
+  let candidate: LocalServiceController | undefined;
+  const {prepareProductionProfile} = createRequire(import.meta.url)(join(app.getAppPath(), existsSync(join(app.getAppPath(),'production-profile.cjs')) ? 'production-profile.cjs' : 'scripts/production-profile.cjs'));
+  const selected = await performDatabaseReselection({
+    quiesce: async () => {
+      if (oldService.health().status === 'running') await oldService.prepareDatabaseSwitch();
+      else {
+        if (oldService.health().status === 'starting' || existsSync(join(oldData,'illustrator-operations','active-operation.json'))) {
+          throw new Error('本机服务正在启动或 Illustrator 操作尚未核对，暂不能切换数据库');
+        }
+        await oldService.stop();
+      }
+    },
+    prepare: beforeSwitch => prepareProductionProfile({
+      appData: app.getPath('appData'), currentDataDir:oldData, forceSelection: true, databaseSafety,
+      chooseMode: async () => 'existing',
+      chooseDatabase: async () => {
+        const result = await dialog.showOpenDialog(mainWindow!, {title:'重新选择数据库（保留当前数据库和全部原文件）', defaultPath:oldData,
+          properties:['openFile'], filters:[{name:'图号规划器数据库 planner.db',extensions:['db']}]});
+        return result.canceled ? null : result.filePaths[0] ?? null;
+      },
+      beforeSwitch,
+      verifyStartup: async (data: string) => {
+        await oldService.stop();
+        candidate = new LocalServiceController({entryPath:fileURLToPath(new URL('../service/entry.js',import.meta.url)),
+          config:{dataDir:data,...(devUrl ? {allowedOrigins:[new URL(devUrl).origin]} : {rendererDir:join(app.getAppPath(),'dist','renderer')})}});
+        await candidate.start();
+      },
+    }),
+    restore: async () => {
+      await candidate?.stop(); localService = oldService;
+      const connection = await oldService.restart();
+      await mainWindow!.loadURL(devUrl ?? connection.url);
+    },
+  });
+  if (!selected.cancelled && candidate) {
+    localService = candidate;
+    // profile.json was atomically committed only after candidate.start() succeeded.
+    const connection = await candidate.start();
+    const {dataDir} = JSON.parse(readFileSync(join(app.getPath('appData'),'DrawingNumberPlanner','profile.json'),'utf8'));
+    app.setPath('userData',dataDir);
+    await mainWindow.loadURL(devUrl ?? connection.url);
+  }
+  return selected;
 }
 
 const primaryInstance = acquireDesktopInstance(app, () => {

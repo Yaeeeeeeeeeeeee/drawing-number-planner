@@ -10,6 +10,7 @@ export class RecoveryError extends Error {
 }
 
 interface RecoveryDependencies {
+  reselectDatabase?(): Promise<{ok:true;cancelled:boolean}>;
   serviceHealth(): LocalServiceHealth;
   restartService(): Promise<LocalServiceConnection>;
   listTasks(): Promise<RecoverableTask[]>;
@@ -47,6 +48,11 @@ function activeTasks(tasks: RecoverableTask[]): RecoverableTask[] {
 
 export class RecoveryController {
   constructor(private readonly dependencies: RecoveryDependencies) {}
+
+  async reselectDatabase(): Promise<{ok:true;cancelled:boolean}> {
+    if (!this.dependencies.reselectDatabase) throw new Error('当前环境不支持重新选择数据库');
+    return this.dependencies.reselectDatabase();
+  }
 
   async status(): Promise<RecoveryStatus> {
     const service = this.dependencies.serviceHealth().status;
@@ -96,7 +102,7 @@ export class RecoveryController {
 }
 
 export function createNativeRecoveryActions(controller: RecoveryController) {
-  type ActionName = 'terminateTask' | 'reloadRenderer' | 'restartService' | 'relaunchApp';
+  type ActionName = 'terminateTask' | 'reloadRenderer' | 'restartService' | 'relaunchApp' | 'reselectDatabase';
   let inFlight: { name: ActionName; promise: Promise<unknown> } | null = null;
   const run = <T>(name: ActionName, action: () => Promise<T>): Promise<T> => {
     if (inFlight) {
@@ -110,6 +116,7 @@ export function createNativeRecoveryActions(controller: RecoveryController) {
     return promise;
   };
   return {
+    reselectDatabase: () => run('reselectDatabase', () => controller.reselectDatabase()),
     terminateTask: () => run('terminateTask', () => controller.terminateTask()),
     reloadRenderer: () => run('reloadRenderer', () => controller.reloadRenderer()),
     restartService: () => run('restartService', () => controller.restartService()),

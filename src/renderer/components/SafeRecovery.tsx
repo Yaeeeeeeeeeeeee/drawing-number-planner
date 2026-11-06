@@ -4,7 +4,7 @@ import type { LocalTaskView, PlannerApi } from '../data/client';
 import { resetApiSession } from '../data/client';
 
 type SurfaceStatus = { service: 'stopped' | 'starting' | 'running' | 'failed'; activeTask: LocalTaskView | null };
-type RecoveryAction = 'terminateTask' | 'reloadRenderer' | 'restartService' | 'relaunchApp';
+type RecoveryAction = 'terminateTask' | 'reloadRenderer' | 'restartService' | 'relaunchApp' | 'reselectDatabase';
 
 const active = (tasks: LocalTaskView[]) => tasks.find((task) => ['queued', 'running', 'finalizing'].includes(task.status)) ?? null;
 const taskProgressSnapshot = (task: LocalTaskView) => [task.id, task.status, task.progress.processed,
@@ -79,6 +79,7 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
         : result.cancelled === false ? '当前没有可终止的任务，未执行终止操作' : '终止操作已返回，任务终止结果无法确认';
       if (action === 'reloadRenderer') feedback = '已执行界面重新加载，重新加载结果尚未验证';
       if (action === 'relaunchApp') feedback = '已执行应用重启，重启后的状态尚未验证';
+      if (action === 'reselectDatabase') feedback = result.cancelled ? '已取消选择，继续使用原数据库' : '已切换数据库，本地服务启动检查通过';
       if (action === 'restartService') {
         try {
           const health = await api.checkServiceHealth();
@@ -118,6 +119,7 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('reloadRenderer')}>重新加载界面</button>
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('restartService')}>重启本地服务</button>
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('relaunchApp')}>完整恢复应用</button>
+      <button type="button" disabled={!desktop?.reselectDatabase || Boolean(busy)} onClick={() => void run('reselectDatabase')}>重新选择数据库</button>
       {message && <p className="recovery-message">{message}</p>}
       {slowTask && !busy && <div className="slow-recovery-warning" role="alert">
         <strong>当前操作响应较慢</strong><p>后台任务长时间没有进展。不会自动终止任务，请选择下一步。</p>

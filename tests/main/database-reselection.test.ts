@@ -1,0 +1,9 @@
+// @vitest-environment node
+import {expect,it,vi} from 'vitest';
+import {performDatabaseReselection,createTrustedRecoveryHandler} from '../../src/main/database-reselection';
+it('rejects an untrusted desktop sender without opening the dialog',async()=>{const action=vi.fn();const handler=createTrustedRecoveryHandler(()=>false,action);await expect(handler({})).resolves.toMatchObject({ok:false,error:{code:'UNTRUSTED_DESKTOP_SENDER'}});expect(action).not.toHaveBeenCalled();});
+it('does not stop or back up when the user cancels',async()=>{const restore=vi.fn(),quiesce=vi.fn();await expect(performDatabaseReselection({prepare:async()=>null,quiesce,restore})).resolves.toEqual({ok:true,cancelled:true});expect(quiesce).not.toHaveBeenCalled();expect(restore).not.toHaveBeenCalled();});
+it('blocks busy operations without restoring or disturbing the service',async()=>{const restore=vi.fn();await expect(performDatabaseReselection({prepare:async before=>{await before();return 'new';},quiesce:async()=>{throw Error('busy');},restore})).rejects.toThrow('busy');expect(restore).not.toHaveBeenCalled();});
+it('restores the previous running service on any failure after quiescence and permits retry',async()=>{const restore=vi.fn(async()=>{});await expect(performDatabaseReselection({prepare:async before=>{await before();throw Error('profile write failed');},quiesce:async()=>{},restore})).rejects.toThrow('profile write failed');expect(restore).toHaveBeenCalledOnce();await expect(performDatabaseReselection({prepare:async before=>{await before();return 'new';},quiesce:async()=>{},restore})).resolves.toEqual({ok:true,cancelled:false});});
+
+it('accepts the trusted main frame and returns its action result',async()=>{const handler=createTrustedRecoveryHandler(()=>true,async()=>({ok:true,cancelled:true}));await expect(handler({})).resolves.toEqual({ok:true,cancelled:true});});

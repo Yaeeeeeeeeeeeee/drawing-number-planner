@@ -162,3 +162,9 @@ describe('safe recovery surface', () => {
     expect(restartService).not.toHaveBeenCalled();
   });
 });
+
+it('exposes database reselection and reports cancellation without claiming a switch',async()=>{
+ window.plannerDesktop={showFileInFolder:vi.fn(),getRecoveryStatus:vi.fn(async()=>({service:'failed' as const,activeTask:null})),reselectDatabase:vi.fn(async()=>({ok:true,cancelled:true}))};
+ render(<App api={api}/>);fireEvent.click(screen.getByRole('button',{name:'安全恢复'}));fireEvent.click(screen.getByRole('button',{name:'重新选择数据库'}));
+ expect(await screen.findByText('已取消选择，继续使用原数据库')).toBeVisible();
+});

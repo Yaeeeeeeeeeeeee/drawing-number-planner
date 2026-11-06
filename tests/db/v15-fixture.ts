@@ -14,5 +14,7 @@ export function createV15Fixture(){
  create unique index material_batches_relative_path_nocase_unique on material_batches(relative_path collate nocase);
  create unique index pdf_files_path_key_unique on pdf_files(path_key);
  insert into schema_migrations(version,applied_at) values(15,'2026-10-19');`);
+ // v6-v14 record their ledger in migrateDatabase, rather than their SQL exports.
+ for(let version=6;version<=14;version++)db.prepare('insert into schema_migrations(version,applied_at) values(?,?)').run(version,'2026-10-19');
  return db;
 }

@@ -109,6 +109,8 @@ export class LocalServiceController {
     return pending.promise as Promise<T>;
   }
 
+  prepareDatabaseSwitch(): Promise<void> { return this.request('prepareDatabaseSwitch'); }
+
   resolvePdfFilePath(id: unknown): Promise<string> { return this.request('resolvePdfFilePath', [id]); }
   resolveBomAssetPath(id: unknown): Promise<string> { return this.request('resolveBomAssetPath', [id]); }
   qrManualAction(action: string, input: unknown): Promise<unknown> { return this.request('qrManualAction', [action, input]); }

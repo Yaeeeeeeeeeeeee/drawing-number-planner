@@ -21,6 +21,12 @@ function fixture(overrides: Record<string, unknown> = {}) {
 }
 
 describe('desktop recovery controller', () => {
+  it('opens native database reselection even when service health and the renderer are unavailable', async () => {
+    const reselectDatabase = vi.fn(async () => ({ok:true as const,cancelled:true}));
+    const {controller,dependencies} = fixture({reselectDatabase,serviceHealth:vi.fn(()=>({status:'failed',restartAttempts:0,error:'offline'}))});
+    await expect(createNativeRecoveryActions(controller).reselectDatabase()).resolves.toEqual({ok:true,cancelled:true});
+    expect(reselectDatabase).toHaveBeenCalledOnce(); expect(dependencies.listTasks).not.toHaveBeenCalled();
+  });
   it('turns a non-JSON service failure into a structured recovery error', () => {
     expect(() => parseRecoveryServiceResponse({ ok: false, status: 502 }, 'Bad Gateway'))
       .toThrow(expect.objectContaining({ code: 'RECOVERY_REQUEST_FAILED', message: '本地服务请求失败（502）' }));

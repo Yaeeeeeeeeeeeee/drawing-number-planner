@@ -5,7 +5,7 @@ import { migrateDatabase } from '../../src/db/migrations';
 it.each([false, true])('v14 recycle-bin upgrade backs up and rolls back on failure=%s', (fail) => {
   const db = createV15Fixture();
   try {
-    db.exec("delete from schema_migrations where version > 14; insert into schema_migrations(version,applied_at) values(14,'2026-10-19')");
+    db.exec('delete from schema_migrations where version > 14');
     if ((db.pragma('table_info(dictionary_items)') as { name: string }[]).some(c => c.name === 'deleted_at')) {
       db.exec('alter table dictionary_items drop column deleted_at');
     }

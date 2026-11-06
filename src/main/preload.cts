@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
   terminateTask() { return ipcRenderer.invoke('planner:recovery-terminate-task'); },
   reloadRenderer() { return ipcRenderer.invoke('planner:recovery-reload-renderer'); },
   restartService() { return ipcRenderer.invoke('planner:recovery-restart-service'); },
+  reselectDatabase() { return ipcRenderer.invoke('planner:recovery-reselect-database'); },
   relaunchApp() { return ipcRenderer.invoke('planner:recovery-relaunch-app'); },
   onServiceRestarted(callback: unknown) {
     if (typeof callback !== 'function') return () => undefined;

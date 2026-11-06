@@ -27,3 +27,8 @@ export function initializeEmptyAcceptanceDatabase(databasePath: string): void {
     database.close();
   }
 }
+
+// The production entry loads these from the existing bundled initializer.
+export {validateProductionDatabase, prepareExistingProductionDatabase, backupProductionDatabase} from '../src/main/database-validation.js';
+
+export {LocalServiceController as ProductionStartupService} from '../src/main/local-service-controller.js';

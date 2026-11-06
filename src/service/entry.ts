@@ -3,6 +3,7 @@ import type { ParentToServiceMessage, ServiceRequestMethod, ServiceToParentMessa
 
 let running: RunningServer | undefined;
 let closing = false;
+let switchingDatabase = false;
 
 function send(message: ServiceToParentMessage): void { if (process.send) process.send(message); }
 function serializedError(error: unknown): { code?: string; message: string } {
@@ -19,12 +20,15 @@ async function closeAndExit(exitCode = 0): Promise<void> {
 }
 
 async function handleRequest(id: number, method: ServiceRequestMethod, args: unknown[]): Promise<void> {
+  if (switchingDatabase) { send({type:'response',id,ok:false,error:{code:'DATABASE_SWITCHING',message:'数据库切换准备中，请稍后重试'}}); return; }
   if (!running) { send({ type: 'response', id, ok: false, error: { code: 'SERVICE_NOT_READY', message: '本地服务尚未就绪' } }); return; }
+  const preparingSwitch = method === 'prepareDatabaseSwitch';
+  if (preparingSwitch) switchingDatabase = true;
   try {
     const callable = running[method] as (...values: unknown[]) => unknown;
     const value = await callable(...args);
     send({ type: 'response', id, ok: true, value });
-  } catch (error) { send({ type: 'response', id, ok: false, error: serializedError(error) }); }
+  } catch (error) { if (preparingSwitch) switchingDatabase = false; send({ type: 'response', id, ok: false, error: serializedError(error) }); }
 }
 
 process.on('message', (value: unknown) => {
