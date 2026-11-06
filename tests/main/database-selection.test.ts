@@ -46,3 +46,13 @@ it('rejects a selected filename that would resolve to a different runtime databa
   expect(readFileSync(config)).toEqual(previous); expect(readFileSync(selected)).toEqual(bytes);
   expect(readdirSync(target)).toEqual(['PLANNER.DB']); expect(beforeSwitch).not.toHaveBeenCalled();
 });
+it('does not substitute a different case-sensitive file merely because the platform is Windows',async()=>{
+ const {root,target,input}=fixture();await prepareProductionProfile(input);
+ const config=join(root,'DrawingNumberPlanner/profile.json'),previous=readFileSync(config),selected=join(target,'PLANNER.DB');
+ writeFileSync(selected,readFileSync(join(target,'planner.db')));const descriptor=Object.getOwnPropertyDescriptor(process,'platform')!;
+ try{
+  Object.defineProperty(process,'platform',{...descriptor,value:'win32'});
+  await expect(prepareProductionProfile({...input,forceSelection:true,chooseDatabase:async()=>selected})).rejects.toThrow('不一致');
+  expect(readFileSync(config)).toEqual(previous);
+ }finally{Object.defineProperty(process,'platform',descriptor);}
+});

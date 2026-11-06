@@ -72,7 +72,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     } catch {
       throw Error('请选择数据目录中实际存在的 planner.db，不会创建替代空库。');
     }
-    if (selectedFile !== runtimeFile && !(process.platform === 'win32' && selectedFile.toLowerCase() === runtimeFile.toLowerCase())) {
+    if (selectedFile !== runtimeFile) {
       throw Error('所选数据库与服务使用的 planner.db 不一致，不会创建替代空库。');
     }
     file = runtimeFile;
