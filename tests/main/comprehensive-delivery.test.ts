@@ -1,3 +1,4 @@
+import * as databaseSafety from '../../src/main/database-validation';
 // @vitest-environment node
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';import {join,resolve} from 'node:path';import {execFileSync} from 'node:child_process';import {createRequire} from 'node:module';
@@ -18,8 +19,8 @@ it('real SQLite profile and delivery helper preserve old v15 rows, WAL backups, 
  const root=mkdtempSync(join(tmpdir(),'planner-delivery-sqlite-'));try{
  const legacy=join(root,'old'),bundle=join(root,'native-verifier.mjs');execFileSync(process.execPath,[resolve('scripts/build-comprehensive-verifier.mjs'),resolve('.'),bundle]);const helper=(mode:string)=>execFileSync(process.execPath,[bundle,mode,legacy],{encoding:'utf8',env:{...process.env,NODE_PATH:resolve('node_modules')}});
  expect(helper('prepare')).toContain('"passed":true');expect(helper('rollback-and-wal')).toContain('"passed":true');
- const settings=readFileSync(join(legacy,'settings.json'));const input={appData:join(root,'appdata'),chooseMode:async()=>'existing',chooseDatabase:async()=>join(legacy,'planner.db'),initializeDatabase:()=>{throw Error('must not initialize old DB')}};
- expect(await prepareProductionProfile(input)).toBe(legacy);const db=openDatabase(join(legacy,'planner.db'));try{expect(migrateDatabase(db,{databaseExists:true,createBackup(){createDatabaseBackup(db,db.name,join(legacy,'backups'),'migration');}})).toEqual({from:15,to:25});}finally{db.close();}
+ const settings=readFileSync(join(legacy,'settings.json'));const input={databaseSafety,appData:join(root,'appdata'),chooseMode:async()=>'existing',chooseDatabase:async()=>join(legacy,'planner.db'),initializeDatabase:()=>{throw Error('must not initialize old DB')}};
+ expect(await prepareProductionProfile(input)).toBe(legacy);const db=openDatabase(join(legacy,'planner.db'));try{expect(migrateDatabase(db,{databaseExists:true,createBackup(){createDatabaseBackup(db,db.name,join(legacy,'backups'),'migration');}})).toEqual({from:25,to:25});}finally{db.close();}
  expect(helper('audit-upgrade')).toContain('"passed":true');expect(await prepareProductionProfile({...input,chooseMode:()=>{throw Error('must not prompt on restart')}})).toBe(legacy);expect(readFileSync(join(legacy,'settings.json'))).toEqual(settings);
  }finally{rmSync(root,{recursive:true,force:true});}
 },20000);
@@ -28,7 +29,7 @@ it('fresh creation preserves an existing default directory and initializes a sep
  try{
   const data=join(root,'DrawingNumberPlanner','data');mkdirSync(data,{recursive:true});
   writeFileSync(join(data,'planner.db'),'existing');writeFileSync(join(data,'settings.json'),'existing settings');
-  const created=await prepareProductionProfile({appData:root,chooseMode:async()=>'fresh',chooseDatabase:async()=>{throw Error('fresh must not choose an existing file');},initializeDatabase(file:string){const db=openDatabase(file);try{migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});}finally{db.close();}}});
+  const created=await prepareProductionProfile({databaseSafety,appData:root,chooseMode:async()=>'fresh',chooseDatabase:async()=>{throw Error('fresh must not choose an existing file');},initializeDatabase(file:string){const db=openDatabase(file);try{migrateDatabase(db,{databaseExists:false,createBackup:()=>undefined});}finally{db.close();}}});
   expect(created).not.toBe(data);expect(created).toMatch(/data-/);expect(readFileSync(join(data,'planner.db'),'utf8')).toBe('existing');expect(readFileSync(join(data,'settings.json'),'utf8')).toBe('existing settings');
   const db=openDatabase(join(created,'planner.db'));try{expect(db.prepare('select count(*) as count from products').get()).toEqual({count:0});}finally{db.close();}
  }finally{rmSync(root,{recursive:true,force:true});}

@@ -28,6 +28,7 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   await page.getByRole('button', { name: /图号规划/ }).click();
   await page.getByLabel('产品类别', { exact: true }).selectOption('冰柜');
   await page.getByLabel('产品型号').selectOption(String(productId));
+  await page.getByRole('button',{name:'下一步',exact:true}).click();
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(itemId));
   await page.getByLabel('第 1 行颜色').selectOption(String(colorId));
@@ -35,12 +36,14 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   await page.getByLabel('第 2 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 2 行项目明细').selectOption(String(itemId));
   await page.getByLabel('第 2 行颜色').selectOption(String(colorId));
-  await page.getByRole('button', { name: '查重并预览' }).click();
+  await page.getByRole('button', { name: '下一步' }).click();
 
-  await expect(page.getByText('12.0404.010.0405001')).toBeVisible();
-  await expect(page.getByText('12.0404.010.0405002')).toBeVisible();
+  await expect(page.getByRole('cell',{name:'12.0404.010.0405001',exact:true})).toBeVisible();
+  await expect(page.getByRole('cell',{name:'12.0404.010.0405002',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'下一步',exact:true}).click();
+  await page.getByRole('checkbox',{name:'已核对本次占号清单'}).check();
   await page.getByRole('button', { name: '确认批量占号' }).click();
-  await expect(page.getByText('已成功占用 2 个图号')).toBeVisible();
+  await expect(page.getByText('成功 2 项',{exact:true})).toBeVisible();
 
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '图号库', exact: true }).click();
   await page.getByLabel('关键词', { exact: true }).fill('ZC200');

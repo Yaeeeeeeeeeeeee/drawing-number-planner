@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { DictionariesPage } from '../../src/renderer/pages/DictionariesPage';
 import { PlanningPage } from '../../src/renderer/pages/PlanningPage';
+import {planningApiFixture} from './planning-workspace-fixture';
 import { ImportPage } from '../../src/renderer/pages/ImportPage';
 
 it('keeps dictionary editing on the approved branch with a locked code and equal action roles', async () => {
@@ -13,15 +14,14 @@ it('keeps dictionary editing on the approved branch with a locked code and equal
   expect(screen.getByRole('button',{name:/^保存$/})).toBeVisible();
 });
 
-it('places the real planning preview beside its source row without granting occupancy', async () => {
-  const api = {
-    listProducts: vi.fn().mockResolvedValue([]), listDictionaries: vi.fn().mockResolvedValue([]),
-    reservePlan: vi.fn(),
-  };
-  const {container}=render(<PlanningPage api={api as never}/>);
-  expect(container.querySelector('.pp-fields')).not.toBeNull();
-  expect(screen.getByRole('button',{name:'确认批量占号'})).toBeDisabled();
-  expect(api.reservePlan).not.toHaveBeenCalled();
+it('places the approved four-step preview in a resizable right panel without granting occupancy', async () => {
+  const api=planningApiFixture();const {container}=render(<PlanningPage api={api as never}/>);
+  expect(screen.getByRole('navigation',{name:'规划步骤'})).toBeVisible();
+  expect(screen.getByRole('complementary',{name:'完整图号与编码拆解'})).toBeVisible();
+  expect(screen.getByRole('separator',{name:'调整图号预览宽度'})).toBeInTheDocument();
+  expect(container.querySelector('.planning-workbench-layout')).not.toBeNull();
+  expect(screen.queryByRole('button',{name:'确认批量占号'})).not.toBeInTheDocument();
+  expect(api.reserveBatchPlan).not.toHaveBeenCalled();
 });
 
 it('shows real migration issues in the approved worksheet and expands actual reasons only', async () => {

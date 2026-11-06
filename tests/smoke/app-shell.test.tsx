@@ -8,11 +8,11 @@ describe('application shell', () => {
     render(<App />);
 
     expect(screen.getByText('图号规划器')).toBeVisible();
-    expect(screen.getByRole('navigation')).toBeVisible();
+    expect(screen.getByRole('navigation',{name:'主导航'})).toBeVisible();
     expect(screen.getByText('日常工作')).toBeVisible();
     expect(screen.getByText('产品明细')).toBeVisible();
     expect(screen.getByText('数据来源')).toBeVisible();
-    const navGroups = Array.from(screen.getByRole('navigation').querySelectorAll<HTMLElement>('.nav-group'));
+    const navGroups = Array.from(screen.getByRole('navigation',{name:'主导航'}).querySelectorAll<HTMLElement>('.nav-group'));
     expect(navGroups.map((group) => group.getAttribute('aria-label'))).toEqual(['日常工作', '产品明细', '数据来源']);
     expect(Array.from(navGroups[0].querySelectorAll('button')).map((button) => button.textContent)).toEqual([
       '图号规划 / 更新包材','制图任务', 'BOM 管理', '外发资料',

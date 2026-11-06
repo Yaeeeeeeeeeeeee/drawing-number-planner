@@ -1,6 +1,6 @@
 {
   "name": "drawing-number-planner",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "type": "module",
   "description": "图号规划、BOM及包材文件管理系统",

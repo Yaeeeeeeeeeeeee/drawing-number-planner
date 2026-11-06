@@ -4,7 +4,7 @@ import { renderProgress } from '../scripts/progress-view';
 it('renders all 30 unique requirements offline without claiming a live worker', () => {
   const result = renderProgress(data);
   expect(result.html).toContain('总需求：30项');
-  expect(result.html).toContain('上次记录的执行状态');
+  expect(result.html).toContain('本页为离线快照，不报告实时运行状态');
   expect(result.html).not.toMatch(/fetch\(|https?:\/\//);
   for (const item of data.items) expect(result.markdown).toContain(`## ${item.id}. ${item.name}`);
   expect(result.html).toContain('0%');

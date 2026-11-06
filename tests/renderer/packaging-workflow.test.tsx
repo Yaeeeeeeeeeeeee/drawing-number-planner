@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DrawingTasksPage } from '../../src/renderer/pages/DrawingTasksPage';
+import {planningApiFixture} from './planning-workspace-fixture';
 import { PlanningPage } from '../../src/renderer/pages/PlanningPage';
 
 const product = {id:7,model:'T40',sku:'SKU7',brandId:1,brandName:'品牌',productCategory:'冰柜',status:'active'};
@@ -89,9 +90,10 @@ describe('packaging workflow',()=>{
     fireEvent.click(screen.getByRole('button',{name:'重试归档索引'}));await waitFor(()=>expect(api.packaging.archive).toHaveBeenCalledWith('task1'));
   });
   it('requires saved reservation IDs for the planning generate action',async()=>{
-    const api={...fixture(),previewPlan:vi.fn().mockResolvedValue({rows:[]}),reservePlan:vi.fn()};
-    render(<PlanningPage api={api as never} onGenerateFiles={vi.fn()}/>);
-    expect(screen.getByRole('button',{name:'生成文件'})).toBeDisabled();
-    expect(screen.getByRole('button',{name:'生成文件'}).compareDocumentPosition(screen.getByRole('button',{name:'查重并预览'})) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const api=planningApiFixture(),generate=vi.fn();
+    render(<PlanningPage api={api as never} onGenerateFiles={generate}/>);
+    expect(screen.queryByRole('button',{name:'生成文件'})).not.toBeInTheDocument();
+    expect(api.reserveBatchPlan).not.toHaveBeenCalled();expect(generate).not.toHaveBeenCalled();
+
   });
 });

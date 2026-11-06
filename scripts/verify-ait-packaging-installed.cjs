@@ -77,16 +77,22 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  await rule.getByLabel('允许长宽互换（高度不参与）',{exact:true}).check();await rule.getByRole('button',{name:'保存匹配规则',exact:true}).click();await rule.waitFor({state:'detached'});
  await capture('AIT-模板尺寸规则真实保存',{responsive:true});
  await navigation.getByRole('button',{name:'图号规划 / 更新包材',exact:true}).click();await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor();
- await page.getByRole('combobox',{name:'产品类别',exact:true}).selectOption(product.productCategory);await page.getByRole('combobox',{name:'产品型号',exact:true}).selectOption(String(product.id));await page.getByRole('combobox',{name:'第 1 行主类别',exact:true}).selectOption(String(main.id));await page.getByRole('combobox',{name:'第 1 行项目明细',exact:true}).selectOption(String(templateProject.id));await page.getByRole('combobox',{name:'第 1 行颜色',exact:true}).selectOption(String(color.id));
- assert.equal(await page.getByRole('group',{name:/本次尺寸/u}).count(),0);assert.equal(await page.getByRole('spinbutton').count(),0);assert.equal(await page.getByRole('button',{name:'生成文件',exact:true}).isDisabled(),true);
- await page.getByLabel('项目 1 预览',{exact:true}).getByText('可占用',{exact:true}).waitFor();assert.ok((await page.getByLabel('项目 1 预览',{exact:true}).boundingBox()).height<100);
- await capture('UI15-图号规划紧凑预览',{responsive:true});
- await page.getByRole('button',{name:'查重并预览',exact:true}).click();await page.getByRole('button',{name:'确认批量占号',exact:true}).click();await page.getByText('已成功占用 1 个图号 · 正式保存',{exact:true}).waitFor();
+ await page.getByRole('combobox',{name:'产品类别',exact:true}).selectOption(product.productCategory);await page.getByRole('combobox',{name:'产品型号',exact:true}).selectOption(String(product.id));
+ await page.getByRole('button',{name:'下一步',exact:true}).click();
+ await page.getByRole('combobox',{name:'第 1 行主类别',exact:true}).selectOption(String(main.id));await page.getByRole('combobox',{name:'第 1 行项目明细',exact:true}).selectOption(String(templateProject.id));await page.getByRole('combobox',{name:'第 1 行颜色',exact:true}).selectOption(String(color.id));
+ // This fixture color is named 验收白色, not a real white dictionary entry.
+ // Explicit independent numbering avoids inventing a white sharing baseline.
+ await page.getByRole('checkbox',{name:'第 1 行其他颜色共用白色图号',exact:true}).uncheck();
+ assert.equal(await page.getByRole('group',{name:/本次尺寸/u}).count(),0);assert.equal(await page.getByRole('spinbutton').count(),0);assert.equal(await page.getByRole('button',{name:'生成文件',exact:true}).count(),0);
+ await page.getByRole('button',{name:'下一步',exact:true}).click();await page.getByText('可占用',{exact:true}).waitFor();
+ await capture('UI16-图号规划四步检查',{responsive:true});
+ await page.getByRole('button',{name:'下一步',exact:true}).click();assert.equal(await page.getByRole('button',{name:'确认批量占号',exact:true}).isDisabled(),true);
+ await page.getByRole('checkbox',{name:'已核对本次占号清单',exact:true}).check();await page.getByRole('button',{name:'确认批量占号',exact:true}).click();await page.getByText('成功 1 项',{exact:true}).waitFor();
  const drawings=(await request(`/api/drawings?productId=${product.id}`)).items;assert.equal(drawings.length,1);const drawing=drawings[0];
  if(!app)await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:new URL(page.url()).origin});
  await page.getByRole('button',{name:`复制图号 ${drawing.fullCode}`,exact:true}).click();
  await expect.poll(()=>app?app.evaluate(({clipboard})=>clipboard.readText()):page.evaluate(()=>navigator.clipboard.readText())).toBe(drawing.fullCode);
- await page.getByRole('button',{name:'查看图号库',exact:true}).click();const drawingDetail=page.getByRole('complementary',{name:'图号详情',exact:true});await drawingDetail.getByRole('heading',{name:drawing.fullCode,exact:true}).waitFor();
+ await page.getByRole('button',{name:`查看 ${product.model} 图号库`,exact:true}).click();const drawingDetail=page.getByRole('complementary',{name:'图号详情',exact:true});await drawingDetail.getByRole('heading',{name:drawing.fullCode,exact:true}).waitFor();
  await capture('UI15-占号结果精确定位图号');await drawingDetail.getByRole('button',{name:'关闭图号详情',exact:true}).click();
  await navigation.getByRole('button',{name:'图号规划 / 更新包材',exact:true}).click();await page.getByRole('region',{name:'本次占号结果',exact:true}).getByText(drawing.fullCode,{exact:true}).waitFor();
  await capture('UI15-占号成功结果保留');

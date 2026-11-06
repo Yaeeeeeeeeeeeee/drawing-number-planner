@@ -61,7 +61,7 @@ async function launch(){
 async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow(app,dialog);await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});return page;}catch(error){await captureFailure(app,app.__verificationLabel,error);throw error;}}
 (async()=>{
  fs.mkdirSync(evidence,{recursive:true});assert.equal(fs.existsSync(profileHome),false,'Refuse to touch any pre-existing runner/user production profile');
- const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,25);assert.equal(version.applicationVersion,'1.5.0');assert.equal(JSON.parse(fs.readFileSync(path.join(appRoot,'package.json'),'utf8')).version,version.applicationVersion);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
+ const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,25);assert.equal(version.applicationVersion,'1.6.0');assert.equal(JSON.parse(fs.readFileSync(path.join(appRoot,'package.json'),'utf8')).version,version.applicationVersion);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
  const legacy=path.join(temporary,'旧版原始数据目录');database('prepare',legacy);database('rollback-and-wal',legacy);const settingsBefore=fs.readFileSync(path.join(legacy,'settings.json'));
  const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));let app;
  try{app=await launch();const page=await ready(app,dialog);
@@ -207,7 +207,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.equal(createHash('sha256').update(fs.readFileSync(firstPdf)).digest('hex'),firstHash);assert.equal(createHash('sha256').update(fs.readFileSync(replacementPdf)).digest('hex'),replacementHash);
   report.nativeQrPdfPicker={actualNativeDialog:true,rendererSelectionPreviewCommit:true,fullWidthFilename:false,asciiParentheses:true,sevenColumnProductList:true,noIndependentAppearancePicker:true,newRecordProductScoped:true,lowercasePurposeAndParenthesisSpaceValidated:true,firstFileHash:firstHash,replacementFileHash:replacementHash,restartPreservesLinkAndMetadata:true,replacementPreservesMetadataAndHistory:true,unlinkPreservesFilesAndAudit:true,oldV15RowsPreserved:true,qrCodeId:linkedState.code.id};
  }finally{await app.close();}
- app=await launch();try{const page=await ready(app);report.v4=await require('./verify-v4-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v41v42=await require('./verify-v41-v42-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v5=await require('./verify-v5-installed.cjs')({page,app,legacy,evidence,snapshot,go,previous:report.v41v42});report.hotfix111=await require('./verify-1.1.1-installed.cjs')({page,app,legacy,evidence,writePdf,go});report.v51=await require('./verify-v51-mail.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),output:path.join(legacy,'v51-mail-exports'),evidence,writePdf,snapshot,databaseFile:path.join(legacy,'planner.db'),go});report.v52=await require('./verify-v52-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,writePdf,snapshot,databaseFile:path.join(legacy,'planner.db'),go});report.hotfix131=await require('./verify-1.3.1-mail-import.cjs')({page,app,source,evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,go});report.aitPackaging=await require('./verify-ait-packaging-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,writePdf,go});}catch(error){await captureFailure(app,'v4',error);throw error;}finally{await app.close();}
+ app=await launch();try{const page=await ready(app);report.v4=await require('./verify-v4-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v41v42=await require('./verify-v41-v42-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v5=await require('./verify-v5-installed.cjs')({page,app,legacy,evidence,snapshot,go,previous:report.v41v42});report.hotfix111=await require('./verify-1.1.1-installed.cjs')({page,app,legacy,evidence,writePdf,go});report.v51=await require('./verify-v51-mail.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),output:path.join(legacy,'v51-mail-exports'),evidence,writePdf,snapshot,databaseFile:path.join(legacy,'planner.db'),go});report.v52=await require('./verify-v52-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,writePdf,snapshot,databaseFile:path.join(legacy,'planner.db'),go});report.hotfix131=await require('./verify-1.3.1-mail-import.cjs')({page,app,source,evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,go});report.aitPackaging=await require('./verify-ait-packaging-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,writePdf,go});report.confirmedRequirements=await require('./verify-confirmed-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,writePdf});}catch(error){await captureFailure(app,'v4',error);throw error;}finally{await app.close();}
  let beforeRestart=snapshot(path.join(legacy,'planner.db'));app=await launch();
  try{
   const page=await ready(app);
@@ -218,8 +218,33 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   report.aitPackaging.realProcessRestartPreservesTask=true;
  }finally{await app.close();}
  const afterRestart=snapshot(path.join(legacy,'planner.db'));
- require('./verify-packaging-restart.cjs')(beforeRestart,afterRestart,{pdfIndexIds:report.aitPackaging.pdfIndexIds,productDirectory:report.aitPackaging.productDirectory});
+ require('./verify-packaging-restart.cjs')(beforeRestart,afterRestart,{pdfIndexIds:report.confirmedRequirements.monitorPdfIndexIds,productDirectories:report.confirmedRequirements.monitorProductDirectories});
  beforeRestart=afterRestart;report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
+ // Exercise both renderer recovery and the native menu with actual Windows pickers.
+ const reselectionCopy=path.join(temporary,'reselection-copy');fs.cpSync(legacy,reselectionCopy,{recursive:true,filter:file=>path.basename(file)!=='backups'});
+ const protectedTables=['drawing_numbers','historical_drawing_numbers','bom_versions','bom_items','outbound_packages','outbound_package_items','qr_codes','packaging_tasks','packaging_task_items'];
+ const protectedBefore=Object.fromEntries(protectedTables.map(table=>[table,beforeRestart[table]]));
+ app=await launch();try{
+  let page=await ready(app);const profileBefore=fs.readFileSync(config,'utf8');
+  await page.getByRole('button',{name:'安全恢复',exact:true}).click();const recovery=page.getByRole('region',{name:'安全恢复面板',exact:true});
+  const cancelled=nativeDialog('reselect-cancel',undefined,'reselect-cancel');try{await recovery.getByRole('button',{name:'重新选择数据库',exact:true}).click();await cancelled.done;await recovery.getByText('已取消选择，继续使用原数据库',{exact:true}).waitFor();}finally{cancelled.child.kill();}
+  assert.equal(fs.readFileSync(config,'utf8'),profileBefore);assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);
+  for(const [label,directory]of [['other',reselectionCopy],['original',legacy]]){
+   const picker=nativeDialog('reselect',path.join(directory,'planner.db'),'reselect-'+label);
+   try{
+    await app.evaluate(({Menu})=>{const item=Menu.getApplicationMenu().items[0].submenu.items.find(item=>item.label==='安全恢复').submenu.items.find(item=>item.label==='重新选择数据库');item.click();});await picker.done;
+    await expect.poll(()=>app.evaluate(({app})=>app.getPath('userData')),{timeout:45000}).toBe(directory);
+    page=await app.firstWindow();await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});
+    await expect.poll(async()=>page.evaluate(async()=>{try{return(await(await fetch('/api/health')).json()).status;}catch{return null;}})).toBe('ok');
+    assert.equal(JSON.parse(fs.readFileSync(config,'utf8')).dataDir,directory);
+    const selected=snapshot(path.join(directory,'planner.db'));for(const table of protectedTables)assert.deepEqual(selected[table],protectedBefore[table],`Switch changed protected ${table}`);
+    await page.screenshot({path:path.join(evidence,'Windows-原生数据库重选-'+label+'.png')});
+   }finally{picker.child.kill();}
+  }
+  report.databaseReselection={actualNativePicker:true,rendererCancelPreservesProfile:true,nativeMenuSwitch:true,selectedOtherExistingDirectory:true,returnedOriginalDirectory:true,protectedBusinessRowsPreserved:true,backupsRequiredAndVerified:true};
+ }catch(error){await captureFailure(app,'database-reselection',error);throw error;}finally{await app.close();}
+ beforeRestart=snapshot(path.join(legacy,'planner.db'));
+
  // Real same-version reinstalls must ask again; ordinary restarts must not.
  const setup=path.join(evidence,'图号规划器-Windows-x64-安装包.exe');
  const markerFile=path.join(path.dirname(executable),'installation.id');

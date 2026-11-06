@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][ValidateSet('existing','fresh','qr','inspect')][string]$Mode,[string]$DatabasePath,[Parameter(Mandatory=$true)][string]$ReportPath)
+param([Parameter(Mandatory=$true)][ValidateSet('existing','fresh','qr','reselect','reselect-cancel','inspect')][string]$Mode,[string]$DatabasePath,[Parameter(Mandatory=$true)][string]$ReportPath)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -65,7 +65,7 @@ function Click-NativeButton($Button) {
 try{
  Save-Stage 'started'
  if($Mode -eq 'inspect'){Save-Diagnostics;exit 0}
- if($Mode -ne 'qr'){
+ if($Mode -notin @('qr','reselect','reselect-cancel')){
   Save-Stage 'waiting-for-mode-dialog'
   $window=Wait-Window '图号规划器 · 选择数据库'
   $report.matchedWindow=@{name=$window.Current.Name;handle=$window.Current.NativeWindowHandle};Save-Stage 'mode-dialog-found'
@@ -77,14 +77,23 @@ try{
   $report.nativeMessageBox=$true
   Save-Stage 'mode-button-posted'
  }
- if($Mode -in @('existing','qr')){
-  if(!(Test-Path -LiteralPath $DatabasePath)){throw 'Selected verification file missing'}
-  $title=if($Mode -eq 'qr'){'选择二维码原始PDF'}else{'选择旧版数据目录中的 planner.db'}
+ if($Mode -in @('existing','qr','reselect','reselect-cancel')){
+  if($Mode -ne 'reselect-cancel' -and !(Test-Path -LiteralPath $DatabasePath)){throw 'Selected verification file missing'}
+  $title=if($Mode -eq 'qr'){'选择二维码原始PDF'}elseif($Mode -in @('reselect','reselect-cancel')){'重新选择数据库（保留当前数据库和全部原文件）'}else{'选择旧版数据目录中的 planner.db'}
   Save-Stage 'waiting-for-file-picker'
   $picker=Wait-Window $title
   $pickerHandle=[IntPtr]$picker.Current.NativeWindowHandle
   $report.matchedWindow=@{name=$picker.Current.Name;handle=$picker.Current.NativeWindowHandle};Save-Stage 'file-picker-found'
   [void][ProfileDialogNative]::SetForegroundWindow($pickerHandle)
+  if($Mode -eq 'reselect-cancel'){
+   $cancel=$picker.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)|Where-Object{$_.Current.AutomationId -eq '2' -and $_.Current.NativeWindowHandle -ne 0 -and (Native-Class $_) -eq 'Button'}|Select-Object -First 1
+   if(!$cancel){throw 'Native Cancel Button not found'}
+   Click-NativeButton $cancel
+   for($attempt=0;$attempt -lt 40 -and [ProfileDialogNative]::IsWindow($pickerHandle);$attempt++){Start-Sleep -Milliseconds 250}
+   if([ProfileDialogNative]::IsWindow($pickerHandle)){throw 'Native picker did not cancel'}
+   $report.nativeFilePicker=$true;$report.cancelled=$true;Save-Stage 'completed';return
+  }
+
   # Set the native filename edit, rather than the address bar. Ctrl+L can merely
   # navigate the dialog, so sending Enter once does not establish selection.
   $edit=$null

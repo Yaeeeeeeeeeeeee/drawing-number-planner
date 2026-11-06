@@ -47,8 +47,11 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await page.getByRole('button', { name: '详细信息', exact: true }).click();
   await page.getByRole('textbox', { name: '资料根目录', exact: true }).fill(workspaceRoot!);
   await page.getByRole('button', { name: '保存根目录' }).click();
-  await page.getByRole('button', { name: '扫描资料库' }).click();
-  await expect(page.getByText('1 个历史图号已登记')).toBeVisible();
+  const scanUi=async()=>{await expect.poll(async()=>{await page.getByRole('button',{name:'扫描资料库',exact:true}).click();return page.getByText('资料库扫描完成',{exact:true}).isVisible();},{timeout:15000}).toBe(true);};
+  await scanUi();
+  // All-active monitoring may register the historical code before this manual scan.
+  const registered=await request.get('/api/drawings?keyword=02.0404.010.0401007');
+  expect((await registered.json()).items.filter((row:{origin:string})=>row.origin==='historical')).toHaveLength(1);
   await expect(page.getByText('1 待确认')).toBeVisible();
   const pendingResponse = await request.get('/api/files?keyword=02.0404.010.0401000');
   expect((await pendingResponse.json()).items).toEqual([expect.objectContaining({matchStatus:'pending',classificationWarning:expect.stringContaining('invalid-format')})]);
@@ -69,16 +72,18 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await page.getByRole('button', { name: '关闭图号详情', exact: true }).click();
 
   await page.getByRole('button', { name: /图号规划/ }).click();
+  await page.getByRole('button',{name:'产品资料',exact:true}).click();
   await page.getByLabel('产品型号').selectOption(String(productId));
+  await page.getByRole('button',{name:'下一步',exact:true}).click();
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(projectId));
   await page.getByLabel('第 1 行颜色').selectOption(String(colorId));
-  await page.getByRole('button', { name: '查重并预览' }).click();
-  await expect(page.getByText('02.0404.010.0401008')).toBeVisible();
+  await page.getByRole('button', { name: '下一步' }).click();
+  await expect(page.getByRole('cell',{name:'02.0404.010.0401008',exact:true})).toBeVisible();
 
   unlinkSync(sourceFile); unlinkSync(outlinedFile);
   await page.getByRole('button', { name: /PDF 文件中心/ }).click();
-  await page.getByRole('button', { name: '扫描资料库' }).click();
+  await scanUi();
   await page.getByText('文件筛选', { exact: true }).click();
   await page.getByLabel('文件关键词').fill('02.0404.010.0401007');
   await page.getByLabel('存在状态').selectOption('missing');
@@ -95,12 +100,14 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await page.getByRole('button', { name: '关闭图号详情', exact: true }).click();
 
   await page.getByRole('button', { name: /图号规划/ }).click();
+  await page.getByRole('button',{name:'产品资料',exact:true}).click();
   await page.getByLabel('产品型号').selectOption(String(productId));
+  await page.getByRole('button',{name:'下一步',exact:true}).click();
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(projectId));
   await page.getByLabel('第 1 行颜色').selectOption(String(colorId));
-  await page.getByRole('button', { name: '查重并预览' }).click();
-  await expect(page.getByText('02.0404.010.0401008')).toBeVisible();
+  await page.getByRole('button', { name: '下一步' }).click();
+  await expect(page.getByRole('cell',{name:'02.0404.010.0401008',exact:true})).toBeVisible();
 
   const database = new Database(join(dataDir!, 'planner.db'), { readonly: true });
   try {
