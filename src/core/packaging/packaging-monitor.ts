@@ -100,8 +100,13 @@ export class PackagingMonitor {
    try{
     for(const directory of this.service.workspace.productDirectories(product.id)){
      if(!directory.exists)continue;
-     const relativePath=normalizeProductDirectories([directory.relativePath])[0],key=toWorkspacePathKey(relativePath);
+     try{
+     // Admission must include retained claims from stopped/deleted products too,
+     // using the same ownership guard as explicit product/category scanning.
+     const resolved=this.service.workspace.resolveProductDirectory(product.id,directory.relativePath);
+     const relativePath=normalizeProductDirectories([resolved.relativePath])[0],key=toWorkspacePathKey(relativePath);
      const claim=claims.get(key)??{directory:{productId:product.id,relativePath},owners:new Set<number>()};claim.owners.add(product.id);claims.set(key,claim);
+     }catch(error){this.error=message(error);}
     }
    }catch(error){this.error=message(error);}
   }

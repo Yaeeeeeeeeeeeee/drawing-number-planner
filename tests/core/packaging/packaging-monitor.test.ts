@@ -34,6 +34,23 @@ it('supplements startup using only known product scopes and discovers only activ
  monitor(f).start();await expect.poll(()=>f.db.prepare('select count(*) as count from pdf_files').get(),{timeout:3000}).toEqual({count:2});
  await expect.poll(()=>f.discovered.includes('active')).toBe(true);expect(f.discovered).not.toContain('waiting');expect(f.scans.every(scope=>scope.length===1)).toBe(true);expect(f.scans.flat()).not.toContain('category/UNKNOWN');
 });
+it('does not scan a directory retained by another inactive product when explicit scope resolution rejects it',async()=>{
+ const f=registered();f.db.prepare("update products set status='inactive' where id=?").run(f.second);
+ f.db.prepare("insert into material_batches(product_id,product_directory,relative_path,name,recognition_status,first_seen_at,last_seen_at) values(?,? ,?,'历史批次','recognized','now','now')").run(f.second,'category/ONE-MODEL','category/ONE-MODEL/03.量产后的变更文件（已量产的产品看最新日期）/00.首批大货');
+ pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/shared.pdf');
+ expect(()=>f.workspace.resolveProductDirectory(f.first,'category/ONE-MODEL')).toThrow('同时属于其他产品');
+ const watcher=monitor(f,{intervalMs:10000,debounceMs:5});watcher.start();await new Promise(resolve=>setTimeout(resolve,100));
+ expect(f.scans).toHaveLength(0);expect(f.db.prepare('select count(*) n from pdf_files').get()).toEqual({n:0});expect(watcher.status().error).toContain('同时属于其他产品');
+});
+it('keeps an unshared current directory watched when the same product also has a rejected historical directory',async()=>{
+ const f=registered();f.db.prepare("update products set status='inactive' where id=?").run(f.second);
+ const batch=f.db.prepare("insert into material_batches(product_id,product_directory,relative_path,name,recognition_status,first_seen_at,last_seen_at) values(?,?,?,'历史批次','recognized','now','now')");
+ batch.run(f.first,'category/AAA','category/AAA/03.量产后的变更文件（已量产的产品看最新日期）/old');batch.run(f.second,'category/AAA','category/AAA/03.量产后的变更文件（已量产的产品看最新日期）/other');
+ pdf(f.root,'category/AAA/02.未转曲源文件/rejected.pdf');pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/current.pdf');
+ monitor(f,{intervalMs:10000,debounceMs:5}).start();
+ await expect.poll(()=>f.db.prepare('select file_name name from pdf_files').all(),{timeout:3000}).toEqual([{name:'current.pdf'}]);
+ expect(f.scans.flat()).toEqual(['category/ONE-MODEL']);
+});
 it('real watcher events index only the affected formal product and discover00 without indexing it',async()=>{
  const f=registered();pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/baseline.pdf');pdf(f.root,'category/TWO-MODEL/02.未转曲源文件/other.pdf');f.tasks.push(task(f.second,'other-active','category/TWO-MODEL'),task(f.first,'active','category/ONE-MODEL'));
  monitor(f).start();await expect.poll(()=>f.scans.length,{timeout:3000}).toBe(2);await expect.poll(()=>f.discovered.length).toBeGreaterThan(0);await new Promise(resolve=>setTimeout(resolve,80));f.scans.length=0;f.discovered.length=0;
