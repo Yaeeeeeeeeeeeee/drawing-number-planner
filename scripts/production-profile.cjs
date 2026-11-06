@@ -62,8 +62,21 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
       throw Error('请选择旧版数据目录中的 planner.db，保留 settings.json 和 backups 等原文件。');
     }
     rejectLink(path.dirname(file));
-    validateDatabase(file);
     data = fs.realpathSync.native(path.dirname(file));
+    // The service opens this fixed name. A case-insensitive basename check is
+    // insufficient on a case-sensitive volume and must never select a new file.
+    let selectedFile, runtimeFile;
+    try {
+      selectedFile = fs.realpathSync.native(file);
+      runtimeFile = fs.realpathSync.native(path.join(data, 'planner.db'));
+    } catch {
+      throw Error('请选择数据目录中实际存在的 planner.db，不会创建替代空库。');
+    }
+    if (selectedFile !== runtimeFile && !(process.platform === 'win32' && selectedFile.toLowerCase() === runtimeFile.toLowerCase())) {
+      throw Error('所选数据库与服务使用的 planner.db 不一致，不会创建替代空库。');
+    }
+    file = runtimeFile;
+    validateDatabase(file);
     await protectCurrent();
     await safety.prepareExistingProductionDatabase(file);
   } else if (mode === 'fresh') {

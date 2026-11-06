@@ -15,7 +15,7 @@ else app.whenReady().then(async()=>{
   initializeDatabase:database=>require('./initialize-empty-acceptance.cjs').initializeEmptyAcceptanceDatabase(database),
   verifyStartup:async data=>{
    const {ProductionStartupService}=require('./initialize-empty-acceptance.cjs');
-   const service=new ProductionStartupService({entryPath:path.join(__dirname,'dist','service','entry.js'),config:{dataDir:data}});
+   const service=new ProductionStartupService({entryPath:path.join(__dirname,'dist','service','entry.js'),config:{dataDir:data,requireExistingDatabase:true}});
    try{await service.start();}finally{await service.stop();}
   }
  });

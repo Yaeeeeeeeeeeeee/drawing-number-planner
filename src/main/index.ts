@@ -28,6 +28,7 @@ async function createWindow() {
     entryPath: fileURLToPath(new URL('../service/entry.js', import.meta.url)),
     config: {
       dataDir: app.getPath('userData'),
+      requireExistingDatabase: !devServerUrl,
       ...(devServerUrl ? { allowedOrigins: [new URL(devServerUrl).origin] } : {}),
       ...(devServerUrl ? {} : { rendererDir: join(app.getAppPath(), 'dist', 'renderer') }),
     },
@@ -192,7 +193,7 @@ async function reselectDatabase(): Promise<{ok:true;cancelled:boolean}> {
       verifyStartup: async (data: string) => {
         await oldService.stop();
         candidate = new LocalServiceController({entryPath:fileURLToPath(new URL('../service/entry.js',import.meta.url)),
-          config:{dataDir:data,...(devUrl ? {allowedOrigins:[new URL(devUrl).origin]} : {rendererDir:join(app.getAppPath(),'dist','renderer')})}});
+          config:{dataDir:data,requireExistingDatabase:true,...(devUrl ? {allowedOrigins:[new URL(devUrl).origin]} : {rendererDir:join(app.getAppPath(),'dist','renderer')})}});
         await candidate.start();
       },
     }),

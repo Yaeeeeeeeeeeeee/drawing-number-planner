@@ -1,6 +1,6 @@
 import type { ServerOptions } from '../server/start-server.js';
 
-export type LocalServiceConfig = Pick<ServerOptions, 'dataDir' | 'allowedOrigins' | 'rendererDir' | 'port'>;
+export type LocalServiceConfig = Pick<ServerOptions, 'dataDir' | 'allowedOrigins' | 'rendererDir' | 'port' | 'requireExistingDatabase'>;
 
 export type ParentToServiceMessage =
   | { type: 'start'; config: LocalServiceConfig }

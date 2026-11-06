@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {afterEach,expect,it,vi} from 'vitest';
 import Database from 'better-sqlite3';
-import {mkdtempSync,mkdirSync,readFileSync,rmSync,writeFileSync,readdirSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,readFileSync,rmSync,writeFileSync,readdirSync,renameSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
@@ -32,4 +32,17 @@ it('refuses switching if the saved current database is missing', async () => {
   rmSync(join(old, 'planner.db'));
   await expect(prepareProductionProfile({...input,forceSelection:true,chooseDatabase:async()=>target})).rejects.toThrow();
   expect(readFileSync(config)).toEqual(previous);
+});
+
+it('rejects a selected filename that would resolve to a different runtime database', async () => {
+  const {root,target,input}=fixture(); await prepareProductionProfile(input);
+  const config=join(root,'DrawingNumberPlanner/profile.json'), previous=readFileSync(config);
+  const selected=join(target,'PLANNER.DB'); renameSync(join(target,'planner.db'),selected);
+  // On Windows these spellings identify the same file; this case models a
+  // case-sensitive volume where the runtime's fixed name would be absent.
+  if (process.platform==='win32') return;
+  const bytes=readFileSync(selected), beforeSwitch=vi.fn();
+  await expect(prepareProductionProfile({...input,forceSelection:true,chooseDatabase:async()=>selected,beforeSwitch})).rejects.toThrow();
+  expect(readFileSync(config)).toEqual(previous); expect(readFileSync(selected)).toEqual(bytes);
+  expect(readdirSync(target)).toEqual(['PLANNER.DB']); expect(beforeSwitch).not.toHaveBeenCalled();
 });

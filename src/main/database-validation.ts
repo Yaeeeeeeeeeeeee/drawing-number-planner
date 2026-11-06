@@ -67,6 +67,19 @@ function assertCurrentStructure(database: Database.Database): void {
     if (!actualTriggers.some(actual => actual.name === trigger.name && actual.sql === trigger.sql)) throw new Error(`数据库保护触发器不兼容：${trigger.name}`);
   }
 }
+/** Validate the exact SQLite handle before any production migration or journal change. */
+export function validateProductionDatabaseConnection(database: Database.Database): void {
+  integrity(database); ledger(database);
+  const snapshot = database.serialize();
+  // Serialization includes committed WAL pages; deserialize needs a private
+  // rollback-journal header instead of trying to find the source WAL on disk.
+  snapshot[18] = 1; snapshot[19] = 1;
+  const rehearsal = new Database(snapshot);
+  try {
+    migrateDatabase(rehearsal,{databaseExists:true,createBackup(){}});
+    integrity(rehearsal); assertCurrentStructure(rehearsal);
+  } finally { rehearsal.close(); }
+}
 /** Read-only source; migration rehearsal runs entirely in memory, including WAL data. */
 export function validateProductionDatabase(file: string): void {
   // Validate an isolated copy so even damaged WAL headers cannot create sidecars
@@ -78,16 +91,7 @@ export function validateProductionDatabase(file: string): void {
     copyFileSync(file,snapshotFile);
     if (existsSync(file+'-wal')) copyFileSync(file+'-wal',snapshotFile+'-wal');
     database = new Database(snapshotFile,{fileMustExist:true});
-    integrity(database); ledger(database);
-    const snapshot = database.serialize();
-    // SQLite deserialize cannot open a WAL-mode header without its on-disk WAL.
-    // serialize already includes committed WAL pages; change only this private copy.
-    snapshot[18] = 1; snapshot[19] = 1;
-    const rehearsal = new Database(snapshot);
-    try {
-      migrateDatabase(rehearsal,{databaseExists:true,createBackup(){}});
-      integrity(rehearsal); assertCurrentStructure(rehearsal);
-    } finally { rehearsal.close(); }
+    validateProductionDatabaseConnection(database);
   } finally { database?.close(); rmSync(scratch,{recursive:true,force:true}); }
 }
 /** Reuse the protected transaction and independently verified migration backup. */
@@ -95,6 +99,7 @@ export function prepareExistingProductionDatabase(file: string): void {
   validateProductionDatabase(file);
   const database = new Database(file,{fileMustExist:true});
   try {
+    validateProductionDatabaseConnection(database);
     database.pragma('foreign_keys = ON');
     migrateDatabase(database,{databaseExists:true,createBackup:()=>createDatabaseBackup(database,file,join(dirname(file),'backups'),'migration')});
     integrity(database);

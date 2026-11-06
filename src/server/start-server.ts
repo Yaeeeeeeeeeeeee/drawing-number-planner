@@ -6,7 +6,9 @@ import { QrManualService, type QrManualInput } from '../core/qr/qr-manual-servic
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import Fastify, {type FastifyRequest,type FastifyReply,type HookHandlerDoneFunction} from 'fastify';
+import Fastify, {type FastifyRequest,type FastifyReply,type HookHandlerDoneFunction,type RouteOptions,type FastifyInstance} from 'fastify';
+import Database from 'better-sqlite3';
+import {validateProductionDatabaseConnection} from '../main/database-validation.js';
 import fastifyStatic from '@fastify/static';
 
 import { resolveAppPaths } from '../core/config/app-paths.js';
@@ -61,6 +63,7 @@ export interface ServerOptions {
   dataDir?: string;
   allowedOrigins?: string[];
   rendererDir?: string;
+  requireExistingDatabase?: boolean;
 }
 
 export interface RunningServer {
@@ -88,12 +91,19 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   const paths = resolveAppPaths(options.dataDir ?? join(process.cwd(), 'work', 'runtime-data'));
   mkdirSync(paths.baseDir, { recursive: true });
   mkdirSync(paths.exports, { recursive: true });
-  const databaseExists = existsSync(paths.database);
-  const database = openDatabase(paths.database);
+  const databaseExists = Boolean(options.requireExistingDatabase) || existsSync(paths.database);
+  // SQLite enforces existence at open, including after the async desktop stop.
+  const database = options.requireExistingDatabase
+    ? new Database(paths.database,{fileMustExist:true}) : openDatabase(paths.database);
   let server: ReturnType<typeof Fastify> | undefined;
   let packagingTasks:PackagingTaskService|undefined;
   let packagingMonitor:PackagingMonitor|undefined;
   try {
+    if (options.requireExistingDatabase) {
+      validateProductionDatabaseConnection(database);
+      database.pragma('foreign_keys = ON');
+      database.pragma('journal_mode = WAL');
+    }
     migrateDatabase(database, {
       databaseExists,
       createBackup: () => createDatabaseBackup(database, paths.database, paths.backups, 'migration'),
@@ -104,13 +114,38 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     }
     server = Fastify({ logger: false, forceCloseConnections: true });
     let switchingDatabase = false;
-    const activeRequests = new Set<string>();
+    const activeRequests = new Map<string,{runningHandlers:number;responseEnded:boolean}>();
+    const endResponse = (request:FastifyRequest) => {
+      const state = activeRequests.get(request.id);
+      if (!state) return;
+      state.responseEnded = true;
+      if (state.runningHandlers === 0) activeRequests.delete(request.id);
+    };
     server.addHook('onRequest', async (request:FastifyRequest, reply:FastifyReply) => {
       if (switchingDatabase) return reply.code(503).send({error:{code:'DATABASE_SWITCHING',message:'数据库切换准备中，请稍后重试'}});
-      activeRequests.add(request.id);
+      activeRequests.set(request.id,{runningHandlers:0,responseEnded:false});
+      reply.raw.once('close',()=>endResponse(request));
     });
-    server.addHook('onResponse', async (request:FastifyRequest) => { activeRequests.delete(request.id); });
-    server.addHook('onRequestAbort', async (request:FastifyRequest) => { activeRequests.delete(request.id); });
+    server.addHook('onResponse', async (request:FastifyRequest) => { endResponse(request); });
+    server.addHook('onRequestAbort', async (request:FastifyRequest) => { endResponse(request); });
+    server.addHook('onRoute',(route:RouteOptions)=>{
+      const handler=route.handler;
+      route.handler=function(this:FastifyInstance,request:FastifyRequest,reply:FastifyReply){
+        // An aborted pre-handler may resume after the request gate closed.
+        if (switchingDatabase) return reply.code(503).send({error:{code:'DATABASE_SWITCHING',message:'数据库切换准备中，请稍后重试'}});
+        const state=activeRequests.get(request.id)??{runningHandlers:0,responseEnded:reply.raw.destroyed};
+        activeRequests.set(request.id,state); state.runningHandlers++;
+        const settled=()=>{
+          state.runningHandlers--;
+          if (state.responseEnded && state.runningHandlers===0) activeRequests.delete(request.id);
+        };
+        try {
+          const result=handler.call(this,request,reply);
+          if (result && typeof (result as {then?:unknown}).then==='function') return Promise.resolve(result).finally(settled);
+          settled(); return result;
+        } catch(error) { settled(); throw error; }
+      };
+    });
   server.addHook('onResponse',(request:FastifyRequest,reply:FastifyReply,done:HookHandlerDoneFunction)=>{
     if(reply.statusCode<300&&((request.method==='PUT'&&request.url==='/api/files/settings')
       ||request.method==='POST'&&(['/api/packaging/tasks','/api/packaging/create-temporary-directories'].includes(request.url)||/^\/api\/packaging\/tasks\/[^/]+\/delete$/u.test(request.url))))packagingMonitor?.refresh();
