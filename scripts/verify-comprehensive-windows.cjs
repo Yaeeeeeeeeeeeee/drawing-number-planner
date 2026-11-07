@@ -105,7 +105,11 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   const counts=await page.evaluate(async()=>await(await fetch('/api/files/navigation?presence=present')).json());
   const list=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());
   const directoryItems=list.items.filter(item=>[path.basename(directoryPdf),path.basename(unmatchedPdf)].includes(item.fileName));
-  assert.equal(counts.products.find(item=>item.productId===5)?.count,priorList.total+2);assert.equal(list.total,priorList.total+2);assert.equal(directoryItems.length,2);assert.deepEqual(directoryItems.map(item=>item.matchStatus).sort(),['matched','unmatched']);
+  // The all-active monitor can index these files before the explicit scan.
+  // Count existing non-fixture rows once and still require both concrete new instances.
+  const alreadyObserved=priorList.items.filter(item=>[path.basename(directoryPdf),path.basename(unmatchedPdf)].includes(item.fileName)).length;
+  const expectedTotal=priorList.total-alreadyObserved+2;
+  assert.equal(counts.products.find(item=>item.productId===5)?.count,expectedTotal);assert.equal(list.total,expectedTotal);assert.equal(directoryItems.length,2);assert.deepEqual(directoryItems.map(item=>item.matchStatus).sort(),['matched','unmatched']);
   assert.ok(directoryItems.every(item=>item.materialBatchId&&item.conversionType==='outlined'));assert.ok(directoryItems.every(item=>item.materialBatchName.includes('首批大货')));
   const afterDirectoryScan=snapshot(path.join(legacy,'planner.db'));for(const row of beforeDirectoryScan.pdf_files)assert.deepEqual(afterDirectoryScan.pdf_files.find(item=>item.id===row.id),row,'Narrowed scan scope must preserve original out-of-scope index rows');
 

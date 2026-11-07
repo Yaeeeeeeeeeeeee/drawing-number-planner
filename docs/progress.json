@@ -852,9 +852,9 @@
       "planningDomain": "complete-reviewed",
       "planningUi": "complete-reviewed",
       "feedback": "complete-reviewed",
-      "pdf": "implemented-tested-review-pending",
-      "databaseReselection": "in-progress",
-      "release": "pending"
+      "pdf": "complete-reviewed",
+      "databaseReselection": "complete-reviewed",
+      "release": "windows-verification-in-progress"
     }
   }
 }
