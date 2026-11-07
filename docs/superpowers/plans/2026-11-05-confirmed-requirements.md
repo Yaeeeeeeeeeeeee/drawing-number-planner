@@ -47,20 +47,20 @@
 - [x] Commit and ledger.
 
 ### Task 5: PDF monitoring/category/presence/batches
-- [ ] RED: 无00启用产品监听、精确类别、列表快照/详情实时、501+分批与失败重试。
-- [ ] GREEN: 扩监听范围、类别接口/操作、明确时点、客户端安全分批不重复成功项。
-- [ ] Verify affected PDF core/server/renderer and watcher suites.
-- [ ] Commit and ledger.
+- [x] RED: 无00启用产品监听、精确类别、列表快照/详情实时、501+分批与失败重试。
+- [x] GREEN: 扩监听范围、类别接口/操作、明确时点、客户端安全分批不重复成功项。
+- [x] Verify affected PDF core/server/renderer and watcher suites.
+- [x] Commit and ledger.
 
 ### Task 6: Database reselection
-- [ ] RED: 兼容旧库/高Schema/损坏/取消/失败/进行中任务、profile回退、备份验证。
-- [ ] GREEN: 复用安装profile验证和桌面原生选择，安全切换及恢复入口；不合并、不覆盖数据。
-- [ ] Verify profile, main recovery, migration and settings suites.
-- [ ] Commit and ledger.
+- [x] RED: 兼容旧库/高Schema/损坏/取消/失败/进行中任务、profile回退、备份验证。
+- [x] GREEN: 复用安装profile验证和桌面原生选择，安全切换及恢复入口；不合并、不覆盖数据。
+- [x] Verify profile, main recovery, migration and settings suites.
+- [x] Commit and ledger.
 
 ### Task 7: Regression/review/Windows/release
-- [ ] Full npm test, npm run typecheck, npm run build, E2E with actual screenshots.
-- [ ] Fresh whole-branch review, fix significant findings with reproducing tests.
+- [x] Full npm test, npm run typecheck, npm run build, E2E with actual screenshots.
+- [x] Fresh whole-branch review, fix significant findings with reproducing tests.
 - [ ] Existing Windows build/install/upgrade/restart verification; immutable tag + Release with checksums/reports/screenshots.
 - [ ] Download released installer and verify SHA256; document actual limitations/upgrade/rollback and production access record.
 
@@ -69,3 +69,5 @@
 - 2026-11-05: 已创建独立worktree codex/confirmed-requirements-20261105，原五份审计文档留在原工作区。
 - Pre-flight: Task1生命周期API由Task4刷新消费；Task2新批量/草稿接口由Task3消费；Task5不改变隔离；Task6按dataDir隔离Task2草稿。正式授权覆盖发布/迁移；不代表当前可访问生产库。
 - Ruling: 用户最新唯一性规则优先，不能用跨产品新流水算法掩盖编码冲突；真实白色不能以本次随意选择代替。
+
+- 2026-11-07: Task5/6复核关闭；完整231文件1966项、Chromium18项、类型与构建通过。Windows验收脚本适配明确授权的全启用产品监听，限定观察字段变化，其余业务保护保留；正式Windows完成及发布尚在进行。
