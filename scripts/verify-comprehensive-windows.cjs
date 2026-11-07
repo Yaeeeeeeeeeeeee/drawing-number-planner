@@ -6,7 +6,7 @@ const {createHash}=require('node:crypto');
 const {waitForNativeDesktopWindow}=require('./comprehensive-native-handshake.cjs');
 const [sourceArg,executableArg,evidenceArg,helperArg]=process.argv.slice(2);
 const source=path.resolve(sourceArg),executable=path.resolve(executableArg),evidence=path.resolve(evidenceArg),helper=path.resolve(helperArg);
-const {_electron}=createRequire(path.join(source,'package.json'))('@playwright/test');
+const {_electron,expect}=createRequire(path.join(source,'package.json'))('@playwright/test');
 const appRoot=path.join(path.dirname(executable),'resources','app');
 const profileHome=path.join(process.env.APPDATA,'DrawingNumberPlanner'),config=path.join(profileHome,'profile.json');
 const temporary=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP,'planner-production-verification-'));
@@ -232,8 +232,11 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  beforeRestart=afterRestart;report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
  // Exercise both renderer recovery and the native menu with actual Windows pickers.
  const reselectionCopy=path.join(temporary,'reselection-copy');fs.cpSync(legacy,reselectionCopy,{recursive:true,filter:file=>path.basename(file)!=='backups'});
- const protectedTables=['drawing_numbers','historical_drawing_numbers','bom_versions','bom_items','outbound_packages','outbound_package_items','qr_codes','packaging_tasks','packaging_task_items'];
- const protectedBefore=Object.fromEntries(protectedTables.map(table=>[table,beforeRestart[table]]));
+ const protectedTables=['drawing_numbers','historical_drawing_numbers','bom_versions','bom_items','outbound_packages','outbound_package_items','product_qr_codes','packaging_tasks','packaging_task_items'];
+ const switchScope={pdfIndexIds:report.confirmedRequirements.monitorPdfIndexIds,productDirectories:report.confirmedRequirements.monitorProductDirectories};
+ const businessRows=require('./verify-packaging-restart.cjs').businessRows;
+ for(const table of protectedTables)assert.ok(Array.isArray(beforeRestart[table]),`Missing protected table ${table}`);
+ const protectedBefore=Object.fromEntries(protectedTables.map(table=>[table,businessRows(beforeRestart,table,beforeRestart[table],switchScope)]));
  app=await launch();try{
   let page=await ready(app);const profileBefore=fs.readFileSync(config,'utf8');
   await page.getByRole('button',{name:'安全恢复',exact:true}).click();const recovery=page.getByRole('region',{name:'安全恢复面板',exact:true});
@@ -247,7 +250,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
     page=await app.firstWindow();await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});
     await expect.poll(async()=>page.evaluate(async()=>{try{return(await(await fetch('/api/health')).json()).status;}catch{return null;}})).toBe('ok');
     assert.equal(JSON.parse(fs.readFileSync(config,'utf8')).dataDir,directory);
-    const selected=snapshot(path.join(directory,'planner.db'));for(const table of protectedTables)assert.deepEqual(selected[table],protectedBefore[table],`Switch changed protected ${table}`);
+    const selected=snapshot(path.join(directory,'planner.db'));for(const table of protectedTables)assert.deepEqual(businessRows(beforeRestart,table,selected[table],switchScope),protectedBefore[table],`Switch changed protected ${table}`);
     await page.screenshot({path:path.join(evidence,'Windows-原生数据库重选-'+label+'.png')});
    }finally{picker.child.kill();}
   }
