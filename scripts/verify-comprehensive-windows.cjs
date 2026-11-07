@@ -22,7 +22,7 @@ function writePdf(file,text){
 }
 function assertPreservedRows(before,after,scope){
  const appendedQr=new Set(['product_qr_codes','qr_manual_links','qr_manual_files','qr_manual_audit']);
- const protectedAfter=Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,appendedQr.has(table)?rows.filter(row=>before[table].some(prior=>prior.id===row.id)):rows]));
+ const protectedAfter=Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,appendedQr.has(table)?require('./verify-packaging-restart.cjs').existingRows(before[table],rows):rows]));
  require('./verify-packaging-restart.cjs')(before,protectedAfter,scope);
 }
 async function observationScope(page,state){return require('./verify-packaging-restart.cjs').observationScope(state,route=>page.evaluate(async route=>{const response=await fetch(route);if(!response.ok)throw Error('Directory lookup failed');return response.json();},route));}

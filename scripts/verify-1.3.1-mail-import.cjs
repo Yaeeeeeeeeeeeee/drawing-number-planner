@@ -42,7 +42,7 @@ module.exports=async function verify({page,app,source,evidence,databaseFile,snap
  const shared=after.outbound_contacts.find(row=>row.email==='shared131@example.com');assert.equal(shared.company,'Shared Coordination');
  assert.ok(after.outbound_template_contact_links.some(row=>row.template_id===created[0].id&&row.contact_id===shared.id&&row.recipient_type==='cc'));
  const added=new Set(['outbound_email_templates','outbound_contacts','outbound_template_contact_links']);
- const protectedAfter=Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,added.has(table)?rows.filter(row=>baseline[table].some(prior=>prior.id===row.id)):rows]));
+ const protectedAfter=Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,added.has(table)?observations.existingRows(baseline[table],rows):rows]));
  observations(baseline,protectedAfter,scope);
  await page.screenshot({path:path.join(evidence,'Hotfix131-单条模板共享抄送导入成功.png')});
  await modal.getByRole('button',{name:'关闭',exact:true}).click();

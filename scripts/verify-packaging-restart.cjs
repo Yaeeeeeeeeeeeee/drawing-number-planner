@@ -39,3 +39,5 @@ module.exports.observationScope=async function(state,get){
  const productDirectories=[...new Set(directories)];
  return {productDirectories,pdfIndexIds:state.pdf_files.filter(row=>productDirectories.some(directory=>row.relative_path.replaceAll('\\','/').startsWith(directory+'/'))).map(row=>row.id)};
 };
+
+module.exports.existingRows=(before,after)=>after.filter(row=>before.some(prior=>Object.keys(prior).every(key=>row[key]===prior[key])));

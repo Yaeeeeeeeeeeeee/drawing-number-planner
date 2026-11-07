@@ -29,3 +29,10 @@ it('does not grant historical timestamp permission through an index outside the 
  (f.before as any).historical_drawing_numbers=[{id:22,last_seen_at:'before'}];f.after.historical_drawing_numbers=[{id:22,last_seen_at:'after'}];
  expect(()=>verify(f.before,f.after,{...f.scope,pdfIndexIds:[9,10]})).toThrow('protected');
 });
+it('preserves populated composite-key snapshots without retaining newly imported contact-role links',()=>{
+ const before=[{template_id:5,contact_id:7,recipient_type:'to',display_order:0}];
+ const added={template_id:6,contact_id:8,recipient_type:'cc',display_order:0};
+ expect(verify.existingRows(before,[...before,added])).toEqual(before);
+ expect(verify.existingRows(before,[{...before[0],recipient_type:'cc'},added])).not.toEqual(before);
+ expect(verify.existingRows(before,[])).not.toEqual(before);
+});
