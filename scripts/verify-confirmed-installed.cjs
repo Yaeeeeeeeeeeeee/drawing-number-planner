@@ -14,7 +14,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
   const value=await response.json();if(!response.ok)throw Error(`${route}: ${value.error?.message??response.status}`);return value;
  },{route,body,method});
  const navigation=page.getByRole('navigation',{name:'主导航'});
- const dictionary=(type,code,name,parentId)=>request(`/api/dictionaries/${type}`,{code,name,...(parentId?{parentId}:{})});
+ const dictionary=async(type,code,name,parentId)=>{const listed=await request(`/api/dictionaries/${type}?includeInactive=false`),existing=listed.items.find(item=>item.code===code&&(parentId==null||item.parentId===parentId));return existing??request(`/api/dictionaries/${type}`,{code,name,...(parentId?{parentId}:{})});};
  const brand=await dictionary('brand','97','连续实施验收品牌'),appearance=await dictionary('appearance','97','验收外观'),color=await dictionary('color','7','连续实施验收颜色'),main=await dictionary('main_category','97','连续实施验收包材');
  const projects=[await dictionary('project_item','01','安全结束验收项目',main.id),await dictionary('project_item','02','独立占号验收项目',main.id)];
  const products=[];

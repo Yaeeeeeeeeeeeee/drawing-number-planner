@@ -1,0 +1,29 @@
+name: Read retained native verification failure
+on:
+  push:
+    branches: [codex/v3-business-ui-20261022]
+    paths: ['.github/workflows/verification-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Read the already retained isolated failure screenshot
+        run: |
+          gh run download 42364535609 --name Comprehensive-Windows-Verification-7fd2a4b6ac7918167a6dd25bee9ee58df853e86d --dir diagnostic
+          python3 - <<'PY'
+          import pathlib,base64
+          file=pathlib.Path('diagnostic/windows-v4-failure.png')
+          assert file.is_file(),[str(p) for p in pathlib.Path('diagnostic').rglob('*failure*')]
+          encoded=base64.b64encode(file.read_bytes()).decode()
+          print('NATIVE_FAILURE_PNG_BEGIN')
+          for offset in range(0,len(encoded),4000): print(encoded[offset:offset+4000])
+          print('NATIVE_FAILURE_PNG_END')
+          PY
