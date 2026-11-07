@@ -114,7 +114,17 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  task=await request(`/api/packaging/tasks/${task.id}`);const originalHash=task.items[0].sha256;assert.equal(task.items[0].mode,'manual');const associated=path.join(workspace,task.items[0].relativePath);assert.equal(hash(associated),originalHash);
  const review=async(currentRow)=>{await currentRow.getByLabel('已检查当前 PDF 内容',{exact:true}).check();await currentRow.getByRole('button',{name:'确认当前文件',exact:true}).click();await currentRow.getByText('此版本已确认',{exact:true}).waitFor();};
  const archive=async(id)=>{
-  await detail.getByRole('button',{name:'归档预览',exact:true}).click();await detail.getByLabel('已核对全部文件和归档位置，确认统一归档',{exact:true}).check();await detail.getByRole('button',{name:'确认统一归档',exact:true}).click();
+  for(let attempt=0;;attempt++){
+   await detail.getByRole('button',{name:'归档预览',exact:true}).click();await detail.getByLabel('已核对全部文件和归档位置，确认统一归档',{exact:true}).check();
+   const response=page.waitForResponse(response=>response.url().endsWith(`/api/packaging/tasks/${id}/archive`)&&response.request().method()==='POST');
+   await detail.getByRole('button',{name:'确认统一归档',exact:true}).click();const result=await response,body=await result.json();
+   if(result.ok())break;
+   console.log('[installed archive response]',JSON.stringify({taskId:id,status:result.status(),body}));
+   // Background discovery can hold this lock. A TASK_BUSY response proves the
+   // archive was refused before publication; only that explicit denial retries.
+   assert.ok(body.error?.code==='TASK_BUSY'&&attempt<5,`Archive rejected: ${JSON.stringify(body)}`);
+   await detail.getByRole('alert').filter({hasText:body.error.message}).waitFor();await page.waitForTimeout(200);
+  }
   await expect.poll(async()=>(await request(`/api/packaging/tasks/${id}`)).state,{timeout:20000}).toMatch(/completed|awaiting_index/u);
   let current=await request(`/api/packaging/tasks/${id}`);if(current.state==='awaiting_index'){await detail.getByRole('button',{name:'重试归档索引',exact:true}).click();}
   await expect.poll(async()=>(await request(`/api/packaging/tasks/${id}`)).state).toBe('completed');await detail.locator('.pkg-task-counters').getByText('已完成',{exact:true}).waitFor();return request(`/api/packaging/tasks/${id}`);
