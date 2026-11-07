@@ -113,3 +113,16 @@ it('starts watching promptly after first settings and task creation without wait
  f.setRoot(root);f.tasks.push(task(f.first,'newly-created','category/ONE-MODEL'));pdf(root,'category/ONE-MODEL/00.临时文件/late.pdf');watcher.refresh();
  await expect.poll(()=>f.discovered.includes('newly-created'),{timeout:3000}).toBe(true);expect(watcher.status().watching).toBe(true);
 });
+it('rechecks a queued product after another asynchronous scan before indexing a product just deactivated',async()=>{
+ const f=registered();pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/active.pdf');
+ let entered=false,release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+ const files=new FileService(new FileRepository(f.db),f.settings);
+ f.setScan(async directories=>{if(directories[0]==='category/ONE-MODEL'){entered=true;await gate;}return files.scanProducts(directories);});
+ const watcher=monitor(f,{intervalMs:10000,debounceMs:5});watcher.start();await expect.poll(()=>entered).toBe(true);
+ f.db.prepare("update products set status='inactive' where id=?").run(f.second);
+ const file=pdf(f.root,'category/TWO-MODEL/02.未转曲源文件/after-deactivation.pdf');release();
+ await expect.poll(()=>watcher.status().lastCheckedAt,{timeout:3000}).toBeTruthy();await watcher.close();
+ expect(f.scans.flat()).not.toContain('category/TWO-MODEL');
+ expect(f.db.prepare("select count(*) n from pdf_files where file_name='after-deactivation.pdf'").get()).toEqual({n:0});
+ expect(readFileSync(file,'utf8')).toContain('%%EOF');
+});

@@ -168,7 +168,17 @@ export class PackagingMonitor {
    const latest=this.files.latestScan?.();
    if(latest&&Date.parse(latest.completedAt)>=scope.queuedAt&&(latest.scope?.kind==='workspace'
     ||latest.scope?.kind==='products'&&latest.scope.productDirectories.some(directory=>toWorkspacePathKey(directory)===key)))continue;
-   try{await this.files.scanProducts([scope.relativePath]);}
+   try{
+    // Earlier asynchronous scans may outlive product status/ownership changes.
+    const owner=this.known.get(key)!;
+    const eligible=this.service.db.prepare(`select product.id from products product
+     left join product_identity_members identity on identity.raw_product_id=product.id
+     where product.id=? and product.deleted_at is null and product.status='active'
+      and coalesce(identity.canonical_product_id,product.id)=product.id`).get(owner.productId);
+    if(!eligible)continue;
+    this.service.workspace.resolveProductDirectory(owner.productId,scope.relativePath);
+    await this.files.scanProducts([scope.relativePath]);
+   }
    catch(error){this.error=message(error);this.scans.set(key,scope);}
   }
   this.lastCheckedAt=new Date().toISOString();

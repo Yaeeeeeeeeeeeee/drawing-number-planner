@@ -41,6 +41,7 @@ module.exports=async function verifyV52({page,app,source,workspace,evidence,writ
   const result=await response.json();if(!response.ok)throw Error(route+': '+JSON.stringify(result));return result;
  },{route,body,method});
  const get=route=>request(route,undefined,'GET'),items=result=>result.items??result;
+ const settleScans=async()=>{for(let attempt=0;;attempt++){try{await request('/api/files/scan',{});return;}catch(error){if(attempt>=40||!/资料库正在扫描，请等待当前扫描完成/u.test(error.message))throw error;await page.waitForTimeout(100);}}};
  const dictionary=async(type,code,name,parentId)=>items(await get(`/api/dictionaries/${type}`)).find(item=>item.code===code&&(parentId==null||item.parentId===parentId))??request(`/api/dictionaries/${type}`,{code,name,...(parentId?{parentId}:{})});
  const brand=await dictionary('brand','87','V52验收品牌'),size=await dictionary('product_size','8787','V52验收品类'),appearance=await dictionary('appearance','87','V52外观'),color=await dictionary('color','7','V52颜色');
  const main=await dictionary('main_category','87','V52印刷件'),project=await dictionary('project_item','01','V52铭牌',main.id);
@@ -72,6 +73,8 @@ module.exports=async function verifyV52({page,app,source,workspace,evidence,writ
  const assetHashes=[imageA,imageB,diagram].map(asset=>({file:path.join(workspace,asset.relativePath),hash:asset.contentSha256}));
  // Isolate the read-only observation fixture from the separately verified active-product watcher.
  await request(`/api/products/${product.id}/deactivate`,{});
+ // Drain a scan already started while active before creating the read-only fixture.
+ await settleScans();
  const unindexed=pdf([production,'04.20261030',`${code}-unindexed（转曲）.pdf`],'V52 read only observation');
  const observationScope=before=>require('./verify-packaging-restart.cjs').observationScope(before,get);
  const beforeObservation=snapshot(databaseFile),readScope=await observationScope(beforeObservation),detail=await get(`/api/drawings/${drawing.id}`);require('./verify-packaging-restart.cjs')(beforeObservation,snapshot(databaseFile),readScope);
@@ -101,7 +104,7 @@ module.exports=async function verifyV52({page,app,source,workspace,evidence,writ
  const unavailableRoot=workspace+'-v52-unavailable';fs.renameSync(workspace,unavailableRoot);
  try{const unknown=await get(`/api/drawings/${drawing.id}`);assert.equal(unknown.fileObservation.source.state,'unavailable');assert.equal(unknown.fileObservation.outlined.state,'unavailable');}finally{fs.renameSync(unavailableRoot,workspace);}
  // Settle the fixture's temporary path moves before asserting mail-only writes.
- for(let attempt=0;;attempt++){try{await request('/api/files/scan',{});break;}catch(error){if(attempt>=40||!/扫描|busy|in.progress/iu.test(error.message))throw error;await page.waitForTimeout(100);}}
+ await settleScans();
  // Native and browser run this exact anonymous 4-sheet matrix through the visible importer.
  const workbook=path.join(evidence,'V52-anonymous-matrix.xlsx');await matrixWorkbook(dep('write-excel-file/node'),workbook);
  const contact=await request('/api/outbound-reference/contacts',{company:'Preserved Company',contactName:'Preserved Name',email:'h@example.com',defaultRecipientType:'to'}),contactBefore=await get(`/api/outbound-reference/contacts/${contact.id}`);

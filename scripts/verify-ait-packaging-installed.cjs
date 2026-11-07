@@ -14,6 +14,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
   const response=await fetch(route,{method,headers:{'content-type':'application/json','x-planner-token':token},...(body===undefined?{}:{body:JSON.stringify(body)})});
   const value=await response.json();if(!response.ok)throw Error(`${route}: ${value.error?.message??response.status}`);return value;
  },{route,body,method});
+ const observations=require('./verify-packaging-restart.cjs'),scope=await observations.observationScope(before,route=>request(route));
  const resize=async(width,height)=>{
   if(app)await app.evaluate(({BrowserWindow},{width,height})=>BrowserWindow.getAllWindows()[0].setContentSize(width,height),{width,height});
   else await page.setViewportSize({width,height});
@@ -147,7 +148,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  const unfinished=await request('/api/packaging/tasks',{productId:product.id,name:'重启恢复验收',type:'new',drawings:[{origin:'planned',id:Math.abs(drawing.id)}]});
  const discovered=await request(`/api/packaging/tasks/${unfinished.id}/discover`,{});assert.equal(discovered.items[0].relativePath,undefined);assert.equal(discovered.pendingFiles.some(file=>file.relativePath===discarded.items[0].relativePath),false);assert.equal(hash(retained),retainedHash);
  await page.getByRole('button',{name:'刷新任务记录',exact:true}).click();await capture('UI15-任务历史删除与文件保留',{responsive:true});
- const after=snapshot(databaseFile);for(const[table,rows]of Object.entries(before)){if(table==='schema_migrations')continue;for(const row of rows)assert.ok(after[table].some(current=>JSON.stringify(current)===JSON.stringify(row)),`Original ${table} row changed`);}
+ const after=snapshot(databaseFile);for(const[table,rows]of Object.entries(before)){if(table==='schema_migrations')continue;const original=observations.businessRows(before,table,rows,scope),current=observations.businessRows(before,table,after[table],scope);assert.deepEqual(observations.existingRows(original,current),original,`Original ${table} row changed`);}
  fs.writeFileSync(path.join(evidence,'UI15-layout-geometry.json'),JSON.stringify(geometry,null,2));
  return{actualHttpAndDom:true,actualInstalledHttpAndDom:Boolean(app),menuOrder:true,independentTaskMenu:true,numberOnlyMappingUi:true,planningNoDimensions:true,exactDrawingFocus:true,flatTemporaryDirectory:true,completedDeletionPreservesFiles:true,unfinishedDeletionReleasesLock:true,catalogSavedThroughUi:true,matchingBasisChoicesThroughUi:true,rangeRuleAndSwapSaved:true,reservationToTask:true,singleProductTask:true,watcherDetectedWithoutClick:true,manualAssociation:true,reviewHash:true,newArchiveAndScopedIndex:true,formalEditCopyOnly:true,formalBackupHashPreserved:true,backupReadableThroughRegisteredId:true,taskCleanupOnly:true,taskHistoryRetained:true,originalAitHashPreserved:true,protectedBusinessRowsPreserved:true,unfinishedTaskId:unfinished.id,unfinishedTaskMode:unfinished.items[0].mode,unfinishedTaskParameters:unfinished.items[0].parameters,pdfIndexIds:indexed.map(file=>file.id),productDirectory:task.productDirectory,productId:product.id,realIllustratorGeneration:false,editablePdfReopenVerified:false,aitFixtureUploadOnly:true,limitations:'No licensed Illustrator or real AIT was provided; actual Adobe generation/editability/font/layout acceptance remains local.'};
 };
