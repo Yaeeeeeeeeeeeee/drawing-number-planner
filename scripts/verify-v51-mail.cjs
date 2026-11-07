@@ -20,13 +20,13 @@ module.exports=async function verifyV51({page,app,source,workspace,output,eviden
  for(const [batch,fullCode,item,text]of [['00.首批大货',code,'铭牌','nameplate before'],['00.首批大货',manualCode,'说明书','manual unchanged'],['01.20261027',code,'铭牌','nameplate after'],['01.20261027',manualCode,'说明书','manual unchanged']]){
   const file=path.join(productRoot,batch,`${fullCode}-V51MODEL-${item}（转曲）.pdf`);writePdf(file,text);original.push({file,hash:createHash('sha256').update(fs.readFileSync(file)).digest('hex')});
  }
- await request('/api/files/settings',{workspaceRoot:workspace},'PUT');await go(page,'PDF 文件中心');await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});
+ await request('/api/files/settings',{workspaceRoot:workspace},'PUT');await go(page,'PDF 文件中心');await require('./verify-scan-ui.cjs')(page);
  const batches=items(await get(`/api/material-batches?productId=${product.id}`));const batch=batches.find(item=>item.name.includes('20261027'));assert.ok(batch);
  const input={workflowVersion:2,productId:product.id,selectedMaterialBatchId:batch.id,materialType:'update',packageMode:'change_only'};
  let preview=await request('/api/outbound-packages/preview',input);assert.equal(preview.items.length,1);assert.equal(preview.items[0].fullCode,code);assert.equal(preview.items[0].selectable,false);
  const label=preview.items[0];const confirmed={...input,fileConfirmations:[{pdfFileId:label.pdfFileId,reason:'已逐页核对铭牌实际变化',contentSha256:label.contentSha256}]};
  const ready=await request('/api/outbound-packages/preview',confirmed);assert.equal(ready.items[0].selectable,true);
- const before=snapshot(databaseFile);
+ const before=snapshot(databaseFile),observations=require('./verify-packaging-restart.cjs'),scope=await observations.observationScope(before,get);
  const dep=createRequire(path.join(source,'package.json'));const writeXlsx=dep('write-excel-file/node');const {expect}=dep('@playwright/test');
  fs.mkdirSync(evidence,{recursive:true});const workbook=path.join(evidence,'V51-隔离结构验收-邮件模板.xlsx');
  const sheets=[{sheet:'首批包材资料',data:[['厂家','V51隔离厂家','V51隔离厂家'],['场景','缺铭牌','完整交付'],['主题','首批资料','首批完整资料'],['正文','请查收首批资料。','请查收完整资料。']]},{sheet:'更新包材资料',data:[['厂家','V51隔离厂家'],['场景','更新资料'],['联系人','V51联系人'],['收件人','v51-to@example.test'],['抄送人','v51-cc@example.test'],['主题','{{brand}} {{model}} 更新资料'],['正文','{{contact_salutation}}，您好！\n请查收 {{brand}} {{model}} {{category}} 的更新资料。\n本次修改的内容为：\n{{change_files}}\n附件：{{package_files}}\n批次：{{batch}}\n日期：{{date}}\n分包：{{count}}']]},{sheet:'ITR',data:[['此场景不应导入包材外发模板']]}];
@@ -60,7 +60,7 @@ module.exports=async function verifyV51({page,app,source,workspace,output,eviden
   await page.getByRole('button',{name:'复制主题',exact:true}).click();await expect.poll(readClipboard).toBe('最终人工主题');
   await page.getByRole('button',{name:'复制邮件内容',exact:true}).click();await expect.poll(readClipboard).toContain('v51-edit@example.test');const fullMail=await readClipboard();assert.ok(fullMail.includes('v51-edit@example.test')&&fullMail.includes('最终人工主题')&&fullMail.includes('人工直接补充'));
   assert.equal(createHash('sha256').update(fs.readFileSync(zip)).digest('hex'),zipHash);assert.deepEqual(await get(`/api/outbound-packages/${history[0].id}`),frozen);
-  const after=snapshot(databaseFile);for(const table of ['drawing_numbers','historical_drawing_numbers','bom_versions','bom_items','product_qr_codes'])assert.deepEqual(after[table],before[table],`${table} must remain unchanged`);
+  const after=snapshot(databaseFile);for(const table of ['drawing_numbers','historical_drawing_numbers','bom_versions','bom_items','product_qr_codes'])assert.deepEqual(observations.businessRows(before,table,after[table],scope),observations.businessRows(before,table,before[table],scope),`${table} must remain unchanged`);
   for(const prior of before.outbound_packages??[])assert.deepEqual(after.outbound_packages.find(item=>item.id===prior.id),prior);for(const file of original)assert.equal(createHash('sha256').update(fs.readFileSync(file.file)).digest('hex'),file.hash);
   return{actualHttpAndDom:true,realXlsx:true,fixtureWorkbookOnly:true,sheets:3,supportedSheets:2,recognizedTemplates:3,importedTemplates:1,contactsCreated:2,exactSelectedZipFileCount:1,changedNameplateOnly:true,reasonSynchronizes:true,directBodyEditPreserved:true,signatureOnce:true,actualClipboardCopy:true,originalPdfHashesPreserved:4,protectedRowsUnchanged:true,zipAndSnapshotsUnchangedByDraft:true};
  }finally{if(app)await app.evaluate(({dialog})=>{dialog.showOpenDialog=globalThis.__v51OriginalOpenDialog;delete globalThis.__v51OriginalOpenDialog;});}

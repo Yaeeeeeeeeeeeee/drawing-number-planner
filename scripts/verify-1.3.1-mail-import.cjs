@@ -12,7 +12,8 @@ module.exports=async function verify({page,app,source,evidence,databaseFile,snap
   ['厂家','Hotfix131 Supplier'],['场景','完整交付'],['联系人','Reviewed Contact'],['收件人','supplier131@example.com'],['抄送人','Review <shared131@example.com>'],
   ['主题','{{model}}资料'],['正文','请查收已核对资料。'],['场景','补充资料'],['主题','补充资料'],['正文','独立案例，不应被导入。'],
  ].map(row=>row.map(value=>({value,type:String})))}]).toBuffer();
- const baseline=snapshot(databaseFile);
+ const baseline=snapshot(databaseFile),observations=require('./verify-packaging-restart.cjs');
+ const scope=await observations.observationScope(baseline,route=>page.evaluate(async route=>{const response=await fetch(route);if(!response.ok)throw Error('Directory lookup failed');return response.json();},route));
  await go(page,'迁移检查');await page.getByRole('button',{name:'导入邮件模板',exact:true}).click();
  const modal=page.getByRole('dialog',{name:'导入邮件模板',exact:true});await modal.getByLabel('邮件模板 Excel',{exact:true}).setInputFiles({name:'hotfix131-anonymous.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:book});
  await modal.getByRole('button',{name:'识别并预览',exact:true}).click();
@@ -26,7 +27,7 @@ module.exports=async function verify({page,app,source,evidence,databaseFile,snap
  const alert=footer.getByRole('alert');await alert.waitFor();assert.match(await alert.innerText(),/未知变量/u);
  const errorGeometry=await alert.evaluate(element=>{const box=element.getBoundingClientRect();return {top:box.top,bottom:box.bottom,viewport:innerHeight};});
  assert.ok(errorGeometry.top>=0&&errorGeometry.bottom<=errorGeometry.viewport);
- assert.deepEqual(snapshot(databaseFile),baseline,'Rejected import must roll back contacts and templates');
+ observations(baseline,snapshot(databaseFile),scope); // Rejected import preserves all business rows; only scoped watcher observations may advance.
  assert.equal(await modal.getByLabel('联系人厂家 1-2',{exact:true}).inputValue(),'Shared Coordination');
  assert.equal(await modal.getByLabel('已确认联系人关联 1',{exact:true}).isChecked(),true);
  await page.screenshot({path:path.join(evidence,'Hotfix131-导入失败在按钮旁可见.png')});
@@ -40,11 +41,9 @@ module.exports=async function verify({page,app,source,evidence,databaseFile,snap
  assert.equal(created[0].scenario,'完整交付');
  const shared=after.outbound_contacts.find(row=>row.email==='shared131@example.com');assert.equal(shared.company,'Shared Coordination');
  assert.ok(after.outbound_template_contact_links.some(row=>row.template_id===created[0].id&&row.contact_id===shared.id&&row.recipient_type==='cc'));
- for(const [table,rows] of Object.entries(baseline)){
-  const added=new Set(['outbound_email_templates','outbound_contacts','outbound_template_contact_links']);
-  if(!added.has(table))assert.deepEqual(after[table],rows,`Protected rows changed in ${table}`);
-  else for(const row of rows)assert.ok(after[table].some(item=>JSON.stringify(item)===JSON.stringify(row)),`Original ${table} row changed`);
- }
+ const added=new Set(['outbound_email_templates','outbound_contacts','outbound_template_contact_links']);
+ const protectedAfter=Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,added.has(table)?rows.filter(row=>baseline[table].some(prior=>prior.id===row.id)):rows]));
+ observations(baseline,protectedAfter,scope);
  await page.screenshot({path:path.join(evidence,'Hotfix131-单条模板共享抄送导入成功.png')});
  await modal.getByRole('button',{name:'关闭',exact:true}).click();
  return {actualHttpAndDom:true,actualInstalledHttpAndDom:Boolean(app),anonymousWorkbook:true,singleTemplateSharedCc:true,errorVisibleBesideButton:true,successVisibleBesideButton:true,failedImportRolledBack:true,reviewedEditsPreserved:true,sharedCompanyPreserved:true,protectedRowsPreserved:true,errorGeometry,successGeometry};

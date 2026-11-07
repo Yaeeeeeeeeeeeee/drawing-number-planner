@@ -1,3 +1,4 @@
+import {scanFromUi} from './scan-ui';
 import { mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
@@ -47,7 +48,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   await page.getByRole('button', { name: '详细信息', exact: true }).click();
   await page.getByRole('textbox', { name: '资料根目录', exact: true }).fill(workspaceRoot!);
   await page.getByRole('button', { name: '保存根目录' }).click();
-  const scanUi=async()=>{await expect.poll(async()=>{await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await expect(page.getByRole('button',{name:'扫描资料库',exact:true})).toBeEnabled();return page.getByText('资料库扫描完成',{exact:true}).isVisible();},{timeout:15000}).toBe(true);};
+  const scanUi=()=>scanFromUi(page);
   await scanUi();
   // All-active monitoring may register the historical code before this manual scan.
   const registered=await request.get('/api/drawings?keyword=02.0404.010.0401007');

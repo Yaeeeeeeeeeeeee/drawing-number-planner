@@ -1,3 +1,4 @@
+import {scanFromUi} from './scan-ui';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -135,8 +136,7 @@ test('real-usage acceptance covers lifecycle, QR, historical BOM, outbound packa
   await page.getByRole('button', { name: '详细信息', exact: true }).click();
   await page.getByRole('textbox', { name: '资料根目录', exact: true }).fill(workspaceRoot!);
   await page.getByRole('button', { name: '保存根目录' }).click();
-  await page.getByRole('button', { name: '扫描资料库' }).click();
-  await expect(page.getByText('资料库扫描完成')).toBeVisible();
+  await scanFromUi(page);
 
   // Package scans do not register QR files. Exercise the actual trusted desktop
   // service against this same isolated database; no renderer bridge is mocked.

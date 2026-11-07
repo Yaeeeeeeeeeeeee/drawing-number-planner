@@ -1,3 +1,4 @@
+import {scanFromUi} from './scan-ui';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
@@ -70,8 +71,7 @@ test('Phase 4 scans a local PDF workspace and persists relative paths only', asy
   await page.getByRole('textbox', { name: '资料根目录', exact: true }).fill(workspaceRoot!);
   await page.getByRole('button', { name: '保存根目录' }).click();
   await expect(page.getByText('资料根目录已保存')).toBeVisible();
-  await page.getByRole('button', { name: '扫描资料库' }).click();
-  await expect(page.getByText('资料库扫描完成')).toBeVisible();
+  await scanFromUi(page);
   await expect(page.getByRole('region', { name: '当前资料库状态' })).toBeVisible();
   await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO`, { exact: true })).toBeVisible();
   await expect(page.getByText(`${logoCode}-PHASE4-ZC400白色-LOGO（转曲）`, { exact: true })).toBeVisible();

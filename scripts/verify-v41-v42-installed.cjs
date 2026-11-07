@@ -27,8 +27,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   const size = async width => { await app.evaluate(({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setContentSize(width, 1080), width); await page.waitForFunction(width => innerWidth === width, width); };
   const recordPdf = (relative, text) => { const file = path.join(legacy, 'workspace', ...relative); originalPdfs.push({ file, hash: writePdf(file, text) }); return file; };
   const scan = async () => {
-    await page.getByRole('button', { name: '扫描资料库', exact: true }).click();
-    await page.getByText('资料库扫描完成', { exact: true }).waitFor({ timeout: 45000 });
+    await require('./verify-scan-ui.cjs')(page);
     await page.getByRole('button', { name: '扫描资料库', exact: true }).waitFor();
   };
   const showCatalog = async () => {

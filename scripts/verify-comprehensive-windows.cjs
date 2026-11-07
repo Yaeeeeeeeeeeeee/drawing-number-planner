@@ -25,11 +25,8 @@ function assertPreservedRows(before,after,scope){
  const protectedAfter=Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,appendedQr.has(table)?rows.filter(row=>before[table].some(prior=>prior.id===row.id)):rows]));
  require('./verify-packaging-restart.cjs')(before,protectedAfter,scope);
 }
-async function observationScope(page,state){
- const canonical=new Map((state.product_identity_members??[]).map(row=>[row.raw_product_id,row.canonical_product_id]));
- const directories=await page.evaluate(async products=>{const result=[];for(const product of products){const response=await fetch(`/api/packaging/product-directories?productId=${product.id}`);if(!response.ok)continue;for(const directory of (await response.json()).items)if(directory.exists)result.push(directory.relativePath.replaceAll('\\','/'));}return [...new Set(result)];},state.products.filter(row=>row.status==='active'&&!row.deleted_at&&(canonical.get(row.id)??row.id)===row.id));
- return {productDirectories:directories,pdfIndexIds:state.pdf_files.filter(row=>directories.some(directory=>row.relative_path.replaceAll('\\','/').startsWith(directory+'/'))).map(row=>row.id)};
-}
+async function observationScope(page,state){return require('./verify-packaging-restart.cjs').observationScope(state,route=>page.evaluate(async route=>{const response=await fetch(route);if(!response.ok)throw Error('Directory lookup failed');return response.json();},route));}
+
 function qrState(file,name){const all=snapshot(file),code=all.product_qr_codes.find(row=>row.name===name);assert.ok(code,'Committed QR must exist in actual SQLite');const links=all.qr_manual_links.filter(row=>row.qr_code_id===code.id);return{code,links,files:links.map(link=>all.qr_manual_files.find(row=>row.id===link.file_id)),audit:all.qr_manual_audit.filter(row=>row.qr_code_id===code.id)};}
 async function go(page,label){const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();await page.getByRole('heading',{name:label==='图号规划 / 更新包材'?'图号规划':label,exact:true}).waitFor();}
 async function assertQrListLayout(page,label){
@@ -110,7 +107,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  const directoryHashes=[writePdf(directoryPdf,'Directory context matched drawing'),writePdf(unmatchedPdf,'Directory context unmatched drawing')];
  const beforeDirectoryScan=snapshot(path.join(legacy,'planner.db'));const bindingsBeforeScan=beforeDirectoryScan.drawing_appearance_bindings;
  app=await launch();try{
-  const page=await ready(app);const priorList=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());await go(page,'PDF 文件中心');await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});
+  const page=await ready(app);const priorList=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());await go(page,'PDF 文件中心');await require('./verify-scan-ui.cjs')(page);
   const counts=await page.evaluate(async()=>await(await fetch('/api/files/navigation?presence=present')).json());
   const list=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());
   const directoryItems=list.items.filter(item=>[path.basename(directoryPdf),path.basename(unmatchedPdf)].includes(item.fileName));
@@ -151,7 +148,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
     await page.waitForFunction(async({name,action})=>{const result=await(await fetch('/api/files?managementState=all&presence=all')).json();const file=result.items.find(item=>item.fileName===name);return action==='clear'?!file:file?.managementState===(action==='ignore'?'ignored':'included');},{name:path.basename(unmatchedPdf),action});
     assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
   }
-  await range.selectOption('included');await filterButton.click();await page.getByRole('button',{name:'扫描资料库',exact:true}).click();
+  await range.selectOption('included');await filterButton.click();await require('./verify-scan-ui.cjs')(page);
   await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor({timeout:45000});
   report.pdfManagementButtons={actualRenderer:true,previewApplyIgnoreRestoreClear:true,originalFileHashPreserved:true,clearedIndexRediscovered:true,zeroCountDoesNotReparentBatch:true};
   await go(page,'图号库');await page.getByRole('button',{name:'自动归类',exact:true}).click();

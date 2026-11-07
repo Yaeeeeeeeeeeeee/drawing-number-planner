@@ -6,6 +6,7 @@ module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapsh
  await page.waitForFunction(()=>innerWidth===1920&&innerHeight===1080);
  const request=async(route,body,method='POST')=>page.evaluate(async({route,body,method})=>{const token=(await(await fetch('/api/session',{method:'POST'})).json()).token;const response=await fetch(route,{method,headers:{'content-type':'application/json','x-planner-token':token},body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw Error(JSON.stringify(result));return result;},{route,body,method});
  const get=route=>page.evaluate(async route=>await(await fetch(route)).json(),route);
+ const observations=require('./verify-packaging-restart.cjs'),scope=await observations.observationScope(before,get);
  const original=await get('/api/products/5');
  const appearance=await request('/api/dictionaries/appearance',{code:'02',name:'2号外观'});
  const main=await request('/api/dictionaries/main_category',{code:'04',name:'印刷件类'});
@@ -13,9 +14,9 @@ module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapsh
  const input={sku:original.sku,model:original.model,productCategory:original.productCategory,brandId:original.brandId,productSizeId:original.productSizeId,defaultAppearanceId:appearance.id};
  const duplicate=await request('/api/products',input);assert.notEqual(duplicate.id,original.id);
  await request('/api/products/5',input,'PUT');
- assert.deepEqual(snapshot(dbFile).historical_drawing_numbers,before.historical_drawing_numbers,'Default appearance must not rewrite historical codes');
+ assert.deepEqual(observations.businessRows(before,'historical_drawing_numbers',snapshot(dbFile).historical_drawing_numbers,scope),observations.businessRows(before,'historical_drawing_numbers',before.historical_drawing_numbers,scope),'Default appearance must not rewrite historical codes');
  const files=Array.from({length:12},(_,i)=>{const code=`02.0209.${i<6?'010':'020'}.0401${String(i+40).padStart(3,'0')}`;const file=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更文件（已量产的产品看最新日期）','00.首批大货',`${code}-V4原生-第${i+1}个很长文件名验证人工归纳不覆盖相邻资料批次（转曲）.pdf`);return{code,file,hash:writePdf(file,`Native V4 manual assignment ${i}`)};});
- await go(page,'PDF 文件中心');await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});
+ await go(page,'PDF 文件中心');await require('./verify-scan-ui.cjs')(page);
  const pending=(await get('/api/files?presence=present&pageSize=100')).items.filter(file=>file.fileName.includes('V4原生-'));assert.equal(pending.length,12);assert.ok(pending.every(file=>file.productId===null));
  const batchList=await get('/api/material-batches');const target=(batchList.items??batchList).find(batch=>batch.relativePath.includes('00.首批大货'));assert.ok(target);
  for(const file of files)await page.getByRole('checkbox',{name:`选择 ${path.basename(file.file)}`,exact:true}).check();
@@ -42,7 +43,7 @@ module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapsh
   geometry.push({width,before:old.width,after:next.width,order});await page.screenshot({path:path.join(evidence,`Windows-V4-列拖动-${width}.png`)});
  }
  const tableLayout=await page.evaluate(()=>JSON.parse(localStorage.getItem('table-layout:v1:pdf-files')));
- await page.getByRole('button',{name:'扫描资料库',exact:true}).click();await page.getByText('资料库扫描完成',{exact:true}).waitFor({timeout:45000});const rescanned=(await get('/api/files?presence=present&pageSize=100')).items.filter(file=>file.fileName.includes('V4原生-'));
+ await require('./verify-scan-ui.cjs')(page);const rescanned=(await get('/api/files?presence=present&pageSize=100')).items.filter(file=>file.fileName.includes('V4原生-'));
  assert.deepEqual(rescanned.map(file=>[file.id,file.productId,file.materialBatchId]).sort(),after.map(file=>[file.id,file.productId,file.materialBatchId]).sort());
  await go(page,'图号库');const nav=page.getByRole('navigation',{name:'图号导航',exact:true});if(!await nav.isVisible())await page.getByRole('button',{name:'产品／批次导航',exact:true}).click();
  const product=nav.locator('.pdf-nav-product[data-product-id="5"]');const expand=product.locator('.pdf-nav-expand').first();if(await expand.getAttribute('aria-expanded')==='false')await expand.click();await product.getByRole('button',{name:'主类别 印刷件类',exact:true}).click();

@@ -2,10 +2,10 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.5.0 · 包材模板与独立制图任务
+## 当前版本 v1.6.0 · 四步规划与任务安全结束
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.5.0/DrawingNumberPlanner-1.5.0-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.0/DrawingNumberPlanner-1.6.0-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.0)
 - [安装、升级和恢复说明](docs/install-and-upgrade.md)
 - [维护和发布方式](docs/maintenance.md)
 - [上一版 v1.3.0（Schema23）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.0)
@@ -14,6 +14,14 @@
 - [V5 修改记录](docs/v5-delivery-20261026.md)
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
+
+## 本轮增量修复
+
+图号规划改为四步工作台，单型号与多型号批量规划各自保存草稿，按型号和项目独立查重及确认。共用颜色只引用本产品真实白色图号。制图任务可明确「保留文件并结束任务」，图号删除或旧PDF强制脱钩不再要求重新关联后才能结束；实际文件操作未结束时继续保护任务锁。
+
+所有启用产品的02/03目录参与监听，支持当前型号、类别及全库扫描；PDF列表保留上次扫描状态，单文件详情另行实时核实。超过500条的管理操作自动分批并保留结果/失败重试。安全恢复及原生菜单可重新选择已有数据库，先验证与备份，切换失败保留原配置。Schema仍25，不清空旧库，不自动归并或释放号码。
+
+详见[本版说明](docs/release-1.6.0.md)。旧版[v1.5.0及安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)保留供配套备份回退。
 
 ## 包材模板与制图任务
 
