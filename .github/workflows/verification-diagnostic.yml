@@ -20,7 +20,7 @@ jobs:
           gh run download 42364535609 --name Comprehensive-Windows-Verification-7fd2a4b6ac7918167a6dd25bee9ee58df853e86d --dir diagnostic
           python3 - <<'PY'
           import pathlib,base64
-          file=pathlib.Path('diagnostic/windows-v4-failure.png')
+          file=pathlib.Path('diagnostic/Windows-v4-failure-0.png')
           assert file.is_file(),[str(p) for p in pathlib.Path('diagnostic').rglob('*failure*')]
           encoded=base64.b64encode(file.read_bytes()).decode()
           print('NATIVE_FAILURE_PNG_BEGIN')
