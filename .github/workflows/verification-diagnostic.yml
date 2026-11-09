@@ -1,4 +1,4 @@
-name: Read retained native verification failure
+name: Read verified native delivery evidence
 on:
   push:
     branches: [codex/v3-business-ui-20261022]
@@ -15,15 +15,19 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - name: Read the already retained isolated failure screenshot
+      - name: Read verified isolated report and screenshots
         run: |
-          gh run download 42364535609 --name Comprehensive-Windows-Verification-7fd2a4b6ac7918167a6dd25bee9ee58df853e86d --dir diagnostic
+          gh run download 42365635186 --name Comprehensive-Windows-Verification-aaef0c9179b20d02ee129d8bb8612d0e03d4aabc --dir diagnostic
           python3 - <<'PY'
           import pathlib,base64
-          file=pathlib.Path('diagnostic/Windows-v4-failure-0.png')
-          assert file.is_file(),[str(p) for p in pathlib.Path('diagnostic').rglob('*failure*')]
-          encoded=base64.b64encode(file.read_bytes()).decode()
-          print('NATIVE_FAILURE_PNG_BEGIN')
-          for offset in range(0,len(encoded),4000): print(encoded[offset:offset+4000])
-          print('NATIVE_FAILURE_PNG_END')
+          print('NATIVE_REPORT_JSON_BEGIN')
+          print(pathlib.Path('diagnostic/windows-comprehensive-verification.json').read_text(encoding='utf-8-sig'))
+          print('NATIVE_REPORT_JSON_END')
+          for name in ['Windows-确认需求-多型号四步确认.png','Windows-确认需求-保留文件结束任务.png','Windows-原生数据库重选-other.png']:
+              file=pathlib.Path('diagnostic')/name
+              assert file.is_file(),name
+              encoded=base64.b64encode(file.read_bytes()).decode()
+              print('NATIVE_PNG_BEGIN '+name)
+              for offset in range(0,len(encoded),4000): print(encoded[offset:offset+4000])
+              print('NATIVE_PNG_END')
           PY
