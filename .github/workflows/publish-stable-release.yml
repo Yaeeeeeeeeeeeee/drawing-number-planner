@@ -137,7 +137,7 @@ jobs:
           pathlib.Path('release-assets/TEST-REPORT-1.6.0.md').write_text(test_report)
           notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.6.0`。\n\n本版完整自动化 **231 文件、1968 项通过；Chromium 端到端 18 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
           pathlib.Path('release-assets/README-Windows-1.6.0.md').write_text(notes)
-          with zipfile.ZipFile('release-assets/Verification-Windows-1.6.0.zip','w',zipfile.ZIP_DEFLATED) as archive:
+          with zipfile.ZipFile('release-assets/Verification-Windows-1.6.0-Verified.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(report.rglob('*')):
                   if file.is_file(): archive.write(file,file.relative_to(report))
           files=sorted(pathlib.Path('release-assets').iterdir())
