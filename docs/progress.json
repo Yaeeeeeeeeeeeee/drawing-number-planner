@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-09T05:58:40.300105+00:00",
+  "updatedAt": "2026-11-09T06:07:13.543222+00:00",
   "branch": "codex/confirmed-requirements-20261105",
   "lastCommit": "aaef0c9",
   "execution": "v1.6.0已正式发布；完整回归、Windows原生验收及公开下载SHA256核对通过",
@@ -861,10 +861,12 @@
     "verifiedSource": "aaef0c9179b20d02ee129d8bb8612d0e03d4aabc",
     "release": {
       "tag": "v1.6.0",
-      "run": 42569914853,
+      "run": 42570890655,
       "url": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.0",
       "installerSha256": "6c54499765ba3f96bdfe941d527315f236b41936e3366d4327c517702556dcb9",
-      "publicDownloadVerified": true
+      "publicDownloadVerified": true,
+      "reportUrl": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.0/Verification-Windows-1.6.0-Verified.zip",
+      "reportSha256": "b35859d465ff1a7fe048670d58eebe91c4abdaae93eeea1c156391e5c7b3b965"
     }
   }
 }

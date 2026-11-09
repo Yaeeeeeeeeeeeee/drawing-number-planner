@@ -87,3 +87,6 @@
 - [完整提交比较](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/compare/v1.5.0...v1.6.0)。主要应用提交：dfdf2b4/ad52acf（P0），4938f71/7a5237b（服务/草稿），a4a2a0b/85679d2（工作台），6fe6ddb（刷新反馈），1178c9c/9a904bd/7fd2a4b（PDF/监听），a277d27/8269db1/6a562d2（数据库重选与文件身份保护）；正式源码固定aaef0c9，首次发布编排提交7a6bdbc。
 
 安装与本机操作：关闭旧程序并独立备份完整数据目录；运行新安装器，首启选择原planner.db，保持本地资料路径。T40的实际残留任务由用户在本机选择「保留文件并结束任务」；ZC100归并和任何强制释放仍由用户明确执行。原文件、占号和BOM/外发历史不得以清空数据库方式处理。
+
+
+最终附件链接复核：说明刷新发布42570319609后，云端访问旧报告地址曾返回504。补充发布[42570890655](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/42570890655)提供[新的已验证报告ZIP](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.0/Verification-Windows-1.6.0-Verified.zip)，已实际下载9,286,335字节，SHA256为`b35859d465ff1a7fe048670d58eebe91c4abdaae93eeea1c156391e5c7b3b965`，与Release资产摘要一致；180文件/126截图CRC与同次native JSON再次一致。安装器始终保留上述相同源码、字节数及SHA256，不因说明更新改变应用程序。
