@@ -61,7 +61,7 @@
 ### Task 7: Regression/review/Windows/release
 - [x] Full npm test, npm run typecheck, npm run build, E2E with actual screenshots.
 - [x] Fresh whole-branch review, fix significant findings with reproducing tests.
-- [ ] Existing Windows build/install/upgrade/restart verification; immutable tag + Release with checksums/reports/screenshots.
+- [ ] Windows42365635186已通过；继续固定aaef0c9不可变Tag并发布同次安装器/校验/报告。
 - [ ] Download released installer and verify SHA256; document actual limitations/upgrade/rollback and production access record.
 
 ## Execution ledger

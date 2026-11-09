@@ -8,16 +8,16 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: publish-stable-1.5.0
+  group: publish-stable-1.6.0
   cancel-in-progress: false
 env:
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
-  SOURCE_SHA: 096dabc1561164e7f3eed91c7800f52006cc7904
-  VERIFIED_RUN: '41397786717'
-  SETUP_DIGEST: 'sha256:de7d8edc4e71a6341a43acdafdc7f51705a30a3abe4b191947c37df5d60c7e40'
-  REPORT_DIGEST: 'sha256:73f0d8582709f0ed85e0913312fa0d325db004661766cc961b947da40855b3ec'
-  RELEASE_TAG: v1.5.0
+  SOURCE_SHA: aaef0c9179b20d02ee129d8bb8612d0e03d4aabc
+  VERIFIED_RUN: '42365635186'
+  SETUP_DIGEST: 'sha256:dd9d28b7a6f33c76bdf463c742151b59c331a417a10bb44ea15bb99764f64314'
+  REPORT_DIGEST: 'sha256:0dc61ca8ce4cb90b02cb233eac9ccdb61ca850705c7ec1c7ff8937bf6f210284'
+  RELEASE_TAG: v1.6.0
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -43,7 +43,7 @@ jobs:
               assert len(selected)==1 and not selected[0]['expired'] and selected[0]['digest']==digest
               assert selected[0]['workflow_run']['head_sha']==os.environ['SOURCE_SHA']
           package=json.loads(subprocess.check_output(['git','show',os.environ['SOURCE_SHA']+':package.json']))
-          assert package['version']=='1.5.0'
+          assert package['version']=='1.6.0'
           PY
       - uses: actions/download-artifact@v4
         with:
@@ -106,6 +106,11 @@ jobs:
           assert all(0<=hotfix[key]['top']<hotfix[key]['bottom']<=hotfix[key]['viewport'] for key in ['errorGeometry','successGeometry'])
           ait=native['aitPackaging']
           assert all(ait[key] for key in ['actualInstalledHttpAndDom','catalogSavedThroughUi','matchingBasisChoicesThroughUi','rangeRuleAndSwapSaved','menuOrder','independentTaskMenu','numberOnlyMappingUi','planningNoDimensions','exactDrawingFocus','flatTemporaryDirectory','completedDeletionPreservesFiles','unfinishedDeletionReleasesLock','reservationToTask','watcherDetectedWithoutClick','manualAssociation','reviewHash','newArchiveAndScopedIndex','formalEditCopyOnly','formalBackupHashPreserved','backupReadableThroughRegisteredId','taskCleanupOnly','taskHistoryRetained','originalAitHashPreserved','protectedBusinessRowsPreserved','realProcessRestartPreservesTask'])
+          confirmed=native['confirmedRequirements']
+          assert all(confirmed[key] for key in ['actualInstalledHttpAndDom','fourStepBatch','modelSpecificSelections','distinctCompleteCodes','persistedDraftRequiresFreshCheck','explicitConfirmation','exactLibraryNavigation','deletedDrawingTaskSafelyEnded','detachedPdfNotReclaimed','formalFileHashPreserved','endedNotArchived','taskLockReleased'])
+          assert not confirmed['productionDatabaseOperated']
+          reselection=native['databaseReselection']
+          assert all(reselection[key] for key in ['actualNativePicker','rendererCancelPreservesProfile','nativeMenuSwitch','selectedOtherExistingDirectory','returnedOriginalDirectory','protectedBusinessRowsPreserved','backupsRequiredAndVerified'])
           geometry=json.loads((report/'UI15-layout-geometry.json').read_text(encoding='utf-8-sig'))
           assert {row['width'] for row in geometry}=={3840,2560,1920,1440,720}
           assert all(row['scrollWidth']<=row['width']+1 for row in geometry)
@@ -116,19 +121,22 @@ jobs:
           wizard=json.loads((report/'windows-chinese-installer.json').read_text(encoding='utf-8-sig'))
           assert wizard['shellFolderPicker'] and wizard['advancedToReady'] and wizard['typedDesktopRootRedirected']
           installed=json.loads((report/'installed-version.json').read_text(encoding='utf-8-sig'))
-          assert installed['installedVersion']=='1.5.0' and installed['revision']==os.environ['SOURCE_SHA']
+          assert installed['installedVersion']=='1.6.0' and installed['revision']==os.environ['SOURCE_SHA']
           source=pathlib.Path('verified-installer/图号规划器-Windows-x64-安装包.exe')
           assert source.is_file() and source.read_bytes()[:2]==b'MZ'
-          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.5.0-Windows-x64-Setup.exe')
+          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.6.0-Windows-x64-Setup.exe')
           shutil.copyfile(source,target)
           assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest()
           shutil.copyfile('docs/install-and-upgrade.md','release-assets/INSTALL-UPGRADE.md')
-          notes=pathlib.Path('docs/release-1.5.0.md').read_text()
+          notes=pathlib.Path('docs/release-1.6.0.md').read_text()
           prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/docs/"
           notes=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',notes)
-          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.5.0`。\n\n本版完整自动化 **218 文件、1855 项通过；Chromium 端到端 13 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
-          pathlib.Path('release-assets/README-Windows-1.5.0.md').write_text(notes)
-          with zipfile.ZipFile('release-assets/Verification-Windows-1.5.0.zip','w',zipfile.ZIP_DEFLATED) as archive:
+          test_report=pathlib.Path('docs/confirmed-delivery-20261107.md').read_text()
+          test_report=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',test_report)
+          pathlib.Path('release-assets/TEST-REPORT-1.6.0.md').write_text(test_report)
+          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.6.0`。\n\n本版完整自动化 **231 文件、1968 项通过；Chromium 端到端 18 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
+          pathlib.Path('release-assets/README-Windows-1.6.0.md').write_text(notes)
+          with zipfile.ZipFile('release-assets/Verification-Windows-1.6.0.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(report.rglob('*')):
                   if file.is_file(): archive.write(file,file.relative_to(report))
           files=sorted(pathlib.Path('release-assets').iterdir())
@@ -141,10 +149,10 @@ jobs:
           existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
           test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace another source tag'; exit 1; }
           if ! gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.5.0 · Windows 正式版' --notes-file release-assets/README-Windows-1.5.0.md --draft
+            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.6.0 · Windows 正式版' --notes-file release-assets/README-Windows-1.6.0.md --draft
           fi
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.5.0.md --draft=false --prerelease=false --latest
+          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.6.0.md --draft=false --prerelease=false --latest
       - name: Update repository homepage without merging application history
         shell: bash
         run: |
@@ -156,7 +164,7 @@ jobs:
           text=pathlib.Path('README.md').read_text()
           prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/"
           text=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',text)
-          body={'branch':'master','sha':old['sha'],'message':'docs: point homepage to verified v1.5.0 release and source tag','content':base64.b64encode(text.encode()).decode()}
+          body={'branch':'master','sha':old['sha'],'message':'docs: point homepage to verified v1.6.0 release and source tag','content':base64.b64encode(text.encode()).decode()}
           pathlib.Path('/tmp/update-homepage.json').write_text(json.dumps(body))
           PY
           gh api --method PUT "repos/$GH_REPO/contents/README.md" --input /tmp/update-homepage.json > /tmp/homepage-updated.json

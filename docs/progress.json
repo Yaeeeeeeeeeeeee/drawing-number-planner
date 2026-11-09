@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-11-07T10:21:04.483758+00:00",
+  "updatedAt": "2026-11-09T05:53:19.109648+00:00",
   "branch": "codex/confirmed-requirements-20261105",
-  "lastCommit": "a7241e1",
-  "execution": "已确认需求源码实现及复核完成；完整自动化和浏览器回归通过，Windows原生验收与正式发布进行中",
+  "lastCommit": "aaef0c9",
+  "execution": "已确认需求实现、完整回归及Windows原生验收通过；正在固定同次安装器并正式发布",
   "current": "已确认未落实需求实施",
-  "recent": "完整231文件1966项、Chromium18项、类型及构建通过；PDF与数据库重选独立复核已关闭",
-  "next": "完成Windows完整安装/旧库升级/原生数据库重选，固定源码Tag并发布安装包和报告",
+  "recent": "完整231文件1968项、Chromium18项、类型/构建及Windows42365635186通过；真实选库/升级/任务结束/多型号/归档已验证",
+  "next": "发布v1.6.0，实际下载公开EXE和报告核对SHA256并记录交付",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
   ],
-  "tests": "完整Vitest231文件1966项；Chromium18项；类型/构建通过；交付观察保护专项20项。Windows完整验收和发布尚在进行。",
+  "tests": "完整231文件1968项；Chromium18项；类型/构建；Windows原生安装、旧库升级/WAL/回滚、重装、二维码、任务、数据库重选与重启通过。",
   "completionRule": "仅功能实现且对应验收测试通过才记为已完成；未完成项保持真实剩余工作。",
   "items": [
     {
@@ -854,8 +854,10 @@
       "feedback": "complete-reviewed",
       "pdf": "complete-reviewed",
       "databaseReselection": "complete-reviewed",
-      "release": "windows-verification-in-progress",
-      "regression": "passed-231-files-1966-tests-18-browser"
-    }
+      "release": "publishing",
+      "regression": "passed-231-files-1968-tests-18-browser",
+      "windows": "passed-42365635186"
+    },
+    "verifiedSource": "aaef0c9179b20d02ee129d8bb8612d0e03d4aabc"
   }
 }
