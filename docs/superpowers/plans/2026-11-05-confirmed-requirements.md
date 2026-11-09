@@ -61,8 +61,8 @@
 ### Task 7: Regression/review/Windows/release
 - [x] Full npm test, npm run typecheck, npm run build, E2E with actual screenshots.
 - [x] Fresh whole-branch review, fix significant findings with reproducing tests.
-- [ ] Windows42365635186已通过；继续固定aaef0c9不可变Tag并发布同次安装器/校验/报告。
-- [ ] Download released installer and verify SHA256; document actual limitations/upgrade/rollback and production access record.
+- [x] Windows42365635186完整通过；Tag v1.6.0固定aaef0c9，发布42569914853成功。
+- [x] 已实际下载公开安装器/全部报告，SHA256全部一致；升级/回退、生产库未操作及Adobe/DPI边界已记录。
 
 ## Execution ledger
 
@@ -71,3 +71,5 @@
 - Ruling: 用户最新唯一性规则优先，不能用跨产品新流水算法掩盖编码冲突；真实白色不能以本次随意选择代替。
 
 - 2026-11-07: Task5/6复核关闭；完整231文件1966项、Chromium18项、类型与构建通过。Windows验收脚本适配明确授权的全启用产品监听，限定观察字段变化，其余业务保护保留；正式Windows完成及发布尚在进行。
+
+- 2026-11-09正式交付：231/1968、Chromium18、类型/构建、Windows42365635186、发布42569914853通过；公开附件实际下载哈希一致，126张Windows截图保留。无生产数据库操作，未执行本机自动安装。

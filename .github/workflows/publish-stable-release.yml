@@ -1,4 +1,5 @@
 name: Publish verified stable Windows release
+# Refresh delivery notes after the public installer download verified on 2026-11-09.
 on:
   push:
     branches: [codex/v3-business-ui-20261022]

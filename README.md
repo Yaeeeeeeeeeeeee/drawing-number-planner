@@ -78,7 +78,7 @@ Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 
 ```sh
 git fetch --tags
-git switch --detach v1.5.0
+git switch --detach v1.6.0
 pnpm install
 pnpm typecheck
 pnpm test

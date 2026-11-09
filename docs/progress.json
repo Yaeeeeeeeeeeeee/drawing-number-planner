@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-11-09T05:53:19.109648+00:00",
+  "updatedAt": "2026-11-09T05:58:40.300105+00:00",
   "branch": "codex/confirmed-requirements-20261105",
   "lastCommit": "aaef0c9",
-  "execution": "已确认需求实现、完整回归及Windows原生验收通过；正在固定同次安装器并正式发布",
+  "execution": "v1.6.0已正式发布；完整回归、Windows原生验收及公开下载SHA256核对通过",
   "current": "已确认未落实需求实施",
-  "recent": "完整231文件1968项、Chromium18项、类型/构建及Windows42365635186通过；真实选库/升级/任务结束/多型号/归档已验证",
-  "next": "发布v1.6.0，实际下载公开EXE和报告核对SHA256并记录交付",
+  "recent": "安装器145217117字节、全部公开附件哈希一致；报告180文件/126截图，真实选库/升级/任务结束/多型号已验收",
+  "next": "用户本机备份后安装v1.6.0、选择原库，执行实际T40任务处理并验收真实AIT/字体及物理显示器",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
   ],
-  "tests": "完整231文件1968项；Chromium18项；类型/构建；Windows原生安装、旧库升级/WAL/回滚、重装、二维码、任务、数据库重选与重启通过。",
+  "tests": "231文件1968项、Chromium18项、类型/构建通过；Windows42365635186与发布42569914853成功；公开EXE/报告已下载核对。",
   "completionRule": "仅功能实现且对应验收测试通过才记为已完成；未完成项保持真实剩余工作。",
   "items": [
     {
@@ -854,10 +854,17 @@
       "feedback": "complete-reviewed",
       "pdf": "complete-reviewed",
       "databaseReselection": "complete-reviewed",
-      "release": "publishing",
+      "release": "complete-published-and-downloaded",
       "regression": "passed-231-files-1968-tests-18-browser",
       "windows": "passed-42365635186"
     },
-    "verifiedSource": "aaef0c9179b20d02ee129d8bb8612d0e03d4aabc"
+    "verifiedSource": "aaef0c9179b20d02ee129d8bb8612d0e03d4aabc",
+    "release": {
+      "tag": "v1.6.0",
+      "run": 42569914853,
+      "url": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.0",
+      "installerSha256": "6c54499765ba3f96bdfe941d527315f236b41936e3366d4327c517702556dcb9",
+      "publicDownloadVerified": true
+    }
   }
 }
