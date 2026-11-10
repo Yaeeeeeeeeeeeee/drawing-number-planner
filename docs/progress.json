@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-11-10T17:48:30.222442+00:00",
+  "updatedAt": "2026-11-10T18:21:47.569679+00:00",
   "branch": "codex/confirmed-requirements-20261105",
-  "lastCommit": "aaef0c9",
-  "execution": "启动专项/约1GB实测通过；正在单并发完整回归，Windows构建待验证",
+  "lastCommit": "a296e04",
+  "execution": "启动修复全部验收通过；正式发布及公开附件核对进行中",
   "current": "本地服务启动超时修复",
-  "recent": "停止竞态和扫描观察断言已修正；GitHub写入工具中断，改用原Git通道",
-  "next": "完成单并发回归及浏览器复测；验证Windows安装包后再发布",
+  "recent": "Windows42872891491全过；1GB首次29.3秒/备份27秒/重启3.4秒，验证旧15秒限额不足",
+  "next": "创建固定源码Tag、发布v1.6.1并下载核对公开EXE/报告",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
   ],
-  "tests": "专项57项及复核后41项通过；约1GB启动/重启通过；首轮并发整套和浏览器失败已记录，未宣称通过",
+  "tests": "232文件1981项、Chromium18项、类型/构建通过；Windows安装/旧库/大库实测全过",
   "completionRule": "仅功能实现且对应验收测试通过才记为已完成；未完成项保持真实剩余工作。",
   "items": [
     {
@@ -851,6 +851,10 @@
     {
       "at": "2026-11-10T11:15:42.647622+00:00",
       "message": "启动修复实测：约1GB独立Schema25，进程启动/重启/行数/FK通过；未复现用户真实耗时。独立复核停止竞态已修正；扫描时间验收断言按事实修正，不改业务监听。"
+    },
+    {
+      "at": "2026-11-10T18:21:47.569679+00:00",
+      "message": "最终Windows42872891491全部通过；约1GB首次29.3秒，其中每日备份26.979秒，重启3.408秒。固定a296e04准备发布，原用户库未操作。"
     }
   ],
   "confirmedImplementation": {
@@ -878,7 +882,7 @@
     }
   },
   "startupRepair": {
-    "status": "in-progress",
+    "status": "verified-awaiting-publish",
     "scope": "No production database/config operations or automatic switching",
     "plan": "docs/superpowers/plans/2026-11-10-local-service-startup.md",
     "targeted": "5 files / 57 tests passed",
@@ -892,6 +896,17 @@
       "reproducesUserTimeout": false
     },
     "review": "Important stop/start race fixed via failing regression; repeated phase and port-release coverage added",
-    "verification": "Serial final suite in progress; browser final rerun and Windows build pending"
+    "verification": "Serial final suite in progress; browser final rerun and Windows build pending",
+    "verifiedSource": "a296e04ee1570d9af6721a4879a60261cdb2cd6a",
+    "windowsRun": 42872891491,
+    "windowsLargeFixture": {
+      "bytes": 1008640000,
+      "startupMs": 29317,
+      "dailyBackupMs": 26979,
+      "restartMs": 3408
+    },
+    "unit": "232 files / 1981 passed",
+    "browser": "18 passed",
+    "productionDatabaseOperations": "none"
   }
 }

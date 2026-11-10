@@ -1,5 +1,5 @@
 name: Publish verified stable Windows release
-# Refresh delivery notes after the public installer download verified on 2026-11-09.
+# Publish only the pinned Windows startup repair verified on 2026-11-10.
 on:
   push:
     branches: [codex/v3-business-ui-20261022]
@@ -9,16 +9,16 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: publish-stable-1.6.0
+  group: publish-stable-1.6.1
   cancel-in-progress: false
 env:
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
-  SOURCE_SHA: aaef0c9179b20d02ee129d8bb8612d0e03d4aabc
-  VERIFIED_RUN: '42365635186'
-  SETUP_DIGEST: 'sha256:dd9d28b7a6f33c76bdf463c742151b59c331a417a10bb44ea15bb99764f64314'
-  REPORT_DIGEST: 'sha256:0dc61ca8ce4cb90b02cb233eac9ccdb61ca850705c7ec1c7ff8937bf6f210284'
-  RELEASE_TAG: v1.6.0
+  SOURCE_SHA: a296e04ee1570d9af6721a4879a60261cdb2cd6a
+  VERIFIED_RUN: '42872891491'
+  SETUP_DIGEST: 'sha256:6351a649393b045fa37b716214a6121a28893d3aa64536df0d6217a7ce4ff72f'
+  REPORT_DIGEST: 'sha256:e9062185f4e014a65d040ca221ef67dc19ededf87e53d2ee7ff3a00b6ecb5179'
+  RELEASE_TAG: v1.6.1
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -44,7 +44,7 @@ jobs:
               assert len(selected)==1 and not selected[0]['expired'] and selected[0]['digest']==digest
               assert selected[0]['workflow_run']['head_sha']==os.environ['SOURCE_SHA']
           package=json.loads(subprocess.check_output(['git','show',os.environ['SOURCE_SHA']+':package.json']))
-          assert package['version']=='1.6.0'
+          assert package['version']=='1.6.1'
           PY
       - uses: actions/download-artifact@v4
         with:
@@ -122,22 +122,27 @@ jobs:
           wizard=json.loads((report/'windows-chinese-installer.json').read_text(encoding='utf-8-sig'))
           assert wizard['shellFolderPicker'] and wizard['advancedToReady'] and wizard['typedDesktopRootRedirected']
           installed=json.loads((report/'installed-version.json').read_text(encoding='utf-8-sig'))
-          assert installed['installedVersion']=='1.6.0' and installed['revision']==os.environ['SOURCE_SHA']
+          assert installed['installedVersion']=='1.6.1' and installed['revision']==os.environ['SOURCE_SHA']
+          large=json.loads((report/'large-database-startup.json').read_text(encoding='utf-8-sig'))
+          assert large['fixtureOnly'] and large['sizeMiB']==960 and large['databaseBytes']>=1_000_000_000
+          assert large['sameDatabaseOnRestart'] and large['logicalRowsPreserved'] and large['foreignKeysValid']
+          assert sum(row['event']=='ready' for row in large['records'])==2
+          assert not any(row['event']=='timeout' for row in large['records'])
           source=pathlib.Path('verified-installer/图号规划器-Windows-x64-安装包.exe')
           assert source.is_file() and source.read_bytes()[:2]==b'MZ'
-          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.6.0-Windows-x64-Setup.exe')
+          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.6.1-Windows-x64-Setup.exe')
           shutil.copyfile(source,target)
           assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest()
           shutil.copyfile('docs/install-and-upgrade.md','release-assets/INSTALL-UPGRADE.md')
-          notes=pathlib.Path('docs/release-1.6.0.md').read_text()
+          notes=pathlib.Path('docs/release-1.6.1.md').read_text()
           prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/docs/"
           notes=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',notes)
-          test_report=pathlib.Path('docs/confirmed-delivery-20261107.md').read_text()
+          test_report=pathlib.Path('docs/startup-repair-verification-20261110.md').read_text()
           test_report=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',test_report)
-          pathlib.Path('release-assets/TEST-REPORT-1.6.0.md').write_text(test_report)
-          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.6.0`。\n\n本版完整自动化 **231 文件、1968 项通过；Chromium 端到端 18 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
-          pathlib.Path('release-assets/README-Windows-1.6.0.md').write_text(notes)
-          with zipfile.ZipFile('release-assets/Verification-Windows-1.6.0-Verified.zip','w',zipfile.ZIP_DEFLATED) as archive:
+          pathlib.Path('release-assets/TEST-REPORT-1.6.1.md').write_text(test_report)
+          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.6.1`。\n\n本版完整自动化 **232 文件、1981 项通过；Chromium 端到端 18 项通过**；类型和前端/Main 构建通过。Windows 实际安装与业务验收：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。验证报告及实际截图随 Release 附件提供。\n"
+          pathlib.Path('release-assets/README-Windows-1.6.1.md').write_text(notes)
+          with zipfile.ZipFile('release-assets/Verification-Windows-1.6.1-Verified.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(report.rglob('*')):
                   if file.is_file(): archive.write(file,file.relative_to(report))
           files=sorted(pathlib.Path('release-assets').iterdir())
@@ -150,10 +155,10 @@ jobs:
           existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
           test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace another source tag'; exit 1; }
           if ! gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.6.0 · Windows 正式版' --notes-file release-assets/README-Windows-1.6.0.md --draft
+            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.6.1 · Windows 正式版' --notes-file release-assets/README-Windows-1.6.1.md --draft
           fi
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.6.0.md --draft=false --prerelease=false --latest
+          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.6.1.md --draft=false --prerelease=false --latest
       - name: Update repository homepage without merging application history
         shell: bash
         run: |
@@ -165,7 +170,7 @@ jobs:
           text=pathlib.Path('README.md').read_text()
           prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/"
           text=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',text)
-          body={'branch':'master','sha':old['sha'],'message':'docs: point homepage to verified v1.6.0 release and source tag','content':base64.b64encode(text.encode()).decode()}
+          body={'branch':'master','sha':old['sha'],'message':'docs: point homepage to verified v1.6.1 release and source tag','content':base64.b64encode(text.encode()).decode()}
           pathlib.Path('/tmp/update-homepage.json').write_text(json.dumps(body))
           PY
           gh api --method PUT "repos/$GH_REPO/contents/README.md" --input /tmp/update-homepage.json > /tmp/homepage-updated.json
