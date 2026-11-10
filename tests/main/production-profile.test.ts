@@ -254,3 +254,32 @@ it('keeps native retry available after a startup profile failure before any rend
   });
   expect(attempts).toEqual([false,true]); expect(retry).toHaveBeenCalledOnce(); expect(quit).toHaveBeenCalledOnce();
 });
+
+it('reports the attempted database in a failed reinstall verification without committing another profile',async()=>{
+  const {root,old,input,config}=fixture();
+  await prepareProductionProfile({...input,installationId:'previous-install'});
+  const previous=readFileSync(config);
+  const target=join(root,'chosen-original');mkdirSync(target);
+  initializeEmptyAcceptanceDatabase(join(target,'planner.db'));
+  const messages:Array<{detail:string;message:string}>=[];
+  class FailedService {
+    async start(){throw Error('本地服务启动超时');}
+    async stop(){}
+  }
+  await runInNewContext(readFileSync(new URL('../../scripts/production-entry.cjs',import.meta.url),'utf8'),{
+    __dirname:join(root,'resources/app'),console:{info(){},error(){}},
+    require:(name:string)=>name==='electron' ? {
+      app:{requestSingleInstanceLock:()=>true,whenReady:async()=>{},getPath:()=>input.appData,quit(){},setPath(){throw Error('must not load business UI');}},
+      dialog:{showMessageBox:async(options:any)=>{
+        if(options.type==='question')return{response:0};
+        messages.push(options);return{response:1};
+      },showOpenDialog:async()=>({canceled:false,filePaths:[join(target,'planner.db')]}),showErrorBox:vi.fn()},
+    }:name==='./production-profile.cjs' ? {
+      prepareProductionProfile:(options:any)=>prepareProductionProfile({...options,installationId:'new-install',databaseSafety}),
+    }:name==='./initialize-empty-acceptance.cjs' ? {...databaseSafety,ProductionStartupService:FailedService} : require(name),
+  });
+  expect(messages).toHaveLength(1);
+  expect(messages[0].detail).toContain(join(target,'planner.db'));
+  expect(readFileSync(config)).toEqual(previous);
+  expect(JSON.parse(readFileSync(config,'utf8')).dataDir).toBe(old);
+});

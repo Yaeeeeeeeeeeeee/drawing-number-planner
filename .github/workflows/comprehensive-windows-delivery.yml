@@ -113,8 +113,8 @@ jobs:
           & ./scripts/verify-desktop-installation.ps1 -SetupPath 'installer/图号规划器-Windows-x64-安装包.exe' -PackageRoot 'Comprehensive-Windows' -OutputDirectory 'installer'
           $desktopReport = Get-Content installer/windows-desktop-install.json -Raw | ConvertFrom-Json
           $installedVersion = (Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{69BB0C19-7394-4ADC-92D1-54A7D56B32EF}_is1').DisplayVersion
-          if ($installedVersion -ne '1.6.0') { throw 'Installed application version mismatch' }
-          @{ packageVersion='1.6.0'; installedVersion=$installedVersion; revision=$env:PLANNER_ACCEPTANCE_REVISION } | ConvertTo-Json | Set-Content installer/installed-version.json
+          if ($installedVersion -ne '1.6.1') { throw 'Installed application version mismatch' }
+          @{ packageVersion='1.6.1'; installedVersion=$installedVersion; revision=$env:PLANNER_ACCEPTANCE_REVISION } | ConvertTo-Json | Set-Content installer/installed-version.json
           "COMPREHENSIVE_INSTALLED=$($desktopReport.chineseChild.installed)" >> $env:GITHUB_ENV
       - name: Bundle verification fixture only into runner temporary storage
         shell: pwsh
@@ -128,6 +128,14 @@ jobs:
         run: |
           node scripts/verify-comprehensive-windows.cjs app-source "$env:COMPREHENSIVE_INSTALLED/图号规划器.exe" installer "$env:COMPREHENSIVE_DB_HELPER"
           if ($LASTEXITCODE -ne 0) { throw 'Native installed application verification failed' }
+      - name: Verify large existing database startup and restart with installed Electron
+        shell: pwsh
+        run: |
+          $env:ELECTRON_RUN_AS_NODE = '1'
+          try {
+            & "$env:COMPREHENSIVE_INSTALLED/图号规划器.exe" scripts/verify-large-startup.cjs "$env:COMPREHENSIVE_INSTALLED/resources/app" installer/large-database-startup.json 960
+            if ($LASTEXITCODE -ne 0) { throw 'Large database startup verification failed' }
+          } finally { Remove-Item Env:ELECTRON_RUN_AS_NODE }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

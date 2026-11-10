@@ -55,6 +55,7 @@ import {PackagingMonitor} from '../core/packaging/packaging-monitor.js';
 import {registerPackagingCatalogRoutes} from './routes/packaging-catalog.js';
 import {registerPackagingTaskRoutes} from './routes/packaging-tasks.js';
 import { assertLoopbackHost, registerLocalAccess } from './security/local-access.js';
+import type { StartupPhase } from '../service/startup-progress.js';
 
 export interface ServerOptions {
   host?: '127.0.0.1';
@@ -64,6 +65,7 @@ export interface ServerOptions {
   allowedOrigins?: string[];
   rendererDir?: string;
   requireExistingDatabase?: boolean;
+  onStartupProgress?: (phase: StartupPhase) => void;
 }
 
 export interface RunningServer {
@@ -91,6 +93,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   const paths = resolveAppPaths(options.dataDir ?? join(process.cwd(), 'work', 'runtime-data'));
   mkdirSync(paths.baseDir, { recursive: true });
   mkdirSync(paths.exports, { recursive: true });
+  options.onStartupProgress?.('database-open');
   const databaseExists = Boolean(options.requireExistingDatabase) || existsSync(paths.database);
   // SQLite enforces existence at open, including after the async desktop stop.
   const database = options.requireExistingDatabase
@@ -100,18 +103,22 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   let packagingMonitor:PackagingMonitor|undefined;
   try {
     if (options.requireExistingDatabase) {
+      options.onStartupProgress?.('database-validation');
       validateProductionDatabaseConnection(database);
       database.pragma('foreign_keys = ON');
       database.pragma('journal_mode = WAL');
     }
+    options.onStartupProgress?.('database-migration');
     migrateDatabase(database, {
       databaseExists,
       createBackup: () => createDatabaseBackup(database, paths.database, paths.backups, 'migration'),
     });
     if (databaseExists) {
+      options.onStartupProgress?.('daily-backup');
       const backup = ensureDailyBackup(database, paths.database, paths.backups);
       if (backup.status === 'failed') console.error(`[backup] ${backup.error}`);
     }
+    options.onStartupProgress?.('service-initialization');
     server = Fastify({ logger: false, forceCloseConnections: true });
     let switchingDatabase = false;
     const activeRequests = new Map<string,{runningHandlers:number;responseEnded:boolean}>();
@@ -196,9 +203,10 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     await registerEmailTemplateImportRoutes(server, database);
     registerTaskRoutes(server, tasks);
     if (options.rendererDir) await server.register(fastifyStatic, { root: options.rendererDir });
+    options.onStartupProgress?.('http-listen');
     const address = await server.listen({ host, port: options.port ?? 4317 });
     if (!options.allowedOrigins) localAccess.allowOrigin(address);
-    packagingMonitor.start();
+    options.onStartupProgress?.('outbound-maintenance');
     let configuredOutputRoot: string | null = null;
     try { configuredOutputRoot = workspaceSettings.getOutboundOutputRoot(); }
     catch (error) { console.error(`[outbound-cleanup] ${error instanceof Error ? error.message : '外发目录设置无效'}`); }
@@ -207,6 +215,16 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     for (const outputRoot of new Set([paths.exports, configuredOutputRoot].filter((value): value is string => Boolean(value)))) {
       cleanupStaleOutboundArtifacts(outputRoot, { activeTaskIds, nowMs: Date.now(), minimumAgeMs: 60 * 60 * 1_000 });
     }
+
+    options.onStartupProgress?.('health-check');
+    try {
+      const health=await fetch(address+'/api/health',{signal:AbortSignal.timeout(10_000)});
+      if (!health.ok || (await health.json() as {status?:unknown}).status!=='ok') throw new Error('健康响应无效');
+    } catch(error) {
+      throw new Error('本地服务健康检查未通过',{cause:error});
+    }
+    // Initial observation must not compete with protected startup validation.
+    packagingMonitor.start();
 
     return {
       prepareDatabaseSwitch: async () => {

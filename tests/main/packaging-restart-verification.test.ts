@@ -36,3 +36,13 @@ it('preserves populated composite-key snapshots without retaining newly imported
  expect(verify.existingRows(before,[{...before[0],recipient_type:'cc'},added])).not.toEqual(before);
  expect(verify.existingRows(before,[])).not.toEqual(before);
 });
+
+it('allows a watcher scan timestamp during task deletion while still comparing every indexed file fact',()=>{
+ const before={items:[{id:9,scannedAt:'before',relativePath:'owned.pdf',matchedDrawingId:7}],total:1};
+ const observed={...before,items:[{...before.items[0],scannedAt:'after'}]};
+ expect(verify.indexedPageBusinessFacts(observed,[9])).toEqual(verify.indexedPageBusinessFacts(before,[9]));
+ for(const changed of [{...observed.items[0],relativePath:'other.pdf'},{...observed.items[0],matchedDrawingId:8}]){
+  expect(verify.indexedPageBusinessFacts({...observed,items:[changed]},[9])).not.toEqual(verify.indexedPageBusinessFacts(before,[9]));
+ }
+ expect(verify.indexedPageBusinessFacts(observed,[])).not.toEqual(verify.indexedPageBusinessFacts(before,[]));
+});

@@ -1,8 +1,13 @@
 import { fork } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { isStartupPhase, startupPhases, type StartupPhase } from '../service/startup-progress.js';
 
 import type { LocalServiceConfig, ParentToServiceMessage, ServiceRequestMethod, ServiceToParentMessage } from '../service/protocol.js';
 
 export interface ServiceChild {
+  pid?: number;
   connected: boolean;
   killed: boolean;
   send(message: ParentToServiceMessage): boolean;
@@ -23,6 +28,8 @@ interface ControllerOptions {
   config: LocalServiceConfig;
   spawn?: (entryPath: string) => ServiceChild;
   startupTimeoutMs?: number;
+  startupDeadlineMs?: number;
+  diagnosticsPath?: string;
   stopTimeoutMs?: number;
   maxAutoRestarts?: number;
   restartBackoffMs?: number;
@@ -46,13 +53,19 @@ function asMessage(value: unknown): ServiceToParentMessage | null {
 }
 
 export class LocalServiceController {
-  private readonly options: Required<Pick<ControllerOptions, 'startupTimeoutMs' | 'stopTimeoutMs' | 'maxAutoRestarts' | 'restartBackoffMs'>> & ControllerOptions;
+  private readonly options: Required<Pick<ControllerOptions, 'startupDeadlineMs' | 'stopTimeoutMs' | 'maxAutoRestarts' | 'restartBackoffMs'>> & ControllerOptions;
   private child: ServiceChild | undefined;
   private connection: LocalServiceConnection | undefined;
   private state: LocalServiceHealth = { status: 'stopped', restartAttempts: 0 };
   private startup: Deferred<LocalServiceConnection> | undefined;
   private stopping: Deferred<void> | undefined;
   private startupTimer: ReturnType<typeof setTimeout> | undefined;
+  private startupDeadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  private startupPhase: StartupPhase = 'module-loading';
+  private attemptId = '';
+  private startedAt = 0;
+  private phaseStartedAt = 0;
+  private diagnosticsFailed = false;
   private restartTimer: ReturnType<typeof setTimeout> | undefined;
   private intentionalStop = false;
   private requestId = 0;
@@ -60,13 +73,14 @@ export class LocalServiceController {
   private readonly failedStarts = new Set<ServiceChild>();
 
   constructor(options: ControllerOptions) {
-    this.options = { startupTimeoutMs: 15_000, stopTimeoutMs: 3_000, maxAutoRestarts: 2,
+    this.options = { startupDeadlineMs: 600_000, stopTimeoutMs: 3_000, maxAutoRestarts: 2,
       restartBackoffMs: 500, ...options };
   }
 
   health(): LocalServiceHealth { return { ...this.state }; }
 
   start(): Promise<LocalServiceConnection> {
+    if (this.stopping) return this.stopping.promise.then(()=>this.start());
     if (this.connection && this.state.status === 'running') return Promise.resolve({ ...this.connection });
     if (this.startup) return this.startup.promise;
     this.intentionalStop = false;
@@ -84,6 +98,7 @@ export class LocalServiceController {
     }
     if (this.stopping) return this.stopping.promise;
     const stopping = deferred<void>(); this.stopping = stopping;
+    this.clearStartup(new Error('本地服务已停止'));
     try { if (child.connected) child.send({ type: 'stop' }); else child.kill('SIGTERM'); }
     catch { child.kill('SIGTERM'); }
     const terminateTimer = setTimeout(() => {
@@ -95,9 +110,7 @@ export class LocalServiceController {
 
   async restart(): Promise<LocalServiceConnection> {
     await this.stop();
-    this.intentionalStop = false;
-    this.state = { status: 'starting', restartAttempts: 0 };
-    return this.spawnService(true);
+    return this.start();
   }
 
   request<T>(method: ServiceRequestMethod, args: unknown[] = []): Promise<T> {
@@ -122,6 +135,9 @@ export class LocalServiceController {
     if (resetAttempts) this.state = { status: 'starting', restartAttempts: 0 };
     else this.state = { status: 'starting', restartAttempts: this.state.restartAttempts };
     const starting = scheduled ?? deferred<LocalServiceConnection>(); this.startup = starting;
+    this.attemptId=randomUUID(); this.startedAt=Date.now(); this.phaseStartedAt=this.startedAt;
+    this.startupPhase='module-loading';
+    this.diagnostic('start');
     const spawn = this.options.spawn ?? ((entryPath: string) => fork(entryPath, [], {
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
@@ -132,35 +148,47 @@ export class LocalServiceController {
     catch (error) {
       const failure = error instanceof Error ? error : new Error('无法启动本地服务');
       this.state = { status: 'failed', restartAttempts: this.state.restartAttempts, error: failure.message };
+      this.diagnostic('spawn-error',{error:failure.message});
       this.startup = undefined; starting.reject(failure); return starting.promise;
     }
     this.child = child;
+    this.diagnostic('spawned');
     child.on('message', (message) => this.handleMessage(child, message));
     child.on('error', (error) => this.handleProcessError(child, error));
     child.on('exit', (code, signal) => this.handleExit(child, code, signal));
-    child.send({ type: 'start', config: this.options.config });
-    this.startupTimer = setTimeout(() => {
-      if (this.child !== child || this.connection) return;
-      const error = new Error('本地服务启动超时');
-      this.state = { status: 'failed', restartAttempts: this.state.restartAttempts, error: error.message };
-      this.failedStarts.add(child); this.clearStartup(error); this.terminateUnresponsive(child);
-    }, this.options.startupTimeoutMs);
+    this.armPhaseTimer(child);
+    this.startupDeadlineTimer=setTimeout(()=>this.timeout(child,true),this.options.startupDeadlineMs);
+    try { child.send({ type: 'start', config: this.options.config }); }
+    catch(error) { this.handleProcessError(child,error instanceof Error ? error : new Error('无法向本地服务发送启动请求')); }
     return starting.promise;
   }
 
   private handleMessage(child: ServiceChild, value: unknown): void {
     if (child !== this.child) return;
     const message = asMessage(value); if (!message) return;
+    if (message.type==='startup-progress') {
+      if (!this.startup || this.failedStarts.has(child) || this.intentionalStop || !isStartupPhase(message.phase)) return;
+      // Repeated messages from the same stalled phase do not extend its deadline.
+      if (message.phase!==this.startupPhase) {
+        const previousPhaseMs=Date.now()-this.phaseStartedAt;
+        this.startupPhase=message.phase; this.phaseStartedAt=Date.now();
+        this.diagnostic('phase',{previousPhaseMs}); this.armPhaseTimer(child);
+      }
+      return;
+    }
     if (message.type === 'ready') {
-      if (this.startupTimer) clearTimeout(this.startupTimer);
-      this.startupTimer = undefined;
+      if (!this.startup || this.failedStarts.has(child) || this.intentionalStop || this.stopping) return;
+      this.clearStartupTimers();
+      this.diagnostic('ready');
       this.connection = { url: message.url, token: message.token };
       this.state = { status: 'running', url: message.url, restartAttempts: this.state.restartAttempts };
       const starting = this.startup; this.startup = undefined; starting?.resolve({ ...this.connection });
       return;
     }
     if (message.type === 'startup-error') {
+      if (!this.startup || this.failedStarts.has(child) || this.intentionalStop) return;
       const error = Object.assign(new Error(message.message), message.code ? { code: message.code } : {});
+      this.diagnostic('startup-error',{error:message.message,errorCode:message.code});
       this.state = { status: 'failed', restartAttempts: this.state.restartAttempts, error: error.message };
       this.failedStarts.add(child); this.clearStartup(error); this.terminateUnresponsive(child); return;
     }
@@ -174,14 +202,15 @@ export class LocalServiceController {
 
   private handleProcessError(child: ServiceChild, error: Error): void {
     if (child !== this.child || this.connection) return;
+    this.diagnostic('process-error',{error:error.message});
     this.state = { status: 'failed', restartAttempts: this.state.restartAttempts, error: error.message };
     this.failedStarts.add(child); this.clearStartup(error); this.terminateUnresponsive(child);
   }
 
-  private handleExit(child: ServiceChild, _code: number | null, _signal: NodeJS.Signals | null): void {
+  private handleExit(child: ServiceChild, code: number | null, signal: NodeJS.Signals | null): void {
     if (child !== this.child) return;
-    if (this.startupTimer) clearTimeout(this.startupTimer);
-    this.startupTimer = undefined; this.child = undefined; this.connection = undefined;
+    this.diagnostic('exit',{exitCode:code,signal});
+    this.clearStartupTimers(); this.child = undefined; this.connection = undefined;
     const requestError = new Error('本地服务连接已中断');
     for (const pending of this.requests.values()) pending.reject(requestError);
     this.requests.clear();
@@ -193,7 +222,7 @@ export class LocalServiceController {
     }
     if (this.failedStarts.delete(child)) return;
     if (this.startup) {
-      const error = new Error('本地服务在启动完成前退出');
+      const error = new Error(`本地服务在启动完成前退出（退出码：${code ?? '无'}，信号：${signal ?? '无'}）。${this.failureContext()}`);
       this.state = { status: 'failed', restartAttempts: this.state.restartAttempts, error: error.message };
       this.clearStartup(error); return;
     }
@@ -214,9 +243,47 @@ export class LocalServiceController {
   }
 
   private clearStartup(error: Error): void {
+    this.clearStartupTimers();
+    const starting = this.startup; this.startup = undefined; starting?.reject(error);
+  }
+
+  private clearStartupTimers(): void {
     if (this.startupTimer) clearTimeout(this.startupTimer);
     this.startupTimer = undefined;
-    const starting = this.startup; this.startup = undefined; starting?.reject(error);
+    if (this.startupDeadlineTimer) clearTimeout(this.startupDeadlineTimer);
+    this.startupDeadlineTimer=undefined;
+  }
+
+  private armPhaseTimer(child: ServiceChild): void {
+    if (this.startupTimer) clearTimeout(this.startupTimer);
+    this.startupTimer=setTimeout(()=>this.timeout(child,false),this.options.startupTimeoutMs ?? startupPhases[this.startupPhase].timeoutMs);
+  }
+
+  private timeout(child: ServiceChild, overall: boolean): void {
+    if (this.child!==child || !this.startup || this.connection || this.intentionalStop) return;
+    const error=new Error(`本地服务启动超时${overall ? '（达到启动总时限）' : ''}。${this.failureContext()}`);
+    this.diagnostic('timeout',{overall});
+    this.state={status:'failed',restartAttempts:this.state.restartAttempts,error:error.message};
+    this.failedStarts.add(child); this.clearStartup(error); this.terminateUnresponsive(child);
+  }
+
+  private failureContext(): string {
+    return `阶段：${startupPhases[this.startupPhase].label}；已等待 ${Math.round((Date.now()-this.startedAt)/1000)} 秒。数据库：${this.databasePath()}`
+      +(this.options.diagnosticsPath ? `；启动日志：${this.options.diagnosticsPath}${this.diagnosticsFailed ? '（写入失败）' : ''}` : '');
+  }
+
+  private diagnostic(event: string, details: Record<string,unknown> = {}): void {
+    if (!this.options.diagnosticsPath) return;
+    try {
+      mkdirSync(dirname(this.options.diagnosticsPath),{recursive:true});
+      appendFileSync(this.options.diagnosticsPath,JSON.stringify({timestamp:new Date().toISOString(),attemptId:this.attemptId,
+        event,phase:this.startupPhase,elapsedMs:Date.now()-this.startedAt,pid:this.child?.pid,
+        databasePath:this.databasePath(),port:this.options.config.port ?? 4317,...details})+'\n');
+    } catch { this.diagnosticsFailed=true; }
+  }
+
+  private databasePath(): string {
+    return join(this.options.config.dataDir ?? join(process.cwd(),'work','runtime-data'),'planner.db');
   }
 
   private terminateUnresponsive(child: ServiceChild): void {

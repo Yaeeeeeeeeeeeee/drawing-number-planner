@@ -151,7 +151,9 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
   await dialog.getByRole('button',{name:'确认删除记录',exact:true}).click();await dialog.waitFor({state:'detached'});assert.equal((await request(`/api/packaging/tasks?productId=${product.id}`)).items.some(task=>task.id===taskId),false);
  };
  const drawingsBeforeDelete=await request(`/api/drawings?productId=${product.id}`),indicesBeforeDelete=await request(`/api/files?productId=${product.id}&presence=all`);
- await deleteRecord(task.id);assert.equal(hash(formal),editedHash);assert.equal(hash(asset),aitHash);assert.deepEqual(await request(`/api/drawings?productId=${product.id}`),drawingsBeforeDelete);assert.deepEqual(await request(`/api/files?productId=${product.id}&presence=all`),indicesBeforeDelete);
+ await deleteRecord(task.id);assert.equal(hash(formal),editedHash);assert.equal(hash(asset),aitHash);assert.deepEqual(await request(`/api/drawings?productId=${product.id}`),drawingsBeforeDelete);
+ const unchangedIndexIds=indicesBeforeDelete.items.map(row=>row.id),indexFacts=observations.indexedPageBusinessFacts;
+ assert.deepEqual(indexFacts(await request(`/api/files?productId=${product.id}&presence=all`),unchangedIndexIds),indexFacts(indicesBeforeDelete,unchangedIndexIds));
  // An unfinished formal-copy task retains its file when deleted. Its successor must not adopt that owned file.
  const discarded=await request('/api/packaging/tasks',{productId:product.id,type:'modify',drawings:[{origin:'planned',id:Math.abs(drawing.id)}]});const retained=path.join(workspace,discarded.items[0].relativePath),retainedHash=hash(retained);
  await page.getByRole('button',{name:'刷新任务记录',exact:true}).click();await deleteRecord(discarded.id,true);assert.equal(hash(retained),retainedHash);assert.equal(hash(formal),editedHash);

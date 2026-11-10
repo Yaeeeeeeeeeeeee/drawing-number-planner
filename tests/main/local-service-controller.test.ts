@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { EventEmitter } from 'node:events';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -185,5 +188,135 @@ describe('LocalServiceController', () => {
     child.emit('exit', null, 'SIGKILL');
     await stopping;
     expect(controller.health()).toEqual({ status: 'stopped', restartAttempts: 0 });
+  });
+
+  it('allows database validation to finish beyond the old fifteen-second deadline', async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const controller = new LocalServiceController({entryPath:'entry.js',config,spawn:()=>child});
+    let failure: unknown;
+    const starting = controller.start().catch(error=>{failure=error;});
+    child.emit('message',{type:'startup-progress',phase:'database-validation'});
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(failure).toBeUndefined();
+    expect(child.killedWith).toEqual([]);
+    child.emit('message',{type:'ready',url:'http://127.0.0.1:4317',token:'secret'});
+    await starting;
+    expect(controller.health().status).toBe('running');
+  });
+
+  it('renews the phase wait on progress but enforces the overall startup deadline', async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const controller = new LocalServiceController({entryPath:'entry.js',config,spawn:()=>child,
+      startupTimeoutMs:50,startupDeadlineMs:120});
+    let failure: Error | undefined;
+    const starting=controller.start().catch(error=>{failure=error;});
+    for(const phase of ['database-validation','daily-backup']) {
+      await vi.advanceTimersByTimeAsync(40);
+      child.emit('message',{type:'startup-progress',phase});
+    }
+    expect(failure).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(40); await starting;
+    expect(failure?.message).toContain('总时限');
+    expect(child.killedWith).toContain('SIGTERM');
+    child.emit('exit',null,'SIGTERM');
+  });
+
+  it('reports the stalled phase and selected database instead of silently timing out', async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const controller = new LocalServiceController({entryPath:'entry.js',config,spawn:()=>child,startupTimeoutMs:50});
+    let failure:Error|undefined;
+    const starting=controller.start().catch(error=>{failure=error;});
+    await vi.advanceTimersByTimeAsync(40);
+    child.emit('message',{type:'startup-progress',phase:'daily-backup'});
+    await vi.advanceTimersByTimeAsync(49);
+    expect(child.killedWith).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1); await starting;
+    expect(failure?.message).toMatch(/每日备份[\s\S]*planner\.db/u);
+    child.emit('exit',null,'SIGTERM');
+  });
+
+  it.each(['timeout','stop'] as const)('ignores late readiness after %s',async(reason)=>{
+    vi.useFakeTimers();
+    const child=new FakeChild();
+    const controller=new LocalServiceController({entryPath:'entry.js',config,spawn:()=>child,startupTimeoutMs:50});
+    const starting=controller.start().catch(()=>{});
+    let stopping:Promise<void>|undefined;
+    if(reason==='timeout') await vi.advanceTimersByTimeAsync(50);
+    else stopping=controller.stop();
+    child.emit('message',{type:'ready',url:'http://127.0.0.1:4317',token:'too-late'});
+    expect(controller.health().status).not.toBe('running');
+    child.emit('exit',null,'SIGTERM'); await starting; await stopping;
+  });
+
+  it('persists startup phases and exit details without recording the private token',async()=>{
+    const root=mkdtempSync(join(tmpdir(),'planner-startup-log-'));
+    try {
+      const diagnosticsPath=join(root,'logs','service-startup.jsonl');
+      const child=Object.assign(new FakeChild(),{pid:12345});
+      const controller=new LocalServiceController({entryPath:'entry.js',config:{...config,dataDir:root},spawn:()=>child,diagnosticsPath});
+      const starting=controller.start();
+      child.emit('message',{type:'startup-progress',phase:'database-validation'});
+      child.emit('message',{type:'ready',url:'http://127.0.0.1:4317',token:'never-write-this-token'});
+      await starting;
+      const stopping=controller.stop(); child.emit('exit',17,null); await stopping;
+      const contents=readFileSync(diagnosticsPath,'utf8');
+      const records=contents.trim().split('\n').map(line=>JSON.parse(line));
+      expect(records).toEqual(expect.arrayContaining([
+        expect.objectContaining({event:'phase',phase:'database-validation',databasePath:join(root,'planner.db'),pid:12345}),
+        expect.objectContaining({event:'exit',exitCode:17,signal:null}),
+      ]));
+      expect(contents).not.toContain('never-write-this-token');
+    } finally {rmSync(root,{recursive:true,force:true});}
+  });
+
+  it('does not block readiness when the diagnostic directory is unwritable',async()=>{
+    const root=mkdtempSync(join(tmpdir(),'planner-startup-log-error-'));
+    try {
+      const blocked=join(root,'not-a-directory');writeFileSync(blocked,'keep');
+      const child=new FakeChild();
+      const controller=new LocalServiceController({entryPath:'entry.js',config,spawn:()=>child,diagnosticsPath:join(blocked,'startup.jsonl')});
+      const starting=controller.start();
+      child.emit('message',{type:'ready',url:'http://127.0.0.1:4317',token:'private'});
+      await expect(starting).resolves.toMatchObject({token:'private'});
+      const stopping=controller.stop();child.emit('exit',0,null);await stopping;
+      expect(readFileSync(blocked,'utf8')).toBe('keep');
+    } finally {rmSync(root,{recursive:true,force:true});}
+  });
+
+  it('waits for the stopping child to exit before coalescing a new start and restart',async()=>{
+    vi.useFakeTimers();
+    const old=new FakeChild(),fresh=new FakeChild();
+    const spawn=vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(fresh);
+    const controller=new LocalServiceController({entryPath:'entry.js',config,spawn});
+    const original=controller.start().catch(()=>{});
+    const stopping=controller.stop();
+    const starting=controller.start(),restarting=controller.restart();
+    const waiting=Promise.all([starting,restarting]);waiting.catch(()=>{});
+    expect(spawn).toHaveBeenCalledTimes(1);
+    old.emit('exit',0,null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(spawn).toHaveBeenCalledTimes(2);
+    fresh.emit('message',{type:'ready',url:'http://127.0.0.1:4317',token:'new-child'});
+    await expect(waiting).resolves.toEqual([
+      {url:'http://127.0.0.1:4317',token:'new-child'},
+      {url:'http://127.0.0.1:4317',token:'new-child'},
+    ]);
+    await original;await stopping;
+    const done=controller.stop();fresh.emit('exit',0,null);await done;
+  });
+
+  it('does not postpone a stalled phase when identical progress is repeated',async()=>{
+    vi.useFakeTimers();const child=new FakeChild();
+    const controller=new LocalServiceController({entryPath:'entry.js',config,spawn:()=>child,startupTimeoutMs:50});
+    let failure:Error|undefined;const starting=controller.start().catch(error=>{failure=error;});
+    child.emit('message',{type:'startup-progress',phase:'database-validation'});
+    await vi.advanceTimersByTimeAsync(40);
+    child.emit('message',{type:'startup-progress',phase:'database-validation'});
+    await vi.advanceTimersByTimeAsync(10);await starting;
+    expect(failure?.message).toContain('数据库完整性校验');
+    expect(child.killedWith).toContain('SIGTERM');child.emit('exit',null,'SIGTERM');
   });
 });

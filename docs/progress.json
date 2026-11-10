@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-11-09T06:07:13.543222+00:00",
+  "updatedAt": "2026-11-10T17:48:30.222442+00:00",
   "branch": "codex/confirmed-requirements-20261105",
   "lastCommit": "aaef0c9",
-  "execution": "v1.6.0已正式发布；完整回归、Windows原生验收及公开下载SHA256核对通过",
-  "current": "已确认未落实需求实施",
-  "recent": "安装器145217117字节、全部公开附件哈希一致；报告180文件/126截图，真实选库/升级/任务结束/多型号已验收",
-  "next": "用户本机备份后安装v1.6.0、选择原库，执行实际T40任务处理并验收真实AIT/字体及物理显示器",
+  "execution": "启动专项/约1GB实测通过；正在单并发完整回归，Windows构建待验证",
+  "current": "本地服务启动超时修复",
+  "recent": "停止竞态和扫描观察断言已修正；GitHub写入工具中断，改用原Git通道",
+  "next": "完成单并发回归及浏览器复测；验证Windows安装包后再发布",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
   ],
-  "tests": "231文件1968项、Chromium18项、类型/构建通过；Windows42365635186与发布42569914853成功；公开EXE/报告已下载核对。",
+  "tests": "专项57项及复核后41项通过；约1GB启动/重启通过；首轮并发整套和浏览器失败已记录，未宣称通过",
   "completionRule": "仅功能实现且对应验收测试通过才记为已完成；未完成项保持真实剩余工作。",
   "items": [
     {
@@ -843,6 +843,14 @@
     {
       "at": "2026-11-05T17:33:31.142387+08:00",
       "message": "P0安全结束及G-03令牌更新；专项7文件66项、浏览器1项与类型检查通过；无生产库操作，无真实设计文件改动。"
+    },
+    {
+      "at": "2026-11-10T11:03:03.727821+00:00",
+      "message": "启动超时修复：controller RED 6失败→19全过；entry RED 3失败→专项57全过。完整回归启动；未访问用户两份数据库。"
+    },
+    {
+      "at": "2026-11-10T11:15:42.647622+00:00",
+      "message": "启动修复实测：约1GB独立Schema25，进程启动/重启/行数/FK通过；未复现用户真实耗时。独立复核停止竞态已修正；扫描时间验收断言按事实修正，不改业务监听。"
     }
   ],
   "confirmedImplementation": {
@@ -868,5 +876,22 @@
       "reportUrl": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.0/Verification-Windows-1.6.0-Verified.zip",
       "reportSha256": "b35859d465ff1a7fe048670d58eebe91c4abdaae93eeea1c156391e5c7b3b965"
     }
+  },
+  "startupRepair": {
+    "status": "in-progress",
+    "scope": "No production database/config operations or automatic switching",
+    "plan": "docs/superpowers/plans/2026-11-10-local-service-startup.md",
+    "targeted": "5 files / 57 tests passed",
+    "userDatabaseAccess": false,
+    "largeFixture": {
+      "bytes": 1008640000,
+      "startupMs": 7285,
+      "restartMs": 3934,
+      "sameDatabaseOnRestart": true,
+      "rowsAndForeignKeysPreserved": true,
+      "reproducesUserTimeout": false
+    },
+    "review": "Important stop/start race fixed via failing regression; repeated phase and port-release coverage added",
+    "verification": "Serial final suite in progress; browser final rerun and Windows build pending"
   }
 }

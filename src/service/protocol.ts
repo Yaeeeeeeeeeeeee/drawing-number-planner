@@ -1,4 +1,5 @@
 import type { ServerOptions } from '../server/start-server.js';
+import type { StartupPhase } from './startup-progress.js';
 
 export type LocalServiceConfig = Pick<ServerOptions, 'dataDir' | 'allowedOrigins' | 'rendererDir' | 'port' | 'requireExistingDatabase'>;
 
@@ -17,6 +18,7 @@ export type ServiceRequestMethod =
   | 'resolveOutboundPackagePath';
 
 export type ServiceToParentMessage =
+  | { type: 'startup-progress'; phase: StartupPhase }
   | { type: 'ready'; url: string; token: string }
   | { type: 'startup-error'; code?: string; message: string }
   | { type: 'stopped' }

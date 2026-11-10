@@ -26,6 +26,7 @@ async function createWindow() {
   const devServerUrl = devArgument?.slice('--dev-server-url='.length);
   localService ??= new LocalServiceController({
     entryPath: fileURLToPath(new URL('../service/entry.js', import.meta.url)),
+    diagnosticsPath:join(app.getPath('userData'),'logs','service-startup.jsonl'),
     config: {
       dataDir: app.getPath('userData'),
       requireExistingDatabase: !devServerUrl,
@@ -193,6 +194,7 @@ async function reselectDatabase(): Promise<{ok:true;cancelled:boolean}> {
       verifyStartup: async (data: string) => {
         await oldService.stop();
         candidate = new LocalServiceController({entryPath:fileURLToPath(new URL('../service/entry.js',import.meta.url)),
+          diagnosticsPath:join(data,'logs','service-startup.jsonl'),
           config:{dataDir:data,requireExistingDatabase:true,...(devUrl ? {allowedOrigins:[new URL(devUrl).origin]} : {rendererDir:join(app.getAppPath(),'dist','renderer')})}});
         await candidate.start();
       },

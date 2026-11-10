@@ -35,7 +35,7 @@ process.on('message', (value: unknown) => {
   const message = value as ParentToServiceMessage;
   if (!message || typeof message !== 'object') return;
   if (message.type === 'start' && !running && !closing) {
-    void startServer(message.config).then((server) => {
+    void startServer({...message.config,onStartupProgress:phase=>send({type:'startup-progress',phase})}).then((server) => {
       running = server;
       // The write token is delivered only over the private parent/child IPC channel.
       send({ type: 'ready', url: server.url, token: server.token });

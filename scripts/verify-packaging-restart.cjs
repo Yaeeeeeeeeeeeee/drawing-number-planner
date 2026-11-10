@@ -41,3 +41,9 @@ module.exports.observationScope=async function(state,get){
 };
 
 module.exports.existingRows=(before,after)=>after.filter(row=>before.some(prior=>Object.keys(prior).every(key=>row[key]===prior[key])));
+
+// A successful watcher observation may refresh only the known files' scan time.
+module.exports.indexedPageBusinessFacts=(page,pdfIndexIds)=>{
+ const owned=new Set(pdfIndexIds);
+ return {...page,items:page.items.map(row=>{if(!owned.has(row.id))return row;const {scannedAt,...facts}=row;return facts;})};
+};
