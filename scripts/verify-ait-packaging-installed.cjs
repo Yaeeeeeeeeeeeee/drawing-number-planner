@@ -161,6 +161,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
   const modelRow=page.locator('.pkg-tasks table tbody tr').filter({has:page.getByRole('button',{name:'删除',exact:true})});
   // Match the row by its creation timestamp and state through the list order returned by the same real API.
   const list=(await request(`/api/packaging/tasks?productId=${product.id}`)).items,index=list.findIndex(task=>task.id===taskId);assert.ok(index>=0);
+  await expect.poll(async()=>(await request(`/api/packaging/tasks/${taskId}/deletion-preview`)).canDelete,{timeout:20000}).toBe(true);
   await modelRow.nth(index).getByRole('button',{name:'删除',exact:true}).click();const dialog=page.getByRole('dialog',{name:'删除制图任务记录',exact:true});await dialog.waitFor();await expect(dialog).toContainText('实际 PDF、原始 AIT、正式文件均保留');
   if(unfinished){assert.equal(await dialog.getByRole('button',{name:'确认删除记录',exact:true}).isDisabled(),true);await dialog.getByRole('checkbox').check();}else assert.equal(await dialog.getByRole('checkbox').count(),0);
   for(let attempt=0;;attempt++){
@@ -170,6 +171,12 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
    await dialog.getByRole('button',{name:'确认删除记录',exact:true}).click();const result=await response,body=await result.json();
    if(result.ok())break;
    console.log('[installed task deletion response]',JSON.stringify({status:result.status(),body}));
+   if(attempt<3&&body.error?.code==='TASK_DELETE_BLOCKED'&&body.error.message==='任务正在处理文件，请完成后再删除'){
+    await expect.poll(async()=>(await request(`/api/packaging/tasks/${taskId}/deletion-preview`)).canDelete,{timeout:20000}).toBe(true);
+    await dialog.getByRole('button',{name:'取消',exact:true}).click();
+    await modelRow.nth(index).getByRole('button',{name:'删除',exact:true}).click();await dialog.waitFor();
+    continue;
+   }
    assert.ok(attempt<3&&body.error?.code==='TASK_DELETE_CHANGED',`Unexpected deletion rejection: ${JSON.stringify(body)}`);
    const refreshed=await renewed;assert.ok(refreshed?.ok(),'Existing dialog must retrieve a new preflight token');
    await dialog.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve(null))));

@@ -123,16 +123,16 @@ jobs:
           node scripts/build-comprehensive-verifier.mjs app-source "$helper"
           if ($LASTEXITCODE -ne 0) { throw 'Native database verification bundle failed' }
           "COMPREHENSIVE_DB_HELPER=$helper" >> $env:GITHUB_ENV
-      - name: Run installed Electron; native profile selection, v15 upgrade, backup, WAL, rollback, restart, V5.2 scoped files/BOM/matrix mail and screenshots
-        shell: pwsh
-        run: |
-          node scripts/verify-comprehensive-windows.cjs app-source "$env:COMPREHENSIVE_INSTALLED/图号规划器.exe" installer "$env:COMPREHENSIVE_DB_HELPER"
-          if ($LASTEXITCODE -ne 0) { throw 'Native installed application verification failed' }
       - name: Verify large existing database startup and restart with installed Electron
         shell: pwsh
         run: |
           node -e 'const {execFileSync}=require("node:child_process");const path=require("node:path");try{execFileSync(path.join(process.env.COMPREHENSIVE_INSTALLED,"图号规划器.exe"),["scripts/verify-large-startup.cjs",path.join(process.env.COMPREHENSIVE_INSTALLED,"resources/app"),"installer/large-database-startup.json","960"],{env:{...process.env,ELECTRON_RUN_AS_NODE:"1"},stdio:["ignore","pipe","pipe"],timeout:900000});console.log(require("node:fs").readFileSync("installer/large-database-startup.json","utf8"));}catch(error){console.error(error.stdout?.toString(),error.stderr?.toString(),error.message);process.exit(1);}'
           if ($LASTEXITCODE -ne 0) { throw 'Large database startup verification failed' }
+      - name: Run installed Electron; native profile selection, v15 upgrade, backup, WAL, rollback, restart, V5.2 scoped files/BOM/matrix mail and screenshots
+        shell: pwsh
+        run: |
+          node scripts/verify-comprehensive-windows.cjs app-source "$env:COMPREHENSIVE_INSTALLED/图号规划器.exe" installer "$env:COMPREHENSIVE_DB_HELPER"
+          if ($LASTEXITCODE -ne 0) { throw 'Native installed application verification failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
