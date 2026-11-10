@@ -131,11 +131,8 @@ jobs:
       - name: Verify large existing database startup and restart with installed Electron
         shell: pwsh
         run: |
-          $env:ELECTRON_RUN_AS_NODE = '1'
-          try {
-            & "$env:COMPREHENSIVE_INSTALLED/图号规划器.exe" scripts/verify-large-startup.cjs "$env:COMPREHENSIVE_INSTALLED/resources/app" installer/large-database-startup.json 960
-            if ($LASTEXITCODE -ne 0) { throw 'Large database startup verification failed' }
-          } finally { Remove-Item Env:ELECTRON_RUN_AS_NODE }
+          node -e 'const {execFileSync}=require("node:child_process");const path=require("node:path");try{execFileSync(path.join(process.env.COMPREHENSIVE_INSTALLED,"图号规划器.exe"),["scripts/verify-large-startup.cjs",path.join(process.env.COMPREHENSIVE_INSTALLED,"resources/app"),"installer/large-database-startup.json","960"],{env:{...process.env,ELECTRON_RUN_AS_NODE:"1"},stdio:["ignore","pipe","pipe"],timeout:900000});console.log(require("node:fs").readFileSync("installer/large-database-startup.json","utf8"));}catch(error){console.error(error.stdout?.toString(),error.stderr?.toString(),error.message);process.exit(1);}'
+          if ($LASTEXITCODE -ne 0) { throw 'Large database startup verification failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
