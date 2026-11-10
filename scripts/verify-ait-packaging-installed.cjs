@@ -112,7 +112,22 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  // The real filesystem watcher plus normal task polling must reveal the ambiguous file without a discovery click.
  await detail.getByLabel(`${pendingName} 关联项目`,{exact:true}).waitFor({timeout:20000});await detail.getByLabel(`${pendingName} 关联项目`,{exact:true}).selectOption(String(task.items[0].id));await detail.getByRole('button',{name:'确认关联',exact:true}).click();await row.getByRole('button',{name:'确认当前文件',exact:true}).waitFor();
  task=await request(`/api/packaging/tasks/${task.id}`);const originalHash=task.items[0].sha256;assert.equal(task.items[0].mode,'manual');const associated=path.join(workspace,task.items[0].relativePath);assert.equal(hash(associated),originalHash);
- const review=async(currentRow)=>{await currentRow.getByLabel('已检查当前 PDF 内容',{exact:true}).check();await currentRow.getByRole('button',{name:'确认当前文件',exact:true}).click();await currentRow.getByText('此版本已确认',{exact:true}).waitFor();};
+ const review=async(currentRow)=>{
+  let reviewedHash;
+  for(let attempt=0;;attempt++){
+   await currentRow.getByLabel('已检查当前 PDF 内容',{exact:true}).check();
+   const response=page.waitForResponse(r=>/\/api\/packaging\/tasks\/[^/]+\/items\/\d+\/review$/u.test(new URL(r.url()).pathname)&&r.request().method()==='POST');
+   await currentRow.getByRole('button',{name:'确认当前文件',exact:true}).click();const result=await response,body=await result.json();
+   const hashSubmitted=result.request().postDataJSON().sha256;
+   if(reviewedHash)assert.equal(hashSubmitted,reviewedHash,'A retry must not silently review different content');else reviewedHash=hashSubmitted;
+   if(result.ok()){await currentRow.getByText('此版本已确认',{exact:true}).waitFor();return;}
+   console.log('[installed review response]',JSON.stringify({status:result.status(),body}));
+   assert.ok(attempt<3&&body.error?.code==='TASK_BUSY',`Unexpected review rejection: ${JSON.stringify(body)}`);
+   const taskRoute=new URL(result.url()).pathname.split('/items/')[0];
+   await expect.poll(async()=>(await request(`${taskRoute}/deletion-preview`)).canDelete,{timeout:15000}).toBe(true);
+   await detail.getByRole('button',{name:'刷新当前任务',exact:true}).click();await detail.getByText('任务已刷新',{exact:true}).waitFor();
+  }
+ };
  const archive=async(id)=>{
   for(let attempt=0;;attempt++){
    await detail.getByRole('button',{name:'归档预览',exact:true}).click();await detail.getByLabel('已核对全部文件和归档位置，确认统一归档',{exact:true}).check();
@@ -148,7 +163,18 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
   const list=(await request(`/api/packaging/tasks?productId=${product.id}`)).items,index=list.findIndex(task=>task.id===taskId);assert.ok(index>=0);
   await modelRow.nth(index).getByRole('button',{name:'删除',exact:true}).click();const dialog=page.getByRole('dialog',{name:'删除制图任务记录',exact:true});await dialog.waitFor();await expect(dialog).toContainText('实际 PDF、原始 AIT、正式文件均保留');
   if(unfinished){assert.equal(await dialog.getByRole('button',{name:'确认删除记录',exact:true}).isDisabled(),true);await dialog.getByRole('checkbox').check();}else assert.equal(await dialog.getByRole('checkbox').count(),0);
-  await dialog.getByRole('button',{name:'确认删除记录',exact:true}).click();await dialog.waitFor({state:'detached'});assert.equal((await request(`/api/packaging/tasks?productId=${product.id}`)).items.some(task=>task.id===taskId),false);
+  for(let attempt=0;;attempt++){
+   if(unfinished)await dialog.getByRole('checkbox').check();
+   const renewed=page.waitForResponse(r=>r.url().endsWith(`/api/packaging/tasks/${taskId}/deletion-preview`)&&r.request().method()==='GET',{timeout:15000}).catch(()=>null);
+   const response=page.waitForResponse(r=>r.url().endsWith(`/api/packaging/tasks/${taskId}/delete`)&&r.request().method()==='POST');
+   await dialog.getByRole('button',{name:'确认删除记录',exact:true}).click();const result=await response,body=await result.json();
+   if(result.ok())break;
+   console.log('[installed task deletion response]',JSON.stringify({status:result.status(),body}));
+   assert.ok(attempt<3&&body.error?.code==='TASK_DELETE_CHANGED',`Unexpected deletion rejection: ${JSON.stringify(body)}`);
+   const refreshed=await renewed;assert.ok(refreshed?.ok(),'Existing dialog must retrieve a new preflight token');
+   await dialog.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve(null))));
+  }
+  await dialog.waitFor({state:'detached'});assert.equal((await request(`/api/packaging/tasks?productId=${product.id}`)).items.some(task=>task.id===taskId),false);
  };
  const drawingsBeforeDelete=await request(`/api/drawings?productId=${product.id}`),indicesBeforeDelete=await request(`/api/files?productId=${product.id}&presence=all`);
  await deleteRecord(task.id);assert.equal(hash(formal),editedHash);assert.equal(hash(asset),aitHash);assert.deepEqual(await request(`/api/drawings?productId=${product.id}`),drawingsBeforeDelete);

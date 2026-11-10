@@ -66,9 +66,12 @@ test('V5.2 real indexed tables keep width, alignment, icon actions and frozen co
    }
    await page.setViewportSize({width:1920,height:900});
    await expect.poll(()=>table.evaluate(element=>Math.abs(element.getBoundingClientRect().width-element.closest('.table-wrap')!.clientWidth))).toBeLessThan(2);
+   // ResizeObserver and its React update settle after the viewport fills the wrapper.
+   await table.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(null)))));
    const before=await table.locator('thead th').evaluateAll(cells=>cells.map(cell=>({key:(cell as HTMLElement).dataset.columnKey!,width:cell.getBoundingClientRect().width})));
    const key=columns[0],handle=table.getByRole('separator',{name:`调整${key==='sku'?'SKU':key==='name'?(label==='编码字典'?'名称':'文件名'):'型号'}列宽`});
    await handle.focus();await handle.press('ArrowLeft');
+   await table.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(null)))));
    const after=await table.locator('thead th').evaluateAll(cells=>cells.map(cell=>({key:(cell as HTMLElement).dataset.columnKey!,width:cell.getBoundingClientRect().width})));
    const target=before.find(cell=>cell.key===key)!,changed=after.find(cell=>cell.key===key)!;
    expect(changed.width).toBeLessThan(target.width);
