@@ -2,32 +2,36 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.6.0 · 四步规划与任务安全结束
+## 当前版本 v1.6.1 · 本地服务启动修复
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.0/DrawingNumberPlanner-1.6.0-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.0)
-- [安装、升级和恢复说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/install-and-upgrade.md)
-- [维护和发布方式](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/maintenance.md)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.1/DrawingNumberPlanner-1.6.1-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.1)
+- [安装、升级和恢复说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/install-and-upgrade.md)
+- [维护和发布方式](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/maintenance.md)
 - [上一版 v1.3.0（Schema23）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.0)
 - [v1.2.0（Schema22，回退须配套旧库备份）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.2.0)
-- [V5.1 邮件导入与草稿实现、验证和限制](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/v51-mail-delivery-20261027.md)
-- [V5 修改记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/v5-delivery-20261026.md)
+- [V5.1 邮件导入与草稿实现、验证和限制](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/v51-mail-delivery-20261027.md)
+- [V5 修改记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/v5-delivery-20261026.md)
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
 
 ## 本轮增量修复
 
+修复大数据库初始化被15秒统一限额中断，以及停止期间再次启动的进程竞态。现在分阶段等待并保留总时限，就绪前验证实际HTTP健康；失败提示显示阶段、数据库路径及日志位置。不会自动切换、重建或合并数据库。Windows安装版约1GB测试首次启动29.3秒、重启3.4秒，完整1981项、浏览器18项及原生安装/升级验证通过。详见[v1.6.1说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/release-1.6.1.md)及[验证记录](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/startup-repair-verification-20261110.md)。
+
+## v1.6.0 工作台与任务安全结束
+
 图号规划改为四步工作台，单型号与多型号批量规划各自保存草稿，按型号和项目独立查重及确认。共用颜色只引用本产品真实白色图号。制图任务可明确「保留文件并结束任务」，图号删除或旧PDF强制脱钩不再要求重新关联后才能结束；实际文件操作未结束时继续保护任务锁。
 
 所有启用产品的02/03目录参与监听，支持当前型号、类别及全库扫描；PDF列表保留上次扫描状态，单文件详情另行实时核实。超过500条的管理操作自动分批并保留结果/失败重试。安全恢复及原生菜单可重新选择已有数据库，先验证与备份，切换失败保留原配置。Schema仍25，不清空旧库，不自动归并或释放号码。
 
-详见[本版说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/release-1.6.0.md)。旧版[v1.5.0及安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)保留供配套备份回退。
+详见[v1.6.0说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/release-1.6.0.md)。旧版[v1.5.0及安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.5.0)保留供配套备份回退。
 
 ## 包材模板与制图任务
 
 「数据来源 → 包材模板」维护 AIT 原件、完整图号映射、简化的尺寸匹配规则和项目生成方式。图号规划只负责预览与确认占号，已保存图号直接进入独立「制图任务」，在任务中配置尺寸、匹配模板和制作文件。支持人工PDF监听关联、逐项重试、统一检查归档、正式文件副本修改与备份；新任务直接使用00，旧任务继续原路径，删除记录保留文件及历史。PDF列表筛选不限制指定型号的正式扫描范围。
 
-Windows 本机通过 Illustrator COM/JSX 用模板副本导出保留编辑能力的 PDF。**没有用户真实AIT及授权Illustrator的开发/CI环境，尚未验证真实字体、版式或PDF重开编辑；本机需配置对象映射与字体并检查实际成果。** 详见[版本说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/release-1.5.0.md)与[实现、使用及验收范围](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/packaging-ui-delivery-20261102.md)。
+Windows 本机通过 Illustrator COM/JSX 用模板副本导出保留编辑能力的 PDF。**没有用户真实AIT及授权Illustrator的开发/CI环境，尚未验证真实字体、版式或PDF重开编辑；本机需配置对象映射与字体并检查实际成果。** 详见[版本说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/release-1.5.0.md)与[实现、使用及验收范围](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/packaging-ui-delivery-20261102.md)。
 
 Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历史快照或当前资料根目录。[v1.3.1（回退需配套升级前Schema23备份）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.1)保留。
 
@@ -35,7 +39,7 @@ Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 
 在「迁移检查 → 导入邮件模板」选择现有 XLSX，核对厂家、场景、正文及历史示例后确认。模板、联系人和签名统一在「外发资料 → 邮件配置」维护。ZIP 成功后点击「生成邮件草稿」，填写实际修改原因、调整收件人和正文，再复制使用；程序不自动发送邮件。
 
-已使用本轮上传的原始 Excel 验证：5 家供应商、20 个首批场景和 5 个更新案例独立解析，正文、签名和联系人分开处理；原始案例及单元格来源保存后仍可查看。实际历史内容始终先预览核对。Schema23 仅增量补充邮件配置关联，不清空旧库。详见 [V5.2说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/release-1.3.0.md)。v1.3.1进一步修复单条导入共享抄送及底部反馈，见[此前说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/docs/release-1.3.1.md)。
+已使用本轮上传的原始 Excel 验证：5 家供应商、20 个首批场景和 5 个更新案例独立解析，正文、签名和联系人分开处理；原始案例及单元格来源保存后仍可查看。实际历史内容始终先预览核对。Schema23 仅增量补充邮件配置关联，不清空旧库。详见 [V5.2说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/release-1.3.0.md)。v1.3.1进一步修复单条导入共享抄送及底部反馈，见[此前说明](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/docs/release-1.3.1.md)。
 
 ## 主要功能
 
@@ -66,7 +70,7 @@ Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 
 本版新扫描仅进入产品目录下的 `02.未转曲源文件` 与 `03.量产后的变更文件（已量产的产品看最新日期）`。范围外既存索引和历史引用保留，不因未扫描而标为缺失。源文件使用独立节点，不作为生产批次；二维码手动关联不受此限制。图号详情只读核实文件，展示全部对应批次，不再使用批次选择框。
 
-详见 [项目 Skill](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/072a62a08204fa04437e7d6e23d2d8b5a60cf94a/.agents/skills/drawing-number-planner/SKILL.md) 及其业务、安全和模型参考。
+详见 [项目 Skill](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/blob/b252e54b903a47e7c0b6bf078501fc341f4027f7/.agents/skills/drawing-number-planner/SKILL.md) 及其业务、安全和模型参考。
 
 ## 数据安全与升级
 
