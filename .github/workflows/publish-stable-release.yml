@@ -1,5 +1,5 @@
 name: Publish verified stable Windows release
-# Publish only the pinned Windows startup repair verified on 2026-11-10.
+# Refresh final delivery notes after the actual public v1.6.1 installer hash verification.
 on:
   push:
     branches: [codex/v3-business-ui-20261022]

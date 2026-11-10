@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-10T18:21:47.569679+00:00",
+  "updatedAt": "2026-11-10T18:26:55.810615+00:00",
   "branch": "codex/confirmed-requirements-20261105",
   "lastCommit": "a296e04",
-  "execution": "启动修复全部验收通过；正式发布及公开附件核对进行中",
+  "execution": "v1.6.1启动修复已发布；公开安装包及验证报告实际下载核对通过",
   "current": "本地服务启动超时修复",
-  "recent": "Windows42872891491全过；1GB首次29.3秒/备份27秒/重启3.4秒，验证旧15秒限额不足",
-  "next": "创建固定源码Tag、发布v1.6.1并下载核对公开EXE/报告",
+  "recent": "公开EXE145219900字节、SHA256一致；报告181文件/126截图，Windows大库备份27秒已复现旧限额不足",
+  "next": "用户安装v1.6.1并明确选择要继续使用的已有planner.db；保留两份库，失败时提供弹窗所指启动日志",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
@@ -855,6 +855,10 @@
     {
       "at": "2026-11-10T18:21:47.569679+00:00",
       "message": "最终Windows42872891491全部通过；约1GB首次29.3秒，其中每日备份26.979秒，重启3.408秒。固定a296e04准备发布，原用户库未操作。"
+    },
+    {
+      "at": "2026-11-10T18:26:55.810615+00:00",
+      "message": "v1.6.1公开EXE及报告已下载核对；Installer SHA256 79dfe6f60b4346c49fcc8eddc9d7e55b170a46d18efc0e04959911c003e378bd；Tag a296e04不可变，未操作用户生产库。"
     }
   ],
   "confirmedImplementation": {
@@ -882,7 +886,7 @@
     }
   },
   "startupRepair": {
-    "status": "verified-awaiting-publish",
+    "status": "complete-published-installer-verified",
     "scope": "No production database/config operations or automatic switching",
     "plan": "docs/superpowers/plans/2026-11-10-local-service-startup.md",
     "targeted": "5 files / 57 tests passed",
@@ -896,7 +900,7 @@
       "reproducesUserTimeout": false
     },
     "review": "Important stop/start race fixed via failing regression; repeated phase and port-release coverage added",
-    "verification": "Serial final suite in progress; browser final rerun and Windows build pending",
+    "verification": "232 files / 1981 tests, 18 browser, types/build and Windows native/large database passed; actual public installer hash verified",
     "verifiedSource": "a296e04ee1570d9af6721a4879a60261cdb2cd6a",
     "windowsRun": 42872891491,
     "windowsLargeFixture": {
@@ -907,6 +911,17 @@
     },
     "unit": "232 files / 1981 passed",
     "browser": "18 passed",
-    "productionDatabaseOperations": "none"
+    "productionDatabaseOperations": "none",
+    "release": {
+      "tag": "v1.6.1",
+      "run": 42874529858,
+      "url": "https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.1",
+      "installerBytes": 145219900,
+      "installerSha256": "79dfe6f60b4346c49fcc8eddc9d7e55b170a46d18efc0e04959911c003e378bd",
+      "installerActuallyDownloaded": true,
+      "reportZipCrcChecked": true,
+      "reportFiles": 181,
+      "screenshots": 126
+    }
   }
 }

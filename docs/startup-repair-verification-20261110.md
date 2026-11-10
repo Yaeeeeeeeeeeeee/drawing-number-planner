@@ -1,6 +1,6 @@
 # v1.6.1 启动修复验证记录（最终验证）
 
-应用修复提交：`3ae9e8b84507b914846b5cb5971fbdce72aa748a`；Windows验收调用修正源码：`8d6c9e87eaae5ed9c12ab74de7885b6167a0ac5c`，Schema25。首轮Windows运行42868770302的安装/旧库/业务通过，但新增大库脚本调用失败；已修正验收入口并重跑。最终正式候选源码：`a296e04ee1570d9af6721a4879a60261cdb2cd6a`。最终Windows运行 [42872891491](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/42872891491) 全部成功，正在发布并核对公开附件。
+应用修复提交：`3ae9e8b84507b914846b5cb5971fbdce72aa748a`；Windows验收调用修正源码：`8d6c9e87eaae5ed9c12ab74de7885b6167a0ac5c`，Schema25。首轮Windows运行42868770302的安装/旧库/业务通过，但新增大库脚本调用失败；已修正验收入口并重跑。正式应用源码：`a296e04ee1570d9af6721a4879a60261cdb2cd6a`。最终Windows运行 [42872891491](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/42872891491) 全部成功。v1.6.1已发布，公开安装包已实际下载并核对。
 
 ## 数据边界及诊断
 
@@ -69,3 +69,9 @@ Windows第二次42869916596在任务删除弹窗等待关闭超时；第三次42
 - 验证工件13790368518：sha256:e9062185f4e014a65d040ca221ef67dc19ededf87e53d2ee7ff3a00b6ecb5179。
 - 上述是Actions ZIP摘要，不能当作EXE摘要；公开EXE的SHA256以Release的SHA256SUMS及下载核对结果为准。
 - 生产数据库操作记录：无。未连接用户电脑，未更改其配置或数据库、未切库、未运行恢复、未操作原始业务文件。安装后的原库环境恢复由用户本机最终验收。
+
+## 公开交付核对
+
+发布运行42874529858成功。公开EXE已实际下载：145,219,900字节，SHA256 `79dfe6f60b4346c49fcc8eddc9d7e55b170a46d18efc0e04959911c003e378bd`，与Release的SHA256SUMS一致，MZ头正确。验证ZIP已下载核对校验文件与CRC，181文件、126张PNG；native JSON源码a296e04及Windows大库29,317ms/3,408ms与运行日志一致。已查看原生选库后界面及中文安装向导原图。最终Release说明刷新仅更新文档，继续使用同一源码、安装器和验证工件。
+
+当前剩余：用户本机确认要继续使用的已有库并安装验收；两份库内容差异及用户现场具体阶段尚无本机日志，不能宣称已操作或恢复用户原数据库。没有遗留审查阻断项，没有额外业务功能扩展。

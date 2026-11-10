@@ -43,9 +43,9 @@ Files: `src/server/start-server.ts`, `src/service/entry.ts`, `src/main/index.ts`
 
 ### Task 3: Integration verification and delivery record
 
-- [ ] Run full unit tests, typecheck and desktop/renderer build; reproduce initialization using a disposable large Schema25 database and record measured stages.
-- [ ] Review the final change independently; update progress/maintenance instructions and record unresolved local Windows/user-data validation.
-- [ ] Commit the focused fix and use the existing Windows verification/delivery workflow if available. Do not claim the user's database has been repaired or switched.
+- [x] Run full unit tests, typecheck and desktop/renderer build; reproduce initialization using a disposable large Schema25 database and record measured stages.
+- [x] Review the final change independently; update progress/maintenance instructions and record unresolved local Windows/user-data validation.
+- [x] Commit the focused fix and use the existing Windows verification/delivery workflow if available. Do not claim the user's database has been repaired or switched.
 
 
 Review: one Important stop/start race reproduced and fixed RED→GREEN; repeated phase and unhealthy-port release assertions now covered. Original local-machine cause remains unverified.
