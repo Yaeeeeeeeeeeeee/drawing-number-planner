@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-10T18:26:55.810615+00:00",
+  "updatedAt": "2026-11-10T18:29:56.515062+00:00",
   "branch": "codex/confirmed-requirements-20261105",
   "lastCommit": "a296e04",
   "execution": "v1.6.1启动修复已发布；公开安装包及验证报告实际下载核对通过",
@@ -859,6 +859,10 @@
     {
       "at": "2026-11-10T18:26:55.810615+00:00",
       "message": "v1.6.1公开EXE及报告已下载核对；Installer SHA256 79dfe6f60b4346c49fcc8eddc9d7e55b170a46d18efc0e04959911c003e378bd；Tag a296e04不可变，未操作用户生产库。"
+    },
+    {
+      "at": "2026-11-10T18:29:56.515062+00:00",
+      "message": "最终说明刷新42875296001成功；公开报告再次下载9295206字节，SHA256 7846457b16cde09fbec575a2621821fc5e49ab50ebfbdb9fb9d47a5c67192512，CRC/181文件/126截图及native a296e04/1GB指标一致；EXE SHA不变。"
     }
   ],
   "confirmedImplementation": {
@@ -921,7 +925,11 @@
       "installerActuallyDownloaded": true,
       "reportZipCrcChecked": true,
       "reportFiles": 181,
-      "screenshots": 126
+      "screenshots": 126,
+      "notesRefreshRun": 42875296001,
+      "reportBytes": 9295206,
+      "reportSha256": "7846457b16cde09fbec575a2621821fc5e49ab50ebfbdb9fb9d47a5c67192512",
+      "finalPublicReportActuallyDownloaded": true
     }
   }
 }
