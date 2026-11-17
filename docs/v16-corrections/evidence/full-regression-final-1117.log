@@ -1,0 +1,24 @@
+npm warn Unknown project config "confirmModulesPurge". This will stop working in the next major version of npm.
+
+> drawing-number-planner@1.6.2 test
+> vitest run --maxWorkers=1 --testTimeout=30000 --hookTimeout=30000
+
+
+ RUN  v4.1.11 /workspace/drawing-number-planner/.worktrees/confirmed-requirements
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+
+ Test Files  241 passed (241)
+      Tests  2101 passed (2101)
+   Start at  03:12:28
+   Duration  543.40s (transform 6.24s, setup 32.27s, import 23.82s, tests 346.55s, environment 107.99s)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

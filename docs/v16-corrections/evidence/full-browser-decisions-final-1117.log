@@ -1,0 +1,95 @@
+
+Running 26 tests using 1 worker
+
+(node:42031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/26] tests/e2e/ait-packaging.spec.ts:10:1 › AIT catalog and durable manual drawing tasks use real UI, watcher, files, archive, original backups and scoped index
+[2/26] tests/e2e/bom-pixels.spec.ts:24:1 › compares real decoded PNG pixels through saved BOM history without altering source images or history
+[3/26] tests/e2e/confirmed-installed-contract.spec.ts:10:1 › confirmed installed contract checks multi-model planning, restored drafts and force-detached safe task ending
+[4/26] tests/e2e/mail-import-feedback.spec.ts:7:1 › single reviewed supplier template imports shared CC and keeps failure/success feedback visible at the submit button
+[5/26] tests/e2e/outbound-draft-recovery.spec.ts:10:1 › restores and saves a real SQLite draft through the browser after reload
+[6/26] tests/e2e/outbound.spec.ts:3:1 › browser preview opens outbound workspace while keeping desktop file actions unavailable
+[7/26] tests/e2e/phase-one.spec.ts:6:1 › Phase 1 browser workflow uses the real local database
+[8/26] tests/e2e/phase-real-usage-outbound.spec.ts:56:1 › real-usage acceptance covers lifecycle, QR, historical BOM, outbound packages, mail and recovery boundary
+tests/e2e/phase-real-usage-outbound.spec.ts:56:1 › real-usage acceptance covers lifecycle, QR, historical BOM, outbound packages, mail and recovery boundary
+
+
+[9/26] tests/e2e/phase-three.spec.ts:18:1 › Phase 3 creates and queries a product-level BOM with a business date
+[10/26] tests/e2e/phase-two.spec.ts:14:1 › Phase 2 previews and atomically reserves a real batch
+[11/26] tests/e2e/phase-z-four.spec.ts:21:1 › Phase 4 scans a local PDF workspace and persists relative paths only
+[12/26] tests/e2e/phase-zz-compatibility.spec.ts:20:1 › compatibility correction scans history, preserves occupancy, and reports completeness
+[13/26] tests/e2e/planning-workspace.spec.ts:42:1 › real saved white identity is shared without occupation; explicit confirmation preserves library navigation
+[14/26] tests/e2e/planning-workspace.spec.ts:73:1 › batch model selections and independent persisted drafts survive reload, then reserve distinct real drawings
+[15/26] tests/e2e/second-acceptance-layout.spec.ts:3:1 › selection controls remain compact beside their labels in a desktop-sized window
+[16/26] tests/e2e/task-termination.spec.ts:13:1 › ends a force-detached T40 task through the real UI, preserving the PDF and index
+[17/26] tests/e2e/v16-workspace.spec.ts:10:1 › preserves module drafts and opens a real AIT drawer without resizing the table
+[18/26] tests/e2e/v51-mail.spec.ts:7:1 › V5.1 real XLSX import -> exact changed PDF ZIP -> editable mail draft preserves business history
+[19/26] tests/e2e/v52-layout.spec.ts:19:1 › V5.2 real indexed tables keep width, alignment, icon actions and frozen controls across window sizes
+[20/26] tests/e2e/v52-mail.spec.ts:7:1 › V5.2 scoped files, exact BOM correction and anonymous matrix import preserve original data
+(node:43715) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[21/26] tests/e2e/pdf-batch-workflow.spec.ts:12:1 › real category scan and501-file selection use two guarded batches without touching files or occupation
+(node:43958) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[22/26] tests/e2e/pdf-list-groups.spec.ts:12:1 › groups actual scanned files and retains checked files through folding
+(node:44144) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[23/26] tests/e2e/pdf-reader.spec.ts:13:1 › opens a real PDF and controls pages, zoom, rotation, thumbnails and search without changing bytes
+tests/e2e/pdf-reader.spec.ts:13:1 › opens a real PDF and controls pages, zoom, rotation, thumbnails and search without changing bytes
+3:09:15 AM [vite] (client) [console.warn] Warning: Indexing all PDF objects
+
+3:09:15 AM [vite] (client) [console.warn] Warning: Indexing all PDF objects
+
+[24/26] tests/e2e/pdf-reader.spec.ts:22:1 › preserves intrinsic page rotation in reading, fitting, thumbnails and printing
+[25/26] tests/e2e/pdf-reader.spec.ts:42:1 › built renderer serves PDF.js resources and renders a PDF with its bundled standard font
+tests/e2e/pdf-reader.spec.ts:42:1 › built renderer serves PDF.js resources and renders a PDF with its bundled standard font
+vite v8.2.2 building client environment for production...
+
+transforming...
+
+
+✓ 2061 modules transformed.
+
+
+rendering chunks...
+
+
+computing gzip size...
+
+
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/index.html                                   0.63 kB │ gzip:   0.40 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/pdf.worker.min-wgc6bjNh.mjs       1,078.61 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/PdfReader-sH0uLncl.css                2.38 kB │ gzip:   0.83 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/index-uz1uIYvi.css                  299.02 kB │ gzip:  47.45 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/pdf.worker.min-tZCqKnqW.js            0.05 kB │ gzip:   0.07 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/qr-first-page-pixels-Wguf8-ms.js      1.84 kB │ gzip:   1.03 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/PdfReader-D7H6wbIq.js                 9.93 kB │ gzip:   3.14 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/pdf-Yv_7QG53.js                     397.01 kB │ gzip: 117.42 kB
+../../../../tmp/pdf-reader-built-Zjmk3d/renderer/assets/index-CQjksbOC.js                 1,218.47 kB │ gzip: 310.35 kB
+
+
+✓ built in 1.26s
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+(node:44483) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[26/26] tests/e2e/qr-first-page-pixels.spec.ts:15:1 › compares real decoded first-page RGBA, excluding metadata and all later pages
+tests/e2e/qr-first-page-pixels.spec.ts:15:1 › compares real decoded first-page RGBA, excluding metadata and all later pages
+3:09:35 AM [vite] (client) [console.warn] Warning: Indexing all PDF objects
+
+  26 passed (3.3m)

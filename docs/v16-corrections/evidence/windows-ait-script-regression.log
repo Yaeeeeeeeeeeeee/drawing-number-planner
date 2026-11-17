@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /workspace/drawing-number-planner/.worktrees/confirmed-requirements
+
+
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Start at  03:27:26
+   Duration  2.10s (transform 229ms, setup 315ms, import 249ms, tests 1.25s, environment 0ms)
+

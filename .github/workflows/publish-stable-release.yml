@@ -1,5 +1,5 @@
 name: Publish verified stable Windows release
-# Publish only the fixed V1.6 corrections source after installed Windows verification.
+# Publish the fixed source and explicitly tracked verification evidence.
 on:
   push:
     branches: [codex/v16-corrections-20261111]
@@ -149,7 +149,12 @@ jobs:
           with zipfile.ZipFile('release-assets/Verification-Windows-1.6.2-Verified.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(report.rglob('*')):
                   if file.is_file(): archive.write(file,file.relative_to(report))
-          shutil.copytree('docs/v16-corrections/evidence','release-assets/automated-evidence')
+          proof=pathlib.Path('docs/v16-corrections/evidence')
+          for entry in json.loads((proof/'MANIFEST.json').read_text())['files']:
+              item=proof/entry['path']
+              assert item.is_file() and item.stat().st_size==entry['bytes']
+              assert hashlib.sha256(item.read_bytes()).hexdigest()==entry['sha256']
+          shutil.copytree(proof,'release-assets/automated-evidence')
           with zipfile.ZipFile('release-assets/Verification-Automated-1.6.2.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(pathlib.Path('release-assets/automated-evidence').rglob('*')):
                   if file.is_file(): archive.write(file,file.relative_to('release-assets/automated-evidence'))
