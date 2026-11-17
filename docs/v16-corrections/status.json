@@ -443,7 +443,7 @@
       "remaining": "用户本机重新验收；本轮Windows相关流程已通过"
     }
   ],
-  "updatedAt": "2026-11-17T15:53:50.464328+08:00",
-  "currentVerification": "最终241文件2101项、Chromium26项及两项受影响浏览器专项通过；Windows44011078119完整通过，固定源码0610c06。等待发布及用户重新验收，真实Adobe/用户库/物理DPI未验证。",
+  "updatedAt": "2026-11-17T16:03:56.845377+08:00",
+  "currentVerification": "最终241文件2101项、Chromium26项及两项受影响浏览器专项、Windows44011078119全部通过。v1.6.2已发布，固定源码0610c06，公开安装器及报告实际下载校验通过。等待用户重新验收，Adobe/用户库/物理DPI未验证。",
   "candidateVersion": "1.6.2 / Schema26"
 }

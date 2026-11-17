@@ -67,3 +67,7 @@ Windows前五轮失败均保留记录，未发布失败工件：锁文件末尾L
 ## 安装与回退
 
 见[版本操作说明](../release-1.6.2.md)。升级前关闭应用并完整备份实际dataDir；安装后选确认要沿用的planner.db，保留现有资料路径。Schema26不能用1.6.1直接打开；回退须在独立目录恢复迁移前Schema25备份，同时保留升级后的完整目录和新增业务。不要以新建空库代替兼容升级。
+
+## 公开安装器核对
+
+本报告完成后已发布v1.6.2，公开EXE实际下载147183693字节，SHA256 `31feead1adeb77525877753dafc7e7687f3caa7d0d04bbd71f14ee5dfb7ebfdb`。Windows和自动化ZIP均实际下载并通过摘要、CRC及清单核对；完整记录见[PUBLIC_DELIVERY.md](PUBLIC_DELIVERY.md)。
