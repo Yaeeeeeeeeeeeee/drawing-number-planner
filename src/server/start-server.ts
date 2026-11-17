@@ -1,3 +1,4 @@
+import { AitSelections } from '../core/packaging/ait-selections.js';
 import {registerPackagingTemplateInspectionRoutes} from './routes/packaging-template-inspection.js';
 import { createHash } from 'node:crypto';
 import { AppearanceService } from '../core/products/appearance-service.js';
@@ -72,6 +73,7 @@ export interface RunningServer {
   url: string;
   token: string;
   qrManualAction(action: string, input: unknown): unknown;
+  selectAitTrusted(path: unknown): unknown;
   resolvePdfFilePath(id: unknown): string;
   resolveBomAssetPath(id: unknown): string;
   resolveQrFilePath(relativePath: string): { path: string; mimeType: string };
@@ -180,14 +182,15 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     const drawingQueryService = new DrawingQueryService(database, () => workspaceSettings.get().workspaceRoot);
     registerDrawingRoutes(server, drawingQueryService);
     const fileService=new FileService(fileRepository, workspaceSettings,undefined,()=>packagingTasks?.hasOperations()??false);
-    registerFileRoutes(server, fileService, tasks);
+    registerFileRoutes(server, fileService, tasks, indexedPdfResolver);
     const packagingCatalog=new PackagingCatalogService(database,paths.baseDir);
+    const aitSelections=new AitSelections();
     const illustrator=new WindowsIllustratorAutomation({operationRoot:join(paths.baseDir,'illustrator-operations')});
     packagingTasks=new PackagingTaskService(database,{workspaceRoot:()=>workspaceSettings.get().workspaceRoot,dataDir:paths.baseDir,catalog:packagingCatalog,automation:illustrator,files:fileService});
     packagingTasks.recover();
-    registerPackagingCatalogRoutes(server,packagingCatalog);
-    registerPackagingTaskRoutes(server,packagingTasks,illustrator);
-    registerPackagingTemplateInspectionRoutes(server,illustrator,{dataDir:paths.baseDir});
+    registerPackagingCatalogRoutes(server,packagingCatalog,aitSelections);
+    registerPackagingTaskRoutes(server,packagingTasks,illustrator,tasks);
+    registerPackagingTemplateInspectionRoutes(server,illustrator,{dataDir:paths.baseDir,selections:aitSelections});
     packagingMonitor=new PackagingMonitor(packagingTasks,fileService);
     registerMaterialBatchRoutes(server, new MaterialBatchService(database, () => workspaceSettings.get().workspaceRoot));
     registerOutboundReferenceRoutes(server, new OutboundReferenceService(database));
@@ -236,6 +239,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
         switchingDatabase = true;
         await packagingMonitor?.close();
       },
+      selectAitTrusted: path => {if(typeof path!=='string')throw new Error('INVALID_AIT_PATH');return aitSelections.selectTrusted(path);},
       qrManualAction: (action, input) => {
         if (!input || typeof input !== 'object') throw new Error('INVALID_QR_MANUAL_INPUT');
         const data = input as Record<string, unknown>;

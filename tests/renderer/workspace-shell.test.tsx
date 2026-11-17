@@ -7,7 +7,9 @@ vi.mock('../../src/renderer/pages/PlanningPage', () => ({ PlanningPage: ({onGene
 vi.mock('../../src/renderer/pages/DrawingTasksPage', () => ({ DrawingTasksPage: ({target,active}:{target?:unknown;active?:boolean}) => <><h1>独立制图任务</h1><input aria-label="保留制图任务输入" data-active={String(active)}/><output aria-label="任务导航目标">{JSON.stringify(target)}</output></> }));
 vi.mock('../../src/renderer/pages/PackagingTemplatesPage', () => ({ PackagingTemplatesPage: ({active}:{active?:boolean}) => <h1 data-active={String(active)}>包材基础配置</h1> }));
 vi.mock('../../src/renderer/pages/QrCodesPage', () => ({ QrCodesPage: ({active}:{active:boolean}) => <input aria-label="保留二维码状态" data-active={String(active)}/> }));
-vi.mock('../../src/renderer/pages/DictionariesPage', () => ({ DictionariesPage: () => <h1>字典内容</h1> }));
+vi.mock('../../src/renderer/pages/DictionariesPage', () => ({ DictionariesPage: () => <><h1>字典内容</h1><input aria-label="字典搜索现场"/></> }));
+vi.mock('../../src/renderer/pages/BomPage',()=>({BomPage:()=> <input aria-label="BOM编辑现场"/>}));
+vi.mock('../../src/renderer/pages/ImportPage',()=>({ImportPage:()=> <input aria-label="导入预览现场"/>}));
 vi.mock('../../src/renderer/components/SafeRecovery', () => ({ SafeRecovery: () => <button>安全恢复</button> }));
 
 function viewport(narrow: boolean) {
@@ -162,4 +164,28 @@ it('marks preserved planning, catalog and tasks active only while their module i
     fireEvent.click(screen.getByRole('button',{name:'制图任务'}));const tasks=screen.getByLabelText('保留制图任务输入');expect(tasks).toHaveAttribute('data-active','true');expect(catalog).toHaveAttribute('data-active','false');
     fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材'}));expect(plan).toHaveAttribute('data-active','true');expect(tasks).toHaveAttribute('data-active','false');
   }finally{vi.unstubAllGlobals();}
+});
+
+// These fields stand in for page-owned drafts; unmounting the real page also loses them.
+it.each([['BOM 管理','BOM编辑现场'],['编码字典','字典搜索现场'],['迁移检查','导入预览现场']])('retains %s input and DOM when temporarily visiting another module',(module,label)=>{
+ viewport(false);
+ try{
+  render(<AppShell api={{} as PlannerApi}/>);
+  fireEvent.click(screen.getByRole('button',{name:module}));
+  const input=screen.getByLabelText(label);fireEvent.change(input,{target:{value:'未保存的工作现场'}});
+  fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材'}));expect(input).not.toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:module}));
+  expect(screen.getByLabelText(label)).toBe(input);expect(input).toHaveValue('未保存的工作现场');
+ }finally{vi.unstubAllGlobals();}
+});
+
+it('restores outer workspace scroll separately for each module',()=>{
+ viewport(false);
+ try{
+  const {container}=render(<AppShell api={{} as PlannerApi}/>);const workspace=container.querySelector('main')!;
+  fireEvent.click(screen.getByRole('button',{name:'BOM 管理'}));workspace.scrollTop=145;fireEvent.scroll(workspace);
+  fireEvent.click(screen.getByRole('button',{name:'编码字典'}));expect(workspace.scrollTop).toBe(0);workspace.scrollTop=32;fireEvent.scroll(workspace);
+  fireEvent.click(screen.getByRole('button',{name:'BOM 管理'}));expect(workspace.scrollTop).toBe(145);
+  fireEvent.click(screen.getByRole('button',{name:'编码字典'}));expect(workspace.scrollTop).toBe(32);
+ }finally{vi.unstubAllGlobals();}
 });

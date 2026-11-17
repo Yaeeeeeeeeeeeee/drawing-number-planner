@@ -1,12 +1,13 @@
 import '../v4-page-tables.css';
 import { useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { BomItemView, BomVersionView, DictionaryItemView, MaterialBatchView } from '../../data/client';
+import type { BomItemAssetView, BomItemView, BomVersionView, DictionaryItemView, MaterialBatchView } from '../../data/client';
+import {decodeImagePixels,equalImagePixels,type PixelComparison} from '../../data/image-pixels';
 import { materialBatchLabel } from '../../../core/files/material-batch-label';
 import { BomRecordNotices } from './BomRecordNotices';
 import { BomHistoryAsset } from './BomHistoryAsset';
 import { BomValue } from './BomValue';
-import { assetRoles, bomFields, compareBomItems, snapshotItems } from './bom-history-diff';
+import { assetRoles, attachmentPixelKey, bomFields, compareAttachments, compareBomItems, snapshotItems } from './bom-history-diff';
 import type { BomFieldKey, HistoryItem } from './bom-history-diff';
 import './bom-history-comparison.css';
 
@@ -71,10 +72,40 @@ export function BomHistoryComparison({ detail, readVersion, ...context }: Contex
   const first = detail.previousVersionId === null;
   const current = result?.target === detail ? result : null;
   const previous = current?.previous;
-  const comparison = useMemo(() => previous ? compareBomItems(detail.items, previous.items) : null, [detail, previous]);
+  const [pixelRetry,setPixelRetry]=useState(0);
+  const [pixelState,setPixelState]=useState<{target:BomVersionView;previous:BomVersionView;values:Record<string,PixelComparison>;errors:Record<string,string>;remaining:number}|null>(null);
+  const currentPixels=pixelState?.target===detail&&pixelState.previous===previous?pixelState:null;
+  useEffect(()=>{
+    if(!previous||context.previewOnly)return;
+    const controller=new AbortController(),pairs=new Map<string,[BomItemAssetView,BomItemAssetView]>();
+    for(const row of compareBomItems(detail.items,previous.items).rows){
+      if(!row.previous||!row.selected)continue;
+      for(const role of assetRoles){
+        const a=row.previous.assets.filter(asset=>asset.role===role),b=row.selected.assets.filter(asset=>asset.role===role);
+        if(a.length===1&&b.length===1&&compareAttachments(a,b).uncertain)pairs.set(attachmentPixelKey(a[0],b[0]),[a[0],b[0]]);
+      }
+    }
+    const values:Record<string,PixelComparison>={...(currentPixels?.values??{})},errors:Record<string,string>={};
+    const pending=[...pairs].filter(([key])=>!values[key]||values[key]==='unavailable');
+    let remaining=pending.length;
+    const report=()=>{if(!controller.signal.aborted)setPixelState({target:detail,previous,values:{...values},errors:{...errors},remaining});};
+    report();
+    // Compare pairs sequentially so a large BOM does not retain all decoded images at once.
+    void (async()=>{for(const [key,[a,b]] of pending){
+      try{
+        const images=await Promise.all([a,b].map(asset=>decodeImagePixels(`/api/boms/assets/${asset.assetId}/preview`,controller.signal)));
+        if(controller.signal.aborted)return;values[key]=equalImagePixels(images[0],images[1])?'equal':'different';
+      }catch(error){if(controller.signal.aborted)return;values[key]='unavailable';errors[key]=error instanceof Error?error.message:'图片像素无法核实';}
+      remaining--;report();
+    }})();
+    return()=>controller.abort();
+  },[detail,previous,context.previewOnly,pixelRetry]);
+  const comparison = useMemo(() => previous ? compareBomItems(detail.items, previous.items,currentPixels?.values) : null, [detail, previous,currentPixels]);
   const rows = useMemo(() => comparison?.rows ?? snapshotItems(detail.items, first ? 'first' : 'pending', first ? '' : '对照尚未确认，以下为所选记录完整资料。'), [comparison, detail, first]);
   return <div className="bom-history-comparison">
     <div className="bom-history-basic"><h3>{detail.model}｜{date(detail)}</h3><span>提交时间：{time(detail.createdAt)}</span>{detail.notes && <p>记录备注：{detail.notes}</p>}</div>
+    {!!currentPixels?.remaining&&<p role="status">正在比较图片像素：剩余 {currentPixels.remaining} 组</p>}
+    {currentPixels&&Object.keys(currentPixels.errors).length>0&&<div role="status">图片比较待确认：{[...new Set(Object.values(currentPixels.errors))].join('；')} <button type="button" className="text-button" onClick={()=>setPixelRetry(value=>value+1)}>重试图片比较</button></div>}
     {!first && !previous && <p role="status">{current?.error ?? '正在读取上一条记录…'}</p>}
     <ProjectList key={`${detail.id}:${detail.editRevision}:${detail.updatedAt}:${previous ? 'ready' : first ? 'first' : 'pending'}`} rows={rows} context={context} currentDate={date(detail)} previousDate={previous ? date(previous) : undefined}/>
   </div>;

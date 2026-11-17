@@ -24,7 +24,7 @@ const statusLabel = {
 
 export interface OutboundMailContext {
   packageId?: number; createdAt?: string; manufacturer?: string; scenario?: string; packageMode?: OutboundPackageModeView;
-  batchName?: string;
+  batchName?: string; selectedMaterialBatchId?:number;
   appearanceVersionId?:number;
   appearanceLabel?:string;
   bomVersionIds?:number[];
@@ -59,6 +59,7 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
   const [mode, setMode] = useState<OutboundPackageModeView>('change_only');
   const [preview, setPreview] = useState<OutboundPackagePreviewView | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
+  const [independentOnly, setIndependentOnly] = useState<OutboundPackagePreviewItemView[]>([]);
   const [created, setCreated] = useState<CreatedOutboundPackageView | null>(null);
   useEffect(()=>{if(target){setProductId(String(target.productId));const product=products.find(item=>item.id===target.productId);if(product){setBrandId(String(product.brandId));setCategoryId(String(product.productSizeId));}}},[target?.productId,target?.appearanceVersionId,products]);
   useEffect(()=>{onResultChange?.(created);},[created,onResultChange]);
@@ -71,7 +72,7 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
   const [detail,setDetail]=useState<OutboundPackagePreviewItemView|null>(null);
   const [preflight,setPreflight]=useState<import('../../data/client').OutboundPreflightView|null>(null);
   const selectedKey=JSON.stringify(selected);const extraKey=JSON.stringify(extraIds);const confirmationKey=JSON.stringify(confirmations);
-  useEffect(()=>{preflightRequest.current+=1;generationRequest.current+=1;setPreflight(null);setBusy(false);},[selectedKey,previewDirty,productId,batchId,materialType,mode,extraKey,confirmationKey]);
+  useEffect(()=>{preflightRequest.current+=1;generationRequest.current+=1;setPreflight(null);setIndependentOnly([]);setBusy(false);},[selectedKey,previewDirty,productId,batchId,materialType,mode,extraKey,confirmationKey]);
   useEffect(()=>{previewRequest.current+=1;},[extraKey,confirmationKey]);
   const v2=true;
   useEffect(() => {
@@ -164,6 +165,11 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
     const context=currentRequestContext.current;
     const isCurrent=()=>serial===generationRequest.current&&contextSerial===previewRequest.current&&context===currentRequestContext.current;
     setError('');
+    const selectedItems = preview.items.filter(item => item.pdfFileId !== null && selected.includes(item.pdfFileId));
+    if (selectedItems.length && selectedItems.every(item => (item.sizeBytes ?? 0) > 50_000_000)) {
+      setCreated(null); setIndependentOnly(selectedItems); return;
+    }
+    setIndependentOnly([]);
     if (!window.plannerDesktop?.chooseOutboundDirectory) {
       setError('生成 ZIP 仅支持 Windows 桌面版，请在桌面版选择输出目录。');
       return;
@@ -184,7 +190,7 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
         onPackage(value, {
           packageId: value.id, createdAt: facts.createdAt, packageMode: facts.packageMode,
           bomVersionIds: [...new Set(preview.items.filter(item=>item.pdfFileId && facts.items.some(file=>file.pdfFileId===item.pdfFileId)).flatMap(item=>item.bomContext?.candidates.map(candidate=>candidate.bomVersionId)??[]))],
-          packageName: value.packageName, batchName: facts.batchName,
+          packageName: value.packageName, batchName: facts.batchName, selectedMaterialBatchId: Number(batchId),
           packageFiles: value.parts?.map(part=>part.zipRelativePath) ?? [value.zipRelativePath],
           product: {...chosenProduct,...facts.product}, materialType: facts.materialType,
           items: facts.items,
@@ -201,6 +207,7 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
 
   return (
     <section className="outbound-panel package-builder">
+      {independentOnly.length > 0 && <section aria-label="独立传输结果" className="info-banner"><h3>没有生成 ZIP</h3><p>所选原始 PDF 均超过 50MB，请独立传输：</p>{independentOnly.map(item => <p key={item.pdfFileId}>{item.fileName} · {item.sizeBytes} 字节 · 超过 50MB，需独立传输 · {item.contentSha256}</p>)}{preview?.items.filter(item => item.pdfFileId === null || !selected.includes(item.pdfFileId)).map((item,index) => <p key={index}>{item.fileName ?? '未命名'} · 未纳入：{item.selectable ? '未选择' : (item.detail ?? '不可选择')}</p>)}</section>}
       <section className="ob-step" aria-label="选择外发范围"><h2><span aria-hidden="true">01</span> 选择外发范围</h2>
       <div className="outbound-selection-grid">
         <label>
@@ -241,7 +248,7 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
               <button className="text-button" type="button" onClick={() => setSelected([])}>取消全选</button>
             </div>
           </div>
-          <div className="ob-table outbound-full-file-list"><LayoutTable showLayoutTools={false} tableId="outbound.files" columns={[{key:'select',label:'选择',width:64,minWidth:56,align:'center',locked:'start'},{key:'fileName',label:'文件名',width:380,minWidth:180,align:'left'},{key:'fullCode',label:'完整图号',width:240,minWidth:180,align:'center'},{key:'source',label:'来源',width:170,minWidth:140,align:'center'},{key:'status',label:'资料状态',width:170,minWidth:140,align:'center'},{key:'actions',label:'操作',width:100,minWidth:88,align:'center',locked:'end'}]} aria-label="外发文件预览"><thead><tr>{['选择','文件名','完整图号','来源','资料状态','操作'].map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>{preview.items.map((item,index)=><tr key={`${item.pdfFileId??item.slotKey}:${index}`}><td><input type="checkbox" aria-label={`选择 ${item.projectItemName}`} disabled={!item.selectable||!item.pdfFileId} checked={!!item.pdfFileId&&selected.includes(item.pdfFileId)} onChange={()=>item.pdfFileId&&setSelected(ids=>ids.includes(item.pdfFileId!)?ids.filter(id=>id!==item.pdfFileId):[...ids,item.pdfFileId!])}/></td><td className="file-primary" title={item.fileName??''}><button className="text-button outbound-file-name" onClick={()=>{setDetail(item);setConfirmationReason(item.confirmationReason??confirmations[item.pdfFileId??0]?.reason??'');}}>{item.fileName??'缺少转曲后文件'}</button></td><td className="mono">{item.fullCode??'待确认'}</td><td>{item.source==='extra'?'额外资料（旧批次）':item.source==='baseline_removed'?'对比基准':'当前批次'}</td><td><span className={`outbound-status ${item.status}`}>{item.status==='normal'&&mode==='change_only'&&preview.baselineBatchId===null?'未对比':item.change==='removed'?'已移除 / 待确认':item.detail==='缺少转曲后文件'?'缺少转曲后文件':item.source==='extra'&&item.selectable?'已确认沿用':item.status==='normal'&&item.change==='copied'?'未变化':item.status==='normal'&&item.change==='replaced'?'已修改':item.status==='normal'&&item.change==='new'?'新增':statusLabel[item.status]}</span></td><td><button className="text-button" onClick={()=>{setDetail(item);setConfirmationReason(item.confirmationReason??confirmations[item.pdfFileId??0]?.reason??'');}}>查看</button></td></tr>)}</tbody></LayoutTable></div>
+          <div className="ob-table outbound-full-file-list"><LayoutTable showLayoutTools={false} tableId="outbound.files" columns={[{key:'select',label:'选择',width:64,minWidth:56,align:'center',locked:'start'},{key:'fileName',label:'文件名',width:380,minWidth:180,align:'left'},{key:'fullCode',label:'完整图号',width:240,minWidth:180,align:'center'},{key:'source',label:'来源',width:170,minWidth:140,align:'center'},{key:'status',label:'资料状态',width:170,minWidth:140,align:'center'},{key:'actions',label:'操作',width:100,minWidth:88,align:'center',locked:'end'}]} aria-label="外发文件预览"><thead><tr>{['选择','文件名','完整图号','来源','资料状态','操作'].map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>{preview.items.map((item,index)=><tr key={`${item.pdfFileId??item.slotKey}:${index}`}><td><input type="checkbox" aria-label={`选择 ${item.projectItemName}`} disabled={!item.selectable||!item.pdfFileId} checked={!!item.pdfFileId&&selected.includes(item.pdfFileId)} onChange={()=>item.pdfFileId&&setSelected(ids=>ids.includes(item.pdfFileId!)?ids.filter(id=>id!==item.pdfFileId):[...ids,item.pdfFileId!])}/></td><td className="file-primary" title={item.fileName??''}><button className="text-button outbound-file-name" onClick={()=>{setDetail(item);setConfirmationReason(item.confirmationReason??confirmations[item.pdfFileId??0]?.reason??'');}}>{item.fileName??'缺少转曲后文件'}</button>{(item.sizeBytes ?? 0)>50_000_000 && <span> 超过50MB，需独立传输，不纳入 ZIP</span>}</td><td className="mono">{item.fullCode??'待确认'}</td><td>{item.source==='extra'?'额外资料（旧批次）':item.source==='baseline_removed'?'对比基准':'当前批次'}</td><td><span className={`outbound-status ${item.status}`}>{item.status==='normal'&&mode==='change_only'&&preview.baselineBatchId===null?'未对比':item.change==='removed'?'已移除 / 待确认':item.detail==='缺少转曲后文件'?'缺少转曲后文件':item.source==='extra'&&item.selectable?'已确认沿用':item.status==='normal'&&item.change==='copied'?'未变化':item.status==='normal'&&item.change==='replaced'?'已修改':item.status==='normal'&&item.change==='new'?'新增':statusLabel[item.status]}</span></td><td><button className="text-button" onClick={()=>{setDetail(item);setConfirmationReason(item.confirmationReason??confirmations[item.pdfFileId??0]?.reason??'');}}>查看</button></td></tr>)}</tbody></LayoutTable></div>
           {previewDirty && <p className="info-banner">外发条件或人工确认已改变，请重新预览文件。</p>}
           <button className="primary-button" type="button" disabled={busy || previewDirty || blockers || selected.length === 0} onClick={() => void runPreflight()}>{busy?'预检中…':'生成压缩包'}</button>
         </>

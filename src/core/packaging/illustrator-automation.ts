@@ -4,19 +4,21 @@ import { constants, copyFileSync, existsSync, mkdirSync, readFileSync, realpathS
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import type { PackagingField } from './packaging-types.js';
+import { parseDrawingCode } from '../drawings/drawing-code.js';
 import { buildIllustratorJsx, type IllustratorJsxInput } from './illustrator-jsx.js';
 export type { PackagingField } from './packaging-types.js';
 
 export interface IllustratorIssue { code: string; message: string; severity: 'error' | 'warning'; objectName?: string }
 export interface IllustratorInspection {
+  drawingNumber?: { originalText:string; matches:number; replaced?:number };
   fields: Array<PackagingField & { matches: number; editable: boolean }>;
-  textObjects?: Array<{ objectName: string; matches?: number; editable: boolean }>;
+  textObjects?: Array<{ objectName: string; matches?: number; editable: boolean; sourceText?:string }>;
   fonts: string[];
   issues: IllustratorIssue[];
   /** Illustrator can substitute fonts on open; this is not proof of original-font fidelity. */
   fontValidation: 'declared-and-observed-only';
 }
-export interface IllustratorInspectInput { templatePath: string; fields: PackagingField[]; requiredFonts?: string[] }
+export interface IllustratorInspectInput { templatePath: string; expectedTemplateSha256?: string; fields: PackagingField[]; requiredFonts?: string[] }
 export interface IllustratorGenerateInput extends IllustratorInspectInput { outputPath: string; values: Record<string, string | number> }
 export interface IllustratorGenerateResult { outputPath: string; sizeBytes: number; sha256: string; preserveEditability: true }
 export interface IllustratorAutomation {
@@ -49,8 +51,6 @@ function serialized<T>(work: () => Promise<T>): Promise<T> { const next=queue.th
 function fail(code:string,message:string,details?:unknown):never { throw new IllustratorAutomationError(code,message,details); }
 function hashFile(path:string):string { return createHash('sha256').update(readFileSync(path)).digest('hex'); }
 function cleanupVerifiedCopies(directory:string,sourceTemplatePath:string,candidateHash?:string):void {
-  const copy=join(directory,'template-copy.ait');
-  try{if(existsSync(copy)&&hashFile(copy)===hashFile(sourceTemplatePath))unlinkSync(copy);}catch{/* Preserve unverified or changed evidence. */}
   const candidate=join(directory,'candidate.pdf');
   try{if(candidateHash&&existsSync(candidate)&&hashFile(candidate)===candidateHash)unlinkSync(candidate);}catch{/* A cleanup failure must not erase the published PDF. */}
 }
@@ -158,20 +158,18 @@ export class WindowsIllustratorAutomation implements IllustratorAutomation {
   }
   private async perform(mode:'inspect'|'generate'|'open',input:IllustratorInspectInput|IllustratorGenerateInput|{pdfPath:string;fields:PackagingField[]}):Promise<{inspection?:IllustratorInspection;candidate?:string;operationDirectory:string}> {
     this.assertWindows();
-    if(mode==='generate'){
-      input={...input,fields:input.fields.filter(field=>field.sourceKey==='DRAWING_NO')};
-      if(!input.fields.length)fail('DRAWING_NUMBER_FIELD_REQUIRED','请配置至少一个完整图号文字对象');
-    }
+    if(mode!=='open')input={...input,fields:input.fields.filter(field=>field.sourceKey==='DRAWING_NO')};
+    if(mode==='generate'&&(!('values' in input)||!Object.prototype.hasOwnProperty.call(input.values,'DRAWING_NO')||typeof input.values.DRAWING_NO!=='string'||!parseDrawingCode(input.values.DRAWING_NO)))
+      fail('DRAWING_NUMBER_FIELD_REQUIRED','请提供有效完整图号；模板对象可自动识别或使用已保存映射');
     if(input.fields.some(field=>!field.objectName.trim()||!field.sourceKey.trim())||new Set(input.fields.map(field=>field.objectName)).size!==input.fields.length)fail('INVALID_FIELD_MAPPING','模板对象名称和数据字段不能为空或重复');
     mkdirSync(this.operationRoot,{recursive:true});
     const previous=this.readActive();if(previous)fail('AUTOMATION_UNSETTLED','上次 Illustrator 操作尚未核对，不能重复生成',previous);
     let sourceTemplatePath:string|undefined,sourceHash:string|undefined;
-    if('templatePath' in input){sourceTemplatePath=realpathSync.native(input.templatePath);if(extname(sourceTemplatePath).toLowerCase()!=='.ait'||!statSync(sourceTemplatePath).isFile())fail('INVALID_AIT_PATH','模板必须是可读取的 AIT 文件');sourceHash=hashFile(sourceTemplatePath);}
+    if('templatePath' in input){sourceTemplatePath=realpathSync.native(input.templatePath);if(extname(sourceTemplatePath).toLowerCase()!=='.ait'||!statSync(sourceTemplatePath).isFile())fail('INVALID_AIT_PATH','模板必须是可读取的 AIT 文件');sourceHash=hashFile(sourceTemplatePath);if(input.expectedTemplateSha256!==undefined&&sourceHash!==input.expectedTemplateSha256)fail('TEMPLATE_CHANGED','原始 AIT 在等待执行期间发生变化，请重新检查模板');}
     const operationId=randomUUID(),operationDirectory=join(this.operationRoot,operationId);
     mkdirSync(operationDirectory);
     const resultPath=join(operationDirectory,'result.json'),completedPath=join(operationDirectory,'runner-finished.json'),runnerPath=join(operationDirectory,'runner.ps1');
-    const templatePath=sourceTemplatePath?join(operationDirectory,'template-copy.ait'):undefined;
-    if(sourceTemplatePath&&templatePath){copyFileSync(sourceTemplatePath,templatePath,constants.COPYFILE_EXCL);if(hashFile(templatePath)!==sourceHash)fail('TEMPLATE_CHANGED','复制期间模板发生变化，请重新检查模板');}
+    const templatePath=sourceTemplatePath;
     const candidate=mode==='generate'?join(operationDirectory,'candidate.pdf'):undefined;
     const job:IllustratorRunnerJob={operationId,mode,operationDirectory,sourceTemplatePath,templatePath,outputPath:candidate,pdfPath:'pdfPath' in input?input.pdfPath:undefined,resultPath,completedPath,runnerPath,scriptPath:join(operationDirectory,'operation.jsx'),fields:input.fields,values:'values' in input?input.values:undefined,requiredFonts:'requiredFonts' in input?input.requiredFonts:[]};
     writeFileSync(job.scriptPath,'\uFEFF'+buildIllustratorJsx(job),{flag:'wx'});
@@ -198,8 +196,12 @@ export class WindowsIllustratorAutomation implements IllustratorAutomation {
     if(mode!=='open'){
       if(!validateInspection(result.inspection))fail('INVALID_ILLUSTRATOR_RESULT','Illustrator 返回的模板检查结果不完整',active);
       if(result.inspection.issues.some(issue=>issue.severity==='error'))fail('TEMPLATE_VALIDATION_FAILED','模板存在未解决的问题，未发布 PDF',result.inspection);
-      if(mode==='generate'&&!input.fields.some(field=>result.inspection!.fields.some(observed=>observed.objectName===field.objectName&&observed.sourceKey==='DRAWING_NO'&&observed.matches===1&&observed.editable)))fail('DRAWING_NUMBER_FIELD_REQUIRED','模板中未找到已配置的可编辑完整图号文字对象',result.inspection);
-      for(const field of input.fields){const observed=result.inspection.fields.find(value=>value.objectName===field.objectName&&value.sourceKey===field.sourceKey);if(!observed||(field.required&&(observed.matches!==1||!observed.editable)))fail('TEMPLATE_VALIDATION_FAILED','模板必要对象检查未通过',result.inspection);}
+      if(mode==='generate'){
+        const proof=result.inspection.drawingNumber;
+        if(!proof||typeof proof.originalText!=='string'||!parseDrawingCode(proof.originalText)||!Number.isSafeInteger(proof.matches)||proof.matches<1||proof.replaced!==proof.matches
+          ||!result.inspection.fields.some(field=>field.sourceKey==='DRAWING_NO'&&field.editable&&field.matches===proof.matches))
+          fail('DRAWING_NUMBER_FIELD_REQUIRED','未收到所有完整图号文字对象均已替换的可靠检查结果，未发布 PDF',result.inspection);
+      }
     }
     return{inspection:result.inspection,candidate,operationDirectory};
   }

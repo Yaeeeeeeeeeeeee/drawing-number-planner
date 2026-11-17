@@ -10,6 +10,7 @@ import {FileRepository} from '../../../src/core/files/file-repository';
 import {WorkspaceSettingsStore} from '../../../src/core/files/workspace-settings';
 import {registerPackagingTaskRoutes} from '../../../src/server/routes/packaging-tasks';
 import {registerFileRoutes} from '../../../src/server/routes/files';
+import {TaskRegistry} from '../../../src/core/tasks/task-registry';
 
 it('scans only enabled canonical products in the exact category and preserves all other indices',async()=>{
   const f=setup(),root=join(f.dir,'library'),app=Fastify();mkdirSync(root);
@@ -20,8 +21,12 @@ it('scans only enabled canonical products in the exact category and preserves al
   for(const directory of paths){mkdirSync(join(root,directory,'02.未转曲源文件'),{recursive:true});writeFileSync(join(root,directory,'02.未转曲源文件','source.pdf'),'%PDF-1.7\ncontent\n%%EOF');}
   const settings=new WorkspaceSettingsStore(join(f.dir,'settings.json'));settings.setWorkspaceRoot(root);
   const files=new FileService(new FileRepository(f.db),settings),workspace=new PackagingWorkspace(f.db,()=>root);
-  registerPackagingTaskRoutes(app,{db:f.db,workspace,options:{files,dataDir:f.dir}} as never,{} as never);registerFileRoutes(app,files);
+  const tasks=new TaskRegistry();
+  registerPackagingTaskRoutes(app,{db:f.db,workspace,options:{files,dataDir:f.dir}} as never,{} as never,tasks);registerFileRoutes(app,files,tasks);
   try{
+    for(const [kind,payload] of [['workspace_scan',{}],['product_scan',{productId:f.first}],['category_scan',{category:'category'}]] as const){
+      const task=tasks.create(kind,payload);await tasks.wait(task.id);expect(tasks.get(task.id)).toMatchObject({status:'completed',result:{comparison:{scope:{kind:kind==='workspace_scan'?'workspace':'products'}}}});
+    }
     await files.scan();const otherBefore=f.db.prepare("select * from pdf_files where relative_path like 'other/%'").all();
     writeFileSync(join(root,paths[0],'02.未转曲源文件','new.pdf'),'%PDF-1.7\nnew\n%%EOF');
     unlinkSync(join(root,paths[1],'02.未转曲源文件','source.pdf'));

@@ -65,7 +65,7 @@ describe('FileService', () => {
     registry.register('workspace_scan', (_payload, context) => service.scan(context));
     const task = registry.create('workspace_scan', {});
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(registry.get(task.id)?.progress).toMatchObject({ processed: 1, total: 2, phase: 'scanning' });
+    expect(registry.get(task.id)?.progress).toMatchObject({ processed: 1, total: 2, phase: 'traversing' });
     registry.cancel(task.id); release(); await registry.wait(task.id);
     expect(registry.get(task.id)?.status).toBe('cancelled');
     expect(repository.latestScan()).toBeNull();

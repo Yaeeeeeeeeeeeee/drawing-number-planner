@@ -641,7 +641,7 @@ describe('OutboundPage', () => {
     fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '脏修改' } });
     expect(register.mock.lastCall?.[0]()).toBe(false); confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: '返回外发工作台' }));
-    expect(register.mock.lastCall?.[0]).toBeNull();
+    expect(register.mock.lastCall?.[0]()).toBe(true);
   });
   it.each(['template', 'parent', 'block', 'signature'])('closes the unified editor after deleting its %s record', async kind => {
     const api = apiFixture(); vi.spyOn(window, 'confirm').mockReturnValue(true);

@@ -79,7 +79,7 @@ export interface BatchPlanningRow extends PlanningRowInput { shareWhite?: boolea
 export interface BatchPlanningInput { groups: Array<{ productId: number; appearanceId?: number; appearanceVersionId?: number; rows: BatchPlanningRow[] }> }
 export interface BatchPlanningCheck {
   clientId: string; productId: number; colorId: number; mainCategoryId: number; projectItemId: number;
-  available: boolean; fullCode?: string; prefix?: string; sequence?: number;
+  available: boolean; fullCode?: string; prefix?: string; sequence?: number; lastUsedSequence?: number;
   parts?: import('../drawings/drawing-code.js').DrawingCodeParts;
   fingerprint?: string; shared?: WhiteDrawingIdentity; error?: { code: string; message: string };
 }

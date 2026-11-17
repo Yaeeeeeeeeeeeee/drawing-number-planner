@@ -3,9 +3,20 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
 /** Ask once per installation, then reuse the chosen database. Never reset old data. */
-async function prepareProductionProfile({ appData, installationId, chooseMode, chooseDatabase, initializeDatabase, databaseSafety, forceSelection = false, beforeSwitch, verifyStartup, currentDataDir }) {
+async function prepareProductionProfile({ appData, installationId, chooseMode, chooseDatabase, initializeDatabase, databaseSafety, forceSelection = false, beforeSwitch, verifyStartup, currentDataDir, confirmDatabase, activate }) {
   const home = path.join(appData, 'DrawingNumberPlanner');
   const config = path.join(home, 'profile.json');
+  const pending = path.join(home, 'profile-switch-pending.json');
+  const restorePending = () => {
+    if (!fs.existsSync(pending)) return;
+    const previous = JSON.parse(fs.readFileSync(pending, 'utf8'));
+    if (previous.exists) {
+      const temporary = path.join(home, `.profile-restore-${randomUUID()}.tmp`);
+      try { fs.writeFileSync(temporary, Buffer.from(previous.bytes, 'base64'), {flag:'wx'}); fs.renameSync(temporary, config); }
+      finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+    } else if (fs.existsSync(config)) fs.unlinkSync(config);
+    fs.unlinkSync(pending);
+  };
   const rejectLink = file => {
     if (fs.existsSync(file) && fs.lstatSync(file).isSymbolicLink()) {
       throw Error('数据配置不能使用链接，请选择原始数据库目录。');
@@ -19,12 +30,14 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     try { fs.readSync(fd, header, 0, 16, 0); }
     finally { fs.closeSync(fd); }
     if (header.toString('ascii') !== 'SQLite format 3\0') throw Error('所选文件不是有效的 SQLite 数据库。');
-    safety.validateProductionDatabase(file);
+    return safety.validateProductionDatabase(file);
   };
 
   const safety = databaseSafety ?? require('./initialize-empty-acceptance.cjs');
   rejectLink(home);
   rejectLink(config);
+  rejectLink(pending);
+  restorePending();
   let saved;
   if (fs.existsSync(config)) {
     saved = JSON.parse(fs.readFileSync(config, 'utf8'));
@@ -76,7 +89,8 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
       throw Error('所选数据库与服务使用的 planner.db 不一致，不会创建替代空库。');
     }
     file = runtimeFile;
-    validateDatabase(file);
+    const summary = validateDatabase(file);
+    if (confirmDatabase && !await confirmDatabase({path:file, ...summary})) return null;
     await protectCurrent();
     await safety.prepareExistingProductionDatabase(file);
   } else if (mode === 'fresh') {
@@ -104,9 +118,21 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
   if (installationId) next.installationId = installationId;
   // Rename within one directory keeps the previous profile intact on write failure.
   const temporary = path.join(home, `.profile-${randomUUID()}.tmp`);
+  if (activate) {
+    const journal = path.join(home, `.profile-journal-${randomUUID()}.tmp`);
+    try {
+      fs.writeFileSync(journal, JSON.stringify({exists:fs.existsSync(config), bytes:fs.existsSync(config) ? fs.readFileSync(config).toString('base64') : ''}), {flag:'wx'});
+      fs.renameSync(journal, pending);
+    } finally { if (fs.existsSync(journal)) fs.unlinkSync(journal); }
+  }
   try {
     fs.writeFileSync(temporary, JSON.stringify(next, null, 2), { flag: 'wx' });
     fs.renameSync(temporary, config);
+    if (activate) await activate(data);
+    if (activate) fs.unlinkSync(pending);
+  } catch (error) {
+    if (activate) restorePending();
+    throw error;
   } finally {
     if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
   }

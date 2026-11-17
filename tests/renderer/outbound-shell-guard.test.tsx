@@ -12,15 +12,15 @@ vi.mock('../../src/renderer/pages/OutboundPage',()=>({OutboundPage:({registerLea
  return <input aria-label="配置测试字段" value={value??''} onChange={e=>setValue(e.target.value)}/>;
 }}));
 describe('outbound shell leave guard',()=>{
- it('keeps the configuration mounted if main navigation discard confirmation is rejected',()=>{
+ it('keeps the configuration and its dirty value on module navigation without asking to discard',()=>{
  const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
  render(<AppShell api={{} as never}/>);
  fireEvent.click(screen.getByRole('button',{name:'外发资料'}));
- fireEvent.change(screen.getByLabelText('配置测试字段'),{target:{value:'未保存'}});
+ const input=screen.getByLabelText('配置测试字段');
+ fireEvent.change(input,{target:{value:'未保存'}});
  fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材'}));
- expect(confirm).toHaveBeenCalled();expect(screen.getByLabelText('配置测试字段')).toHaveValue('未保存');
- confirm.mockReturnValue(true);
- fireEvent.click(screen.getByRole('button',{name:'图号规划 / 更新包材'}));
- expect(screen.queryByLabelText('配置测试字段')).toBeNull();expect(screen.getByText('规划主页')).toBeVisible();
+ expect(confirm).not.toHaveBeenCalled();expect(input).not.toBeVisible();expect(screen.getByText('规划主页')).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'外发资料'}));
+ expect(screen.getByLabelText('配置测试字段')).toBe(input);expect(input).toHaveValue('未保存');
  });
 });

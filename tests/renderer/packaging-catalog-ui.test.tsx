@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+afterEach(()=>vi.restoreAllMocks());
 import { PackagingTemplatesPage } from '../../src/renderer/pages/PackagingTemplatesPage';
 import { ConfigEditor, RuleEditor, TemplateEditor } from '../../src/renderer/pages/packaging/PackagingEditors';
 import type { PackagingCatalog, PackagingParameter, PackagingTemplate } from '../../src/core/packaging/packaging-types';
@@ -9,7 +10,7 @@ const lookups={products:[],projects:[project],mains:[{id:2,name:'印刷件',code
 const template={id:9,name:'标准模板',mainCategoryId:2,projectItemId:3,brandIds:[],productIds:[],fields:[{objectName:'图号文字',sourceKey:'DRAWING_NO',required:true},{objectName:'品牌文字',sourceKey:'BRAND',required:false}],requiredFonts:['ExistingFont'],status:'active',fileName:'标准.ait',revision:1,assetRelativePath:'templates/标准.ait',sha256:'hash',createdAt:'2026-11-02',updatedAt:'2026-11-02'} as PackagingTemplate;
 const parameters:PackagingParameter[]=[{key:'side_a',label:'旧长',type:'number',axis:'length',required:true,unit:'mm'},{key:'side_b',label:'旧宽',type:'number',axis:'width',required:true,unit:'mm'},{key:'legacy_note',label:'历史规格说明',type:'text',required:true}];
 function catalog():PackagingCatalog{return {templates:[template],dimensions:[],rules:[],configs:[{projectItemId:3,mode:'ait',parameters}]};}
-function packagingApi(){return {getCatalog:vi.fn().mockResolvedValue(catalog()),saveConfig:vi.fn().mockResolvedValue({}),updateTemplate:vi.fn().mockResolvedValue(template),replaceTemplateFile:vi.fn().mockResolvedValue(template),createTemplate:vi.fn().mockResolvedValue(template),saveRule:vi.fn().mockResolvedValue({}),inspectTemplate:vi.fn().mockResolvedValue({fields:[],textObjects:[{objectName:'图号文字',editable:true},{objectName:'其他文字',editable:true}],fonts:['DetectedFont'],issues:[]}),inspectTemplateFile:vi.fn().mockResolvedValue({fields:[],textObjects:[{objectName:'上传图号',editable:true}],fonts:['UploadFont'],issues:[]})};}
+function packagingApi(){return {getCatalog:vi.fn().mockResolvedValue(catalog()),saveConfig:vi.fn().mockResolvedValue({}),updateTemplate:vi.fn().mockResolvedValue(template),replaceTemplateFile:vi.fn().mockResolvedValue(template),createTemplate:vi.fn().mockResolvedValue(template),saveRule:vi.fn().mockResolvedValue({}),inspectTemplate:vi.fn().mockResolvedValue({fields:[],textObjects:[{objectName:'图号文字',editable:true},{objectName:'其他文字',editable:true}],fonts:['DetectedFont'],issues:[]}),selectTemplateReference:vi.fn().mockResolvedValue({token:'cap',fileName:'新模板.ait',displayPath:'/original/新模板.ait'}),saveTemplateReference:vi.fn().mockResolvedValue(template),inspectTemplateReference:vi.fn().mockResolvedValue({fields:[],textObjects:[{objectName:'上传图号',editable:true}],fonts:['UploadFont'],issues:[]})};}
 const saved=()=>Promise.resolve();
 
 describe('packaging catalog simplification',()=>{
@@ -35,17 +36,17 @@ describe('packaging catalog simplification',()=>{
   });
   it('reads selected AIT objects and fonts without saving the immutable asset',async()=>{
     const api=packagingApi();render(<TemplateEditor api={api as never} initial={template} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);
-    const file=new File(['ait'],'新模板.ait');fireEvent.change(screen.getByLabelText(/AIT 原始文件/),{target:{files:[file]}});
+    fireEvent.click(screen.getByRole('button',{name:'重新定位 AIT'}));
     await waitFor(()=>expect(document.querySelector('#packaging-ait-objects option[value="上传图号"]')).toBeInTheDocument());
-    expect(api.inspectTemplateFile).toHaveBeenCalledWith(file,template.fields,template.requiredFonts);
+    expect(api.inspectTemplateReference).toHaveBeenCalledWith('cap',template.fields,template.requiredFonts);
     expect(screen.getByLabelText('所需字体')).toHaveValue('ExistingFont, UploadFont');
     expect(api.replaceTemplateFile).not.toHaveBeenCalled();
   });
   it('keeps draft and manual controls when automatic AIT inspection fails',async()=>{
-    const api=packagingApi();api.inspectTemplateFile.mockRejectedValue(new Error('Illustrator 未启动'));
+    const api=packagingApi();api.inspectTemplateReference.mockRejectedValue(new Error('Illustrator 未启动'));
     render(<TemplateEditor api={api as never} initial={template} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);
     fireEvent.change(screen.getByLabelText('模板名称'),{target:{value:'未保存模板'}});
-    fireEvent.change(screen.getByLabelText(/AIT 原始文件/),{target:{files:[new File(['ait'],'新模板.ait')]}});
+    fireEvent.click(screen.getByRole('button',{name:'重新定位 AIT'}));
     expect(await screen.findByText(/Illustrator 未启动/)).toBeVisible();
     expect(screen.getByLabelText('模板名称')).toHaveValue('未保存模板');
     expect(screen.getByLabelText('AIT 对象名称 1')).toHaveValue('图号文字');
@@ -87,7 +88,7 @@ describe('packaging catalog simplification',()=>{
     fireEvent.click(screen.getByRole('button',{name:'添加尺寸条件'}));
     expect(within(screen.getByLabelText('条件尺寸 1')).getAllByRole('option').map(option=>option.textContent)).toEqual(['长','宽']);
     fireEvent.change(screen.getByLabelText('比较方式 1'),{target:{value:'between'}});fireEvent.change(screen.getByLabelText('最小值 1'),{target:{value:'50'}});fireEvent.change(screen.getByLabelText('最大值 1'),{target:{value:'100'}});
-    fireEvent.click(screen.getByLabelText('允许长宽互换（高度不参与）'));fireEvent.click(screen.getByRole('button',{name:'保存匹配规则'}));
+    expect(screen.getByLabelText('允许长宽互换（高度不参与）')).toBeChecked();fireEvent.click(screen.getByRole('button',{name:'保存匹配规则'}));
     await waitFor(()=>expect(api.saveRule).toHaveBeenCalledWith(expect.objectContaining({conditions:[{key:'side_a',operator:'between',value:50,max:100}],allowLengthWidthSwap:true})));
   });
   it('saves a fixed template rule without technical parameter entry',async()=>{
@@ -114,4 +115,81 @@ describe('packaging catalog simplification',()=>{
     expect(screen.getByLabelText('模板名称')).toHaveValue('尚未保存');expect(packaging.updateTemplate).not.toHaveBeenCalled();
   });
 });
-it('reads a newly selected AIT before the user knows its drawing text object name',async()=>{const api=packagingApi();render(<TemplateEditor api={api as never} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);const file=new File(['new AIT'],'新文件.ait');fireEvent.change(screen.getByLabelText(/AIT 原始文件/),{target:{files:[file]}});await waitFor(()=>expect(api.inspectTemplateFile).toHaveBeenCalledWith(file,[],[]));expect(api.createTemplate).not.toHaveBeenCalled();expect(document.querySelector('#packaging-ait-objects option[value="上传图号"]')).not.toBeNull();});
+it('reads a newly selected AIT before the user knows its drawing text object name',async()=>{const api=packagingApi();render(<TemplateEditor api={api as never} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);fireEvent.click(screen.getByRole('button',{name:'选择 AIT 原始文件'}));await waitFor(()=>expect(api.inspectTemplateReference).toHaveBeenCalledWith('cap',[],[]));expect(api.createTemplate).not.toHaveBeenCalled();expect(document.querySelector('#packaging-ait-objects option[value="上传图号"]')).not.toBeNull();});
+
+
+describe('confirmed AIT overlay editor',()=>{
+ it('uses a right dialog and confirms unsaved close only once while preserving input on rejection',()=>{
+  const onCancel=vi.fn(),confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
+  render(<TemplateEditor api={packagingApi() as never} initial={template} lookups={lookups as never} onSaved={saved} onCancel={onCancel}/>);
+  const dialog=screen.getByRole('dialog',{name:'编辑 AIT 模板'});
+  expect(dialog).toHaveAttribute('aria-modal','true');expect(dialog).toHaveClass('pkg-template-drawer');
+  fireEvent.change(within(dialog).getByLabelText('模板名称'),{target:{value:'未保存模板'}});
+  fireEvent.keyDown(dialog,{key:'Escape'});expect(confirm).toHaveBeenCalledTimes(1);expect(onCancel).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('模板名称')).toHaveValue('未保存模板');
+  confirm.mockReturnValue(true);fireEvent.click(within(dialog).getByRole('button',{name:'取消'}));expect(confirm).toHaveBeenCalledTimes(2);expect(onCancel).toHaveBeenCalledTimes(1);
+ });
+ it('closes an unchanged editor without a save warning',()=>{
+  const onCancel=vi.fn(),confirm=vi.spyOn(window,'confirm');
+  render(<TemplateEditor api={packagingApi() as never} initial={template} lookups={lookups as never} onSaved={saved} onCancel={onCancel}/>);
+  fireEvent.click(screen.getByRole('button',{name:'取消'}));expect(onCancel).toHaveBeenCalledOnce();expect(confirm).not.toHaveBeenCalled();
+ });
+ it('clears dirty after a successful save even when refreshing the list then fails',async()=>{
+  const api=packagingApi(),onCancel=vi.fn(),confirm=vi.spyOn(window,'confirm');
+  render(<TemplateEditor api={api as never} initial={template} lookups={lookups as never} onSaved={async()=>{throw Error('列表刷新失败');}} onCancel={onCancel}/>);
+  fireEvent.change(screen.getByLabelText('模板名称'),{target:{value:'已保存名称'}});
+  fireEvent.submit(screen.getByRole('form',{name:'AIT 模板编辑'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('列表刷新失败');
+  expect(api.updateTemplate).toHaveBeenCalledOnce();fireEvent.click(screen.getByRole('button',{name:'取消'}));
+  expect(confirm).not.toHaveBeenCalled();expect(onCancel).toHaveBeenCalledOnce();
+ });
+ it('preserves dirty changes after a failed save',async()=>{
+  const api=packagingApi(),onCancel=vi.fn(),confirm=vi.spyOn(window,'confirm').mockReturnValue(false);api.updateTemplate.mockRejectedValueOnce(Error('模板保存失败'));
+  render(<TemplateEditor api={api as never} initial={template} lookups={lookups as never} onSaved={saved} onCancel={onCancel}/>);
+  fireEvent.change(screen.getByLabelText('模板名称'),{target:{value:'失败也保留'}});fireEvent.submit(screen.getByRole('form',{name:'AIT 模板编辑'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('模板保存失败');fireEvent.click(screen.getByRole('button',{name:'取消'}));
+  expect(confirm).toHaveBeenCalledOnce();expect(onCancel).not.toHaveBeenCalled();expect(screen.getByLabelText('模板名称')).toHaveValue('失败也保留');
+ });
+});
+it('uses the desktop chooser capability to relocate a template',async()=>{const api=packagingApi() as any;api.selectTemplateReference=vi.fn().mockResolvedValue({token:'cap',fileName:'new.ait',displayPath:'/original/new.ait'});api.inspectTemplateReference=vi.fn().mockResolvedValue({fields:[],textObjects:[],fonts:[],issues:[]});api.saveTemplateReference=vi.fn().mockResolvedValue(template);render(<TemplateEditor api={api} initial={template} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);fireEvent.click(screen.getByRole('button',{name:'重新定位 AIT'}));await waitFor(()=>expect(api.inspectTemplateReference).toHaveBeenCalledWith('cap',template.fields,template.requiredFonts));fireEvent.click(screen.getByRole('button',{name:'保存模板'}));await waitFor(()=>expect(api.saveTemplateReference).toHaveBeenCalledWith(template,'cap',template.id));});
+it('shows a missing original while retaining relocation',async()=>{const api=packagingApi() as any;api.templateStatus=vi.fn().mockResolvedValue({available:false,message:'模板文件不存在或无法读取'});render(<TemplateEditor api={api} initial={template} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);expect(await screen.findByText(/模板文件不存在或无法读取/)).toBeVisible();expect(screen.getByRole('button',{name:'重新定位 AIT'})).toBeEnabled();});
+
+it('previews automatic full-code detection and saves a new template without forcing an object name',async()=>{
+ const api=packagingApi();api.inspectTemplateReference.mockResolvedValue({fields:[],textObjects:[],fonts:[],issues:[],drawingNumber:{originalText:'02.0305.010.0201001',matches:2}} as never);
+ render(<TemplateEditor api={api as never} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);
+ fireEvent.change(screen.getByLabelText('模板名称'),{target:{value:'自动识别模板'}});
+ fireEvent.change(screen.getByLabelText('资料类别'),{target:{value:'2'}});fireEvent.change(screen.getByLabelText('项目明细'),{target:{value:'3'}});
+ fireEvent.click(screen.getByRole('button',{name:'选择 AIT 原始文件'}));
+ expect(await screen.findByText(/原完整图号：02.0305.010.0201001/)).toHaveTextContent('2 处');
+ expect(screen.queryByLabelText('AIT 对象名称 1')).not.toBeInTheDocument();
+ fireEvent.submit(screen.getByRole('form',{name:'AIT 模板编辑'}));
+ await waitFor(()=>expect(api.saveTemplateReference).toHaveBeenCalledWith(expect.objectContaining({name:'自动识别模板',fields:[]}),'cap'));
+});
+
+it('keeps length-width swapping enabled when choosing a template for a new rule',()=>{
+ render(<RuleEditor api={packagingApi() as never} catalog={catalog()} onSaved={saved} onCancel={()=>{}}/>);
+ fireEvent.change(screen.getByLabelText('目标模板'),{target:{value:'9'}});
+ expect(screen.getByLabelText('允许长宽互换（高度不参与）')).toBeChecked();
+});
+
+it('shows template range and unavailable original without dropping the record',async()=>{
+ const packaging=packagingApi() as any;const value=catalog();value.rules=[{id:4,name:'范围',templateId:9,conditions:[{key:'side_a',operator:'between',value:50,max:100}],allowLengthWidthSwap:true,status:'active'}];packaging.getCatalog.mockResolvedValue(value);packaging.templateStatus=vi.fn().mockResolvedValue({available:false,message:'原始文件不存在'});
+ render(<PackagingTemplatesPage api={{packaging,listProducts:async()=>[],listDictionaries:async(type:string)=>type==='project_item'?lookups.projects:type==='main_category'?lookups.mains:[]} as never}/>);
+ expect(await screen.findByText('原始文件不存在')).toBeVisible();expect(within(screen.getByRole('tabpanel',{name:'AIT 模板管理'})).getByText(/长 介于 50 至 100/)).toBeVisible();expect(within(screen.getByRole('tabpanel',{name:'AIT 模板管理'})).getByText('标准模板')).toBeVisible();
+});
+
+it('saves template metadata and configured dimensions in one reference request',async()=>{
+ const api=packagingApi();const value=catalog();render(<TemplateEditor api={api as never} catalog={value} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);
+ fireEvent.change(screen.getByLabelText('模板名称'),{target:{value:'尺寸模板'}});fireEvent.change(screen.getByLabelText('资料类别'),{target:{value:'2'}});fireEvent.change(screen.getByLabelText('项目明细'),{target:{value:'3'}});fireEvent.click(screen.getByLabelText('设置模板尺寸范围'));fireEvent.change(screen.getByLabelText('长最小值'),{target:{value:'50'}});fireEvent.change(screen.getByLabelText('长最大值'),{target:{value:'100'}});fireEvent.click(screen.getByRole('button',{name:'选择 AIT 原始文件'}));await waitFor(()=>expect(api.inspectTemplateReference).toHaveBeenCalled());fireEvent.submit(screen.getByRole('form',{name:'AIT 模板编辑'}));
+ await waitFor(()=>expect(api.saveTemplateReference).toHaveBeenCalledWith(expect.objectContaining({name:'尺寸模板'}),'cap',undefined,expect.objectContaining({conditions:[{key:'side_a',operator:'between',value:50,max:100}]})));expect(api.saveRule).not.toHaveBeenCalled();
+});
+it('preserves multiple legacy rules and directs editing to the rules tab',()=>{
+ const api=packagingApi();const value=catalog();value.rules=[{id:1,name:'规则一',templateId:9,conditions:[],allowLengthWidthSwap:true,status:'active'},{id:2,name:'规则二',templateId:9,conditions:[],allowLengthWidthSwap:true,status:'active'}];render(<TemplateEditor api={api as never} initial={template} catalog={value} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);
+ expect(screen.getByText(/存在多条启用规则/)).toBeVisible();expect(screen.getByText(/规则一/)).toBeVisible();expect(screen.getByText(/规则二/)).toBeVisible();expect(screen.queryByLabelText('设置模板尺寸范围')).not.toBeInTheDocument();
+});
+
+it('updates one existing range together with template metadata using its rule ID',async()=>{
+ const api=packagingApi();const value=catalog();value.rules=[{id:41,name:'现有范围',templateId:9,conditions:[{key:'side_a',operator:'between',value:10,max:20}],allowLengthWidthSwap:true,status:'active'}];render(<TemplateEditor api={api as never} initial={template} catalog={value} lookups={lookups as never} onSaved={saved} onCancel={()=>{}}/>);
+ fireEvent.click(screen.getByLabelText('设置模板尺寸范围'));expect(screen.getByLabelText('长最小值')).toHaveValue(10);fireEvent.change(screen.getByLabelText('长最大值'),{target:{value:'30'}});fireEvent.change(screen.getByLabelText('模板名称'),{target:{value:'新名称'}});fireEvent.submit(screen.getByRole('form',{name:'AIT 模板编辑'}));
+ await waitFor(()=>expect(api.updateTemplate).toHaveBeenCalledWith(9,expect.objectContaining({name:'新名称'}),expect.objectContaining({id:41,name:'现有范围',conditions:[{key:'side_a',operator:'between',value:10,max:30}]})));expect(api.saveRule).not.toHaveBeenCalled();
+});

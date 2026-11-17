@@ -68,6 +68,7 @@ export class QrManualService {
     const product = this.db.prepare(`select coalesce(master.model,product.model) as model from products product left join product_identity_members identity on identity.raw_product_id=product.id left join products master on master.id=identity.canonical_product_id where product.id=? and product.deleted_at is null`).get(input.productId) as { model: string } | undefined;
     const purpose = this.repository.listPurposes().find(p => p.id === input.purposeId && p.status === 'active');
     if (!product || !purpose) throw new QrManualError('NOT_FOUND', '产品或用途不存在');
+    if (!input.qrCodeId && !this.repository.purposeAppliesToProduct(input.productId, input.purposeId)) throw new QrManualError('PURPOSE_NOT_APPLICABLE', '该用途不适用于此产品类别');
     if (input.appearanceVersionId!=null) new QrService(this.db).list({productId:input.productId,appearanceVersionId:input.appearanceVersionId});
     if (input.qrCodeId) {
       const code=this.repository.get(input.qrCodeId);

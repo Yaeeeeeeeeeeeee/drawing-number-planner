@@ -85,10 +85,10 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   unlinkSync(sourceFile); unlinkSync(outlinedFile);
   await page.getByRole('button', { name: /PDF 文件中心/ }).click();
   await scanUi();
-  await page.getByText('文件筛选', { exact: true }).click();
+  await page.getByRole('button',{name:'筛选',exact:true}).click();
   await page.getByLabel('文件关键词').fill('02.0404.010.0401007');
   await page.getByLabel('存在状态').selectOption('missing');
-  await page.getByRole('button', { name: '筛选 PDF' }).click();
+  await page.getByRole('complementary',{name:'PDF 筛选'}).getByRole('button',{name:'关闭',exact:true}).click();
   await expect(page.locator('.file-primary').filter({ hasText: '02.0404.010.0401007' })).toHaveCount(2);
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '图号库', exact: true }).click();
   await page.getByLabel('关键词', { exact: true }).fill('02.0404.010.0401007');

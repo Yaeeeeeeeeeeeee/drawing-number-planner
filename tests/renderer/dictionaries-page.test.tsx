@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest';
 
 import { DictionariesPage } from '../../src/renderer/pages/DictionariesPage';
+import type { DictionaryItemView } from '../../src/renderer/data/client';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -21,18 +22,18 @@ describe('DictionariesPage', () => {
     expect(screen.getByRole('button', {name:'恢复 历史品牌'})).toBeVisible();
     expect(screen.queryByRole('button', {name:'删除 历史品牌'})).not.toBeInTheDocument();
   });
-  const mainCategories = [
+  const mainCategories: DictionaryItemView[] = [
     { id: 10, type: 'main_category', code: '04', name: '印刷件类', parentId: null, status: 'active' as const },
     { id: 11, type: 'main_category', code: '05', name: '包装类', parentId: null, status: 'inactive' as const },
   ];
-  const projects = [
+  const projects: DictionaryItemView[] = [
     { id: 20, type: 'project_item', code: '01', name: 'LOGO', parentId: 10, status: 'active' as const },
     { id: 21, type: 'project_item', code: '02', name: '大外箱', parentId: 11, status: 'active' as const },
   ];
-  const layers = [{ id: 30, type: 'layer_count', code: '3', name: '三层', parentId: null, status: 'active' as const }];
+  const layers: DictionaryItemView[] = [{ id: 30, type: 'layer_count', code: '3', name: '三层', parentId: null, status: 'active' as const }];
 
   const hierarchyApi = () => ({
-    listDictionaries: vi.fn((type: string) => {
+    listDictionaries: vi.fn((type: string, _inactive?: boolean, _deleted?: boolean): Promise<DictionaryItemView[]> => {
       if (type === 'main_category') return Promise.resolve(mainCategories);
       if (type === 'project_item') return Promise.resolve(projects);
       if (type === 'layer_count') return Promise.resolve(layers);
@@ -186,6 +187,79 @@ describe('DictionariesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存项目明细' }));
 
     expect(api.createDictionary).toHaveBeenCalledWith('project_item', { code: '09', name: '售后卡', parentId: 10 });
+  });
+
+  it.each(['大外箱', '02'])('finds a child by %s with its correct parent and matching details', async (search) => {
+    const api = hierarchyApi();
+    render(<DictionariesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 印刷件类 的项目明细' }));
+    fireEvent.change(screen.getByLabelText('搜索编码或名称'), { target: { value: search } });
+
+    expect(screen.queryByRole('button', { name: '查看 印刷件类 的项目明细' })).toBeNull();
+    expect(screen.getByRole('button', { name: '查看 包装类 的项目明细' })).toBeVisible();
+    expect(screen.queryByText('LOGO')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '查看 包装类 的项目明细' }));
+    expect(screen.getByText('05 包装类')).toBeVisible();
+    expect(screen.getByText('大外箱')).toBeVisible();
+    expect(screen.getByRole('button', { name: '新增项目明细' })).toBeDisabled();
+    expect(api.createDictionary).not.toHaveBeenCalled();
+  });
+
+  it('shows only matching children and preserves child status and deleted filtering', async () => {
+    const api = hierarchyApi();
+    const extraProjects = [
+      ...projects,
+      { ...projects[0], id: 22, code: '03', name: '旧 LOGO', status: 'inactive' as const },
+      { ...projects[0], id: 23, code: '09', name: '归档 LOGO', status: 'inactive' as const, deletedAt: '2026-11-16' },
+      { ...projects[0], id: 24, code: '11', name: '说明书' },
+    ];
+    api.listDictionaries.mockImplementation((type: string, _inactive?: boolean, deleted?: boolean) => Promise.resolve(
+      type === 'main_category' ? mainCategories : type === 'project_item' ? extraProjects.filter(item => deleted || !('deletedAt' in item)) : [],
+    ));
+    render(<DictionariesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    await screen.findByText('印刷件类');
+    fireEvent.change(screen.getByLabelText('搜索编码或名称'), { target: { value: 'LOGO' } });
+    fireEvent.click(screen.getByRole('button', { name: '查看 印刷件类 的项目明细' }));
+    expect(screen.getByText('LOGO')).toBeVisible();
+    expect(screen.getByText('旧 LOGO')).toBeVisible();
+    expect(screen.queryByText('归档 LOGO')).toBeNull();
+    expect(screen.queryByText('说明书')).toBeNull();
+    fireEvent.change(screen.getByLabelText('字典状态'), { target: { value: 'inactive' } });
+    expect(screen.getByRole('button', { name: '查看 印刷件类 的项目明细' })).toBeVisible();
+    expect(screen.queryByText('LOGO')).toBeNull();
+    expect(screen.getByText('旧 LOGO')).toBeVisible();
+    fireEvent.click(screen.getByLabelText('显示已删除'));
+    fireEvent.change(screen.getByLabelText('字典状态'), { target: { value: 'deleted' } });
+    fireEvent.click(await screen.findByRole('button', { name: '查看 印刷件类 的项目明细' }));
+    expect(screen.getByText('归档 LOGO')).toBeVisible();
+    expect(screen.queryByText('旧 LOGO')).toBeNull();
+  });
+
+  it('disables child creation for a deleted parent even if its stored status is active', async () => {
+    const archived = { ...mainCategories[0], deletedAt: '2026-11-16' };
+    const api = hierarchyApi();
+    api.listDictionaries.mockImplementation((type: string) => Promise.resolve(type === 'main_category' ? [archived] : []));
+    render(<DictionariesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 印刷件类 的项目明细' }));
+    expect(screen.getByRole('button', { name: '新增项目明细' })).toBeDisabled();
+    expect(api.createDictionary).not.toHaveBeenCalled();
+  });
+
+  it('explains empty parent search results and child status results', async () => {
+    const api = hierarchyApi();
+    api.listDictionaries.mockImplementation((type: string) => Promise.resolve(type === 'main_category' ? mainCategories :
+      type === 'project_item' ? [{ ...projects[0], status: 'inactive' as const }] : []));
+    render(<DictionariesPage api={api as never} />);
+    fireEvent.click(screen.getByRole('tab', { name: '主类别' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 印刷件类 的项目明细' }));
+    fireEvent.change(screen.getByLabelText('字典状态'), { target: { value: 'active' } });
+    expect(screen.getByText('没有符合筛选条件的项目明细。')).toBeVisible();
+    fireEvent.change(screen.getByLabelText('搜索编码或名称'), { target: { value: '不存在的项目' } });
+    expect(screen.getByText('没有符合筛选条件的记录。')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '新增项目明细' })).toBeNull();
   });
 
   it('does not load or show the layer-count management entry in the dictionaries page', async () => {

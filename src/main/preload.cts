@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
 
 contextBridge.exposeInMainWorld('plannerDesktop', {
+  openPdfInDefaultApp(pdfFileId: unknown) { return ipcRenderer.invoke('planner:open-pdf', pdfFileId); },
   showFileInFolder(pdfFileId: unknown) {
     const observed = typeof pdfFileId === 'object' && pdfFileId !== null
       ? pdfFileId as Record<string, unknown> : null;
@@ -25,6 +26,7 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
     }
     return ipcRenderer.invoke('planner:qr-file-action', relativePath, action);
   },
+  selectAitFile() { return ipcRenderer.invoke('planner:select-ait'); },
   qrManualSelectFile() { return ipcRenderer.invoke('planner:qr-manual-select'); },
   qrManualAction(action: unknown, input: unknown) {
     if (!['preview','commit','history','unlink','open','show'].includes(String(action))) return Promise.reject(new Error('INVALID_QR_MANUAL_ACTION'));

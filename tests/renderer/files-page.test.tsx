@@ -45,6 +45,29 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
+  it('keeps selection through group folding and clears it when a filter changes', async () => {
+    const api=apiFixture(true);
+    const historical={...file,id:20,fileName:'old-version.pdf',relativePath:'old-version.pdf',isPresent:false};
+    api.searchPdfFiles.mockResolvedValue({items:[file,historical],total:2,page:1,pageSize:100});
+    Object.assign(api,{previewPdfManagement:vi.fn()});
+    render(<FilesPage api={api as never}/>);
+    const group=await screen.findByRole('button',{name:/已加载 2 个版本/});
+    expect(group).toHaveTextContent('包含缺失文件');
+    expect(screen.queryByRole('checkbox',{name:`选择 ${file.fileName}`})).not.toBeInTheDocument();
+    fireEvent.click(group);
+    fireEvent.click(screen.getByRole('checkbox',{name:`选择 ${file.fileName}`}));
+    expect(screen.getByText('已选 1 条')).toBeVisible();
+    fireEvent.click(group);
+    expect(screen.getByText('已选 1 条')).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'筛选'}));
+    fireEvent.change(screen.getByRole('combobox',{name:'匹配状态'}),{target:{value:'pending'}});
+    await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({matchStatus:'pending'})));
+    expect(screen.queryByText('已选 1 条')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'关闭'}));
+    fireEvent.click(screen.getByRole('button',{name:'筛选'}));
+    expect(screen.getByRole('combobox',{name:'匹配状态'})).toHaveValue('pending');
+  });
+
   it('centers filename, batch and matched-code headers and body cells without changing row identities', async () => {
     const view = render(<FilesPage api={apiFixture(true) as never} />);
     await screen.findByText('02.0404.010.0401001-LOGO',{selector:'.file-primary'});
@@ -61,17 +84,17 @@ describe('FilesPage', () => {
   it('keeps manual file filters when all files clears only navigation scope', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
     await screen.findByRole('button', { name: '全部文件' });
-    fireEvent.click(screen.getByText('文件筛选'));
+    fireEvent.click(screen.getByRole('button',{name:'筛选'}));
     fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'manual' } });
     fireEvent.change(screen.getByRole('combobox',{name:'匹配状态'}), { target: { value: 'pending' } });
-    fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
+
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'manual',matchStatus:'pending'})));
     fireEvent.click(screen.getByRole('button', { name: '待关联产品' }));
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'manual', matchStatus: 'pending', unassociatedProduct: 'true' })));
     fireEvent.click(screen.getByRole('button', { name: '全部文件' }));
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenCalledWith({ keyword: 'manual', matchStatus: 'pending', conversionType: '', presence: 'all', managementState:'included', page: 1, pageSize: 100 }));
     expect(screen.getAllByLabelText('文件关键词')).toHaveLength(1);
-    expect(screen.getByLabelText('文件关键词').closest('nav')).toHaveAttribute('aria-label', '资料导航');
+    expect(screen.getByLabelText('文件关键词').closest('aside')).toHaveAttribute('aria-label', 'PDF 筛选');
     expect(screen.queryByRole('button', { name: '待确认文件' })).not.toBeInTheDocument();
     expect(screen.queryByText('回收站')).not.toBeInTheDocument();
   });
@@ -127,6 +150,7 @@ describe('FilesPage', () => {
 
     render(<FilesPage api={api as never} />);
 
+    fireEvent.click(await screen.findByRole('button',{name:/已加载 2 个版本/}));
     expect(await screen.findAllByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' })).toHaveLength(2);
     expect(screen.getByText('首批大货', { selector: '.files-batch-code' })).toBeVisible();
     expect(screen.getByText('20260309', { selector: '.files-batch-code' })).toBeVisible();
@@ -297,11 +321,11 @@ describe('FilesPage', () => {
   it('submits combined filters and shows unmatched or missing states without stale requests winning', async () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
     await screen.findByText(unmatched.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
-    fireEvent.click(screen.getByText('文件筛选'));
+    fireEvent.click(screen.getByRole('button',{name:'筛选'}));
     fireEvent.change(screen.getByLabelText('文件关键词'), { target: { value: 'unknown' } });
     fireEvent.change(screen.getByRole('combobox',{name:'匹配状态'}), { target: { value: 'unmatched' } });
     fireEvent.change(screen.getByLabelText('存在状态'), { target: { value: 'missing' } });
-    fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
+
 
     await waitFor(() => expect(api.searchPdfFiles).toHaveBeenLastCalledWith({ keyword: 'unknown', matchStatus: 'unmatched',
       conversionType: '', presence: 'missing', managementState:'included', page: 1, pageSize: 100 }));
@@ -483,10 +507,10 @@ describe('PDF quick filters and scan scope',()=>{
     const getPdfFileNavigation=vi.fn().mockResolvedValue({total:4,unassociatedProducts:0,categories:[],products:[],batches:[],batchProducts:[{materialBatchId:2,productId:9}]});
     Object.assign(api,{packaging:{scanProduct},getPdfFileNavigation});
     render(<FilesPage api={api as never} initialTarget={{productId:9}}/>);await screen.findByText('PDF 4');
-    fireEvent.click(screen.getByText('文件筛选'));
+    fireEvent.click(screen.getByRole('button',{name:'筛选'}));
     fireEvent.change(screen.getByLabelText('资料批次筛选'),{target:{value:'2'}});
     fireEvent.change(screen.getByLabelText('文件变更日期从'),{target:{value:'2026-11-01'}});fireEvent.change(screen.getByLabelText('文件变更日期至'),{target:{value:'2026-11-02'}});
-    fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));
+
     const dates={modifiedFrom:new Date(2026,10,1,0,0,0,0).toISOString(),modifiedTo:new Date(2026,10,2,23,59,59,999).toISOString(),materialBatchId:2};
     await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({...dates,productId:9})));
     await waitFor(()=>expect(getPdfFileNavigation).toHaveBeenCalledWith(expect.objectContaining(dates)));
@@ -512,7 +536,7 @@ describe('PDF quick filters and scan scope',()=>{
   });
   it('clears a detailed batch filter after the batch index was explicitly cleared',async()=>{
     const api=apiFixture(true);render(<FilesPage api={api as never}/>);await screen.findByDisplayValue('X:\\Library');
-    fireEvent.click(screen.getByText('文件筛选'));fireEvent.change(screen.getByLabelText('资料批次筛选'),{target:{value:'2'}});fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));
+    fireEvent.click(screen.getByRole('button',{name:'筛选'}));fireEvent.change(screen.getByLabelText('资料批次筛选'),{target:{value:'2'}});
     await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({materialBatchId:2})));
     fireEvent.click(screen.getByRole('button',{name:'清空资料库索引'}));fireEvent.click(await screen.findByRole('button',{name:'继续'}));fireEvent.change(screen.getByLabelText('确认短语'),{target:{value:'清空资料库索引'}});fireEvent.click(screen.getByRole('button',{name:'确认清空资料库索引'}));
     await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.not.objectContaining({materialBatchId:2})));
@@ -523,7 +547,7 @@ describe('PDF quick filters and scan scope',()=>{
 it('keeps successful PDF metadata and files when products fail, and retries without losing filters',async()=>{
  const api=apiFixture(true);api.listProducts.mockRejectedValueOnce(new Error('产品资料离线'));render(<FilesPage api={api as never}/>);
  expect(await screen.findByRole('alert')).toHaveTextContent('产品资料离线');expect(await screen.findByText('02.0404.010.0401001-LOGO',{selector:'.file-primary'})).toBeVisible();
- fireEvent.click(screen.getByText('文件筛选'));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'保留条件'}});
+ fireEvent.click(screen.getByRole('button',{name:'筛选'}));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'保留条件'}});
  expect(screen.getByRole('option',{name:/20260309/})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'重试 PDF 辅助资料'}));
  await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(screen.getByLabelText('文件关键词')).toHaveValue('保留条件');expect(screen.getByRole('button',{name:'产品 SKDZC100JP · ZC100'})).toBeVisible();
 });
@@ -539,8 +563,8 @@ it('retains PDF catalog and counts after a failed refresh and retries without cl
 
 it('distinguishes an empty PDF index from filtered no-results and offers retry for failed index loads',async()=>{
  const api=apiFixture(true);api.searchPdfFiles.mockResolvedValue({items:[],total:0,page:1,pageSize:100});render(<FilesPage api={api as never}/>);
- expect(await screen.findByText('暂无 PDF 文件索引')).toBeVisible();fireEvent.click(screen.getByText('文件筛选'));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'不存在'}});fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));
+ expect(await screen.findByText('暂无 PDF 文件索引')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'筛选'}));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'不存在'}});
  expect(await screen.findByText('没有符合条件的 PDF')).toBeVisible();
- api.searchPdfFiles.mockRejectedValueOnce(new Error('索引离线'));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'重试'}});fireEvent.click(screen.getByRole('button',{name:'筛选 PDF'}));expect(await screen.findByRole('alert')).toHaveTextContent('索引离线');
+ api.searchPdfFiles.mockRejectedValueOnce(new Error('索引离线'));fireEvent.change(screen.getByLabelText('文件关键词'),{target:{value:'重试'}});expect(await screen.findByRole('alert')).toHaveTextContent('索引离线');
  fireEvent.click(screen.getByRole('button',{name:'重新加载 PDF'}));await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(screen.getByLabelText('文件关键词')).toHaveValue('重试');
 });

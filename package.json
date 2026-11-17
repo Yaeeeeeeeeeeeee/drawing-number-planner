@@ -1,6 +1,6 @@
 {
   "name": "drawing-number-planner",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "private": true,
   "type": "module",
   "description": "图号规划、BOM及包材文件管理系统",
@@ -21,6 +21,7 @@
     "better-sqlite3": "^13.0.3",
     "fastify": "^5.12.1",
     "lucide-react": "1.59.0",
+    "pdfjs-dist": "5.4.624",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "read-excel-file": "^9.3.10",

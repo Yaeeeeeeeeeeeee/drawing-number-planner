@@ -33,7 +33,7 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
   await page.getByLabel('品类尺寸').selectOption({ label: 'ZC220冰柜' });
   await page.getByLabel('默认外观').selectOption({ label: '1号外观' });
   await page.getByRole('button', { name: '保存产品' }).click();
-  await expect(page.getByText('ZC220', { exact: true })).toBeVisible();
+  await expect(page.getByText('SAMKYO · ZC220', { exact: true })).toBeVisible();
 
   const rows = Array.from({ length: 23 }, () => Array<string | null>(14).fill(null));
   rows[20] = ['品类尺寸', null, null, null, null, '品牌字典', null, null, null, null, null, null, null, null];

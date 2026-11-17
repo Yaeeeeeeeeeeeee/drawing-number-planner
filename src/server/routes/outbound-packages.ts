@@ -41,6 +41,12 @@ function sendError(error: unknown, reply: FastifyReply) {
 }
 
 export function registerOutboundPackageRoutes(app: FastifyInstance, service: OutboundPackageService, tasks?: TaskRegistry): void {
+  app.get('/api/outbound-email-drafts/latest', async () => service.latestEmailDraft());
+  app.post('/api/outbound-email-drafts', async (request, reply) => {
+    const body = z.object({packageId:z.number().int().positive(),context:z.unknown(),to:z.string(),cc:z.string(),subject:z.string(),body:z.string()}).strict().safeParse(request.body);
+    if (!body.success) return invalid(reply);
+    try { return service.saveEmailDraft(body.data); } catch (error) { return sendError(error, reply); }
+  });
   app.get('/api/outbound-batch-scopes',async(request,reply)=>{
     const query=z.object({productId:z.coerce.number().int().positive(),appearanceVersionId:z.coerce.number().int().positive().optional()}).strict().safeParse(request.query);if(!query.success)return invalid(reply);return service.batchScopes(query.data.productId,query.data.appearanceVersionId);
   });

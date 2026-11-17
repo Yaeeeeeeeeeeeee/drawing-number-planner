@@ -18,7 +18,7 @@ beforeEach(()=>{
  const dict=new DictionaryService(db);const brand=dict.create({type:'brand',code:'B',name:'Brand'}),size=dict.create({type:'product_size',code:'S',name:'Size'}),appearance=dict.create({type:'appearance',code:'A',name:'Appearance'});
  productId=new ProductService(db).create({sku:'SKU70',model:'ZU70SD',productCategory:'冰柜',brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id}).id;
  const qr=new QrService(db);purposeId=qr.listPurposes().items.find(p=>p.englishName==='User Manual')!.id;
- codeId=qr.create({productId,purposeId,name:'Original',targetUrl:'https://qrs.ly/c2hg2h8',status:'active'}).id;
+ codeId=qr.create({productId,purposeId,name:'Original',targetUrl:'https://qrs.ly/c2hg2h8',status:'active'}).id;qr.activate(codeId);
  manual=new QrManualService(db);
 });
 afterEach(()=>{db.close();rmSync(dir,{recursive:true,force:true});});
@@ -32,6 +32,7 @@ describe('manual PDF association persistence',()=>{
   db.prepare('update products set model=? where id=?').run('B500',productId);
   const qr=new QrService(db),warranty=qr.listPurposes().items.find(p=>p.englishName==='Warranty')!;
   const code=qr.create({productId,purposeId:warranty.id,name:'B500售后卡',targetUrl:'https://qrs.ly/hwh0kd9',status:'active'});
+  qr.activate(code.id);
   const path=join(dir,'B500-warranty （hwh0kd9）.pdf');writeFileSync(path,PDF);const before=readFileSync(path);
   const chosen=manual.selectTrustedFile(path),result=manual.preview({token:chosen.token,qrCodeId:code.id,productId,purposeId:warranty.id,name:code.name,targetUrl:code.targetUrl!});
   expect(result.issues).toEqual([]);const linked=manual.commit(result.previewId);
@@ -44,6 +45,16 @@ describe('manual PDF association persistence',()=>{
   const code=qr.create({productId,purposeId:warranty.id,name:'H10售后卡',targetUrl:'https://qrs.ly/g8gwcl6',status:'inactive'}),path=join(dir,'H10-warranty-avakyo（g8gwcl6）.pdf');writeFileSync(path,PDF);const before=readFileSync(path);
   const chosen=manual.selectTrustedFile(path),result=manual.preview({token:chosen.token,qrCodeId:code.id,productId,purposeId:warranty.id,name:code.name,targetUrl:code.targetUrl!});expect(result.issues).toEqual(['文件名须为 型号-英文用途(7位网址尾码).pdf']);
   expect(()=>manual.commit(result.previewId)).toThrowError(expect.objectContaining({code:'VALIDATION_BLOCKED'}));const linked=manual.commit(result.previewId,{confirmed:true,reason:'已核对历史文件型号用途及网址尾码'});expect(linked).toMatchObject({id:code.id,targetUrl:code.targetUrl,status:'inactive'});expect(readFileSync(path)).toEqual(before);expect(db.prepare('select reason from qr_manual_audit where qr_code_id=?').get(code.id)).toEqual({reason:'已核对历史文件型号用途及网址尾码'});
+ });
+ it('blocks a new out-of-category recipe preview but preserves an existing legacy recipe',()=>{
+  const recipe=new QrService(db).listPurposes().items.find(p=>p.key==='recipe')!;
+  db.prepare('update qr_purposes set default_for_all=1 where id=?').run(recipe.id);
+  const path=join(dir,'ZU70SD-Recipe(c2hg2h8).pdf');writeFileSync(path,PDF);const before=readFileSync(path);const selected=manual.selectTrustedFile(path);
+  const input={token:selected.token,productId,purposeId:recipe.id,name:'Recipe',targetUrl:'https://qrs.ly/c2hg2h8'};
+  expect(()=>manual.preview(input)).toThrowError(expect.objectContaining({code:'PURPOSE_NOT_APPLICABLE'}));
+  const now=new Date().toISOString();const id=Number(db.prepare("insert into product_qr_codes(product_id,purpose_id,name,target_url,status,created_at,updated_at) values(?,?,?,?,?,?,?)").run(productId,recipe.id,'Recipe',input.targetUrl,'active',now,now).lastInsertRowid);
+  const preview=manual.preview({...input,qrCodeId:id});manual.commit(preview.previewId);
+  expect(new QrService(db).get(id)).toMatchObject({id,status:'active',targetUrl:input.targetUrl});expect(readFileSync(path)).toEqual(before);
  });
  it('selection and preview cancel leave all DB tables untouched',()=>{preview();expect(count('qr_manual_files')).toBe(0);expect(count('qr_manual_links')).toBe(0);expect(count('qr_manual_audit')).toBe(0);expect(count('product_qr_codes')).toBe(1);});
  it('confirms real PDF and keeps name, status, original path/content unchanged',()=>{
@@ -117,7 +128,7 @@ describe('manual PDF association persistence',()=>{
  it('canonical alias queries keep every old QR id while showing one product identity',()=>{
  const refs=db.prepare('select brand_id,product_size_id,default_appearance_id from products where id=?').get(productId) as {brand_id:number;product_size_id:number;default_appearance_id:number};
  const alias=new ProductService(db).create({sku:'ALIAS70',model:'OLDMODEL',productCategory:'冰柜',brandId:refs.brand_id,productSizeId:refs.product_size_id,defaultAppearanceId:refs.default_appearance_id});
- const qr=new QrService(db);const old=qr.create({productId:alias.id,purposeId,name:'Old alias',targetUrl:'https://qrs.ly/pdgp845',status:'active'});const appearances=new AppearanceService(db);const merge=appearances.mergePreview({primaryProductId:productId,aliasProductIds:[alias.id]});appearances.mergeConfirm({...merge,confirmed:true,expectedFingerprint:merge.fingerprint,expectedRevision:merge.revision});
+ const qr=new QrService(db);const old=qr.create({productId:alias.id,purposeId,name:'Old alias',targetUrl:'https://qrs.ly/pdgp845',status:'active'});qr.activate(old.id);const appearances=new AppearanceService(db);const merge=appearances.mergePreview({primaryProductId:productId,aliasProductIds:[alias.id]});appearances.mergeConfirm({...merge,confirmed:true,expectedFingerprint:merge.fingerprint,expectedRevision:merge.revision});
  const all=qr.list({productId}).items;expect(all.map(c=>c.id).sort()).toEqual([codeId,old.id].sort());expect(all.every(c=>c.canonicalProductId===productId&&c.model==='ZU70SD'&&c.sku==='SKU70')).toBe(true);expect(qr.get(old.id)).toMatchObject({productId:alias.id,status:'active',targetUrl:'https://qrs.ly/pdgp845'});
  });
  it('rejects duplicate confirm and unknown file capability',()=>{const p=preview();manual.commit(p.result.previewId);expect(()=>manual.commit(p.result.previewId)).toThrow();expect(count('qr_manual_links')).toBe(1);expect(()=>manual.resolveFile('../../../secret')).toThrowError(expect.objectContaining({code:'NOT_FOUND'}));});

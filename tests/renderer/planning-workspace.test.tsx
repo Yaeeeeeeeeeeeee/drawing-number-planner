@@ -7,7 +7,7 @@ import {planningApiFixture,choosePlanningProduct as chooseProduct,fillPlanningPr
 describe('four-step planning workspace',()=>{
  it('restores an older nonwhite draft with default sharing checked and submits the same sharing decision',async()=>{
   const api=planningApiFixture();api.getPlanningDraft.mockResolvedValue({revision:7,draft:{revision:7,updatedAt:'2026-11-05T00:00:00Z',requiresCheck:true,input:{step:2,activeProductId:1,groups:[{productId:1,appearanceId:3,rows:[{clientId:'legacy',colorId:7,mainCategoryId:5,projectItemId:6}]}]}}} as never);
-  render(<PlanningPage api={api as never}/>);expect(await screen.findByLabelText('第 1 行其他颜色共用白色图号')).toBeChecked();await checkPlanning();
+  render(<PlanningPage api={api as never}/>);expect(await screen.findByLabelText('第 1 行独立占号')).not.toBeChecked();await checkPlanning();
   expect(api.previewBatchPlan).toHaveBeenCalledWith({groups:[expect.objectContaining({rows:[expect.objectContaining({shareWhite:true})]})]});
  });
  it('locks inputs and mode changes while deleting the current draft',async()=>{
@@ -69,4 +69,20 @@ describe('four-step planning workspace',()=>{
   await act(async()=>{resolve({groups:[{productId:1,model:'T40',rows:[{clientId:'stale',available:true,fullCode:'99.9999.999.9999999'}]}]});});
   await waitFor(()=>expect(screen.queryByText('99.9999.999.9999999')).not.toBeInTheDocument());
  });
+});
+
+it('hides redundant white sharing controls for white projects and exposes independent numbering only for nonwhite',async()=>{
+ const api=planningApiFixture();render(<PlanningPage api={api as never}/>);await chooseProduct();fillProject();
+ expect(screen.queryByLabelText('第 1 行其他颜色共用白色图号')).not.toBeInTheDocument();expect(screen.queryByLabelText('第 1 行独立占号')).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('第 1 行颜色'),{target:{value:'7'}});expect(screen.getByLabelText('第 1 行独立占号')).not.toBeChecked();
+ fireEvent.click(screen.getByLabelText('第 1 行独立占号'));expect(screen.queryByRole('button',{name:'查看真实白色基准'})).not.toBeInTheDocument();
+ await checkPlanning();expect(api.previewBatchPlan.mock.calls.at(-1)?.[0].groups[0].rows[0].shareWhite).toBe(false);
+});
+it('shows dictionary names and both used and recommended sequences in the right preview',async()=>{
+ const api=planningApiFixture();const preview=api.previewBatchPlan.getMockImplementation()!;api.previewBatchPlan.mockImplementation(async input=>{const result=await preview(input);result.groups[0].rows[0].lastUsedSequence=4;return result;});
+ render(<PlanningPage api={api as never}/>);await chooseProduct();fillProject();await checkPlanning();
+ const panel=screen.getByRole('complementary',{name:'完整图号与编码拆解'});
+ expect(within(panel).getByText('SAMKYO（02）')).toBeVisible();expect(within(panel).getByText('白色（0）')).toBeVisible();
+ expect(within(panel).getByText('最后使用流水号').nextElementSibling).toHaveTextContent('004');
+ expect(within(panel).getByText('推荐流水号').nextElementSibling).toHaveTextContent('005');
 });

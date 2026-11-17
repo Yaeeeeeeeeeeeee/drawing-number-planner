@@ -27,6 +27,9 @@ function blocking(){for(var i=0;i<inspection.issues.length;i++)if(inspection.iss
 function fontAvailable(name){try{var font=app.textFonts.getByName(name);return !!font&&font.name===name;}catch(e){return false;}}
 function recordFont(name){for(var i=0;i<inspection.fonts.length;i++)if(inspection.fonts[i]===name)return;inspection.fonts.push(name);if(!fontAvailable(name))issue('MISSING_FONT','Font is unavailable: '+name);}
 function editable(frame){try{var current=frame;while(current&&current.typename!=='Document'){if(current.locked===true||current.hidden===true||current.visible===false||current.editable===false)return false;current=current.parent;}return true;}catch(e){return false;}}
+// Snapshot the layout and text attributes that replacement must preserve.
+function properties(object,keys){var result=[],i,v;for(i=0;i<keys.length;i++){try{v=object&&object[keys[i]];if(v===undefined||v===null)result.push('');else if(typeof v==='object'&&typeof v.length==='number')result.push(String(v));else if(typeof v==='object'&&v.typename)result.push(properties(v,['typename','name','red','green','blue','cyan','magenta','yellow','black','gray','tint','mValueA','mValueB','mValueC','mValueD','mValueTX','mValueTY']));else if(typeof v==='object'&&v.name)result.push(String(v.name));else result.push(String(v));}catch(e){result.push('<unavailable>');}}return result.join('|');}
+function layout(frame){var out=[properties(frame,['name','typename','left','top','width','height','position','rotation','matrix','kind','orientation'])],chars=frame.characters||[],i;for(i=0;i<chars.length;i++){out.push(properties(chars[i].characterAttributes,['textFont','size','fillColor','strokeColor','strokeWeight','tracking','kerningMethod','baselineShift','horizontalScale','verticalScale','rotation','leading','autoLeading','capitalization','figureStyle','ligature','underline','strikeThrough']));out.push(properties(chars[i].paragraphAttributes,['justification','firstLineIndent','leftIndent','rightIndent','spaceBefore','spaceAfter','leadingType','hyphenation']));}return out.join('~');}
 function resource(item){try{if(item.embedded===true)return;var file=item.file;if(!file||!file.exists)issue('MISSING_RESOURCE','Linked resource is unavailable'+(file&&file.fsName?': '+file.fsName:''));}catch(e){issue('MISSING_RESOURCE','Linked resource cannot be read: '+String(e));}}
 try {
   previousInteraction=app.userInteractionLevel;
@@ -48,36 +51,63 @@ try {
         if(typeof name==='string'&&name.replace(/\\s/g,'')!=='') {
           var observed=null;
           for(j=0;j<inspection.textObjects.length;j++)if(inspection.textObjects[j].objectName===name)observed=inspection.textObjects[j];
-          if(observed){observed.matches++;observed.editable=false;}
-          else inspection.textObjects.push({objectName:name,matches:1,editable:editable(frames[i])});
+          if(observed){observed.matches++;observed.editable=false;delete observed.sourceText;}
+          else inspection.textObjects.push({objectName:name,matches:1,editable:editable(frames[i]),sourceText:String(frames[i].contents)});
         }
         var chars=frames[i].characters;
         if(chars)for(j=0;j<chars.length;j++) {try{recordFont(chars[j].characterAttributes.textFont.name);}catch(fontError){issue('FONT_INSPECTION_FAILED','Cannot inspect a text font');}}
       }
       for(i=0;i<doc.placedItems.length;i++)resource(doc.placedItems[i]);
       for(i=0;i<doc.rasterItems.length;i++)if(doc.rasterItems[i].embedded!==true)resource(doc.rasterItems[i]);
-      var selected=[];
-      for(i=0;i<job.fields.length;i++) {
-        var field=job.fields[i],matches=[];
-        if(job.mode==='generate'&&field.sourceKey!=='DRAWING_NO')continue;
-        for(j=0;j<frames.length;j++)if(frames[j].name===field.objectName)matches.push(frames[j]);
-        var info={objectName:field.objectName,sourceKey:field.sourceKey,required:field.required,matches:matches.length,editable:matches.length===1&&editable(matches[0])};inspection.fields.push(info);
-        if(matches.length===0){var nonText=false;for(j=0;j<doc.pageItems.length;j++)if(doc.pageItems[j].name===field.objectName)nonText=true;issue(nonText?'FIELD_NOT_TEXT':'MISSING_FIELD','Named TextFrame is missing: '+field.objectName,field.objectName,field.required||nonText?'error':'warning');}
-        else if(matches.length>1)issue('DUPLICATE_FIELD','Named TextFrame is duplicated: '+field.objectName,field.objectName);
-        else if(!info.editable)issue('UNEDITABLE_FIELD','Named TextFrame is locked, hidden or not editable: '+field.objectName,field.objectName);
-        var value=job.values&&Object.prototype.hasOwnProperty.call(job.values,field.sourceKey)?job.values[field.sourceKey]:undefined;
-        if(job.mode==='generate'&&typeof value!=='undefined'&&(typeof value!=='string'&&typeof value!=='number'||typeof value==='number'&&!isFinite(value)))issue('INVALID_VALUE','Data must be text or a finite number: '+field.sourceKey,field.objectName);
-        if(job.mode==='generate'&&(typeof value==='undefined'||value===null||String(value).replace(/\\s/g,'')===''))issue('MISSING_VALUE','Required data is missing: '+field.sourceKey,field.objectName);
-        selected.push({frame:matches.length===1?matches[0]:null,value:value});
+      var mapping=null, mappings=[], named=[], candidates=[], original=null, targets=[], before=[], layouts=[], parents=[];
+      function validCode(value){return typeof value==='string'&&/^\\d{2}\\.\\d{4}\\.\\d{3}\\.\\d{7}$/.test(value);}
+      function addCandidate(value){for(var c=0;c<candidates.length;c++)if(candidates[c]===value)return;candidates.push(value);}
+      for(i=0;i<job.fields.length;i++)if(job.fields[i].sourceKey==='DRAWING_NO') {
+        mappings.push(job.fields[i]);
+        if(!mapping)mapping=job.fields[i];
       }
-      if(job.mode==='generate') {
-        var hasNumber=false;
-        for(i=0;i<selected.length;i++)if(selected[i].frame&&editable(selected[i].frame))hasNumber=true;
-        if(!hasNumber)issue('DRAWING_NUMBER_FIELD_REQUIRED','请配置模板中实际存在的可编辑完整图号文字对象');
+      for(i=0;i<frames.length;i++) {
+        var text=String(frames[i].contents);
+        before.push(text); layouts.push(layout(frames[i])); parents.push(frames[i].parent);
+        if(validCode(text))addCandidate(text);
+        if(!mapping&&frames[i].name==='DRAWING_NO')named.push(frames[i]);
       }
+      if(mapping) {
+        for(i=0;i<mappings.length;i++) {
+          var found=false;
+          for(j=0;j<frames.length;j++)if(frames[j].name===mappings[i].objectName){named.push(frames[j]);found=true;}
+          if(!found)issue('AMBIGUOUS_DRAWING_NUMBER','Mapped drawing number object is missing');
+        }
+      }
+      if(mapping||named.length>0) {
+        for(i=0;i<named.length;i++) {
+          var anchor=String(named[i].contents);
+          if(!validCode(anchor))issue('INVALID_ORIGINAL_DRAWING_NUMBER','Mapped text must be an entire valid drawing number');
+          else if(original===null)original=anchor;
+          else if(original!==anchor)issue('AMBIGUOUS_DRAWING_NUMBER','Drawing number anchors have different original codes');
+        }
+      } else if(candidates.length===1)original=candidates[0];
+      else issue('AMBIGUOUS_DRAWING_NUMBER','Cannot uniquely identify the original drawing number; save a manual mapping');
+      if(original!==null) {
+        for(i=0;i<frames.length;i++)if(before[i]===original)targets.push(frames[i]);
+        inspection.drawingNumber={originalText:original,matches:targets.length};
+        for(i=0;i<targets.length;i++)if(!editable(targets[i]))issue('UNEDITABLE_FIELD','A matching drawing number is locked, hidden or not editable');
+        inspection.fields.push({objectName:mapping?mapping.objectName:(named.length===1?'DRAWING_NO':''),sourceKey:'DRAWING_NO',required:true,matches:targets.length,editable:!blocking()});
+      }
+      var value=job.values&&Object.prototype.hasOwnProperty.call(job.values,'DRAWING_NO')?job.values.DRAWING_NO:undefined;
+      if(job.mode==='generate'&&!validCode(value))issue('INVALID_VALUE','Replacement must be a complete drawing number');
       if(!blocking()) {
         if(job.mode==='generate') {
-          for(i=0;i<selected.length;i++)if(selected[i].frame&&typeof selected[i].value!=='undefined')selected[i].frame.contents=String(selected[i].value);
+          // Equal-length character edits preserve the formatting of each character.
+          for(i=0;i<targets.length;i++) {
+            if(!targets[i].characters||targets[i].characters.length!==original.length)throw new Error('Cannot preserve character formatting');
+            for(j=0;j<original.length;j++)if(original.charAt(j)!==value.charAt(j))targets[i].characters[j].contents=value.charAt(j);
+          }
+          for(i=0;i<frames.length;i++) {
+            var expected=before[i]===original?value:before[i];
+            if(String(frames[i].contents)!==expected||frames[i].parent!==parents[i]||layout(frames[i])!==layouts[i])throw new Error('Drawing number replacement verification failed');
+          }
+          inspection.drawingNumber.replaced=targets.length;
           var pdfOptions=new PDFSaveOptions();pdfOptions.preserveEditability=true;
           doc.saveAs(new File(job.outputPath),pdfOptions);
         }

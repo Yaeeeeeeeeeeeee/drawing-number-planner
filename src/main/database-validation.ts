@@ -3,7 +3,7 @@ import {dirname,join} from 'node:path';
 import {copyFileSync,existsSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {createDatabaseBackup} from '../db/backup.js';
-import {migrateDatabase} from '../db/migrations.js';
+import {CURRENT_SCHEMA_VERSION,migrateDatabase} from '../db/migrations.js';
 
 function integrity(database: Database.Database): void {
   if (database.pragma('integrity_check', {simple:true}) !== 'ok'
@@ -14,7 +14,7 @@ function integrity(database: Database.Database): void {
 function ledger(database: Database.Database): void {
   const versions = database.prepare('SELECT version, applied_at FROM schema_migrations ORDER BY version').all() as {version:number;applied_at:string}[];
   const latest = versions.at(-1)?.version;
-  if (!latest || latest > 25) throw new Error(`数据库版本 ${latest ?? '未知'} 不受当前版本支持（最高25）`);
+  if (!latest || latest > CURRENT_SCHEMA_VERSION) throw new Error(`数据库版本 ${latest ?? '未知'} 不受当前版本支持（最高${CURRENT_SCHEMA_VERSION}）`);
   if (versions.length !== latest || versions.some((row,index) => row.version !== index+1 || typeof row.applied_at !== 'string' || !row.applied_at.trim())) {
     throw new Error('无法识别数据库迁移来源，拒绝初始化或修补');
   }
@@ -81,7 +81,7 @@ export function validateProductionDatabaseConnection(database: Database.Database
   } finally { rehearsal.close(); }
 }
 /** Read-only source; migration rehearsal runs entirely in memory, including WAL data. */
-export function validateProductionDatabase(file: string): void {
+export function validateProductionDatabase(file: string): {schemaVersion:number} {
   // Validate an isolated copy so even damaged WAL headers cannot create sidecars
   // beside an untrusted selection. Existing WAL pages participate in the rehearsal.
   const scratch = mkdtempSync(join(tmpdir(),'planner-db-check-'));
@@ -92,6 +92,7 @@ export function validateProductionDatabase(file: string): void {
     if (existsSync(file+'-wal')) copyFileSync(file+'-wal',snapshotFile+'-wal');
     database = new Database(snapshotFile,{fileMustExist:true});
     validateProductionDatabaseConnection(database);
+    return {schemaVersion: (database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as {version:number}).version};
   } finally { database?.close(); rmSync(scratch,{recursive:true,force:true}); }
 }
 /** Reuse the protected transaction and independently verified migration backup. */

@@ -275,7 +275,10 @@ export interface OutboundPackagePreviewItemView {
 }
 export interface OutboundBatchScopeView {id:number;productId:number;name:string;originalName:string;relativePath:string;sequenceNumber:number|null;businessDate:string|null;appearanceVersionId:number|null;completeness:'pending'|'complete'|'partial';revision:number;baselineBatchId:number|null}
 export interface OutboundPackagePreviewView { warnings?:string[];baselineBatchId?:number|null;batchCompleteness?:'pending'|'complete'|'partial';bomCheck?:{status:'missing'|'matched'|'partial';missingFullCodes:string[];extraPdfFileIds:number[]};previewToken: string; packageName: string; items: OutboundPackagePreviewItemView[] }
+export interface OutboundEmailDraftView { packageId:number; context: import('../pages/outbound/PackageBuilder').OutboundMailContext; to:string; cc:string; subject:string; body:string; savedAt?:string }
 export interface CreatedOutboundPackageView {
+  independentFiles?: Array<{pdfFileId:number;fileName:string;relativePath:string;contentSha256:string|null;sizeBytes:number;reason:string}>;
+  excludedFiles?: Array<{pdfFileId:number|null;fileName:string|null;reason:string}>;
   mailFacts?: import('../../core/outbound/outbound-types').OutboundPackageMailFacts; id: number; packageName: string; zipRelativePath: string; fileCount: number; createdAt: string;
   parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number;fileCount?:number;contentSha256?:string;files?:Array<{fileName:string;contentSha256:string;pdfFileId:number}> }> }
 export interface OutboundHistoryFiltersView {
@@ -410,6 +413,8 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
   activateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deactivateOutboundSignature(id: number): Promise<OutboundSignatureView>;
   deleteOutboundSignature(id: number): Promise<{ deleted: true }>;
+  latestOutboundEmailDraft?():Promise<OutboundEmailDraftView|null>;
+  saveOutboundEmailDraft?(draft:OutboundEmailDraftView):Promise<OutboundEmailDraftView>;
   listOutboundPackages(productId?: number, filters?:OutboundHistoryFiltersView): Promise<Array<Omit<CreatedOutboundPackageView, 'parts'> & {
     parts: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number | null; fileCount?:number; contentSha256?:string }> ;
     brand?:string|null;model?:string|null;sku?:string|null;appearanceVersionId?:number|null;appearanceLabel?:string|null;selectedMaterialBatchId?:number;batchName?:string|null;materialType?:OutboundMaterialTypeView;
@@ -583,7 +588,7 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 const taskInProgress = (status: LocalTaskStatusView) => ['queued', 'running', 'finalizing'].includes(status);
 
-async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_import' | 'outbound_package', payload: unknown): Promise<T> {
+async function runLocalTask<T>(kind: 'workspace_scan' | 'product_scan' | 'category_scan' | 'index_clear' | 'excel_import' | 'outbound_package', payload: unknown): Promise<T> {
   let task = await request<LocalTaskView>(`/api/tasks/${kind}`, json('POST', payload));
   while (taskInProgress(task.status)) {
     task = await request<LocalTaskView>(`/api/tasks/${task.id}`);
@@ -596,7 +601,7 @@ async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_i
 
 export const apiClient: PlannerApi = {
   ...createPlanningWorkspaceApi(request),
-  packaging: createPackagingApi(request),
+  packaging: createPackagingApi(request, runLocalTask),
   ...createAppearanceApi(request), ...createBomAppearanceApi(request), ...createDrawingAppearanceApi(request),
   ...createPdfManagementApi(request), ...createQrManualApi(request),
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),
@@ -682,6 +687,8 @@ export const apiClient: PlannerApi = {
   activateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/activate`, json('POST')),
   deactivateOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}/deactivate`, json('POST')),
   deleteOutboundSignature: (id) => request(`/api/outbound-reference/signatures/${id}`, { method: 'DELETE' }),
+  latestOutboundEmailDraft: () => request('/api/outbound-email-drafts/latest'),
+  saveOutboundEmailDraft: draft => request('/api/outbound-email-drafts', json('POST', draft)),
   listOutboundPackages: (productId, filters={}) => request(`/api/outbound-packages${queryString({productId,...filters})}`),
   getOutboundPackageDetails:id=>request(`/api/outbound-packages/${id}`),
   prepareOutboundRegeneration:id=>request(`/api/outbound-packages/${id}/regeneration-preview`,json('POST')),

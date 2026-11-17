@@ -1,16 +1,17 @@
-import type { PackagingField, PackagingTaskDeletionPreview, PackagingTaskDeleteInput, DimensionProfile, DimensionProfileInput, PackagingArchivePreview, PackagingCatalog, PackagingProductDirectory, PackagingProjectConfig, PackagingTask, PackagingTaskCreate, PackagingTaskItemInput, PackagingTemplate, PackagingTemplateInput, TemplateRule, TemplateRuleInput } from '../../core/packaging/packaging-types';
+import type { PackagingField, PackagingTaskDeletionPreview, PackagingTaskDeleteInput, DimensionProfile, DimensionProfileInput, PackagingArchivePreview, PackagingCatalog, PackagingProductDirectory, PackagingProjectConfig, PackagingTask, PackagingTaskCreate, PackagingTaskItemInput, PackagingTemplate, PackagingTemplateInput, TemplateRule, TemplateRuleInput, TemplateRangeInput } from '../../core/packaging/packaging-types';
 import type {PdfScanSummaryView} from './client';
 
-export interface PackagingInspectionView {fields:Array<{objectName:string;matches:number;editable:boolean}>;fonts:string[];issues:Array<{severity:'error'|'warning';message:string}>;fontValidation:'declared-and-observed-only';textObjects?:Array<{objectName:string;matches?:number;editable:boolean}>}
+export interface PackagingInspectionView {drawingNumber?:{originalText:string;matches:number;replaced?:number};fields:Array<{objectName:string;matches:number;editable:boolean}>;fonts:string[];issues:Array<{severity:'error'|'warning';message:string}>;fontValidation:'declared-and-observed-only';textObjects?:Array<{objectName:string;matches?:number;editable:boolean}>}
 export interface PackagingApi {
+  templateStatus(id:number):Promise<{available:boolean;message?:string}>;
+  selectTemplateReference(): Promise<{token:string;fileName:string;displayPath:string}|null>;
+  saveTemplateReference(input:PackagingTemplateInput, token:string, id?:number, range?:TemplateRangeInput):Promise<PackagingTemplate>;
+  inspectTemplateReference(token:string,fields?:PackagingField[],requiredFonts?:string[]):Promise<PackagingInspectionView>;
   getAutomation(): Promise<{platform:string;available:boolean;message:string;blocked?:boolean}>;
   reconcileAutomation(): Promise<{platform:string;available:boolean;message:string;blocked?:boolean}>;
   getCatalog(): Promise<PackagingCatalog>;
-  createTemplate(input: PackagingTemplateInput, file: File): Promise<PackagingTemplate>;
-  updateTemplate(id: number, input: PackagingTemplateInput): Promise<PackagingTemplate>;
-  replaceTemplateFile(id: number, file: File, input?:PackagingTemplateInput): Promise<PackagingTemplate>;
+  updateTemplate(id: number, input: PackagingTemplateInput, range?:TemplateRangeInput): Promise<PackagingTemplate>;
   inspectTemplate(id: number): Promise<PackagingInspectionView>;
-  inspectTemplateFile(file:File,fields?:PackagingField[],requiredFonts?:string[]):Promise<PackagingInspectionView>;
   saveDimension(input: DimensionProfileInput & { id?: number }): Promise<DimensionProfile>;
   saveRule(input: TemplateRuleInput & { id?: number }): Promise<TemplateRule>;
   saveConfig(input: PackagingProjectConfig): Promise<PackagingProjectConfig>;
@@ -36,25 +37,26 @@ export interface PackagingApi {
   archivePreview(taskId: string): Promise<PackagingArchivePreview>;
   archive(taskId: string): Promise<PackagingTask>;
 }
-export function createPackagingApi(request: <T>(path: string, init?: RequestInit) => Promise<T>): PackagingApi {
+export function createPackagingApi(request: <T>(path: string, init?: RequestInit) => Promise<T>, runScan?: <T>(kind: 'product_scan' | 'category_scan', payload: unknown) => Promise<T>): PackagingApi {
   const base='/api/packaging';
   const json=(method:string,body?:unknown):RequestInit=>({method,headers:{'content-type':'application/json'},body:JSON.stringify(body??{})});
   const task=(id:string)=>`${base}/tasks/${encodeURIComponent(id)}`;
   return {
+    templateStatus:id=>request(`${base}/templates/${id}/status`),
+    selectTemplateReference:()=>{if(!window.plannerDesktop?.selectAitFile)throw new Error('请在桌面版选择 AIT 原始文件');return window.plannerDesktop.selectAitFile();},
+    saveTemplateReference:(metadata,token,id,range)=>request(`${base}/template-reference`,json('POST',{metadata,token,id,...(range?{range}:{})})),
+    inspectTemplateReference:(token,fields,requiredFonts)=>request(`${base}/inspect-template-reference`,json('POST',{token,fields,requiredFonts})),
     getAutomation:()=>request(`${base}/automation`),reconcileAutomation:()=>request(`${base}/automation/reconcile`,json('POST')),
     getCatalog:()=>request(`${base}/catalog`),
-    createTemplate:(metadata,file)=>{const body=new FormData();body.append('metadata',JSON.stringify(metadata));body.append('file',file);return request(`${base}/templates`,{method:'POST',body});},
-    updateTemplate:(id,input)=>request(`${base}/templates/${id}`,json('PUT',input)),
-    replaceTemplateFile:(id,file,input)=>{const body=new FormData();if(input)body.append('metadata',JSON.stringify(input));body.append('file',file);return request(`${base}/templates/${id}/file`,{method:'POST',body});},
+    updateTemplate:(id,input,range)=>request(`${base}/templates/${id}`,json('PUT',range?{metadata:input,range}:input)),
     inspectTemplate:id=>request(`${base}/templates/${id}/inspect`,json('POST')),
-    inspectTemplateFile:(file,fields,requiredFonts)=>{const body=new FormData();body.append('file',file);body.append('metadata',JSON.stringify({fields,requiredFonts}));return request(`${base}/inspect-template-file`,{method:'POST',body});},
     saveDimension:input=>request(`${base}/dimensions`,json('POST',input)),
     saveRule:input=>request(`${base}/rules`,json('POST',input)),
     saveConfig:input=>request(`${base}/configs`,json('POST',input)),
     getProductDirectories:async productId=>(await request<{items:PackagingProductDirectory[]}>(`${base}/product-directories?productId=${productId}`)).items,
     createTemporaryDirectories:productIds=>request(`${base}/create-temporary-directories`,json('POST',{productIds})),
-    scanProduct:productId=>request(`${base}/scan-product`,json('POST',{productId})),
-    scanCategory:category=>request(`${base}/scan-category`,json('POST',{category})),
+    scanProduct:productId=>runScan ? runScan('product_scan',{productId}) : request(`${base}/scan-product`,json('POST',{productId})),
+    scanCategory:category=>runScan ? runScan('category_scan',{category}) : request(`${base}/scan-category`,json('POST',{category})),
     listTasks:async productId=>(await request<{items:PackagingTask[]}>(`${base}/tasks${productId?`?productId=${productId}`:''}`)).items,
     createTask:input=>request(`${base}/tasks`,json('POST',input)),getTask:id=>request(task(id)),
     deletionPreview:id=>request(`${task(id)}/deletion-preview`),deleteTask:(id,input)=>request(`${task(id)}/delete`,json('POST',input)),

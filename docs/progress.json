@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-11-10T18:29:56.515062+00:00",
-  "branch": "codex/confirmed-requirements-20261105",
-  "lastCommit": "a296e04",
-  "execution": "v1.6.1启动修复已发布；公开安装包及验证报告实际下载核对通过",
-  "current": "本地服务启动超时修复",
-  "recent": "公开EXE145219900字节、SHA256一致；报告181文件/126截图，Windows大库备份27秒已复现旧限额不足",
-  "next": "用户安装v1.6.1并明确选择要继续使用的已有planner.db；保留两份库，失败时提供弹窗所指启动日志",
+  "updatedAt": "2026-11-17T10:29:47.025299+08:00",
+  "branch": "codex/v16-corrections-20261111",
+  "lastCommit": "27c45a0",
+  "execution": "V1.6本轮44项修正实施中；旧30项完成率仅为历史记录",
+  "current": "本轮代码240文件2075项及Chromium25项通过，准备Windows候选验证",
+  "recent": "首轮自动化20失败/浏览器4失败均已处理；最终240文件2075项、Chromium25项、类型及1.6.2源码构建通过",
+  "next": "固定候选提交并推送独立分支运行Windows安装升级验证；等待两项业务答复，不发布未完成Release",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
   ],
-  "tests": "232文件1981项、Chromium18项、类型/构建通过；Windows安装/旧库/大库实测全过",
+  "tests": "专项证据见docs/v16-corrections；完整本轮回归、Windows构建和真实Adobe尚未完成",
   "completionRule": "仅功能实现且对应验收测试通过才记为已完成；未完成项保持真实剩余工作。",
   "items": [
     {
@@ -863,6 +863,18 @@
     {
       "at": "2026-11-10T18:29:56.515062+00:00",
       "message": "最终说明刷新42875296001成功；公开报告再次下载9295206字节，SHA256 7846457b16cde09fbec575a2621821fc5e49ab50ebfbdb9fb9d47a5c67192512，CRC/181文件/126截图及native a296e04/1GB指标一致；EXE SHA不变。"
+    },
+    {
+      "at": "2026-11-11T10:57:20.801466+00:00",
+      "message": "任务书完整读取，用户确认菜谱仅空气炸锅及AIT尺寸精度规则；P0专项4文件55项通过"
+    },
+    {
+      "at": "2026-11-11T11:09:26.205149+00:00",
+      "message": "P0浏览器1项、UI专项5文件52项及抽屉浏览器1项通过；尺寸匹配专项2文件43项通过"
+    },
+    {
+      "at": "2026-11-16T07:37:28.858765+00:00",
+      "message": "AIT范围原子保存、Schema26旧数据升级及正式文件编辑保护专项通过；PDF阅读器dev/build实测通过"
     }
   ],
   "confirmedImplementation": {
@@ -931,5 +943,39 @@
       "reportSha256": "7846457b16cde09fbec575a2621821fc5e49ab50ebfbdb9fb9d47a5c67192512",
       "finalPublicReportActuallyDownloaded": true
     }
-  }
+  },
+  "v16Corrections": {
+    "source": "docs/requirements/v16-corrections-20261111.md",
+    "status": "implementation-and-integration-regression",
+    "matrix": "docs/v16-corrections/status.json",
+    "items": 44,
+    "fullRegression": "passed",
+    "schema": 26,
+    "productionDatabaseOperations": "none",
+    "unresolved": [
+      "QR PDF像素比较页面范围待用户答复",
+      "同图号多正式PDF候选自动完成规则待用户答复",
+      "真实Windows/Adobe验收尚未完成"
+    ],
+    "unit": "240 files / 2075 passed",
+    "typecheck": "passed",
+    "build": "1.6.2 source build passed",
+    "candidateVersion": "1.6.2",
+    "browser": "25 passed",
+    "windows": "pending branch verification"
+  },
+  "taskLog": [
+    {
+      "at": "2026-11-17T08:15:00+08:00",
+      "message": "阶段4/5/6专项证据已整理；原始Excel25候选且原件SHA不变，完整串行回归开始；不宣称Windows通过。"
+    },
+    {
+      "at": "2026-11-17T10:26:51.874563+08:00",
+      "message": "完整240文件2075项通过；128MiB/96MiB堆升级回归、邮件dirty修订、PDF原生旋转及固定PDF.js交付守卫修复；1.6.2验收候选未发布。"
+    },
+    {
+      "at": "2026-11-17T10:29:47.025299+08:00",
+      "message": "最终Chromium25项全部通过（2.1m）；原始任务书SHA256与上传文件一致，保留原有Markdown硬换行。准备固定候选，未改主分支/旧Tag。"
+    }
+  ]
 }

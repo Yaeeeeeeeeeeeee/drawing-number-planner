@@ -42,7 +42,7 @@ describe('BOM history presentation diff',()=>{
   expect(compareBomItems([next],[prev]).rows[0].changedFields).toEqual(['quantity','white']);
  });
  it('uses valid content hashes for attachments, never filenames',()=>{
-  expect(compareAttachments([asset()],[asset('b'.repeat(64))]).kind).toBe('replaced');
+  expect(compareAttachments([asset()],[asset('b'.repeat(64))]).kind).toBe('unknown');
   expect(compareAttachments([asset()],[asset('a'.repeat(64),2)]).kind).toBe('unchanged');
   expect(compareBomItems([item(1,{assets:[asset('a'.repeat(64),2)]})],[item(1,{assets:[asset()]})]).counts.unchanged).toBe(1);
   expect(compareAttachments([asset()],[asset()]).kind).toBe('unchanged');
@@ -55,7 +55,7 @@ describe('BOM history presentation diff',()=>{
  it('counts real attachment additions removals and replacements',()=>{
   expect(compareAttachments([],[asset()]).kind).toBe('added');
   expect(compareAttachments([asset()],[]).kind).toBe('removed');
-  expect(compareBomItems([item(1,{assets:[asset('b'.repeat(64))]})],[item(1,{assets:[asset()]})]).counts.modified).toBe(1);
+  expect(compareBomItems([item(1,{assets:[asset('b'.repeat(64))]})],[item(1,{assets:[asset()]})]).counts.pending).toBe(1);
  });
  it('does not mutate or sort the loaded snapshots in place',()=>{
   const a=[item(2),item(1)],b=[item(1)];const before=JSON.stringify([a,b]);compareBomItems(a,b);expect(JSON.stringify([a,b])).toBe(before);
@@ -70,4 +70,11 @@ it('excludes independent QR associations from BOM history change counts without 
 it('keeps missing-digest metadata differences pending without proving an image change',()=>{
  const result=compareBomItems([item(1,{assets:[asset('unknown',2)]})],[item(1,{assets:[asset('unknown',1)]})]);
  expect(result.counts).toMatchObject({modified:0,pending:1});expect(result.rows[0].attachments.image.changed).toBe(false);
+});
+
+it('uses exact decoded-pixel results instead of assuming different encoded hashes mean different images',()=>{
+ const previous=[asset()],current=[asset('b'.repeat(64),2)];
+ expect(compareAttachments(previous,current,'equal').kind).toBe('unchanged');
+ expect(compareAttachments(previous,current,'different').kind).toBe('replaced');
+ expect(compareAttachments(previous,current,'unavailable')).toMatchObject({kind:'unknown',uncertain:true,changed:false});
 });

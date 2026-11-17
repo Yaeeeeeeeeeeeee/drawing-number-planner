@@ -13,8 +13,9 @@ async function indexedCompletion(service:PackagingTaskService,task:PackagingTask
  const scan=service.db.prepare('select index_scan_id as id from packaging_tasks where id=?').get(task.id) as {id:number|null};
  if(task.state!=='awaiting_index'||scan.id===null)return;
  const rows=service.db.prepare('select * from packaging_archive_journal where task_id=? order by item_id').all(task.id) as Journal[];
- if(rows.length!==task.items.filter(item=>item.mode!=='none').length||rows.some(row=>row.state!=='indexed'))return;
+ if(rows.length!==task.items.filter(item=>item.mode!=='none'&&!(item.relativePath&&service.isFormalPath(task,item.relativePath))).length||rows.some(row=>row.state!=='indexed'))return;
  service.validateTaskDrawings(task);
+ for(const item of task.items.filter(item=>item.relativePath&&service.isFormalPath(task,item.relativePath))){const formal=await service.formalFile(task,item);if(!formal||formal.path!==item.relativePath||formal.hash!==item.reviewedSha256)taskFail('INDEX_NOT_CONFIRMED','正式文件索引尚未完整核实');}
  for(const row of rows){
   const item=service.store.item(task.id,row.item_id),index=service.db.prepare('select drawing_id,historical_drawing_id,content_sha256,is_present from pdf_files where path_key=?').get(toWorkspacePathKey(row.destination_relative_path)) as {drawing_id:number|null;historical_drawing_id:number|null;content_sha256:string;is_present:number}|undefined;
   if(!index||!index.is_present||index.content_sha256!==row.source_sha256||(item.drawing.origin==='planned'?index.drawing_id:index.historical_drawing_id)!==item.drawing.id)taskFail('INDEX_NOT_CONFIRMED','归档索引尚未完整核实，临时文件保留');
@@ -47,6 +48,7 @@ export async function previewPackagingArchive(service:PackagingTaskService,id:st
  for(const item of task.items){
   if(item.mode==='none')continue;
   try{
+   if(item.relativePath&&service.isFormalPath(task,item.relativePath)){const formal=await service.formalFile(task,item);if(!formal||formal.path!==item.relativePath||formal.hash!==item.reviewedSha256||item.state!=='completed')taskFail('INDEX_NOT_CONFIRMED','正式文件索引尚未完整核实');continue;}
    if(!item.relativePath||!item.reviewedSha256||item.state!=='completed')taskFail('REVIEW_REQUIRED',`${item.projectName}尚未生成或完成人工检查`);
    const source=await pdfFact(service.taskPath(id,item.relativePath!));if(source.sha256!==item.reviewedSha256)taskFail('FILE_CHANGED',`${item.projectName}在人工确认后发生变化，请重新检查`);
    const target=destination(service,task,item),journal=service.db.prepare('select * from packaging_archive_journal where item_id=?').get(item.id) as Journal|undefined;
@@ -113,6 +115,7 @@ export async function archivePackagingTask(service:PackagingTaskService,id:strin
    service.db.prepare('update packaging_tasks set index_scan_id=? where id=?').run(scan.scanId,id);
   }).immediate();
   for(const journal of journals)if((await pdfFact(service.taskPath(id,journal.destination_relative_path))).sha256!==journal.source_sha256)taskFail('ARCHIVE_CHANGED','索引确认后正式文件发生变化，临时文件不清理');
+  if(!await indexedCompletion(service,service.store.task(id)))taskFail('INDEX_NOT_CONFIRMED','正式文件索引尚未完整核实');
   return finishCleanup(service,task);
  }catch(error){service.store.state(id,'awaiting_index',error instanceof Error?error.message:'归档未完成，临时文件已保留');throw error;}
 }

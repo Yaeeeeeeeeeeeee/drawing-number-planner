@@ -8,7 +8,7 @@ const visibilityOnly=base.replace("    show: false,","    // Keep native recover
 it('accepts the unchanged source and only the requested visibility additions',()=>{expect(()=>assertDesktopLayoutOnly(base,base)).not.toThrow();expect(()=>assertDesktopLayoutOnly(base,visibilityOnly.replaceAll('\n','\r\n'))).not.toThrow();});
 it('rejects weakening security or deleting recovery while allowing menu visibility',()=>{expect(()=>assertDesktopLayoutOnly(base,visibilityOnly.replace('nodeIntegration: false','nodeIntegration: true'))).toThrow(/Unexpected desktop/);expect(()=>assertDesktopLayoutOnly(base,visibilityOnly.replace('  installRecoveryControls();\n',''))).toThrow(/Unexpected desktop/);});
 
-it('accepts exactly the pinned renderer icon dependency and rejects unrelated package or lock changes', () => {
+it('accepts exactly pinned renderer icons/PDF reader and rejects unrelated package or lock changes', () => {
   const old = (file: string) => execFileSync('git', ['show', `8dc2112b596cebc045a121f6e5126c8059a6c4e0:${file}`], {encoding:'utf8'});
   const candidatePackage = readFileSync('package.json','utf8');
   const candidateLock = readFileSync('pnpm-lock.yaml','utf8');
@@ -19,6 +19,7 @@ it('accepts exactly the pinned renderer icon dependency and rejects unrelated pa
   releasePackage.version='2.0.0';
   expect(() => check(JSON.stringify(releasePackage))).toThrow();
   expect(() => check(candidatePackage.replace('1.59.0','1.60.0'))).toThrow();
+  expect(() => check(candidatePackage.replace('5.4.624','5.4.625'))).toThrow();
   expect(() => check(candidatePackage.replace('^13.0.3','^14.0.0'))).toThrow();
   expect(() => check(candidatePackage, candidateLock.replace('sha512-5qgMyy','sha512-wrong'))).toThrow();
   expect(() => check(candidatePackage, candidateLock.replace('lockfileVersion:', 'changedVersion:'))).toThrow();

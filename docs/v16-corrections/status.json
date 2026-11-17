@@ -1,0 +1,449 @@
+{
+  "baseline": "27c45a0 / v1.6.1 / Schema25",
+  "spec": "docs/requirements/v16-corrections-20261111.md",
+  "items": [
+    {
+      "id": "BUG-T40-001",
+      "module": "制图任务",
+      "title": "安全结束残留任务、修复型号锁和旧PDF脱钩冲突",
+      "decision": "已确认",
+      "implementation": "已有实现，本轮专项通过",
+      "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
+      "tests": "4文件55项＋实际浏览器1项；PHASE1_TASK_SAFETY.md",
+      "remaining": "用户真实T40库及最终Windows验收"
+    },
+    {
+      "id": "UI-STATE-001",
+      "module": "全局",
+      "title": "模块切换保留工作现场",
+      "decision": "已确认",
+      "implementation": "部分修复，继续按模块核查",
+      "evidence": "src/renderer/layout/AppShell.tsx；src/renderer/components/",
+      "tests": "导航/滚动专项通过；PHASE2_WORKSPACE_UI.md",
+      "remaining": "其他模块刷新/重启策略及全系统验收"
+    },
+    {
+      "id": "UI-DRAWER-001",
+      "module": "全局",
+      "title": "已确认页面真正实现右侧抽屉",
+      "decision": "已确认",
+      "implementation": "AIT新增/编辑抽屉已实施，专项通过",
+      "evidence": "src/renderer/layout/AppShell.tsx；src/renderer/components/",
+      "tests": "组件及1920/600浏览器；PHASE2_WORKSPACE_UI.md",
+      "remaining": "其他历史确认抽屉核查、Windows"
+    },
+    {
+      "id": "UI-SAVE-001",
+      "module": "全局",
+      "title": "消除无意义重复保存确认",
+      "decision": "已确认",
+      "implementation": "AIT脏状态和重复提交已修复，其他模块待核查",
+      "evidence": "src/renderer/layout/AppShell.tsx；src/renderer/components/",
+      "tests": "AIT保存成功/失败关闭专项",
+      "remaining": "全局保存确认回归"
+    },
+    {
+      "id": "UI-CHECK-001",
+      "module": "全局",
+      "title": "修复确认框/复选框无法操作",
+      "decision": "已确认",
+      "implementation": "原生控件与抽屉遮罩修复，专项通过",
+      "evidence": "src/renderer/layout/AppShell.tsx；src/renderer/components/",
+      "tests": "AIT抽屉1920/600实际浏览器、QR/字典/文件页组件",
+      "remaining": "最终键盘/Windows跨模块验收"
+    },
+    {
+      "id": "UI-PROGRESS-001",
+      "module": "全局",
+      "title": "长任务真实进度",
+      "decision": "已确认",
+      "implementation": "三种扫描范围真实阶段已实施",
+      "evidence": "src/renderer/layout/AppShell.tsx；src/renderer/components/",
+      "tests": "扫描任务/保护专项；PHASE4_PDF_BOM.md",
+      "remaining": "跳过/失败文件数不可可靠统计时显示未知；Windows及现场验收"
+    },
+    {
+      "id": "UI-VISUAL-001",
+      "module": "全局",
+      "title": "信息层级和排版优化",
+      "decision": "已确认",
+      "implementation": "保留现有布局，修正抽屉/文件分组/中文信息",
+      "evidence": "src/renderer/layout/AppShell.tsx；src/renderer/components/",
+      "tests": "实际抽屉、PDF、BOM截图；PHASE2/4/5",
+      "remaining": "全系统尺寸与Windows验收"
+    },
+    {
+      "id": "UI-TABLE-001",
+      "module": "全局",
+      "title": "表格宽度、对齐、布局记忆",
+      "decision": "已确认",
+      "implementation": "既有总宽/拖动复用，补入新列不破坏旧顺序",
+      "evidence": "src/renderer/layout/AppShell.tsx；src/renderer/components/",
+      "tests": "table-layout等整合5文件92项",
+      "remaining": "Windows物理DPI及跨显示器验收；1366/1920/2560/3840/720宽度已测"
+    },
+    {
+      "id": "PLAN-MODE-001",
+      "module": "图号工作台",
+      "title": "仅新建/批量两种模式",
+      "decision": "已确认",
+      "implementation": "已有新建/批量两模式，复用并专项回归",
+      "evidence": "src/core/planning/；src/renderer/pages/PlanningPage.tsx",
+      "tests": "规划服务和页面专项、实际浏览器2项",
+      "remaining": "最终Windows验收"
+    },
+    {
+      "id": "PLAN-FLOW-001",
+      "module": "图号工作台",
+      "title": "四步流程与右侧中文编码拆解",
+      "decision": "已确认",
+      "implementation": "中文拆解与流水预览已修复，专项通过",
+      "evidence": "src/core/planning/；src/renderer/pages/PlanningPage.tsx",
+      "tests": "规划5文件59项，浏览器3项（含抽屉）",
+      "remaining": "Windows现场验收"
+    },
+    {
+      "id": "PLAN-DRAFT-001",
+      "module": "图号工作台",
+      "title": "草稿独立、切换不丢失",
+      "decision": "已确认",
+      "implementation": "已有独立持久草稿，恢复强制重新检查，复用",
+      "evidence": "src/core/planning/；src/renderer/pages/PlanningPage.tsx",
+      "tests": "规划草稿/服务/页面专项",
+      "remaining": "最终Windows重启"
+    },
+    {
+      "id": "PLAN-UNIQUE-001",
+      "module": "图号工作台",
+      "title": "完整图号唯一、占号前查重",
+      "decision": "已确认",
+      "implementation": "已有事务唯一与产品状态复验，复用",
+      "evidence": "src/core/planning/；src/renderer/pages/PlanningPage.tsx",
+      "tests": "batch-planning-service、规划专项",
+      "remaining": "最终Windows"
+    },
+    {
+      "id": "PLAN-WHITE-001",
+      "module": "图号工作台",
+      "title": "白色默认共用、非白色独立",
+      "decision": "已确认",
+      "implementation": "UI/API白色默认共用已修复，专项通过",
+      "evidence": "src/core/planning/；src/renderer/pages/PlanningPage.tsx",
+      "tests": "白色默认3文件41项",
+      "remaining": "Windows现场验收"
+    },
+    {
+      "id": "PLAN-CHECK-001",
+      "module": "图号工作台",
+      "title": "查重/占号/生成依赖保护",
+      "decision": "已确认",
+      "implementation": "已有查重与正式占号依赖保护，复用",
+      "evidence": "src/core/planning/；src/renderer/pages/PlanningPage.tsx",
+      "tests": "规划服务/API/页面专项",
+      "remaining": "最终Windows"
+    },
+    {
+      "id": "AIT-STRUCT-001",
+      "module": "包材模板",
+      "title": "AIT管理/匹配/项目设置职责分离",
+      "decision": "已确认",
+      "implementation": "现有管理/规则/项目职责复用，范围直接编辑已补齐",
+      "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
+      "tests": "AIT目录原子保存及组件专项",
+      "remaining": "真实Windows/Adobe"
+    },
+    {
+      "id": "AIT-FILE-001",
+      "module": "包材模板",
+      "title": "直接引用AIT原路径",
+      "decision": "已确认",
+      "implementation": "原路径选择/重新定位/队列哈希保护已实施",
+      "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
+      "tests": "原路径67项，队列回归39项（交叉）；独立复核",
+      "remaining": "真实Windows/Adobe验证"
+    },
+    {
+      "id": "AIT-PROJECT-001",
+      "module": "包材模板",
+      "title": "每项目独立配置AIT/现成/人工",
+      "decision": "已确认",
+      "implementation": "existing模式和唯一正式索引自动确认已实施",
+      "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
+      "tests": "任务、迁移及保护专项；PHASE3_PLANNING_AIT.md",
+      "remaining": "多02/03候选完成策略待用户答复"
+    },
+    {
+      "id": "AIT-MATCH-001",
+      "module": "包材模板",
+      "title": "品牌/尺寸自动匹配及冲突处理",
+      "decision": "已确认",
+      "implementation": "完全等尺寸优先及冲突来源保护已实施",
+      "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
+      "tests": "匹配与任务2文件50项；范围原子保存专项",
+      "remaining": "最终跨模块/真实模板验收"
+    },
+    {
+      "id": "AIT-REPLACE-001",
+      "module": "包材模板",
+      "title": "只替换完整图号文本对象",
+      "decision": "已确认",
+      "implementation": "整段相同图号全对象替换与结果校验已实施",
+      "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
+      "tests": "VM及驱动集成专项；PHASE3_PLANNING_AIT.md",
+      "remaining": "真实Adobe字体/版式/重开验证"
+    },
+    {
+      "id": "AIT-OUTPUT-001",
+      "module": "包材模板",
+      "title": "只生成可编辑PDF、不覆盖",
+      "decision": "已确认",
+      "implementation": "仅PDF及已有目标阻止已实施",
+      "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
+      "tests": "自动化/目标冲突专项",
+      "remaining": "真实可编辑PDF验收"
+    },
+    {
+      "id": "AIT-UI-001",
+      "module": "包材模板",
+      "title": "右侧抽屉、舒适型列表",
+      "decision": "已确认",
+      "implementation": "抽屉、范围、原路径状态与匹配证据已实施",
+      "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
+      "tests": "UI25项，原子保存专项",
+      "remaining": "Windows现场验收"
+    },
+    {
+      "id": "TASK-STRUCT-001",
+      "module": "制图任务",
+      "title": "独立模块并沿用任务数据",
+      "decision": "已确认",
+      "implementation": "已有独立任务菜单与数据，复用",
+      "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
+      "tests": "任务服务及P0实际浏览器；PHASE1/3",
+      "remaining": "Windows及用户现场"
+    },
+    {
+      "id": "TASK-LIFE-001",
+      "module": "制图任务",
+      "title": "唯一任务、恢复、重试",
+      "decision": "已确认",
+      "implementation": "原流程复用，新增方式及正式文件编辑保护已修复",
+      "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
+      "tests": "安全修复2文件51项，独立复核通过",
+      "remaining": "Windows/多文件策略"
+    },
+    {
+      "id": "TASK-CREATE-001",
+      "module": "制图任务",
+      "title": "从已占号项目创建、人工文件关联",
+      "decision": "已确认",
+      "implementation": "已有占号关联/临时目录/人工文件，补existing方式",
+      "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
+      "tests": "任务服务/文件保护2文件51项",
+      "remaining": "同图号多正式候选完成策略待答复"
+    },
+    {
+      "id": "TASK-EDIT-PDF-001",
+      "module": "制图任务",
+      "title": "正式PDF副本编辑和安全替换",
+      "decision": "已确认",
+      "implementation": "已有副本/备份替换，补正式文件禁止直接COM编辑",
+      "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
+      "tests": "任务服务/迁移2文件51项，复核关闭",
+      "remaining": "真实Adobe操作及最终Windows"
+    },
+    {
+      "id": "TASK-ARCHIVE-001",
+      "module": "制图任务",
+      "title": "安全归档、部分失败重试",
+      "decision": "已确认",
+      "implementation": "已有安全归档/部分失败/保留文件结束，复用",
+      "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
+      "tests": "任务服务、P0、归档保护专项",
+      "remaining": "Windows，保留多候选待确认"
+    },
+    {
+      "id": "PDF-SCAN-001",
+      "module": "PDF中心",
+      "title": "02/03监听、当前类别扫描",
+      "decision": "已确认",
+      "implementation": "现有02/03监听/型号类别全库扫描复用，接入进度",
+      "evidence": "src/core/files/；src/renderer/pages/FilesPage.tsx",
+      "tests": "扫描范围与任务注册专项；PHASE4_PDF_BOM.md",
+      "remaining": "最终目录/Windows回归"
+    },
+    {
+      "id": "PDF-PROGRESS-001",
+      "module": "PDF中心",
+      "title": ">500分批、真实进度、状态区分",
+      "decision": "已确认",
+      "implementation": "三种扫描范围已接任务进度，专项通过",
+      "evidence": "src/core/files/；src/renderer/pages/FilesPage.tsx",
+      "tests": "任务/保护/页面专项，pdf-progress-report.md",
+      "remaining": "跳过/访问失败文件数不确定时如实未知；最终回归"
+    },
+    {
+      "id": "PDF-LIST-001",
+      "module": "PDF中心",
+      "title": "筛选、分组、选择和现场保持",
+      "decision": "已确认",
+      "implementation": "分组/即时筛选/选择保持已实施，专项通过",
+      "evidence": "src/core/files/；src/renderer/pages/FilesPage.tsx",
+      "tests": "3文件50项、真实3PDF浏览器及501条分批",
+      "remaining": "真实大资料库滚动体验及Windows；宽度/滚动/501条流程已在Chromium验证"
+    },
+    {
+      "id": "PDF-VIEW-001",
+      "module": "PDF中心",
+      "title": "内置只读PDF阅读器",
+      "decision": "已确认",
+      "implementation": "只读阅读工作区及资源打包已实施，专项通过",
+      "evidence": "src/core/files/；src/renderer/pages/FilesPage.tsx",
+      "tests": "dev/build真实文本PDF浏览器2项，类型/构建及API专项",
+      "remaining": "Windows默认程序/实际打印、CJK真实文件"
+    },
+    {
+      "id": "PDF-META-001",
+      "module": "PDF中心",
+      "title": "业务日期、人工归属、索引安全",
+      "decision": "已确认",
+      "implementation": "现有业务批次日期/人工归属/安全索引复用",
+      "evidence": "src/core/files/；src/renderer/pages/FilesPage.tsx",
+      "tests": "文件服务与管理专项、501条实际浏览器",
+      "remaining": "Windows"
+    },
+    {
+      "id": "BOM-EDIT-001",
+      "module": "BOM",
+      "title": "保存后重开加载最新数据",
+      "decision": "已确认",
+      "implementation": "已有准确ID重开/最新持久资产身份，复用",
+      "evidence": "src/core/bom/；src/renderer/pages/BomPage.tsx",
+      "tests": "bom-page重开/存储身份/失败回归；PHASE4_PDF_BOM.md",
+      "remaining": "Windows"
+    },
+    {
+      "id": "BOM-CREATE-001",
+      "module": "BOM",
+      "title": "新增入口明显、表单重置",
+      "decision": "已确认",
+      "implementation": "已有明显新增/成功重置/失败保留，复用",
+      "evidence": "src/core/bom/；src/renderer/pages/BomPage.tsx",
+      "tests": "bom-page专项；PHASE4_PDF_BOM.md",
+      "remaining": "Windows"
+    },
+    {
+      "id": "BOM-QUERY-001",
+      "module": "BOM",
+      "title": "查询筛选、历史和附件保护",
+      "decision": "已确认",
+      "implementation": "类别列和精确RGBA像素比较已实施，专项通过",
+      "evidence": "src/renderer/pages/bom/BomQuery.tsx；BomHistoryComparison.tsx；src/renderer/data/image-pixels.ts",
+      "tests": "5文件92项；真实PNG相同/alpha/RGB浏览器",
+      "remaining": "Windows"
+    },
+    {
+      "id": "PRODUCT-001",
+      "module": "产品档案",
+      "title": "品牌·型号显示和安全停用/删除",
+      "decision": "已确认",
+      "implementation": "品牌·型号显示及菜谱上下文修正；安全规则复用",
+      "evidence": "src/renderer/pages/ProductsPage.tsx",
+      "tests": "产品页面及QR专项；PHASE5_PRODUCTS_QR_DICTIONARY.md",
+      "remaining": "Windows"
+    },
+    {
+      "id": "QR-001",
+      "module": "二维码",
+      "title": "手动上传、启用、产品上下文、像素比较",
+      "decision": "已确认",
+      "implementation": "新增未启用/手动关联/无QR产品上下文已修复",
+      "evidence": "src/core/qr/；src/renderer/pages/QrCodesPage.tsx",
+      "tests": "QR5文件65项，旧URL/状态/PDF保持",
+      "remaining": "QR PDF像素比较页面范围待答复；Windows"
+    },
+    {
+      "id": "QR-RECIPE-001",
+      "module": "二维码",
+      "title": "菜谱按产品类别控制",
+      "decision": "已确认：仅空气炸锅（2026-11-11用户补充）",
+      "implementation": "新菜谱仅空气炸锅，历史关联可维护已实施",
+      "evidence": "src/core/qr/qr-applicability.ts；qr-service.ts；qr-manual-service.ts；QrCodesPage.tsx",
+      "tests": "API/人工预览/广泛旧配置绕过/页面专项65项",
+      "remaining": "Windows"
+    },
+    {
+      "id": "DICT-001",
+      "module": "编码字典",
+      "title": "项目明细搜索、父级停用后端校验",
+      "decision": "已确认",
+      "implementation": "子项目搜索/停用父级服务拒绝/引用示例已实施",
+      "evidence": "src/core/dictionaries/dictionary-service.ts；src/renderer/pages/DictionariesPage.tsx",
+      "tests": "7文件57项、密度2项、最终页面20项",
+      "remaining": "Windows"
+    },
+    {
+      "id": "MIG-EMAIL-001",
+      "module": "迁移检查",
+      "title": "邮件模板导入入口和解析保护",
+      "decision": "已确认",
+      "implementation": "已有入口与解析复用；原始XLSX再次只读验证",
+      "evidence": "src/renderer/pages/ImportPage.tsx；src/core/import/",
+      "tests": "原XLSX25候选、2支持/2不支持工作表、无主体厂家、原件SHA不变",
+      "remaining": "全套导入事务回归与Windows"
+    },
+    {
+      "id": "OUT-001",
+      "module": "外发资料",
+      "title": "按用户选择的批次和文件外发",
+      "decision": "已确认",
+      "implementation": "选定批次/文件复用，独立及未选事实显示已补齐",
+      "evidence": "src/core/outbound/；src/renderer/pages/OutboundPage.tsx",
+      "tests": "外发5文件117项、真实ZIP浏览器；PHASE6_DATABASE_OUTBOUND.md",
+      "remaining": "Windows"
+    },
+    {
+      "id": "OUT-50MB-001",
+      "module": "外发资料",
+      "title": ">50MB独立传输、不进ZIP，ZIP<=50MB",
+      "decision": "已确认",
+      "implementation": "原始PDF>50000000字节排除ZIP，独立传输清单已实施",
+      "evidence": "src/core/outbound/；src/renderer/pages/OutboundPage.tsx",
+      "tests": "外发117项，超限源文件SHA/ZIP内容/最终上限",
+      "remaining": "全独立仅显示清单无ZIP历史；最终Windows"
+    },
+    {
+      "id": "OUT-DRAFT-001",
+      "module": "邮件",
+      "title": "草稿跨软件重启恢复，不自动发送",
+      "decision": "已确认",
+      "implementation": "明确手动保存/恢复及准确任务上下文校验已实施",
+      "evidence": "src/renderer/pages/outbound/；src/core/outbound/",
+      "tests": "SQLite关闭重开、延迟保存、实际浏览器重载恢复",
+      "remaining": "真实Windows应用关闭重启未验证"
+    },
+    {
+      "id": "DB-SWITCH-001",
+      "module": "数据库",
+      "title": "选择后直接检查切换，失败回退",
+      "decision": "已确认",
+      "implementation": "一次选择/兼容摘要/核心读及提交后失败回退已实施",
+      "evidence": "src/main/index.ts；database-selection.ts；database-reselection.ts；scripts/production-profile.cjs",
+      "tests": "主进程54项、实际服务8项；PHASE6_DATABASE_OUTBOUND.md",
+      "remaining": "原生Windows切换与重启验收"
+    },
+    {
+      "id": "BASELINE-ADD-001",
+      "module": "跨模块",
+      "title": "继承G/Q已批准增补",
+      "decision": "已确认",
+      "implementation": "逐项继承，范围/任务/分批/数据库专项已复用修正",
+      "evidence": "docs/requirements/v16-corrections-20261111.md §15",
+      "tests": "任务书§15及PHASE1/3/4/6证据",
+      "remaining": "Windows；不新增完整备份中心"
+    }
+  ],
+  "updatedAt": "2026-11-17T10:29:47.025299+08:00",
+  "currentVerification": "完整240文件2075项、Chromium25项、类型与1.6.2构建通过；Windows待运行",
+  "candidateVersion": "1.6.2 / Schema26"
+}

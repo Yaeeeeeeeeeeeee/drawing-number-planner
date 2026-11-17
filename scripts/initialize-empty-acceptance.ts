@@ -32,3 +32,5 @@ export function initializeEmptyAcceptanceDatabase(databasePath: string): void {
 export {validateProductionDatabase, prepareExistingProductionDatabase, backupProductionDatabase} from '../src/main/database-validation.js';
 
 export {LocalServiceController as ProductionStartupService} from '../src/main/local-service-controller.js';
+
+export {CURRENT_SCHEMA_VERSION} from '../src/db/migrations.js';

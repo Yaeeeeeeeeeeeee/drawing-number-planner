@@ -44,7 +44,9 @@ export function columnDefault(c:LayoutColumn){return Math.max(columnMinimum(c),c
 export function normalizeLayout(columns:LayoutColumn[],value?:unknown):TableLayout{
  const stored=value as Partial<TableLayout>&{version?:number}|undefined;
  const valid=stored?.version===1?stored:undefined;
- const keys=columns.map(c=>c.key);const order=[...new Set([...(Array.isArray(valid?.order)?valid.order.filter(k=>keys.includes(k)):[]),...keys])];
+ const keys=columns.map(c=>c.key);const order=[...new Set(Array.isArray(valid?.order)?valid.order.filter(k=>keys.includes(k)):[])];
+ // New columns follow their default neighbour without resetting the user's existing order.
+ for(const [index,key] of keys.entries())if(!order.includes(key)){const anchor=keys.slice(index+1).find(next=>order.includes(next));order.splice(anchor?order.indexOf(anchor):order.length,0,key);}
  const pinned=(lock:'start'|'end')=>columns.filter(c=>c.locked===lock).map(c=>c.key);
  return {...(valid?.fixed===true?{fixed:true}:{}),order:[...pinned('start'),...order.filter(k=>!columns.find(c=>c.key===k)?.locked),...pinned('end')],widths:Object.fromEntries(columns.map(c=>{const w=valid?.widths?.[c.key];return[c.key,typeof w==='number'&&Number.isFinite(w)?Math.max(columnMinimum(c),w):columnDefault(c)];}))};
 }

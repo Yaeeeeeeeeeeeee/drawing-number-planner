@@ -62,6 +62,7 @@ export class QrService {
     if(input.qrFileId!=null)throw new QrError('MANUAL_QR_REQUIRED','请使用本地PDF选择、校验与确认流程关联文件');
     if (!this.repository.productIsActive(input.productId)) throw new QrError('NOT_FOUND', '启用中的产品不存在');
     if (!this.repository.purposeIsActive(input.purposeId)) throw new QrError('PURPOSE_NOT_FOUND', '启用中的二维码用途不存在');
+    if (!this.repository.purposeAppliesToProduct(input.productId, input.purposeId)) throw new QrError('PURPOSE_NOT_APPLICABLE', '该用途不适用于此产品类别');
     if (this.repository.findByProductPurpose(input.productId, input.purposeId, input.appearanceVersionId ?? null)) {
       throw new QrError('DUPLICATE_PRODUCT_PURPOSE', '该产品已经存在此二维码用途');
     }
@@ -74,7 +75,7 @@ export class QrService {
     const name = input.name.trim();
     if (!name) throw new QrError('INVALID_NAME', '二维码名称不能为空');
     return this.database.transaction(() => {
-      const created = this.repository.create({ ...input, name, targetUrl: normalizeUrl(input.targetUrl) });
+      const created = this.repository.create({ ...input, status: 'inactive', name, targetUrl: normalizeUrl(input.targetUrl) });
       return created;
     }).immediate();
   }

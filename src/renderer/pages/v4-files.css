@@ -18,3 +18,10 @@
 .files-page .files-name-clamp,.files-page .files-batch-code {text-align:center;}
 .files-page .files-management-toolbar .files-management-icon {display:inline-flex;align-items:center;justify-content:center;width:34px;min-width:34px;padding:7px;}
 .files-page .files-management-toolbar .files-management-icon svg {flex:none;}
+.files-page tr[aria-selected=true]{background:#e2edf6}
+.files-page .files-filter-controls,.files-page .files-active-filters {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.files-page .files-filter-overlay {position:fixed;z-index:100;right:0;top:0;bottom:0;width:min(380px,90vw);overflow:auto;background:var(--ws-surface,#fff);box-shadow:-6px 0 24px #0003;padding:20px;}
+.files-page .files-filter-overlay>div {display:flex;justify-content:space-between;align-items:center;}
+.files-page .files-filter-overlay .files-filter {display:flex;flex-direction:column;align-items:stretch;}
+.files-page .files-filter-overlay .files-filter label {display:flex;flex-direction:column;gap:4px;}
+.files-page .files-group-toggle {border:0;background:transparent;font-weight:600;text-align:left;cursor:pointer;}

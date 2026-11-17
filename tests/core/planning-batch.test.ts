@@ -131,3 +131,21 @@ it('rejects a white base with another appearance or project and invalidates edit
  approved.groups[0].rows[0].notes='Changed since check';
  expect(service.reserveBatch(approved).results[0]).toMatchObject({outcome:'failed',error:{code:'PLAN_STALE'}});
 });
+
+it('reports existing occupied maximum separately from the recommendation without allocating new numbers',()=>{
+ const input={groups:[{productId:refs.product.id,rows:[{...row(),colorId:refs.white.id}]}]};
+ const fresh=service.previewBatch(input).groups[0].rows[0];expect(fresh).toMatchObject({lastUsedSequence:0,sequence:1});
+ whiteBase();
+ db.prepare(`insert into historical_drawing_numbers(full_code,brand_code,product_size_code,appearance_code,color_code,main_category_code,project_item_code,sequence,product_id,first_seen_at,last_seen_at) values('02.0404.014.0401007','02','0404','01','4','04','01',7,?,'now','now')`).run(refs.product.id);
+ const before=db.prepare('select * from drawing_numbers').all();
+ expect(service.previewBatch(input).groups[0].rows[0]).toMatchObject({lastUsedSequence:7,sequence:8});
+ expect(db.prepare('select * from drawing_numbers').all()).toEqual(before);
+});
+
+it('defaults omitted nonwhite sharing to real white reuse and never invents a white base',()=>{
+ const omitted={...row(),shareWhite:undefined};const input={groups:[{productId:refs.product.id,rows:[omitted]}]};
+ expect(service.previewBatch(input).groups[0].rows[0]).toMatchObject({available:false,error:{code:'WHITE_BASE_REQUIRED'}});
+ const white=whiteBase(),before=db.prepare('select * from drawing_numbers').all();
+ expect(service.previewBatch(input).groups[0].rows[0]).toMatchObject({available:true,fullCode:white.fullCode,shared:{origin:'planned',id:white.id}});
+ expect(db.prepare('select * from drawing_numbers').all()).toEqual(before);
+});

@@ -30,7 +30,7 @@ it('rehearses a genuine v15 ledger without changing bytes, then backs up before 
   try {
     expect(backup.pragma('integrity_check', {simple:true})).toBe('ok');
     expect(backup.prepare('SELECT max(version) AS v FROM schema_migrations').get()).toEqual({v:15});
-    expect(upgraded.prepare('SELECT max(version) AS v FROM schema_migrations').get()).toEqual({v:25});
+    expect(upgraded.prepare('SELECT max(version) AS v FROM schema_migrations').get()).toEqual({v:26});
     expect(upgraded.pragma('foreign_key_check')).toEqual([]);
   } finally { backup.close(); upgraded.close(); }
 });
@@ -66,4 +66,9 @@ it.each(['unique', 'partial-predicate', 'foreign-key', 'trigger'])('rejects miss
   const bytes = readFileSync(file);
   expect(() => validateProductionDatabase(file)).toThrow();
   expect(readFileSync(file)).toEqual(bytes);
+});
+
+it('accepts schema 26 and rejects a future schema 27 without changing the selected database',()=>{
+  const {file}=fixture(),original=readFileSync(file);validateProductionDatabase(file);expect(readFileSync(file)).toEqual(original);
+  const db=new Database(file);db.prepare('insert into schema_migrations values(27,?)').run('future');db.close();const future=readFileSync(file);expect(()=>validateProductionDatabase(file)).toThrow(/27.*最高26/);expect(readFileSync(file)).toEqual(future);
 });

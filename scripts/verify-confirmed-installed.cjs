@@ -32,7 +32,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
   await page.getByRole('combobox',{name:`第 ${number} 行主类别`,exact:true}).selectOption(String(main.id));
   await page.getByRole('combobox',{name:`第 ${number} 行项目明细`,exact:true}).selectOption(String(project.id));
   await page.getByRole('combobox',{name:`第 ${number} 行颜色`,exact:true}).selectOption(String(color.id));
-  await page.getByRole('checkbox',{name:`第 ${number} 行其他颜色共用白色图号`,exact:true}).uncheck();
+  const independent=page.getByRole('checkbox',{name:`第 ${number} 行独立占号`,exact:true});if(await independent.count())await independent.check();
  };
  await fields(1,projects[0]);await page.getByRole('button',{name:'添加项目',exact:true}).click();await fields(2,projects[1]);
  await page.getByRole('textbox',{name:'第 1 行备注',exact:true}).fill('型号A独立输入');await page.getByRole('tab',{name:products[1].model,exact:true}).click();await fields(1,projects[0]);

@@ -25,12 +25,13 @@ describe('ProductsPage', () => {
     expect(headers).not.toContain('关联资料');
     expect(headers.slice(5, 8)).toEqual(['说明书', '售后卡', '菜谱']);
     const normalCells = within(screen.getByRole('button', {name:'编辑 N100'}).closest('tr')!).getAllByRole('cell');
+    expect(normalCells[1]).toHaveTextContent('SAMKYO · N100');
     expect(within(normalCells[5]).getByRole('button', { name: '说明书 · 已启用' })).toBeVisible();
     expect(within(normalCells[5]).getByRole('button', {name:'说明书 · 已启用'})).toHaveClass('product-purpose-active');
     expect(within(normalCells[6]).getByRole('button', {name:'售后卡 · 已停用'})).toHaveClass('product-purpose-inactive');
-    expect(within(normalCells[7]).getByRole('button', {name:'菜谱 · 未配置'})).toHaveClass('product-purpose-unconfigured');
+    expect(within(normalCells[7]).queryByRole('button')).toBeNull();
     expect(within(normalCells[6]).getByRole('button', { name: '售后卡 · 已停用' })).toBeVisible();
-    expect(normalCells[7]).toHaveTextContent('未配置');
+    expect(normalCells[7]).toHaveTextContent('—');
     expect(screen.getByRole('heading',{name:'产品档案'}).closest('.page-sticky-controls')).toContainElement(screen.getByRole('button',{name:'筛选'}));
     expect(headers).toEqual(['SKU','型号','品牌','产品类别','状态','说明书','售后卡','菜谱','操作']);
     expect(screen.getAllByRole('columnheader').map(h=>h.style.textAlign)).toEqual(Array(9).fill('center'));
@@ -43,8 +44,7 @@ describe('ProductsPage', () => {
     expect(screen.queryByText('Quick Start')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '菜谱 · 已停用' }));
     expect(onOpenQr).toHaveBeenCalledWith(expect.objectContaining({productId:2,sku:'SKU-A',model:'A100',purposeKey:'recipe'}));
-    fireEvent.click(within(normalCells[7]).getByRole('button',{name:'菜谱 · 未配置'}));
-    expect(onOpenQr).toHaveBeenLastCalledWith(expect.objectContaining({productId:1,purposeKey:'recipe'}));
+    expect(within(normalCells[7]).queryByRole('button',{name:'菜谱 · 未配置'})).toBeNull();
   });
 
   it('creates a product archive record with active dictionary selections', async () => {

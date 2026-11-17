@@ -43,6 +43,7 @@ describe('PDF renderer-only preview isolation', () => {
     const desktop = vi.fn(); window.plannerDesktop = { showFileInFolder: desktop };
     const network = vi.fn(); vi.stubGlobal('fetch', network);
     render(<App api={new Proxy({}, { get: () => real }) as never} />);
+    fireEvent.click((await screen.findAllByRole('button',{name:/已加载 .* 个版本/}))[0]);
     await screen.findByText('说明书-001-源文件');
     expect(document.querySelector('.files-page .file-relative')).toBeNull();
     expect(document.querySelector('.file-match.matched .files-match-badge')).toHaveTextContent('已匹配');
@@ -87,10 +88,9 @@ describe('PDF renderer-only preview isolation', () => {
     const network = vi.fn(); vi.stubGlobal('fetch', network);
     render(<App api={new Proxy({}, { get: () => real }) as never} />);
     await screen.findByText('包装箱-002-转曲后');
-    fireEvent.click(screen.getByRole('button', { name: '产品／批次导航' }));
+    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
     fireEvent.change(screen.getByLabelText('存在状态'), { target: { value: 'all' } });
-    fireEvent.click(screen.getByRole('button', { name: '筛选 PDF' }));
-    fireEvent.click(screen.getByRole('button', { name: '关闭产品导航' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     await screen.findByText('说明书-001-源文件');
     expect(document.querySelector('.file-match.pending .files-match-badge')?.textContent).toBe('待确认');
     expect(document.querySelector('.file-match.conflict .files-match-badge')?.textContent).toBe('多图号冲突');

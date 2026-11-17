@@ -41,6 +41,20 @@ describe('DictionaryService', () => {
       .toThrowError(expect.objectContaining({ code: 'INVALID_PARENT' }));
   });
 
+  it.each(['inactive', 'deleted', 'deleted-active'] as const)('rejects new children under an %s parent without altering existing identities', (state) => {
+    const parent = service.create({ type: 'main_category', code: '04', name: '印刷件类' });
+    service.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: parent.id });
+    if (state === 'inactive') service.deactivate(parent.id);
+    else service.deleteUnused(parent.id);
+    if (state === 'deleted-active') db.prepare("update dictionary_items set status='active' where id=?").run(parent.id);
+    const before = db.serialize();
+
+    expect(() => service.create({ type: 'project_item', code: '02', name: '说明书', parentId: parent.id }))
+      .toThrowError(expect.objectContaining({ code: 'INVALID_PARENT', message: expect.stringMatching(/启用/) }));
+    expect(db.serialize()).toEqual(before);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
+
   it('scopes project-item code uniqueness to its main category', () => {
     const printing = service.create({ type: 'main_category', code: '04', name: '印刷件类' });
     const packaging = service.create({ type: 'main_category', code: '05', name: '包装件类' });

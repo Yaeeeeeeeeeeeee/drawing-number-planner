@@ -10,6 +10,17 @@ function archived(){const item=service.create({type:'brand',code:'98',name:'可�
 const input=(p:ReturnType<DictionaryService['previewPermanentDeletion']>)=>({confirmationCode:p.item.code,expectedName:p.item.name,expectedDeletedAt:p.item.deletedAt!});
 const history=(code:string)=>db.prepare("insert into historical_drawing_numbers(full_code,brand_code,product_size_code,appearance_code,color_code,main_category_code,project_item_code,sequence,first_seen_at,last_seen_at) values(?,?,'0209','01','0','04','01',1,'2026-09-30','2026-09-30')").run(`${code}.0209.010.0401001`,code);
 describe('explicit permanent dictionary deletion',()=>{
+ it('names referenced historical codes and child dictionary codes during preflight without changing records',()=>{
+  const p=archived();history(p.item.code);const before=db.serialize();
+  expect(service.previewPermanentDeletion(p.item.id).blockers.join('；')).toContain('98.0209.010.0401001');
+  expect(db.serialize()).toEqual(before);
+  const main=service.create({type:'main_category',code:'95',name:'测试父级'});
+  const child=service.create({type:'project_item',parentId:main.id,code:'08',name:'测试项目'});
+  service.deleteUnused(main.id);const archivedBefore=db.serialize();
+  expect(service.previewPermanentDeletion(main.id).blockers.join('；')).toContain('08 · 测试项目');
+  expect(db.serialize()).toEqual(archivedBefore);
+  expect(db.prepare('select id,parent_id from dictionary_items where id=?').get(child.id)).toEqual({id:child.id,parent_id:main.id});
+ });
  it('physically removes only the confirmed archived unused identity',()=>{const p=archived();const unrelated=service.create({type:'brand',code:'97',name:'其他品牌'});expect(p.allowed).toBe(true);service.deletePermanently(p.item.id,input(p));expect(db.prepare('select id from dictionary_items where id=?').get(p.item.id)).toBeUndefined();expect(service.list({type:'brand'})).toContainEqual(unrelated);expect(db.pragma('foreign_key_check')).toEqual([]);});
  it('rejects active records, wrong confirmation and stale identity without changing data',()=>{const p=archived();const before=db.serialize();expect(()=>service.deletePermanently(p.item.id,{...input(p),confirmationCode:'98 '})).toThrow(/完整/);expect(()=>service.deletePermanently(p.item.id,{...input(p),expectedDeletedAt:'旧时间'})).toThrow(/已变化/);expect(db.serialize()).toEqual(before);service.activate(p.item.id);expect(()=>service.deletePermanently(p.item.id,input(p))).toThrow(/仅已删除/);});
  it('rechecks historical references inserted after a successful preflight',()=>{const p=archived();history(p.item.code);const before=db.serialize();expect(service.previewPermanentDeletion(p.item.id)).toMatchObject({allowed:false,blockers:expect.arrayContaining(['历史图号编码仍有引用'])});expect(()=>service.deletePermanently(p.item.id,input(p))).toThrow(/历史图号/);expect(db.serialize()).toEqual(before);});

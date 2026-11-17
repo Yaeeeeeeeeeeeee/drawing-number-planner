@@ -1,4 +1,5 @@
 import { lstatSync } from 'node:fs';
+import { isQrPurposeApplicable } from './qr-applicability.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import type { CreateProductQrCodeInput, CreateQrPurposeInput, ProductQrCode, ProductQrCodeFilters, QrFileReference,
   QrFileMatchStatus, QrPurpose, QrReferenceSummary, QrStatus, UpdateProductQrCodeInput } from './qr-types.js';
@@ -48,7 +49,7 @@ export class QrRepository {
       from products product join qr_purposes purpose
       left join qr_purpose_product_categories category on category.purpose_id = purpose.id
       where product.id = @productId and purpose.status = 'active'
-        and (purpose.default_for_all = 1 or category.product_category = product.product_category)
+        and ((purpose.key = 'recipe' and product.product_category = '空气炸锅') or (purpose.key <> 'recipe' and (purpose.default_for_all = 1 or category.product_category = product.product_category)))
       on conflict do nothing`).run({ productId, now: new Date().toISOString() });
   }
 
@@ -58,6 +59,7 @@ export class QrRepository {
       from products product join qr_purposes purpose
       where product.id = @productId and purpose.id = @purposeId
         and product.status = 'active' and purpose.status = 'active'
+        and ((purpose.key='recipe' and product.product_category='空气炸锅') or (purpose.key<>'recipe' and (purpose.default_for_all=1 or exists (select 1 from qr_purpose_product_categories c where c.purpose_id=purpose.id and c.product_category=product.product_category))))
       on conflict do nothing`).run({ productId, purposeId, now: new Date().toISOString() });
   }
 
@@ -90,6 +92,12 @@ export class QrRepository {
       return purposeId;
     }).immediate();
     return this.listPurposes().find((purpose) => purpose.id === id)!;
+  }
+
+  purposeAppliesToProduct(productId: number, purposeId: number): boolean {
+    const product = this.db.prepare(`select coalesce(master.product_category, product.product_category) as category from products product left join product_identity_members identity on identity.raw_product_id=product.id left join products master on master.id=identity.canonical_product_id where product.id=?`).get(productId) as {category:string}|undefined;
+    const purpose = this.listPurposes().find(item => item.id === purposeId);
+    return !!product && !!purpose && isQrPurposeApplicable(purpose, product.category);
   }
 
   productIsActive(id: number): boolean {

@@ -143,10 +143,12 @@ export class FileService {
     if (!workspaceRoot) throw new FileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
     this.scanning = true;
     try {
-      context?.report({ processed: 0, total: null, phase: 'scanning', message: '正在读取资料目录' });
+      context?.report({ processed: 0, total: null, phase: 'preparing', message: '正在准备资料目录' });
+      context?.throwIfCancelled();
+      context?.report({ processed: 0, total: null, phase: 'traversing', message: '正在遍历资料目录' });
       const progress = (processed: number, total: number | null, relativePath: string) => {
         context?.throwIfCancelled();
-        context?.report({ processed, total, phase: 'scanning', message: relativePath });
+        context?.report({ processed, total, phase: 'traversing', message: relativePath });
       };
       const directories = new Map<string, DirectoryScanSnapshot>();
       const files = (await this.scanner(workspaceRoot, { signal: context?.signal, onProgress: progress,
@@ -158,7 +160,7 @@ export class FileService {
       context?.throwIfCancelled();
       const drawings = this.repository.listDrawingCodes();
       let fingerprinted = 0; const fingerprintTotal = files.length;
-      context?.report({ processed: 0, total: fingerprintTotal, phase: 'fingerprinting', message: '正在校验文件内容' });
+      context?.report({ processed: 0, total: fingerprintTotal, phase: 'reading', message: '正在读取并校验文件信息' });
       const fingerprints = await mapWithConcurrency(files, FINGERPRINT_CONCURRENCY, async (file) => {
         context?.throwIfCancelled();
         const pathKey = toWorkspacePathKey(file.relativePath);
@@ -166,8 +168,9 @@ export class FileService {
         const result = await resolveFileFingerprint({ absolutePath: file.absolutePath, pathKey, sizeBytes: file.sizeBytes,
           modifiedAt: file.modifiedAt, existing: null, snapshot: file });
         fingerprinted += 1; context?.report({ processed: fingerprinted, total: fingerprintTotal,
-          phase: 'fingerprinting', message: file.relativePath }); return result;
+          phase: 'reading', message: file.relativePath }); return result;
       });
+      context?.report({ processed: 0, total: null, phase: 'comparing', message: '正在准备索引比对' });
       const historicalCodes: HistoricalDrawingScanRecord[] = [];
       const records = files.map((file, index): FileScanRecord => {
         if (!file.fileName.toLocaleLowerCase('en-US').endsWith('.pdf')) throw new Error('扫描器返回了非 PDF 文件');
@@ -191,6 +194,7 @@ export class FileService {
         }
       }
       for (const file of files) assertFileSnapshot(file.absolutePath, file);
+      context?.report({ processed: records.length, total: records.length, phase: 'writing', message: '文件已校验，正在比对并写入索引' });
       context?.beginFinalizing();
       const { missing, historicalRegistered } = this.repository.replaceScan(records, historicalCodes, scannedAt, undefined, pdfWorkspaceKey(workspaceRoot), scope);
       const completedScan = this.repository.latestScan();

@@ -11,6 +11,7 @@ export type ParentToServiceMessage =
 export type ServiceRequestMethod =
   | 'prepareDatabaseSwitch'
   | 'qrManualAction'
+  | 'selectAitTrusted'
   | 'resolvePdfFilePath'
   | 'resolveBomAssetPath'
   | 'resolveQrFilePath'

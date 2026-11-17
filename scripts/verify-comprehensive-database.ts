@@ -2,7 +2,7 @@
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
 import {createV15Fixture} from '../tests/db/v15-fixture';
 import {openDatabase} from '../src/db/database';
-import {migrateDatabase} from '../src/db/migrations';
+import {CURRENT_SCHEMA_VERSION,migrateDatabase} from '../src/db/migrations';
 import {createDatabaseBackup} from '../src/db/backup';
 const [mode,root]=process.argv.slice(2);if(!root)throw Error('Temporary verification directory required');
 const file=path.join(root,'planner.db');
@@ -42,7 +42,7 @@ if(mode==='prepare'){
  fs.writeFileSync(path.join(root,'native-rollback-and-wal.json'),JSON.stringify({walCommittedRowInBackup:true,v15To18FailureRollsBackSchemaAndRows:true,backupBeforeMigration:true}));
  }finally{db.close();}
 }else if(mode==='audit-upgrade'){
- const db=openDatabase(file);try{assert.equal((db.prepare('select max(version) as v from schema_migrations').get() as {v:number}).v,25);verifyLegacy(db,JSON.parse(fs.readFileSync(path.join(root,'legacy.json'),'utf8')));
+ const db=openDatabase(file);try{assert.equal((db.prepare('select max(version) as v from schema_migrations').get() as {v:number}).v,CURRENT_SCHEMA_VERSION);verifyLegacy(db,JSON.parse(fs.readFileSync(path.join(root,'legacy.json'),'utf8')));
  const backups=fs.readdirSync(path.join(root,'backups')).filter(name=>name.startsWith('migration-')&&name.endsWith('.db'));assert.ok(backups.length>0);let preUpgrade=false;
  for(const name of backups){const backup=openDatabase(path.join(root,'backups',name));try{if((backup.prepare('select max(version) as v from schema_migrations').get() as {v:number}).v===15){verifyLegacy(backup,JSON.parse(fs.readFileSync(path.join(root,'legacy.json'),'utf8')));preUpgrade=true;}}finally{backup.close();}}
  assert.ok(preUpgrade,'Real startup must create a readable, row-preserving v15 backup');

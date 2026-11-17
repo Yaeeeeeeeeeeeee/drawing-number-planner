@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto';
+
 /** Only the explicitly requested native menu visibility changes are permitted. */
 export function assertDesktopLayoutOnly(base: string, candidate: string): void {
   const normalize = (value: string) => value.replaceAll('\r\n','\n').trim();
@@ -7,15 +9,24 @@ export function assertDesktopLayoutOnly(base: string, candidate: string): void {
   if (reverted !== normalize(base)) throw new Error('Unexpected desktop source change; only native menu visibility is permitted');
 }
 
-/** Permit renderer icons and the approved stable app version without runtime upgrades. */
+/** Permit pinned renderer icons/PDF reader without upgrading the reused native runtime. */
 export function assertRendererIconDependencyOnly(basePackage: string, candidatePackage: string, baseLock: string, candidateLock: string): void {
   const normalize = (value: string) => value.replaceAll('\r\n', '\n');
   const base = JSON.parse(basePackage), candidate = JSON.parse(candidatePackage);
-  if (candidate.version !== base.version && !['1.0.0','1.1.0','1.1.1','1.1.2','1.2.0','1.3.0','1.3.1','1.4.0','1.5.0','1.6.0','1.6.1'].includes(candidate.version)) throw new Error('Unexpected application release version');
+  if (candidate.version !== base.version && !['1.0.0','1.1.0','1.1.1','1.1.2','1.2.0','1.3.0','1.3.1','1.4.0','1.5.0','1.6.0','1.6.1','1.6.2'].includes(candidate.version)) throw new Error('Unexpected application release version');
   candidate.version = base.version;
   if (candidate.dependencies?.['lucide-react'] !== '1.59.0') throw new Error('Unexpected icon dependency version');
   delete candidate.dependencies['lucide-react'];
+  const reader=candidate.dependencies?.['pdfjs-dist'];
+  if(reader!==undefined){if(reader!=='5.4.624')throw new Error('Unexpected PDF reader dependency version');delete candidate.dependencies['pdfjs-dist'];}
   if (JSON.stringify(base) !== JSON.stringify(candidate)) throw new Error('Unexpected package change beyond renderer icons');
+  if(reader!==undefined){
+    // Exact reviewed lock pair includes PDF.js's optional canvas packages; none are substituted
+    // into the reused Electron/SQLite runtime. Any transitive or integrity change needs review.
+    const hash=(value:string)=>createHash('sha256').update(normalize(value)).digest('hex');
+    if(hash(baseLock)!=='b483ff9b5cb90f9301856a61902fa3ae2d152a16205e7053db41cf6bd98cf83d'||hash(candidateLock)!=='9016baaf4defd07798c3078900ea8ce8fdd8b920cee3d874d8018d6c47081ba9')throw new Error('Unexpected lockfile change beyond pinned renderer icons and PDF reader');
+    return;
+  }
   const additions = [
     '      lucide-react:\n        specifier: 1.59.0\n        version: 1.59.0(@types/react@19.2.18)(react@19.2.8)\n',
     "  lucide-react@1.59.0:\n    resolution: {integrity: sha512-5qgMyyCPU6OvnKpLS2t693+ZtiqA8oaSweWoUows0BLFKFf6V75m4+CptpmohZHpD5IuOVIBXHBBiv2vpLJmtw==}\n    peerDependencies:\n      '@types/react': '*'\n      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0\n    peerDependenciesMeta:\n      '@types/react':\n        optional: true\n\n",

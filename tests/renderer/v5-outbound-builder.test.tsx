@@ -33,3 +33,13 @@ it('keeps independent product categories even when their size dictionary ID is s
  fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'类别甲'}});
  expect(within(screen.getByLabelText('产品型号')).getAllByRole('option').map(x=>x.getAttribute('value'))).toEqual(['','11']);
 });
+it('lists all independent files without creating a ZIP or mail package',async()=>{
+ const items=[1,2].map(id=>({pdfFileId:id,fileName:`large${id}.pdf`,projectItemName:`项目${id}`,sizeBytes:50_000_001,contentSha256:`hash${id}`,status:'normal',change:'new',selectable:true}));
+ const api={listProducts:vi.fn().mockResolvedValue([{id:11,brandId:1,productCategory:'类别甲',model:'T40'}]),listDictionaries:vi.fn().mockResolvedValue([{id:1,name:'品牌甲'}]),listMaterialBatches:vi.fn().mockResolvedValue([{id:1,name:'批次',isPresent:true,recognitionStatus:'recognized'}]),previewOutboundPackage:vi.fn().mockResolvedValue({previewToken:'token',packageName:'本次',items}),preflightOutboundPackage:vi.fn().mockResolvedValue({selectedCount:2,normalCount:2,warningCount:0,blockingErrors:[],warnings:[]}),createOutboundPackage:vi.fn()};
+ const onPackage=vi.fn();render(<PackageBuilder api={api as never} onPackage={onPackage}/>);
+ await within(screen.getByLabelText('品牌')).findByRole('option',{name:'品牌甲'});
+ fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'类别甲'}});fireEvent.change(screen.getByLabelText('产品型号'),{target:{value:'11'}});
+ await within(screen.getByLabelText('资料批次')).findByRole('option',{name:'批次'});fireEvent.change(screen.getByLabelText('资料批次'),{target:{value:'1'}});fireEvent.click(screen.getByRole('button',{name:'预览文件'}));
+ await screen.findByText('large1.pdf');fireEvent.click(screen.getByRole('button',{name:'生成压缩包'}));fireEvent.click(await screen.findByRole('button',{name:'确认生成'}));
+ const result=screen.getByLabelText('独立传输结果');expect(result).toHaveTextContent('没有生成 ZIP');expect(result).toHaveTextContent('large1.pdf');expect(result).toHaveTextContent('large2.pdf');expect(result).toHaveTextContent('独立传输');expect(api.createOutboundPackage).not.toHaveBeenCalled();expect(onPackage).not.toHaveBeenCalled();
+});

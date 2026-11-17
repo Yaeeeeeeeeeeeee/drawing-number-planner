@@ -56,7 +56,7 @@ it('real watcher events index only the affected formal product and discover00 wi
  monitor(f).start();await expect.poll(()=>f.scans.length,{timeout:3000}).toBe(2);await expect.poll(()=>f.discovered.length).toBeGreaterThan(0);await new Promise(resolve=>setTimeout(resolve,80));f.scans.length=0;f.discovered.length=0;
  pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/new.pdf');
  await expect.poll(()=>f.db.prepare("select count(*) as count from pdf_files where file_name='new.pdf'").get(),{timeout:3000}).toEqual({count:1});expect(f.scans.flat()).not.toContain('category/TWO-MODEL');
- await new Promise(resolve=>setTimeout(resolve,60));f.scans.length=0;
+ await new Promise(resolve=>setTimeout(resolve,60));f.scans.length=0;f.discovered.length=0;
  const manual=pdf(f.root,'category/ONE-MODEL/00.临时文件/unknown.pdf');await expect.poll(()=>f.discovered.includes('active'),{timeout:3000}).toBe(true);
  expect(readFileSync(manual,'utf8')).toContain('%%EOF');expect(f.db.prepare("select count(*) as count from pdf_files where file_name='unknown.pdf'").get()).toEqual({count:0});expect(f.scans).toHaveLength(0);
  f.discovered.length=0;writeFileSync(join(f.root,'category','ONE-MODEL','metadata.txt'),'metadata');await new Promise(resolve=>setTimeout(resolve,100));expect(f.discovered).toHaveLength(0);expect(f.scans).toHaveLength(0);
@@ -125,4 +125,7 @@ it('rechecks a queued product after another asynchronous scan before indexing a 
  expect(f.scans.flat()).not.toContain('category/TWO-MODEL');
  expect(f.db.prepare("select count(*) n from pdf_files where file_name='after-deactivation.pdf'").get()).toEqual({n:0});
  expect(readFileSync(file,'utf8')).toContain('%%EOF');
+});
+it('refreshes active task discovery after its formal directory has been indexed',async()=>{
+ const f=registered();f.tasks.push(task(f.first,'active','category/ONE-MODEL'));pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/new.pdf');const observed:number[]=[];f.setDiscover(async()=>{observed.push((f.db.prepare('select count(*) n from pdf_files').get() as {n:number}).n);});monitor(f).start();await expect.poll(()=>observed.includes(1),{timeout:1000}).toBe(true);
 });

@@ -294,6 +294,25 @@ describe('OutboundPackageService', () => {
       .toEqual([{ part_number: 1 }, { part_number: 2 }]);
     expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 1 });
   });
+  it('persists the editable mail draft and exact package context across database reopen', async () => {
+    const preview = service.previewPackage(request());
+    const result = await service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] });
+    const draft = { packageId: result.id, context: { packageId: result.id, product: {id: productId}, selectedMaterialBatchId: batchId, createdAt:result.createdAt, items:[{pdfFileId:pdfId}] }, to: 'to@example.com', cc: 'cc@example.com', subject: '手动主题', body: '手动正文' };
+    service.saveEmailDraft(draft);
+    db.close();
+    db = openDatabase(join(root, 'planner.sqlite'));
+    service = new OutboundPackageService(db, { workspaceRoot: () => workspace, outputRoot: () => output, now: fixedNow });
+    expect(service.latestEmailDraft()).toMatchObject(draft);
+  });
+  it('rejects a draft with wrong file or time context and skips legacy drafts', async () => {
+    const preview=service.previewPackage(request());const result=await service.createPackage({...request(),previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]});
+    db.prepare("insert into outbound_email_drafts(package_id,recipients_json,cc_json,subject,body,created_at,updated_at) values(?,'[]','[]','legacy','legacy','now','now')").run(result.id);
+    expect(service.latestEmailDraft()).toBeNull();
+    const base={packageId:result.id,context:{packageId:result.id,product:{id:productId},selectedMaterialBatchId:batchId,createdAt:result.createdAt,items:[{pdfFileId:pdfId}]},to:'',cc:'',subject:'subject',body:'body'};
+    expect(()=>service.saveEmailDraft({...base,context:{...base.context,items:[{pdfFileId:999}]}})).toThrow(/不一致/);
+    expect(()=>service.saveEmailDraft({...base,context:{...base.context,createdAt:'wrong'}})).toThrow(/不一致/);
+    expect(db.prepare('select count(*) as count from outbound_email_drafts').get()).toEqual({count:1});
+  });
   it('registers the measured first ZIP part together with the completed package', async () => {
     const preview = service.previewPackage(request());
     const result = await service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] });
@@ -306,6 +325,33 @@ describe('OutboundPackageService', () => {
     const descriptor = openSync(join(workspace, row.relative_path), 'r+');
     try { ftruncateSync(descriptor, 63_000_000); } finally { closeSync(descriptor); }
     expect(service.previewPackage(request()).items[0].selectable).toBe(true);
+    expect(readdirSync(output)).toEqual([]);
+    expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
+  });
+  it('keeps a compressible oversized source outside the ZIP and records its disposition', async () => {
+    const largeId = addOutlined({ relativePath: 'large.pdf', fullCode: '02.0209.010.0402001' });
+    const largePath = join(workspace, 'large.pdf');
+    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] >>'];
+    let pdf = '%PDF-1.4\n'; const offsets = [0];
+    objects.forEach((object,index) => { offsets.push(Buffer.byteLength(pdf)); pdf += `${index+1} 0 obj\n${object}\nendobj\n`; });
+    const xref = Buffer.byteLength(pdf);
+    pdf += `xref\n0 4\n0000000000 65535 f \n${offsets.slice(1).map(offset => `${String(offset).padStart(10,'0')} 00000 n \n`).join('')}trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    writeFileSync(largePath, pdf);
+    const descriptor = openSync(largePath, 'r+');
+    try { ftruncateSync(descriptor, 50_000_001); } finally { closeSync(descriptor); }
+    const before = createHash('sha256').update(readFileSync(largePath)).digest('hex');
+    const preview = service.previewPackage(request());
+    const result = await service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId, largeId] });
+    for (const part of result.parts ?? []) expect([...decodedZipEntries(join(output, part.zipRelativePath)).keys()]).not.toContain('large.pdf');
+    expect(result.independentFiles).toEqual([expect.objectContaining({ pdfFileId: largeId, fileName: 'large.pdf', sizeBytes: 50_000_001 })]);
+    expect(createHash('sha256').update(readFileSync(largePath)).digest('hex')).toBe(before);
+  });
+  it('reports an all-independent selection without creating an empty ZIP or history', async () => {
+    const row = db.prepare('select relative_path from pdf_files where id = ?').get(pdfId) as { relative_path: string };
+    const descriptor = openSync(join(workspace, row.relative_path), 'r+');
+    try { ftruncateSync(descriptor, 50_000_001); } finally { closeSync(descriptor); }
+    const preview = service.previewPackage(request());
+    await expect(service.createPackage({ ...request(), previewToken: preview.previewToken, selectedPdfFileIds: [pdfId] })).rejects.toThrow(/独立传输/);
     expect(readdirSync(output)).toEqual([]);
     expect(db.prepare('select count(*) as total from outbound_packages').get()).toEqual({ total: 0 });
   });
@@ -671,7 +717,7 @@ describe('batch-first V2 workflow',()=>{
   function scope(id:number,appearanceVersionId:number,sequenceComplete=true){db.prepare(`insert into outbound_batch_scopes(batch_id,appearance_version_id,completeness,revision,updated_at,reason) values(?,?,?,1,?,'人工确认历史批次归属')`).run(id,appearanceVersionId,sequenceComplete?'complete':'pending',now);}
   function bind(id:number,appearanceVersionId:number){const row=db.prepare('select historical_drawing_id as id from pdf_files where id=?').get(id) as {id:number};db.prepare("insert into drawing_appearance_bindings(origin,record_id,product_id,appearance_version_id,source,updated_at) values('historical',?,?,?,'manual',?)").run(row.id,productId,appearanceVersionId,now);}
   function pdfBytes(id:number,text:string){const file=db.prepare('select relative_path as path from pdf_files where id=?').get(id) as {path:string};writeFileSync(join(workspace,file.path),'%PDF-1.7\n'+text);}
-  it.each([1,50,69,100,200])('includes a real %iMB PDF byte-for-byte with accurate part counts', async mb=>{
+  it.each([1,50])('includes a real %iMB PDF byte-for-byte with accurate part counts', async mb=>{
     const appearanceVersionId=version();scope(batchId,appearanceVersionId);bind(pdfId,appearanceVersionId);
     const row=db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string};
     const path=join(workspace,row.path);const bytes=Buffer.alloc(mb*1_000_000,32);bytes.write('%PDF-1.7\n');writeFileSync(path,bytes);
@@ -688,7 +734,7 @@ describe('batch-first V2 workflow',()=>{
     const path=join(workspace,row.path);const bytes=randomFillSync(Buffer.alloc(51_000_000));bytes.write('%PDF-1.7\n');writeFileSync(path,bytes);
     const hash=createHash('sha256').update(bytes).digest('hex');const input={...request(),workflowVersion:2 as const,appearanceVersionId};
     const preview=service.previewPackage(input);expect(preview.items[0]).toMatchObject({selectable:true,status:'normal',presenceStatus:'present'});
-    await expect(service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]})).rejects.toThrow(/源 PDF 存在且可读取.*50MB/);
+    await expect(service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId]})).rejects.toThrow(/独立传输/);
     expect(service.listCompleted(productId)).toHaveLength(0);expect(readdirSync(output)).toEqual([]);
     expect(createHash('sha256').update(readFileSync(path)).digest('hex')).toBe(hash);
   },30000);
@@ -739,6 +785,17 @@ describe('batch-first V2 workflow',()=>{
     const request={...input,selectedMaterialBatchId:next};const preview=service.previewPackage(request);const hash=preview.items[0].contentSha256!;
     expect(service.previewPackage({...request,fileConfirmations:[{pdfFileId:changed,reason:'已经逐项核对内容',contentSha256:hash}]}).items[0].selectable).toBe(true);
     pdfBytes(changed,'changed again');expect(service.previewPackage({...request,fileConfirmations:[{pdfFileId:changed,reason:'已经逐项核对内容',contentSha256:hash}]}).items[0].selectable).toBe(false);
+  });
+  it('freezes included, independent and unselected dispositions in V2 history', async () => {
+    const input=ready();const main=(db.prepare("select id from dictionary_items where type='main_category' and code='04'").get() as {id:number}).id;dictionary('project_item','02','彩盒',main);dictionary('project_item','03','标签',main);const large=addOutlined({fullCode:'02.0209.011.0402001',relativePath:'large-v2（转曲）.pdf'});db.prepare("update historical_drawing_numbers set project_item_code='02' where id=(select historical_drawing_id from pdf_files where id=?)").run(large);bind(large,input.appearanceVersionId);pdfBytes(large,'compressible');
+    const path=join(workspace,'large-v2（转曲）.pdf');const descriptor=openSync(path,'r+');try{ftruncateSync(descriptor,50_000_001);}finally{closeSync(descriptor);}
+    const excluded=addOutlined({fullCode:'02.0209.012.0403001',relativePath:'unselected（转曲）.pdf'});db.prepare("update historical_drawing_numbers set project_item_code='03' where id=(select historical_drawing_id from pdf_files where id=?)").run(excluded);bind(excluded,input.appearanceVersionId);pdfBytes(excluded,'not selected');
+    const preview=service.previewPackage(input);const result=await service.createPackage({...input,previewToken:preview.previewToken,selectedPdfFileIds:[pdfId,large]});
+    expect(result.independentFiles).toEqual([expect.objectContaining({pdfFileId:large,sizeBytes:50_000_001})]);
+    expect(result.excludedFiles).toEqual(expect.arrayContaining([expect.objectContaining({pdfFileId:excluded,reason:'未选择'})]));
+    expect([...decodedZipEntries(join(output,result.zipRelativePath)).keys()]).not.toContain('large-v2（转曲）.pdf');
+    const history=service.historyDetail(result.id);expect(history.files).toEqual(expect.arrayContaining([expect.objectContaining({pdfFileId:large,disposition:'independent'}),expect.objectContaining({pdfFileId:pdfId,disposition:'included'})]));
+    expect(history.context).toMatchObject({excludedFiles:expect.arrayContaining([expect.objectContaining({pdfFileId:excluded})])});
   });
   it('does not package ignored files, even as manually confirmed extra material',()=>{
     const input=ready();db.prepare("update pdf_files set management_state='ignored' where id=?").run(pdfId);const source=readFileSync(join(workspace,(db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string}).path));

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BomHistoryComparison } from '../../src/renderer/pages/bom/BomHistoryComparison';
-import type { BomItemView, BomVersionView } from '../../src/renderer/data/client';
+import * as pixels from '../../src/renderer/data/image-pixels';
+import type { BomItemAssetView, BomItemView, BomVersionView } from '../../src/renderer/data/client';
 const item=(id:number,material='纸'):BomItemView=>({bomItemId:id,projectItemId:id,projectItemName:`资料${id}`,origin:'planned',drawingId:id,fullCode:`02.0404.010.040100${id}`,displayName:'资料',status:'active',effectiveMaterialBatchId:null,effectiveBatchName:null,effectiveBatchRelativePath:null,material,dimensions:'210×297',position:'内部',changeDetails:null,notes:null,usesWhiteMaterial:false,assets:[],qrCodes:[]});
 const version=(id:number,items:BomItemView[],previousVersionId:number|null=null):BomVersionView=>({id,productId:1,model:'F60',versionNumber:id,previousVersionId,businessChangeDate:'2026-09-28',businessChangeDateLabel:'2026-09-28',notes:null,createdAt:'2026-09-28T00:00:00Z',updatedAt:'2026-09-28T00:00:00Z',editRevision:1,items});
 const props={mainCategories:[],projects:[],batches:[],onOpenAsset:vi.fn(),previewOnly:false};
@@ -60,4 +61,23 @@ it('renders selected values before previous values in static field, attachment a
  const row=screen.getByRole('rowheader',{name:'材质'}).closest('tr')!;expect(within(row).getAllByRole('cell').map(c=>c.textContent)).toEqual(['新纸','旧纸']);
  expect(screen.queryByRole('button',{name:/恢复.*布局/})).toBeNull();
  fireEvent.click(screen.getByText('批次详情'));expect(Array.from(document.querySelectorAll('.bom-history-batch-snapshots section')).map(e=>e.getAttribute('aria-label'))).toEqual(['所选记录批次详情','上一条记录批次详情']);
+});
+
+const imageAsset=(id:number,hash:string):BomItemAssetView=>({id,assetId:id,role:'image',inheritedFromBomItemAssetId:null,relativePath:`BOM/${id}.png`,originalFileName:`图片${id}.png`,mimeType:'image/png',sizeBytes:100,contentSha256:hash.repeat(64),createdAt:'2026-11-16'});
+const pixel=(red=10)=>({width:1,height:1,data:new Uint8ClampedArray([red,20,30,255])});
+afterEach(()=>vi.restoreAllMocks());
+it('compares decoded images and treats identical pixels with different hashes as unchanged',async()=>{
+ const decode=vi.spyOn(pixels,'decodeImagePixels').mockResolvedValue(pixel());
+ const a={...item(1),assets:[imageAsset(1,'a')]},b={...item(1),assets:[imageAsset(2,'b')]};
+ render(<BomHistoryComparison {...props} detail={version(2,[b],1)} readVersion={vi.fn().mockResolvedValue(version(1,[a]))}/>);
+ expect(await screen.findByRole('button',{name:/项目 1 · 资料1.*未变化/})).toBeVisible();
+ expect(decode.mock.calls.map(call=>call[0])).toEqual(['/api/boms/assets/1/preview','/api/boms/assets/2/preview']);
+});
+it('keeps image failures pending and offers a retry without changing saved BOM data',async()=>{
+ const decode=vi.spyOn(pixels,'decodeImagePixels').mockRejectedValue(Error('图片暂时无法读取'));
+ const a={...item(1),assets:[imageAsset(1,'a')]},b={...item(1),assets:[imageAsset(2,'b')]};const source=JSON.stringify([a,b]);
+ render(<BomHistoryComparison {...props} detail={version(2,[b],1)} readVersion={vi.fn().mockResolvedValue(version(1,[a]))}/>);
+ expect(await screen.findByRole('button',{name:'重试图片比较'})).toBeVisible();expect(screen.getByRole('button',{name:/项目 1 · 资料1.*待确认/})).toBeVisible();
+ decode.mockResolvedValue(pixel());fireEvent.click(screen.getByRole('button',{name:'重试图片比较'}));
+ expect(await screen.findByRole('button',{name:/项目 1 · 资料1.*未变化/})).toBeVisible();expect(JSON.stringify([a,b])).toBe(source);
 });

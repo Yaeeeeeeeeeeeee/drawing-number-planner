@@ -144,7 +144,8 @@ module.exports=async function verifyV52({page,app,source,workspace,evidence,writ
   const key=columns[0];await table.locator(`thead th[data-column-key="${key}"]`).getByRole('separator').press('ArrowLeft');
   const after=await table.locator('thead th').evaluateAll(cells=>cells.map(cell=>({key:cell.dataset.columnKey,width:cell.getBoundingClientRect().width}))),changed=before.find(cell=>cell.key===key).width-after.find(cell=>cell.key===key).width;assert.ok(changed>0);assert.ok(Math.abs(after.at(-1).width-before.at(-1).width-changed)<2);for(const cell of after)if(cell.key!==key&&cell.key!==after.at(-1).key)assert.ok(Math.abs(cell.width-before.find(old=>old.key===cell.key).width)<2);
   if(label==='PDF 文件中心'){
-   const toolbar=section.getByRole('region',{name:'PDF 索引管理',exact:true}),buttons=toolbar.getByRole('button');assert.equal(await buttons.count(),6);assert.deepEqual(await toolbar.getByRole('group').evaluateAll(groups=>groups.map(group=>group.querySelectorAll('button').length)),[3,3]);
+    await section.getByRole('button',{name:'全选已加载文件',exact:true}).click();
+   const toolbar=section.getByRole('region',{name:'PDF 索引管理',exact:true}),buttons=toolbar.getByRole('button');assert.equal(await buttons.count(),6);assert.deepEqual(await toolbar.getByRole('group').evaluateAll(groups=>groups.map(group=>group.querySelectorAll('button').length).filter(count=>count>0)),[3,3]);
    assert.ok(await buttons.evaluateAll(nodes=>nodes.every(node=>!!node.querySelector('svg')&&!node.textContent.trim()&&node.title===node.getAttribute('aria-label'))));
    const rows=await buttons.evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().y));assert.ok(Math.max(...rows)-Math.min(...rows)<2);
   }

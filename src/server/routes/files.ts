@@ -1,8 +1,10 @@
+import { open } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import { FileError } from '../../core/files/file-errors.js';
 import { FILE_INDEX_CLEAR_CONFIRMATION, type FileService } from '../../core/files/file-service.js';
+import type { IndexedPdfResolver } from '../../core/files/indexed-pdf-resolver.js';
 import type { TaskRegistry } from '../../core/tasks/task-registry.js';
 
 const settingsSchema = z.object({ workspaceRoot: z.string().trim().min(1).max(2000) }).strict();
@@ -41,7 +43,7 @@ function sendFileError(reply: FastifyReply, error: unknown) {
   return reply.code(status).send({ error: { code: error.code, message: error.message } });
 }
 
-export function registerFileRoutes(app: FastifyInstance, service: FileService, tasks?: TaskRegistry): void {
+export function registerFileRoutes(app: FastifyInstance, service: FileService, tasks?: TaskRegistry, resolver?: IndexedPdfResolver): void {
   tasks?.register('workspace_scan', (payload, context) => {
     const input = emptyBodySchema.safeParse(payload ?? {});
     if (!input.success) throw Object.assign(new Error('扫描请求不应包含额外参数'), { code: 'INVALID_REQUEST' });
@@ -140,6 +142,20 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService, t
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 导航筛选条件无效' } });
     try { return service.navigation(query.data); }
     catch (error) { return sendFileError(reply, error); }
+  });
+
+  app.get('/api/files/:id/content', async (request, reply) => {
+    const params = scanIdSchema.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'PDF 索引编号无效'}});
+    try {
+      if (!resolver) throw new FileError('PDF_FILE_UNAVAILABLE', 'PDF 文件服务不可用');
+      const path = resolver.resolve(params.data.id);
+      const file = await open(path, 'r');
+      return reply.type('application/pdf').header('Cache-Control', 'no-store').send(file.createReadStream());
+    } catch (error) {
+      if (error instanceof FileError) return sendFileError(reply, error);
+      return reply.code(422).send({error:{code:'PDF_FILE_UNAVAILABLE',message:'文件无法读取或已不存在'}});
+    }
   });
 
   app.get('/api/files/:id/presence',async(request,reply)=>{

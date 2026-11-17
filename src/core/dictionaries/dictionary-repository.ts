@@ -107,22 +107,53 @@ export class DictionaryRepository {
       bom_versions: 'BOM历史记录仍有引用', bom_items: 'BOM项目仍有引用',
       outbound_package_items: '外发历史仍有引用', dictionary_items: '仍有子级字典（包括已删除子项）',
     };
+    // These are examples from real records, not invented names for unknown FKs.
+    // Keep the complete FK check below even when no readable example is available.
+    const referenceLabels: Record<string, string> = {
+      products: "reference.model",
+      drawing_numbers: "reference.full_code || ' · ' || reference.display_name",
+      dictionary_items: "reference.code || ' · ' || reference.name",
+      bom_versions: "(select model from products where id = reference.product_id) || coalesce(' · ' || reference.business_change_date, '')",
+      bom_items: `coalesce((select full_code from drawing_numbers where id = reference.drawing_id),
+        (select full_code from historical_drawing_numbers where id = reference.historical_drawing_id),
+        (select code || ' · ' || name from dictionary_items where id = reference.project_item_id))`,
+      outbound_package_items: "reference.drawing_code_snapshot || ' · ' || reference.project_item_name_snapshot",
+      product_appearance_versions: "(select model from products where id = reference.product_id) || ' · ' || reference.label",
+      product_appearance_colors: "(select product.model || ' · ' || appearance.label from product_appearance_versions appearance join products product on product.id = appearance.product_id where appearance.id = reference.appearance_version_id)",
+    };
+    const addExamples = (label: string, sql: string, parameters: (string | number)[]) => {
+      const examples = (this.db.prepare(sql).all(...parameters) as {label:string|null}[]).map(row => row.label).filter(Boolean);
+      if (examples.length) blockers.add(`${label} · 引用示例（最多5项）：${examples.join('；')}`);
+    };
     // Check every actual FK, including RESTRICT, SET NULL and CASCADE. Never
     // rely on a cascading delete to detach another business record.
     const tables = this.db.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%'").all() as {name:string}[];
     for (const {name} of tables) {
       const keys = this.db.prepare(`pragma foreign_key_list(${quote(name)})`).all() as {table:string;from:string}[];
       for (const key of keys.filter(key => key.table === 'dictionary_items')) {
-        if (this.db.prepare(`select 1 from ${quote(name)} where ${quote(key.from)} = ? limit 1`).get(id)) blockers.add(labels[name] ?? '关联业务记录仍有引用');
+        if (this.db.prepare(`select 1 from ${quote(name)} where ${quote(key.from)} = ? limit 1`).get(id)) {
+          const label = labels[name] ?? '关联业务记录仍有引用';
+          blockers.add(label);
+          if (referenceLabels[name]) addExamples(label, `select distinct ${referenceLabels[name]} as label from ${quote(name)} as reference where reference.${quote(key.from)} = ? order by label limit 5`, [id]);
+        }
       }
     }
     const columns: Partial<Record<DictionaryType,string>> = {brand:'brand_code',product_size:'product_size_code',appearance:'appearance_code',color:'color_code',main_category:'main_category_code'};
     for (const table of ['drawing_numbers','historical_drawing_numbers']) {
+      const label = table === 'drawing_numbers' ? '正式图号编码快照仍有引用' : '历史图号编码仍有引用';
+      let condition: string;
+      let parameters: string[];
       if (item.type === 'project_item') {
         const parent = item.parentId ? this.get(item.parentId) : undefined;
         if (!parent) { blockers.add('主类别关系缺失，无法可靠核对历史编码'); continue; }
-        if (this.db.prepare(`select 1 from ${table} where main_category_code = ? and project_item_code = ? limit 1`).get(parent.code,item.code)) blockers.add(table === 'drawing_numbers' ? '正式图号编码快照仍有引用' : '历史图号编码仍有引用');
-      } else if (columns[item.type] && this.db.prepare(`select 1 from ${table} where ${columns[item.type]} = ? limit 1`).get(item.code)) blockers.add(table === 'drawing_numbers' ? '正式图号编码快照仍有引用' : '历史图号编码仍有引用');
+        condition = 'main_category_code = ? and project_item_code = ?'; parameters = [parent.code, item.code];
+      } else if (columns[item.type]) {
+        condition = `${columns[item.type]} = ?`; parameters = [item.code];
+      } else continue;
+      if (this.db.prepare(`select 1 from ${table} where ${condition} limit 1`).get(...parameters)) {
+        blockers.add(label);
+        addExamples(label, `select full_code as label from ${table} where ${condition} order by full_code limit 5`, parameters);
+      }
     }
     return [...blockers];
   }

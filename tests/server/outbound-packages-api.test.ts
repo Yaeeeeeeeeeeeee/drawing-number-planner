@@ -1,7 +1,8 @@
 import { ensureProductAppearance } from '../../src/core/products/appearance-identity';
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -53,15 +54,15 @@ beforeEach(() => {
 afterEach(async () => { await app.close(); db.close(); rmSync(root, { recursive: true, force: true }); });
 
 describe('outbound package API', () => {
-  it('previews and packages a real 69MB PDF through the API while preserving source and part facts',async()=>{
+  it('previews a 69MB PDF and reports independent transfer without creating a ZIP',async()=>{
     const row=db.prepare('select relative_path as path from pdf_files where id=?').get(pdfId) as {path:string};
     const bytes=Buffer.alloc(69_000_000,32);bytes.write('%PDF-1.7\n');writeFileSync(join(root,'workspace',row.path),bytes);
     const payload={workflowVersion:2,productId,selectedMaterialBatchId:batchId,materialType:'initial',packageMode:'current_complete'};
     const preview=await app.inject({method:'POST',url:'/api/outbound-packages/preview',payload});expect(preview.statusCode).toBe(200);
     expect(preview.json().items[0]).toMatchObject({selectable:true,status:'normal',sizeBytes:69_000_000,presenceStatus:'present'});
     const created=await app.inject({method:'POST',url:'/api/outbound-packages',payload:{...payload,previewToken:preview.json().previewToken,selectedPdfFileIds:[pdfId]}});
-    expect(created.statusCode).toBe(201);expect(created.json().parts[0]).toMatchObject({fileCount:1,files:[{pdfFileId:pdfId}]});
-    expect((await app.inject({method:'GET',url:'/api/outbound-packages'})).json()).toHaveLength(1);
+    expect(created.statusCode).toBe(400);expect(created.json().error.message).toContain('独立传输');
+    expect((await app.inject({method:'GET',url:'/api/outbound-packages'})).json()).toHaveLength(0);expect(createHash('sha256').update(readFileSync(join(root,'workspace',row.path))).digest('hex')).toBe(createHash('sha256').update(bytes).digest('hex'));
   },30000);
 
   it('reads all persisted package parts after file indexes are cleared', async () => {

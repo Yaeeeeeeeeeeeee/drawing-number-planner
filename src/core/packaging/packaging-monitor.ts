@@ -144,6 +144,7 @@ export class PackagingMonitor {
   }else return;
   this.schedule();
  }
+ private async discoverAfterScan(key:string):Promise<void>{for(const task of this.tasks.values())if(toWorkspacePathKey(task.productDirectory)===key){try{await this.service.discover(task.id);}catch(error){this.error=message(error);this.discoveries.add(task.id);}}}
  private async drain():Promise<void>{
   if(this.closed)return;this.error=undefined;
   if(!this.refreshRoot())return;
@@ -167,7 +168,7 @@ export class PackagingMonitor {
    if(scope.root!==root||!this.known.has(key))continue;
    const latest=this.files.latestScan?.();
    if(latest&&Date.parse(latest.completedAt)>=scope.queuedAt&&(latest.scope?.kind==='workspace'
-    ||latest.scope?.kind==='products'&&latest.scope.productDirectories.some(directory=>toWorkspacePathKey(directory)===key)))continue;
+    ||latest.scope?.kind==='products'&&latest.scope.productDirectories.some(directory=>toWorkspacePathKey(directory)===key))){await this.discoverAfterScan(key);continue;}
    try{
     // Earlier asynchronous scans may outlive product status/ownership changes.
     const owner=this.known.get(key)!;
@@ -178,6 +179,7 @@ export class PackagingMonitor {
     if(!eligible)continue;
     this.service.workspace.resolveProductDirectory(owner.productId,scope.relativePath);
     await this.files.scanProducts([scope.relativePath]);
+    await this.discoverAfterScan(key);
    }
    catch(error){this.error=message(error);this.scans.set(key,scope);}
   }

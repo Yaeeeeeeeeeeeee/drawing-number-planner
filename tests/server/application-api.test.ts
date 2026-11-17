@@ -9,6 +9,7 @@ import { DictionaryService } from '../../src/core/dictionaries/dictionary-servic
 import { ProductService } from '../../src/core/products/product-service';
 
 import { startServer } from '../../src/server/start-server';
+import { CURRENT_SCHEMA_VERSION } from '../../src/db/migrations';
 import { resolveAppPaths } from '../../src/core/config/app-paths';
 import { expectedOutboundClaimFileName } from '../../src/core/outbound/outbound-artifact-ownership';
 import { openDatabase } from '../../src/db/database';
@@ -93,7 +94,7 @@ describe('real application API', () => {
     const paths = resolveAppPaths(dataDir); mkdirSync(paths.baseDir, { recursive: true });
     const database = openDatabase(paths.database);
     database.exec(`create table schema_migrations (version integer primary key, applied_at text not null);
-      insert into schema_migrations values (26, '2026-08-24T00:00:00Z')`);
+      insert into schema_migrations values (${CURRENT_SCHEMA_VERSION + 1}, '2026-08-24T00:00:00Z')`);
     database.close();
 
     await expect(startServer({ port: 0, dataDir })).rejects.toThrow('高于当前软件支持的版本');

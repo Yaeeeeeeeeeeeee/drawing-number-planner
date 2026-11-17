@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DimensionProfile, DimensionProfileInput, PackagingCatalog, PackagingProjectConfig, PackagingTemplate, PackagingTemplateInput, TemplateRule, TemplateRuleInput } from './packaging-types.js';
+import type { DimensionProfile, DimensionProfileInput, PackagingCatalog, PackagingProjectConfig, PackagingTemplate, PackagingTemplateInput, TemplateRule, TemplateRuleInput, TemplateRangeInput } from './packaging-types.js';
 
 const idSchema = z.number().int().positive();
 const nameSchema = z.string().trim().min(1).max(200);
@@ -13,7 +13,7 @@ const idsSchema = z.array(idSchema).refine(ids => new Set(ids).size === ids.leng
 export const packagingTemplateSchema = z.object({ name:nameSchema,mainCategoryId:idSchema,projectItemId:idSchema,brandIds:idsSchema,productIds:idsSchema,fields:z.array(z.object({objectName:nameSchema,sourceKey:keySchema,required:z.boolean()})).refine(fields=>new Set(fields.map(f=>f.objectName)).size===fields.length,'对象名称不能重复'),requiredFonts:z.array(nameSchema),status:statusSchema });
 export const packagingDimensionSchema = z.object({name:nameSchema,projectItemId:idSchema,scope:z.enum(['specific','shared']),productIds:idsSchema.min(1),parameters:z.record(keySchema,z.union([z.string().max(1000),z.number().finite()])),isDefault:z.boolean(),defaultProductIds:idsSchema.optional(),ratioKeys:z.tuple([keySchema,keySchema]).optional(),ratio:z.number().positive().finite().optional(),status:statusSchema});
 export const packagingRuleSchema = z.object({name:nameSchema,templateId:idSchema,conditions:z.array(z.object({key:keySchema,operator:z.enum(['lt','lte','gt','gte','between','eq']),value:z.union([z.string().max(1000),z.number().finite()]),max:z.number().finite().optional()})),allowLengthWidthSwap:z.boolean(),status:statusSchema});
-export const packagingConfigSchema = z.object({projectItemId:idSchema,mode:z.enum(['ait','manual','none']),parameters:z.array(z.object({key:keySchema,label:nameSchema,type:z.enum(['number','text']),required:z.boolean(),unit:z.string().trim().max(30).optional(),axis:z.enum(['length','width','height']).optional()})).refine(parameters=>new Set(parameters.map(p=>p.key)).size===parameters.length,'参数名称不能重复').refine(parameters=>{const axes=parameters.map(p=>p.axis).filter(Boolean);return new Set(axes).size===axes.length;},'尺寸轴不能重复').refine(parameters=>parameters.every(p=>!p.axis||p.type==='number'),'尺寸轴必须使用数字参数')});
+export const packagingConfigSchema = z.object({projectItemId:idSchema,mode:z.enum(['ait','manual','none','existing']),parameters:z.array(z.object({key:keySchema,label:nameSchema,type:z.enum(['number','text']),required:z.boolean(),unit:z.string().trim().max(30).optional(),axis:z.enum(['length','width','height']).optional()})).refine(parameters=>new Set(parameters.map(p=>p.key)).size===parameters.length,'参数名称不能重复').refine(parameters=>{const axes=parameters.map(p=>p.axis).filter(Boolean);return new Set(axes).size===axes.length;},'尺寸轴不能重复').refine(parameters=>parameters.every(p=>!p.axis||p.type==='number'),'尺寸轴必须使用数字参数')});
 export class PackagingCatalogError extends Error {
   constructor(public readonly code:string,message:string){super(message);this.name='PackagingCatalogError';}
 }
@@ -47,12 +47,39 @@ export class PackagingCatalogService {
     else id=Number(this.db.prepare('insert into packaging_templates(name,main_category_id,project_item_id,brand_ids_json,product_ids_json,fields_json,required_fonts_json,status,file_name,asset_relative_path,sha256,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...values,now,now).lastInsertRowid);
     return this.getTemplate(id!);
   }
+  saveTemplateReference(input:PackagingTemplateInput,path:string,id?:number):PackagingTemplate {
+    const value=this.templateInput(input);const previous=id===undefined?undefined:this.getTemplate(id);
+    if(!isAbsolute(path)||!/.ait$/iu.test(path))fail('模板文件路径无效');
+    let absolutePath:string,buffer:Buffer;
+    try{absolutePath=realpathSync.native(path);if(!statSync(absolutePath).isFile())fail('模板文件路径无效');buffer=readFileSync(absolutePath);if(!buffer.length||buffer.length>20*1024*1024)fail('请选择不超过 20 MB 的非空 AIT 模板文件');}catch(error){if(error instanceof PackagingCatalogError)throw error;throw new PackagingCatalogError('PACKAGING_ASSET_UNAVAILABLE','模板文件不存在或无法读取');}
+    const sha256=createHash('sha256').update(buffer).digest('hex'),now=new Date().toISOString();
+    const values=[value.name,value.mainCategoryId,value.projectItemId,JSON.stringify(value.brandIds),JSON.stringify(value.productIds),JSON.stringify(value.fields),JSON.stringify(value.requiredFonts),value.status,basename(absolutePath),absolutePath,sha256];
+    if(previous)this.db.prepare('update packaging_templates set name=?,main_category_id=?,project_item_id=?,brand_ids_json=?,product_ids_json=?,fields_json=?,required_fonts_json=?,status=?,file_name=?,asset_relative_path=?,sha256=?,revision=revision+1,updated_at=? where id=?').run(...values,now,id!);
+    else id=Number(this.db.prepare('insert into packaging_templates(name,main_category_id,project_item_id,brand_ids_json,product_ids_json,fields_json,required_fonts_json,status,file_name,asset_relative_path,sha256,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...values,now,now).lastInsertRowid);
+    return this.getTemplate(id!);
+  }
   saveTemplate(id:number,input:PackagingTemplateInput):PackagingTemplate{this.getTemplate(id);const value=this.templateInput(input);this.db.prepare('update packaging_templates set name=?,main_category_id=?,project_item_id=?,brand_ids_json=?,product_ids_json=?,fields_json=?,required_fonts_json=?,status=?,revision=revision+1,updated_at=? where id=?').run(value.name,value.mainCategoryId,value.projectItemId,JSON.stringify(value.brandIds),JSON.stringify(value.productIds),JSON.stringify(value.fields),JSON.stringify(value.requiredFonts),value.status,new Date().toISOString(),id);return this.getTemplate(id);}
+  private saveTemplateRange(template:PackagingTemplate,range:TemplateRangeInput):void {
+    const existing=this.getCatalog().rules.filter(r=>r.templateId===template.id&&r.status==='active');
+    if(range.id!==undefined){parse(idSchema,range.id);if(!existing.some(r=>r.id===range.id))fail('所选启用规则不属于此模板');}
+    else if(existing.length)fail('已有启用规则，请明确选择规则');
+    const value=parse(packagingRuleSchema,{...range,templateId:template.id});
+    const definitions=this.getCatalog().configs.find(c=>c.projectItemId===template.projectItemId)?.parameters??[];
+    for(const condition of value.conditions){if(!definitions.some(p=>p.key===condition.key&&p.type==='number'))fail('尺寸范围与项目定义不匹配');}
+    this.saveRule(value,range.id);
+  }
+  saveTemplateReferenceWithRule(input:PackagingTemplateInput,path:string,id?:number,range?:TemplateRangeInput):PackagingTemplate {
+    return this.db.transaction(()=>{const template=this.saveTemplateReference(input,path,id);if(range)this.saveTemplateRange(template,range);return template;})();
+  }
+  saveTemplateWithRule(id:number,input:PackagingTemplateInput,range?:TemplateRangeInput):PackagingTemplate {
+    return this.db.transaction(()=>{const template=this.saveTemplate(id,input);if(range)this.saveTemplateRange(template,range);return template;})();
+  }
   templateAsset(id:number,snapshot?:PackagingTemplate):{absolutePath:string;sha256:string;fileName:string;template:PackagingTemplate}{
     const current=this.getTemplate(id);if(snapshot&&snapshot.id!==current.id)fail('模板快照与模板编号不匹配');
     const template=snapshot??current,expected=`packaging-templates/assets/`;
-    if(!template.assetRelativePath.startsWith(expected)||!/^packaging-templates\/assets\/[a-f0-9-]+\.ait$/u.test(template.assetRelativePath))fail('模板文件路径无效');
-    let absolutePath:string;try{const base=realpathSync(join(this.dataDir,'packaging-templates','assets'));absolutePath=realpathSync(resolve(this.dataDir,template.assetRelativePath));const inside=relative(base,absolutePath);if(inside.startsWith('..')||isAbsolute(inside))fail('模板文件路径无效');if(createHash('sha256').update(readFileSync(absolutePath)).digest('hex')!==template.sha256)fail('模板文件校验失败，原文件已变更');}catch(error){if(error instanceof PackagingCatalogError)throw error;throw new PackagingCatalogError('PACKAGING_ASSET_UNAVAILABLE','模板文件不存在或无法读取');}
+    const original=isAbsolute(template.assetRelativePath);
+    if(original?!/\.ait$/iu.test(template.assetRelativePath):(!template.assetRelativePath.startsWith(expected)||!/^packaging-templates\/assets\/[a-f0-9-]+\.ait$/u.test(template.assetRelativePath)))fail('模板文件路径无效');
+    let absolutePath:string;try{absolutePath=realpathSync(original?template.assetRelativePath:resolve(this.dataDir,template.assetRelativePath));if(!original){const base=realpathSync(join(this.dataDir,'packaging-templates','assets'));const inside=relative(base,absolutePath);if(inside.startsWith('..')||isAbsolute(inside))fail('模板文件路径无效');}if(!statSync(absolutePath).isFile())fail('模板文件路径无效');if(createHash('sha256').update(readFileSync(absolutePath)).digest('hex')!==template.sha256)fail('模板文件校验失败，原文件已变更');}catch(error){if(error instanceof PackagingCatalogError)throw error;throw new PackagingCatalogError('PACKAGING_ASSET_UNAVAILABLE','模板文件不存在或无法读取');}
     return{absolutePath,sha256:template.sha256,fileName:template.fileName,template};
   }
   saveDimension(input:DimensionProfileInput,id?:number):DimensionProfile{

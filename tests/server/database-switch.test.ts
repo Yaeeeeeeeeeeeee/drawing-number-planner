@@ -86,3 +86,17 @@ it('keeps consumed disconnected requests busy until their handler settles, then 
     await vi.waitFor(()=>server.prepareDatabaseSwitch());
   } finally {finish();request.destroy();}
 });
+
+it('reads candidate core APIs and rolls back a post-commit renderer failure to the old service',async()=>{
+ const {dataDir:old,server}=await fixture(), root=mkdtempSync(join(tmpdir(),'planner-activation-'));roots.push(root);
+ const target=join(root,'target');mkdirSync(target);initializeEmptyAcceptanceDatabase(join(target,'planner.db'));
+ const {prepareProductionProfile}=createRequire(import.meta.url)('../../scripts/production-profile.cjs');
+ const input={appData:root,databaseSafety,chooseMode:async()=>'existing',chooseDatabase:async()=>old};await prepareProductionProfile(input);
+ const profile=join(root,'DrawingNumberPlanner/profile.json'),previous=readFileSync(profile);let candidate:RunningServer|undefined,restored:RunningServer|undefined;
+ await expect(performDatabaseReselection({quiesce:()=>server.prepareDatabaseSwitch(),prepare:beforeSwitch=>prepareProductionProfile({...input,forceSelection:true,beforeSwitch,chooseDatabase:async()=>target,
+  verifyStartup:async()=>{await server.close();candidate=await startServer({dataDir:target,port:0,requireExistingDatabase:true});servers.push(candidate);for(const path of ['/api/products','/api/boms/query','/api/files']){const response=await fetch(candidate.url+path,{headers:{origin:candidate.url}});expect(response.status).toBe(200);await response.json();}},
+  activate:async()=>{expect(JSON.parse(readFileSync(profile,'utf8')).dataDir).toBe(target);throw Error('renderer load failed');}}),
+  restore:async()=>{await candidate?.close();restored=await startServer({dataDir:old,port:0,requireExistingDatabase:true});servers.push(restored);}
+ })).rejects.toThrow('renderer load failed');
+ expect(readFileSync(profile)).toEqual(previous);expect((await fetch(restored!.url+'/api/products')).status).toBe(200);expect(await prepareProductionProfile(input)).toBe(old);
+});

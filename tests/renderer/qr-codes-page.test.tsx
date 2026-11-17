@@ -11,6 +11,18 @@ function desktop(){const result={token:'picker-token',fileName:manual.files[0].f
 async function expand(){fireEvent.click(await screen.findByRole('button',{name:'展开 ZU70SD 的二维码用途'}));return document.querySelector('.qr-manual-subtable') as HTMLElement;}
 afterEach(()=>{Object.defineProperty(window,'plannerDesktop',{configurable:true,value:undefined});localStorage.clear();});
 describe('manual QR page',()=>{
+ it('finds unconfigured products through filters and offers only applicable purposes',async()=>{
+  const recipe={...purpose,id:3,key:'recipe',englishName:'Recipe',displayName:'菜谱',defaultForAll:true,productCategories:['空气炸锅','冰柜']};
+  desktop();const api=apiFor([]);api.listQrPurposes.mockResolvedValue({items:[recipe,purpose,warranty]});render(<QrCodesPage api={api as never}/>);
+  await screen.findByRole('button',{name:'展开 ZU70SD 的二维码用途'});
+  fireEvent.change(screen.getByLabelText('SKU / 型号'),{target:{value:'ZU70'}});fireEvent.change(screen.getByRole('combobox',{name:'产品类别'}),{target:{value:'冰柜'}});fireEvent.click(screen.getByRole('button',{name:'筛选'}));
+  await waitFor(()=>expect(api.listQrCodes).toHaveBeenCalledTimes(2));
+  const sub=await expand();expect(within(sub).queryByText('菜谱')).not.toBeInTheDocument();
+  fireEvent.click(within(sub).getAllByRole('button',{name:'新增用途'})[0]);
+  const dialog=screen.getByRole('dialog');expect(within(dialog).queryByRole('option',{name:'菜谱'})).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));
+  await waitFor(()=>expect(api.qrManualPreview).toHaveBeenCalledWith(expect.objectContaining({productId:product.id,purposeId:purpose.id})));
+ });
  it('keeps every independent legacy file action outside a shared two-line clamp',async()=>{
   const files=[1,2,3].map((id)=>({...manual.files[0],id,externalFileId:`file-${id}`,fileName:`ZU70SD-User Manual-very-long-${id}（c2hg2h8）.pdf`}));
   render(<QrCodesPage api={apiFor([{...manual,files}]) as never}/>);const sub=await expand();

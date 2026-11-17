@@ -124,7 +124,7 @@ export class BatchPlanningService {
           const context = this.resolveContext(group, row);
           model = context.model;
           const resolved = context.rows[0];
-          if (row.whiteBase || (row.shareWhite === true && !isWhite(resolved.colorName))) {
+          if (row.whiteBase || (row.shareWhite !== false && !isWhite(resolved.colorName))) {
             if (row.whiteBase && row.shareWhite === false) throw new PlanningError('INVALID_PLAN', '独立占号不能同时选择白色共用基准');
             const candidates = this.bases(context, row.mainCategoryId, row.projectItemId);
             const selected = row.whiteBase ? candidates.filter(base => base.origin === row.whiteBase!.origin && base.id === row.whiteBase!.id) : candidates;
@@ -142,6 +142,7 @@ export class BatchPlanningService {
             const { fullCode: _code, prefix: _prefix, sequence: _sequence, ...parts } = parsed; check.parts = parts;
             allocated.push(row);
           }
+          check.lastUsedSequence = this.repository.findMaxSequence(check.prefix!);
           check.available = true;
           check.fingerprint = this.fingerprint(group, row, check, context);
         } catch (error) { check.available = false; delete check.fingerprint; check.error = failure(error); }

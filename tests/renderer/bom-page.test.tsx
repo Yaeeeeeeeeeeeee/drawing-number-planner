@@ -268,9 +268,10 @@ describe('BomPage product-level BOM', () => {
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     expect(await screen.findByText('业务日期未补录')).toBeVisible();
     const table=screen.getByText('业务日期未补录').closest('table')!;
+    const modelPosition=Array.from(table.querySelectorAll('thead th')).findIndex(cell=>cell.getAttribute('data-column-key')==='model');
     fireEvent.keyDown(within(table).getByRole('columnheader',{name:'型号'}),{altKey:true,key:'ArrowLeft'});
-    expect(table.querySelectorAll('thead th')[1]).toHaveAttribute('data-column-key','model');
-    expect(table.querySelectorAll('tbody tr')[0].querySelectorAll('td')[1]).toHaveTextContent('ZC100');
+    expect(table.querySelectorAll('thead th')[modelPosition-1]).toHaveAttribute('data-column-key','model');
+    expect(table.querySelectorAll('tbody tr')[0].querySelectorAll('td')[modelPosition-1]).toHaveTextContent('ZC100');
     expect(within(table).getByRole('button',{name:'查看 BOM 20'})).toBeEnabled();
 
     await waitFor(() => expect(api.queryBomVersions).toHaveBeenLastCalledWith({ productId:1,mainCategoryId:6,businessDateFrom:'2026-09-02',businessDateTo:'2026-09-30',projectItemId:7,fullCode:'0401001' }));

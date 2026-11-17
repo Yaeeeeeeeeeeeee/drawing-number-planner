@@ -1,6 +1,6 @@
 import { DraftingCompass, ClipboardList, PackageCheck, Boxes, LibraryBig, QrCode, Files, BookOpen, ShieldCheck, Menu, ChevronsLeft, PenTool, ListTodo } from 'lucide-react';
 import type { ProductVersionTarget } from '../pages/products/ProductAppearancePanel';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { DrawingTasksPage } from '../pages/DrawingTasksPage';
 import type { PlanningDrawingTarget } from '../pages/PlanningPage';
@@ -57,13 +57,17 @@ export function AppShell({ api }: { api: PlannerApi }) {
   const recoveryPreview = isRecoveryMock();
   const previewPage = publicUiPreview ? 'recovery' : recoveryPreview ? 'recovery' : isMigrationMock() ? 'import' : isPlanningMock() ? 'planning' : isDictionariesMock() ? 'dictionaries' : isProductsMockEnabled() ? 'products' : isOutboundMockEnabled() ? 'exports' : isQrMockEnabled() ? 'qr' : filesPreview ? 'files' : bomPreview ? 'bom' : null;
   const [page, setPage] = useState<Page | 'recovery'>(publicUiPreview ? 'recovery' : previewPage ?? 'planning');
+  const workspace=useRef<HTMLElement>(null);
+  const scrollPositions=useRef(new Map<string,{top:number;left:number}>());
+  useLayoutEffect(()=>{
+    const element=workspace.current,position=scrollPositions.current.get(page);
+    if(element){element.scrollTop=position?.top??0;element.scrollLeft=position?.left??0;}
+  },[page]);
   const drawingLeaveGuard = useRef<(() => boolean) | null>(null);
   const registerDrawingLeaveGuard = useCallback((guard: (() => boolean) | null) => { drawingLeaveGuard.current = guard; }, []);
   const outboundLeaveGuard = useRef<(() => boolean) | null>(null);
   const registerOutboundLeaveGuard = useCallback((guard: (() => boolean) | null) => { outboundLeaveGuard.current = guard; }, []);
   const navigatePage = (next: Page) => {
-    if (page === 'drawings' && next !== page && drawingLeaveGuard.current && !drawingLeaveGuard.current()) return;
-    if (page === 'exports' && next !== page && outboundLeaveGuard.current && !outboundLeaveGuard.current()) return;
     setPage(next);
     setVersionTarget(null);setDrawingBomTarget(null);
     if (next === 'drawings') setDrawingTarget(undefined);
@@ -72,6 +76,9 @@ export function AppShell({ api }: { api: PlannerApi }) {
     if (next === 'drawing-tasks') setTaskTarget(null);
     if (narrow) closeNavigation();
   };
+  // A module visit is temporary navigation, not a request to discard its editor.
+  const [retainedPages, setRetainedPages] = useState<Set<string>>(() => new Set([page]));
+  useEffect(() => { setRetainedPages(previous => previous.has(page) ? previous : new Set([...previous, page])); }, [page]);
   const [versionTarget, setVersionTarget] = useState<ProductVersionTarget | null>(null);
   const [drawingBomTarget,setDrawingBomTarget]=useState<{productId:number;bomVersionId:number}|null>(null);
   const [drawingTarget, setDrawingTarget] = useState<PlanningDrawingTarget & {revision?:number}>();
@@ -151,11 +158,11 @@ export function AppShell({ api }: { api: PlannerApi }) {
       <p className="nav-group-label">{group.label}</p>{group.items.map((item) => <button className={`nav-item ${page === item.key ? 'active' : ''}`} disabled={!item.enabled || (previewPage !== null && item.key !== previewPage)} onClick={() => item.enabled && (!previewPage || item.key === previewPage) && navigatePage(item.key as Page)} key={item.key} type="button">
         <span className="nav-label"><item.icon size={18} strokeWidth={1.8} aria-hidden="true"/>{item.label}</span></button>)}</section>)}</nav>
     <div className="sidebar-footer">{recoveryPreview ? <RecoveryMockPage docked/> : previewPage ? <small>开发 Mock · 未连接业务服务</small> : <SafeRecovery api={api} />}</div></aside>
-    <main className="workspace" inert={narrow && navigationOpen}>    <button ref={navigationToggle} type="button" className="navigation-toggle" aria-controls="workspace-navigation"
+    <main ref={workspace} className="workspace" inert={narrow && navigationOpen} onScroll={event=>{const element=event.currentTarget;scrollPositions.current.set(page,{top:element.scrollTop,left:element.scrollLeft});}}>    <button ref={navigationToggle} type="button" className="navigation-toggle" aria-controls="workspace-navigation"
       hidden={navigationOpen} aria-expanded={navigationOpen} aria-label="展开导航" title="展开工作导航"
-      onClick={() => setNavigationOpen(true)}><Menu size={18} strokeWidth={1.8} aria-hidden="true"/></button>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage onNavigateBom={target=>{if(drawingLeaveGuard.current&&!drawingLeaveGuard.current())return;setVersionTarget(null);setDrawingBomTarget(target);setPage('bom');}} api={api} navigationTarget={drawingTarget} registerLeaveGuard={registerDrawingLeaveGuard} active={page === 'drawings'} onNavigatePdf={target => { if (drawingLeaveGuard.current && !drawingLeaveGuard.current()) return; setDrawingPdfTarget(target); setPage('files'); }} /></div>}{page === 'dictionaries' && <DictionariesPage api={api} />}
-      {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} onOpenVersion={openVersion} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{page === 'import' && <ImportPage api={api} />}{(page === 'planning'||planningVisited) && <div hidden={page!=='planning'} className="planning-page-host"><PlanningPage api={api} active={page==='planning'} onGenerateFiles={target=>{setTaskTarget(target);setPage('drawing-tasks');}} onOpenDrawingLibrary={target => {setDrawingTarget({...target,revision:Date.now()});setPage('drawings');}} /></div>}
+      onClick={() => setNavigationOpen(true)}><Menu size={18} strokeWidth={1.8} aria-hidden="true"/></button>{publicUiPreview && <PublicUiMock/>}{(page === 'drawings' || drawingsVisited) && <div hidden={page !== 'drawings'} className="drawings-page-host"><DrawingLibraryPage onNavigateBom={target=>{if(drawingLeaveGuard.current&&!drawingLeaveGuard.current())return;setVersionTarget(null);setDrawingBomTarget(target);setPage('bom');}} api={api} navigationTarget={drawingTarget} registerLeaveGuard={registerDrawingLeaveGuard} active={page === 'drawings'} onNavigatePdf={target => { if (drawingLeaveGuard.current && !drawingLeaveGuard.current()) return; setDrawingPdfTarget(target); setPage('files'); }} /></div>}{(page === 'dictionaries' || retainedPages.has('dictionaries')) && <div hidden={page !== 'dictionaries'} className="dictionaries-page-host"><DictionariesPage api={api} /></div>}
+      {(page === 'products' || productsVisited) && <div hidden={page !== 'products'} className="products-page-host"><ProductsPage api={api} onOpenVersion={openVersion} active={page === 'products'} onOpenQr={(target) => { setProductQrTarget(target); setPage('qr'); }} /></div>}{(page === 'import' || retainedPages.has('import')) && <div hidden={page !== 'import'} className="import-page-host"><ImportPage api={api} /></div>}{(page === 'planning'||planningVisited) && <div hidden={page!=='planning'} className="planning-page-host"><PlanningPage api={api} active={page==='planning'} onGenerateFiles={target=>{setTaskTarget(target);setPage('drawing-tasks');}} onOpenDrawingLibrary={target => {setDrawingTarget({...target,revision:Date.now()});setPage('drawings');}} /></div>}
       {(page === 'packaging'||packagingVisited)&&<div hidden={page!=='packaging'} className="packaging-page-host"><PackagingTemplatesPage api={api} active={page==='packaging'}/></div>}
       {(page === 'drawing-tasks'||tasksVisited)&&<div hidden={page!=='drawing-tasks'} className="drawing-tasks-page-host"><DrawingTasksPage api={api} active={page==='drawing-tasks'} target={taskTarget}/></div>}
-      {page === 'bom' && <BomPage api={api} target={drawingBomTarget??(versionTarget?.section === 'bom' ? versionTarget : undefined)} />}{page === 'exports' && <OutboundPage api={api} target={versionTarget?.section === 'outbound' ? versionTarget : undefined} registerLeaveGuard={registerOutboundLeaveGuard} />}{(page === 'files' || filesVisited) && <div hidden={page !== 'files'} className="files-page-host"><FilesPage active={page === 'files'} api={api} initialTarget={drawingPdfTarget} /></div>}{(page === 'qr' || qrVisited) && <div hidden={page !== 'qr'} className="qr-page-host"><QrCodesPage active={page === 'qr'} api={api} versionTarget={versionTarget?.section === 'qr' ? versionTarget : null} productTarget={productQrTarget} onReturnProducts={() => { setPage('products'); setProductQrTarget(null); }} /></div>}</main></div>;
+      {(page === 'bom' || retainedPages.has('bom')) && <div hidden={page !== 'bom'} className="bom-page-host"><BomPage api={api} target={drawingBomTarget??(versionTarget?.section === 'bom' ? versionTarget : undefined)} /></div>}{(page === 'exports' || retainedPages.has('exports')) && <div hidden={page !== 'exports'} className="outbound-page-host"><OutboundPage api={api} target={versionTarget?.section === 'outbound' ? versionTarget : undefined} registerLeaveGuard={registerOutboundLeaveGuard} /></div>}{(page === 'files' || filesVisited) && <div hidden={page !== 'files'} className="files-page-host"><FilesPage active={page === 'files'} api={api} initialTarget={drawingPdfTarget} /></div>}{(page === 'qr' || qrVisited) && <div hidden={page !== 'qr'} className="qr-page-host"><QrCodesPage active={page === 'qr'} api={api} versionTarget={versionTarget?.section === 'qr' ? versionTarget : null} productTarget={productQrTarget} onReturnProducts={() => { setPage('products'); setProductQrTarget(null); }} /></div>}</main></div>;
 }

@@ -26,6 +26,21 @@ async function appWithProduct() {
 }
 
 describe('QR code API', () => {
+  it('enforces category applicability and creates inactive until explicitly enabled', async () => {
+    const { app, product } = await appWithProduct();
+    const recipe = new QrService(db).listPurposes().items.find(p => p.key === 'recipe')!;
+    db.prepare('update qr_purposes set default_for_all=1 where id=?').run(recipe.id);
+    db.prepare('insert into qr_purpose_product_categories(purpose_id,product_category,created_at) values(?,?,?)').run(recipe.id,'冰柜',new Date().toISOString());
+    const rejected = await app.inject({ method: 'POST', url: '/api/qr-codes', payload: { productId: product.id, purposeId: recipe.id, name: 'Recipe', targetUrl: 'https://example.test/recipe', status: 'active' } });
+    expect(rejected.statusCode).toBe(400);
+    db.prepare('update products set product_category=? where id=?').run('空气炸锅', product.id);
+    const created = await app.inject({ method: 'POST', url: '/api/qr-codes', payload: { productId: product.id, purposeId: recipe.id, name: 'Recipe', targetUrl: 'https://example.test/recipe', status: 'active' } });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ status: 'inactive', targetUrl: 'https://example.test/recipe' });
+    expect((await app.inject({method:'POST', url:`/api/qr-codes/${created.json().id}/activate`})).json().status).toBe('active');
+    await app.close();
+  });
+
   it('creates purposes but refuses the former pending association bypass', async () => {
     const { app, product } = await appWithProduct();
     const purposeResponse = await app.inject({ method: 'POST', url: '/api/qr-purposes', payload: {

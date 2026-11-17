@@ -85,6 +85,6 @@ it('marks only the selected Unicode product batch missing when its last PDF disa
 it('rejects a PDF changed after hashing but before the final index transaction',async()=>{
  const f=fixture();const path=pdf(f.root,'类/SKU-A/02.未转曲源文件/a.pdf');await f.service.scan();const before=snapshot(f.db);
  const controller=new AbortController();await expect(f.service.scanProducts(['类/SKU-A'],{id:'test',signal:controller.signal,throwIfCancelled(){},beginFinalizing(){},report(progress){
-  if(progress.phase==='fingerprinting'&&progress.processed===1)writeFileSync(path,'%PDF changed after hashing');
+  if(progress.phase==='reading'&&progress.processed===1)writeFileSync(path,'%PDF changed after hashing');
  }})).rejects.toMatchObject({code:'SCAN_FAILED'});expect(snapshot(f.db)).toEqual(before);
 });

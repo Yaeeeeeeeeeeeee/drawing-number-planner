@@ -16,6 +16,29 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('dictionary API', () => {
+  it.each(['inactive', 'deleted', 'deleted-active'] as const)('rejects direct project creation under an %s parent and allows explicit restoration', async (state) => {
+    const service = new DictionaryService(db);
+    const parent = service.create({ type: 'main_category', code: '04', name: '印刷件类' });
+    service.create({ type: 'project_item', code: '01', name: 'LOGO', parentId: parent.id });
+    if (state === 'inactive') service.deactivate(parent.id);
+    else service.deleteUnused(parent.id);
+    if (state === 'deleted-active') db.prepare("update dictionary_items set status='active' where id=?").run(parent.id);
+    const app = Fastify(); registerDictionaryRoutes(app, service);
+    try {
+      const before = db.serialize();
+      const payload = { code: '02', name: '说明书', parentId: parent.id };
+      const rejected = await app.inject({ method: 'POST', url: '/api/dictionaries/project_item', payload });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json()).toMatchObject({ error: { code: 'INVALID_PARENT', message: expect.stringMatching(/启用/) } });
+      expect(db.serialize()).toEqual(before);
+      await app.inject({ method: 'POST', url: `/api/dictionaries/items/${parent.id}/activate` });
+      const accepted = await app.inject({ method: 'POST', url: '/api/dictionaries/project_item', payload });
+      expect(accepted.statusCode).toBe(201);
+      expect(accepted.json()).toMatchObject({ parentId: parent.id, code: '02', name: '说明书', status: 'active' });
+      expect(db.pragma('foreign_key_check')).toEqual([]);
+    } finally { await app.close(); }
+  });
+
   it('creates and lists real dictionary records', async () => {
     const app = Fastify();
     registerDictionaryRoutes(app, new DictionaryService(db));

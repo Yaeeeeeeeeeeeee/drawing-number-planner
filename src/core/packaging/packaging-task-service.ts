@@ -6,6 +6,7 @@ import {DrawingRepository} from '../drawings/drawing-repository.js';
 import type {DrawingRecord} from '../drawings/drawing-types.js';
 import type {FileService} from '../files/file-service.js';
 import {resolveWorkspacePath,toWorkspacePathKey} from '../files/workspace-paths.js';
+import {isMaterialDirectory} from '../files/material-directory-policy.js';
 import {resolveCanonicalProductId} from '../products/appearance-identity.js';
 import {PackagingCatalogService} from './packaging-catalog.js';
 import {matchPackagingTemplates,resolvePackagingDimensions} from './packaging-matcher.js';
@@ -64,8 +65,23 @@ export class PackagingTaskService {
   if(!fresh.endedAt&&fresh.state==='active')fresh.items=fresh.items.map(item=>{try{return{...item,match:this.match(fresh,item)};}catch(error){return{...item,error:item.error??errorText(error)};}});
   return fresh;
  }
+ isFormalPath(task:PackagingTask,path:string){const normalized=path.replaceAll('\\','/');const base=task.productDirectory.replaceAll('\\','/');if(!normalized.startsWith(`${base}/`))return false;const segments=normalized.slice(base.length+1).split('/');return segments.length>=2&&isMaterialDirectory(segments[0]);}
+ async formalFile(task:PackagingTask,item:PackagingTaskItem){
+  this.drawing(item.drawing,task.productId);
+  const rows=this.db.prepare(`select relative_path as path,content_sha256 as hash,detected_codes_json as codes,drawing_id as drawingId,historical_drawing_id as historicalId,management_state as management,match_status as status,classification_warning as warning from pdf_files where is_present=1`).all() as Array<{path:string;hash:string;codes:string;drawingId:number|null;historicalId:number|null;management:string;status:string;warning:string|null}>;
+  const candidates=rows.filter(row=>this.isFormalPath(task,row.path)&&(()=>{try{const codes=JSON.parse(row.codes);return Array.isArray(codes)&&codes.includes(item.fullCode);}catch{return false;}})());
+  if(candidates.length!==1)return undefined;
+  const row=candidates[0];let codes:unknown;try{codes=JSON.parse(row.codes);}catch{return undefined;}
+  if(!Array.isArray(codes)||codes.length!==1||row.management!=='included'||row.status!=='matched'||row.warning||(item.drawing.origin==='planned'?row.drawingId!==item.drawing.id||row.historicalId!==null:row.historicalId!==item.drawing.id||row.drawingId!==null)||this.db.prepare('select 1 from drawing_force_release_files where path_key=? and full_code=?').get(toWorkspacePathKey(row.path),item.fullCode))return undefined;
+  try{const fact=await pdfFact(this.taskPath(task.id,row.path));return fact.sha256===row.hash?row:undefined;}catch{return undefined;}
+ }
+ private async refreshFormalFiles(task:PackagingTask){if(task.type!=='new')return;for(const item of task.items){
+  if(!['manual','existing'].includes(item.mode)||item.relativePath&&!this.isFormalPath(task,item.relativePath))continue;
+  const row=await this.formalFile(task,item);if(row){this.store.updateItem(item.id,{relativePath:row.path,fileName:basename(row.path),sha256:row.hash,reviewedSha256:row.hash,state:'completed',error:undefined});}
+  else if(item.relativePath&&this.isFormalPath(task,item.relativePath))this.store.updateItem(item.id,{relativePath:undefined,fileName:undefined,sha256:undefined,reviewedSha256:undefined,state:'awaiting_upload',error:undefined});
+ }}
  private async refreshFiles(task:PackagingTask){for(const item of task.items){
-   if(!item.relativePath||item.state==='generating'||item.mode==='none')continue;
+   if(!item.relativePath||item.state==='generating'||item.mode==='none'||this.isFormalPath(task,item.relativePath))continue;
     try{const fact=await pdfFact(this.taskPath(task.id,item.relativePath));if(fact.sha256!==item.sha256){this.store.updateItem(item.id,{sha256:fact.sha256,reviewedSha256:undefined,state:'awaiting_review',error:undefined});this.store.own(task.id,{relativePath:item.relativePath,sha256:fact.sha256});}}
    catch(error){this.store.updateItem(item.id,{reviewedSha256:undefined,error:errorText(error)});}
   }}
@@ -99,11 +115,12 @@ export class PackagingTaskService {
    const catalog=this.options.catalog.getCatalog();
    for(const [index,drawing]of drawings.entries()){
     const config=catalog.configs.find(row=>row.projectItemId===drawing.projectItemId),mode=input.type==='modify'?'manual':config?.mode??'manual';
-    const profile=resolvePackagingDimensions(catalog,productId,drawing.projectItemId!).defaultProfile,parameters=profile?.parameters??{};
+    const dimensionSources=resolvePackagingDimensions(catalog,productId,drawing.projectItemId!),profile=dimensionSources.defaultProfile,parameters=profile?.parameters??{};
     const match=matchPackagingTemplates(catalog,{productId,brandId:product.brandId,projectItemId:drawing.projectItemId!,mainCategoryId:drawing.mainCategoryId!,parameters});
-    const template=mode==='ait'&&match.status==='unique'?catalog.templates.find(row=>row.id===match.templateIds[0]):undefined;
+    const template=mode==='ait'&&!dimensionSources.conflictingDefaults.length&&match.status==='unique'?catalog.templates.find(row=>row.id===match.templateIds[0]):undefined;
     const rowId=Number(this.db.prepare(`insert into packaging_task_items(task_id,drawing_origin,drawing_id,planned_drawing_id,historical_drawing_id,full_code,project_item_id,project_name,color,mode,parameters_json,template_id,dimension_profile_id,template_snapshot_json,template_name,state,ratio_locked)
-     values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`).run(id,input.drawings[index].origin,Math.abs(drawing.id),drawing.origin==='planned'?Math.abs(drawing.id):null,drawing.origin==='historical'?Math.abs(drawing.id):null,drawing.fullCode,drawing.projectItemId,drawing.projectItemName,drawing.colorName,mode,JSON.stringify(parameters),template?.id??null,profile?.id??null,template?JSON.stringify(template):null,template?.name??null,mode==='none'?'none':mode==='manual'?'awaiting_upload':'pending').lastInsertRowid);
+     values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`).run(id,input.drawings[index].origin,Math.abs(drawing.id),drawing.origin==='planned'?Math.abs(drawing.id):null,drawing.origin==='historical'?Math.abs(drawing.id):null,drawing.fullCode,drawing.projectItemId,drawing.projectItemName,drawing.colorName,mode,JSON.stringify(parameters),template?.id??null,profile?.id??null,template?JSON.stringify(template):null,template?.name??null,mode==='none'?'none':mode==='manual'||mode==='existing'?'awaiting_upload':'pending').lastInsertRowid);
+    if(mode==='ait'&&dimensionSources.conflictingDefaults.length)this.store.updateItem(rowId,{error:`已保存的产品尺寸来源冲突：${dimensionSources.conflictingDefaults.map(source=>source.name).join('、')}；请明确选择尺寸记录后保存`});
     if(input.type==='modify'){
      const source=originals.get(index)!;this.store.updateItem(rowId,{originalRelativePath:source.relativePath,originalSha256:source.sha256,fileName:source.fileName});
     }
@@ -170,7 +187,7 @@ export class PackagingTaskService {
   if(templateId!==undefined&&(!template||template.status!=='active'||template.projectItemId!==item.projectItemId||template.productIds.length&&!template.productIds.includes(task.productId)||template.brandIds.length&&!template.brandIds.includes(this.workspace.product(task.productId).brandId)))taskFail('TEMPLATE_NOT_APPLICABLE','请选择适用于当前产品项目的启用模板');
   const mode=input.mode??item.mode;
   if(item.relativePath&&mode==='none')taskFail('ITEM_HAS_FILE','项目已有 PDF，不能通过无需生成跳过文件检查');
-  this.store.updateItem(itemId,{mode,parameters,dimensionProfileId:profile?.id??input.dimensionProfileId,ratioLocked:input.ratioLocked??item.ratioLocked,templateId:template?.id,templateName:template?.name,reviewedSha256:undefined,state:mode==='none'?'none':mode==='manual'?(item.relativePath?'awaiting_review':'awaiting_upload'):'pending',error:undefined});this.store.setSnapshot(itemId,template);return this.getTask(taskId);
+  this.store.updateItem(itemId,{mode,parameters,dimensionProfileId:profile?.id??input.dimensionProfileId,ratioLocked:input.ratioLocked??item.ratioLocked,templateId:template?.id,templateName:template?.name,reviewedSha256:undefined,state:mode==='none'?'none':mode==='manual'||mode==='existing'?(item.relativePath?'awaiting_review':'awaiting_upload'):'pending',error:undefined});this.store.setSnapshot(itemId,template);return this.getTask(taskId);
  }
  async generate(taskId:string,input:{itemIds?:number[];regenerate?:boolean}={}){
   this.mutable(taskId);if(this.operations.has(taskId))taskFail('TASK_BUSY','任务正在处理中');
@@ -190,10 +207,11 @@ export class PackagingTaskService {
     const drawing=this.drawing(item.drawing,task.productId),product=this.workspace.product(task.productId),snapshot=this.store.snapshot(item.id),catalog=this.options.catalog.getCatalog();
     if(!snapshot||!catalog.templates.some(template=>template.id===snapshot.id&&template.status==='active'))taskFail('TEMPLATE_REQUIRED','请先匹配并明确选择启用的 AIT 模板');
     const config=catalog.configs.find(config=>config.projectItemId===item.projectItemId);for(const definition of config?.parameters??[])if(definition.required&&(item.parameters[definition.key]===undefined||item.parameters[definition.key]===''))taskFail('DIMENSIONS_REQUIRED',`请补充${definition.label}`);
-    const asset=this.options.catalog.templateAsset(snapshot!.id,snapshot),relativePath=this.availableTaskPath(task,`${item.fullCode}-${item.projectName}`),fileName=basename(relativePath);
+    const asset=this.options.catalog.templateAsset(snapshot!.id,snapshot),relativePath=join(task.taskDirectory,`${packagingName(`${item.fullCode}-${item.projectName}`)}.pdf`),fileName=basename(relativePath);
+    if(existsSync(this.taskPath(taskId,relativePath))||this.otherTaskOwns(task,relativePath))taskFail('FILE_NAME_CONFLICT','目标 PDF 已存在，请先核对文件');
     this.store.updateItem(item.id,{state:'generating',error:undefined,reviewedSha256:undefined});
-    const fields=snapshot!.fields.filter(field=>field.sourceKey==='DRAWING_NO');if(!fields.length)taskFail('DRAWING_FIELD_REQUIRED','此模板尚未配置完整图号文字对象，请先在包材模板中设置');
-    const result=await this.options.automation.generate({templatePath:asset.absolutePath,outputPath:this.taskPath(taskId,relativePath),fields,requiredFonts:snapshot!.requiredFonts,values:{DRAWING_NO:item.fullCode}});
+    const fields=snapshot!.fields.filter(field=>field.sourceKey==='DRAWING_NO');
+    const result=await this.options.automation.generate({templatePath:asset.absolutePath,expectedTemplateSha256:snapshot!.sha256,outputPath:this.taskPath(taskId,relativePath),fields,requiredFonts:snapshot!.requiredFonts,values:{DRAWING_NO:item.fullCode}});
     const fact=await pdfFact(this.taskPath(taskId,relativePath));if(!result.preserveEditability||fact.sha256!==result.sha256)taskFail('PDF_VERIFICATION_FAILED','Illustrator 返回结果与实际 PDF 不一致');
     this.store.updateItem(item.id,{state:'awaiting_review',relativePath,fileName,sha256:fact.sha256,reviewedSha256:undefined,error:undefined});this.store.own(taskId,{relativePath,sha256:fact.sha256});
    }catch(error){this.store.updateItem(item.id,{state:'failed',error:errorText(error)});}
@@ -207,6 +225,7 @@ export class PackagingTaskService {
   const task=this.mutable(taskId);if(this.operations.has(taskId))return this.store.task(taskId);
   await this.copyOriginalItems(taskId);
   await this.refreshFiles(this.store.task(taskId));
+  await this.refreshFormalFiles(this.store.task(taskId));
   const directories=[...new Set([join(task.productDirectory,'00.临时文件'),task.taskDirectory].map(path=>path.replaceAll('\\','/')))],observed=new Set<string>();
   for(const directory of directories){
    for(const entry of readdirSync(this.taskPath(taskId,directory),{withFileTypes:true})){
@@ -243,7 +262,7 @@ export class PackagingTaskService {
   const already=this.store.pending(taskId).some(other=>other.id!==fileId&&other.status==='linked'&&other.relativePath===file!.relativePath);if(already)taskFail('FILE_ALREADY_LINKED','同一文件不能重复关联');
   const inside=file!.relativePath.replaceAll('\\','/').startsWith(`${task.taskDirectory.replaceAll('\\','/')}/`),relativePath=inside?file!.relativePath:this.availableTaskPath(task,`${item.fullCode}-${item.projectName}`);
   if(!inside){await copyPdfExclusive(source,this.taskPath(taskId,relativePath),fact.sha256);if((await pdfFact(source)).sha256!==fact.sha256)taskFail('FILE_CHANGED','人工 PDF 正在变化，暂不整理原文件');}
-  this.db.transaction(()=>{if(this.store.item(taskId,itemId).relativePath)taskFail('ITEM_HAS_FILE','项目已关联其他文件');this.store.updateItem(itemId,{relativePath,fileName:basename(relativePath),sha256:fact.sha256,reviewedSha256:undefined,mode:'manual',state:'awaiting_review',error:undefined});this.db.prepare("update packaging_pending_files set status='linked',item_id=? where id=? and status='pending'").run(itemId,fileId);this.store.own(taskId,{relativePath,sha256:fact.sha256});})();
+  this.db.transaction(()=>{if(this.store.item(taskId,itemId).relativePath)taskFail('ITEM_HAS_FILE','项目已关联其他文件');this.store.updateItem(itemId,{relativePath,fileName:basename(relativePath),sha256:fact.sha256,reviewedSha256:undefined,mode:item.mode==='existing'?'existing':'manual',state:'awaiting_review',error:undefined});this.db.prepare("update packaging_pending_files set status='linked',item_id=? where id=? and status='pending'").run(itemId,fileId);this.store.own(taskId,{relativePath,sha256:fact.sha256});})();
   if(!inside&&(await pdfFact(source)).sha256===fact.sha256)unlinkSync(source);
   return this.getTask(taskId);
  }
@@ -256,10 +275,11 @@ export class PackagingTaskService {
   if(!item.relativePath||!['awaiting_review','generated','completed'].includes(item.state))taskFail('FILE_REQUIRED','项目尚无可检查的 PDF；参数调整后请先另存重新生成');const fact=await pdfFact(this.taskPath(taskId,item.relativePath!));
   if(fact.sha256!==sha256)taskFail('FILE_CHANGED','文件已变化，请重新核对后确认');this.store.updateItem(itemId,{sha256:fact.sha256,reviewedSha256:fact.sha256,state:'completed',error:undefined});this.store.own(taskId,{relativePath:item.relativePath,sha256:fact.sha256});return this.getTask(taskId);
  }
- async filePath(taskId:string,itemId:number){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');this.assertWorkspace(taskId);const task=this.store.task(taskId),item=this.store.item(taskId,itemId);let relativePath=item.relativePath;if(task.state==='completed'){const row=this.db.prepare('select destination_relative_path as path from packaging_archive_journal where task_id=? and item_id=?').get(taskId,itemId) as {path:string}|undefined;relativePath=row?.path;}if(!relativePath)taskFail('FILE_REQUIRED','项目尚无 PDF');const path=this.taskPath(taskId,relativePath!);await pdfFact(path);return path;}
+ async filePath(taskId:string,itemId:number){if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');this.assertWorkspace(taskId);const task=this.store.task(taskId),item=this.store.item(taskId,itemId);let relativePath=item.relativePath;if(task.state==='completed'){const row=this.db.prepare('select destination_relative_path as path from packaging_archive_journal where task_id=? and item_id=?').get(taskId,itemId) as {path:string}|undefined;relativePath=row?.path??(relativePath&&this.isFormalPath(task,relativePath)?relativePath:undefined);}if(!relativePath)taskFail('FILE_REQUIRED','项目尚无 PDF');const path=this.taskPath(taskId,relativePath!);await pdfFact(path);return path;}
  async backupPath(taskId:string,itemId:number){this.store.task(taskId);if(this.closed)taskFail('SERVICE_CLOSING','服务正在关闭');const item=this.store.item(taskId,itemId);if(!item.backupRelativePath||!item.originalSha256)taskFail('BACKUP_NOT_FOUND','此项目没有正式原件备份');const path=resolveWorkspacePath(this.options.dataDir,item.backupRelativePath);if((await pdfFact(path)).sha256!==item.originalSha256)taskFail('BACKUP_CHANGED','原件备份内容已变化，不能作为已核实备份打开');return path;}
  async openItem(taskId:string,itemId:number){
-  this.mutable(taskId);if(this.operations.has(taskId))taskFail('TASK_BUSY','任务正在处理文件，请稍后重试');
+  const task=this.mutable(taskId);if(this.operations.has(taskId))taskFail('TASK_BUSY','任务正在处理文件，请稍后重试');
+  const item=this.store.item(taskId,itemId);if(item.relativePath&&this.isFormalPath(task,item.relativePath))taskFail('FORMAL_FILE_EDIT_BLOCKED','正式文件不能直接编辑，请创建修改正式文件任务并编辑临时副本');
   if(!this.options.automation.openPdf)taskFail('ILLUSTRATOR_UNAVAILABLE','当前环境不能打开 Illustrator');
   const work=(async()=>{await this.options.automation.openPdf!(await this.filePath(taskId,itemId));return{ok:true};})();
   this.operations.set(taskId,work);try{return await work;}finally{this.operations.delete(taskId);}

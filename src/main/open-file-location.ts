@@ -101,3 +101,22 @@ export function createQrFileActionHandler(dependencies: QrFileDependencies) {
 import { Buffer } from 'node:buffer';
 
 import { validateWorkspaceRelativePath } from '../core/files/workspace-paths.js';
+
+/** Opens only an identity resolved by the local service, never a renderer-provided path. */
+export function createOpenPdfHandler(dependencies: {
+  isTrustedEvent(event: unknown): boolean;
+  resolvePdfFilePath(id: unknown): string | Promise<string>;
+  openPath(path: string): Promise<string>;
+}) {
+  return async (event: unknown, id: unknown): Promise<DesktopFileResult> => {
+    if (!dependencies.isTrustedEvent(event)) return {ok:false,error:{code:'UNTRUSTED_SENDER',message:'不允许此窗口打开文件'}};
+    const observed=typeof id==='object'&&id!==null?id as Record<string,unknown>:null;
+    const validObserved=observed?.kind==='drawing-file'&&['planned','historical'].includes(String(observed.origin))&&Number.isInteger(observed.recordId)&&Number(observed.recordId)>0&&typeof observed.relativePath==='string';
+    if ((!Number.isInteger(id)||Number(id)<=0)&&!validObserved) return {ok:false,error:{code:'INVALID_PDF_FILE_ID',message:'PDF 文件索引无效'}};
+    try {
+      const path=await dependencies.resolvePdfFilePath(id);
+      const error=await dependencies.openPath(path);
+      return error?{ok:false,error:{code:'OPEN_PDF_FAILED',message:error}}:{ok:true};
+    } catch(error) {return {ok:false,error:{code:typeof error==='object'&&error&&'code' in error?String(error.code):'OPEN_PDF_FAILED',message:error instanceof Error?error.message:'打开 PDF 失败'}};}
+  };
+}

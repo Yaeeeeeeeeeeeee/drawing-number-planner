@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][ValidateSet('existing','fresh','qr','reselect','reselect-cancel','inspect')][string]$Mode,[string]$DatabasePath,[Parameter(Mandatory=$true)][string]$ReportPath)
+param([Parameter(Mandatory=$true)][ValidateSet('existing','fresh','qr','reselect','reselect-cancel','ait','inspect')][string]$Mode,[string]$DatabasePath,[Parameter(Mandatory=$true)][string]$ReportPath)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -65,7 +65,7 @@ function Click-NativeButton($Button) {
 try{
  Save-Stage 'started'
  if($Mode -eq 'inspect'){Save-Diagnostics;exit 0}
- if($Mode -notin @('qr','reselect','reselect-cancel')){
+ if($Mode -notin @('qr','reselect','reselect-cancel','ait')){
   Save-Stage 'waiting-for-mode-dialog'
   $window=Wait-Window '图号规划器 · 选择数据库'
   $report.matchedWindow=@{name=$window.Current.Name;handle=$window.Current.NativeWindowHandle};Save-Stage 'mode-dialog-found'
@@ -79,7 +79,7 @@ try{
  }
  if($Mode -in @('existing','qr','reselect','reselect-cancel')){
   if($Mode -ne 'reselect-cancel' -and !(Test-Path -LiteralPath $DatabasePath)){throw 'Selected verification file missing'}
-  $title=if($Mode -eq 'qr'){'选择二维码原始PDF'}elseif($Mode -in @('reselect','reselect-cancel')){'重新选择数据库（保留当前数据库和全部原文件）'}else{'选择旧版数据目录中的 planner.db'}
+  $title=if($Mode -eq 'ait'){'选择 AIT 原始文件'}elseif($Mode -eq 'qr'){'选择二维码原始PDF'}elseif($Mode -in @('reselect','reselect-cancel')){'重新选择数据库（保留当前数据库和全部原文件）'}else{'选择旧版数据目录中的 planner.db'}
   Save-Stage 'waiting-for-file-picker'
   $picker=Wait-Window $title
   $pickerHandle=[IntPtr]$picker.Current.NativeWindowHandle
@@ -143,6 +143,14 @@ try{
   for($attempt=0;$attempt -lt 40 -and [ProfileDialogNative]::IsWindow($pickerHandle);$attempt++){Start-Sleep -Milliseconds 250}
   if([ProfileDialogNative]::IsWindow($pickerHandle)){throw 'Native picker remained open after submitting the actual file path'}
   $report.nativeFilePicker=$true
+  if($Mode -eq 'reselect'){
+   Save-Stage 'waiting-for-checked-database-confirmation'
+   $checked=Wait-Window '确认切换数据库'
+   $confirm=$checked.FindFirst([System.Windows.Automation.TreeScope]::Descendants,(New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,'确认切换')))
+   if(!$confirm){throw 'Checked database confirmation button not found'}
+   Click-NativeButton $confirm
+   $report.checkedDatabaseConfirmed=$true
+  }
  }
  Save-Stage 'completed'
 }catch{

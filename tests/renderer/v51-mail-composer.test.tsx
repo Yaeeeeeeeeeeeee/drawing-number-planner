@@ -15,6 +15,69 @@ function apiFixture() { return {
 }; }
 afterEach(() => vi.restoreAllMocks());
 describe('V5.1 outbound mail draft', () => {
+  it('keeps manually selected recipient text until adopting a different package is confirmed',async()=>{
+    const api=apiFixture(),view=render(<EmailComposer api={api as never} mailContext={context as never}/>);
+    await waitFor(()=>expect(screen.getByLabelText('正文')).not.toHaveValue(''));
+    fireEvent.change(screen.getByLabelText('收件人文本'),{target:{value:'manual@example.com'}});
+    view.rerender(<EmailComposer api={api as never} mailContext={{...context,packageId:13,packageName:'另一包',manufacturer:'厂家乙'} as never}/>);
+    expect(await screen.findByRole('button',{name:'使用新压缩包资料'})).toBeVisible();
+    expect(screen.getByLabelText('收件人文本')).toHaveValue('manual@example.com');expect(screen.getByLabelText('主题')).not.toHaveValue('另一包');
+  });
+  it('protects newly regenerated text when an earlier save finishes late', async () => {
+    let finish!: () => void;
+    const api = {...apiFixture(), latestOutboundEmailDraft:vi.fn().mockResolvedValue(null),
+      saveOutboundEmailDraft:vi.fn(draft => new Promise(resolve => { finish=()=>resolve({...draft,savedAt:'now'}); }))};
+    let guard: (() => boolean) | null=null;
+    render(<EmailComposer api={api as never} mailContext={context as never} registerLeaveGuard={next=>{guard=next;}} />);
+    await waitFor(()=>expect(screen.getByLabelText('正文')).not.toHaveValue(''));
+    fireEvent.change(screen.getByLabelText('主题'),{target:{value:'保存中的旧主题'}});
+    fireEvent.click(screen.getByRole('button',{name:'保存草稿'}));
+    const confirm=vi.spyOn(window,'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button',{name:'生成邮件内容'}));
+    await waitFor(()=>expect(screen.getByLabelText('主题')).not.toHaveValue('保存中的旧主题'));
+    await act(async()=>finish());
+    confirm.mockReturnValue(false);expect(guard!()).toBe(false);
+    const unload=new Event('beforeunload',{cancelable:true});window.dispatchEvent(unload);expect(unload.defaultPrevented).toBe(true);
+  });
+  it('saves explicitly and restores the saved context and edits on reopening', async () => {
+    const api = { ...apiFixture(), saveOutboundEmailDraft: vi.fn(async draft => ({...draft,savedAt:'2026-11-16T00:00:00Z'})), latestOutboundEmailDraft: vi.fn().mockResolvedValue(null) };
+    const view = render(<EmailComposer api={api as never} mailContext={context as never} />);
+    await waitFor(() => expect(screen.getByLabelText('正文')).not.toHaveValue(''));
+    fireEvent.change(screen.getByLabelText('主题'), {target:{value:'我的主题'}});
+    fireEvent.change(screen.getByLabelText('正文'), {target:{value:'我的正文'}});
+    fireEvent.click(screen.getByRole('button',{name:'保存草稿'}));
+    await waitFor(() => expect(api.saveOutboundEmailDraft).toHaveBeenCalled());
+    const saved = await api.saveOutboundEmailDraft.mock.results[0].value;
+    view.unmount(); api.latestOutboundEmailDraft.mockResolvedValue(saved);
+    render(<EmailComposer api={api as never} mailContext={null} />);
+    fireEvent.click(await screen.findByRole('button',{name:'恢复已保存草稿'}));
+    expect(screen.getByLabelText('主题')).toHaveValue('我的主题');
+    expect(screen.getByLabelText('正文')).toHaveValue('我的正文');
+    expect(screen.getByText(/本次 ZIP/)).toHaveTextContent('本次资料.zip');
+  });
+  it('keeps edits made while a save is pending and preserves input on failure', async () => {
+    let resolve!: (value: any) => void;
+    const api = {...apiFixture(), latestOutboundEmailDraft:vi.fn().mockResolvedValue(null), saveOutboundEmailDraft:vi.fn().mockImplementationOnce(draft => new Promise(r => {resolve = () => r({...draft,savedAt:'now'});})).mockRejectedValueOnce(new Error('保存失败'))};
+    const guards: Array<(() => boolean)|null> = [];
+    render(<EmailComposer api={api as never} mailContext={context as never} registerLeaveGuard={guard => guards.push(guard)} />);
+    await waitFor(() => expect(screen.getByLabelText('正文')).not.toHaveValue(''));
+    fireEvent.change(screen.getByLabelText('主题'),{target:{value:'第一次'}});fireEvent.click(screen.getByRole('button',{name:'保存草稿'}));
+    fireEvent.change(screen.getByLabelText('主题'),{target:{value:'保存期间修改'}});await act(async()=>resolve(null));
+    expect(screen.getByLabelText('主题')).toHaveValue('保存期间修改');
+    const confirm = vi.spyOn(window,'confirm').mockReturnValue(false);expect(guards.at(-1)!()).toBe(false);expect(confirm).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button',{name:'保存草稿'}));await screen.findByText('保存失败');expect(screen.getByLabelText('主题')).toHaveValue('保存期间修改');
+  });
+  it('keeps the new package dirty when an older save finishes late', async () => {
+    let finish!: () => void;
+    const api={...apiFixture(),latestOutboundEmailDraft:vi.fn().mockResolvedValue(null),saveOutboundEmailDraft:vi.fn(draft=>new Promise(resolve=>{finish=()=>resolve({...draft,savedAt:'now'});} ))};
+    let guard: (()=>boolean)|null = null; const register=(next:(()=>boolean)|null)=>{guard=next;};
+    const view=render(<EmailComposer api={api as never} mailContext={context as never} registerLeaveGuard={register}/>);
+    await waitFor(()=>expect(screen.getByLabelText('正文')).not.toHaveValue(''));
+    fireEvent.change(screen.getByLabelText('主题'),{target:{value:'旧任务编辑'}});fireEvent.click(screen.getByRole('button',{name:'保存草稿'}));
+    view.rerender(<EmailComposer api={api as never} mailContext={{...context,packageId:13,packageName:'新任务'} as never} registerLeaveGuard={register}/>);
+    const confirm=vi.spyOn(window,'confirm').mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:'使用新压缩包资料'}));
+    await act(async()=>finish());confirm.mockReturnValue(false);expect(guard!()).toBe(false);expect(screen.getByLabelText('主题')).not.toHaveValue('旧任务编辑');
+  });
   it('uses only actual changed ZIP files, retains PDF names, and synchronizes reasons', async () => {
     const api = apiFixture();
     render(<EmailComposer api={api as never} mailContext={{ ...context, items: [...context.items, { ...context.items[0], pdfFileId: 2, fileName: '沿用说明书.pdf', projectItemName: '说明书', change: 'copied' }] } as never} />);

@@ -1,4 +1,4 @@
-export type PackagingMode = 'ait' | 'manual' | 'none';
+export type PackagingMode = 'ait' | 'manual' | 'none' | 'existing';
 export type PackagingParameters = Record<string, string | number>;
 export interface PackagingParameter {
   key: string; label: string; type: 'number' | 'text'; required: boolean; unit?: string;
@@ -25,6 +25,7 @@ export interface TemplateRuleInput {
   status: 'active' | 'inactive';
 }
 export interface TemplateRule extends TemplateRuleInput { id: number }
+export type TemplateRangeInput = Omit<TemplateRuleInput,'templateId'> & {id?:number};
 export interface PackagingProjectConfig {
   projectItemId: number; mode: PackagingMode; parameters: PackagingParameter[];
 }

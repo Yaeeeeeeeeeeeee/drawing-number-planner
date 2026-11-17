@@ -81,3 +81,18 @@ it.each(['batch','ancestor','non-pdf'])('does not call an internal batch empty w
  const service=new MaterialBatchService(f.db,()=>f.root);expect(service.previewDeletion(id)?.allowed).toBe(false);
  expect(f.db.prepare('select id from material_batches where id=?').get(id)).toEqual({id});
 });
+it('reports real scan stages and comparison after a complete scan',async()=>{
+ const f=fixture();pdf(f.root,'类/SKU-M/02.未转曲源文件/a.pdf');
+ const reports:any[]=[];const controller=new AbortController();
+ const context={id:'test',signal:controller.signal,report:(p:any)=>reports.push(p),throwIfCancelled:()=>controller.signal.throwIfAborted(),beginFinalizing:()=>{}};
+ const result=await f.service.scan(context);
+ expect(reports.map(p=>p.phase)).toEqual(expect.arrayContaining(['preparing','traversing','reading','comparing','writing']));
+ expect(reports.find(p=>p.phase==='reading')).toMatchObject({total:1});
+ expect(result.comparison).toMatchObject({added:1,changed:0,unchanged:0});
+});
+it('cancels before index replacement and retains the previous scan',async()=>{
+ const f=fixture();pdf(f.root,'类/SKU-M/02.未转曲源文件/a.pdf');await f.service.scan();const before=snapshot(f.db);
+ pdf(f.root,'类/SKU-M/02.未转曲源文件/b.pdf');const controller=new AbortController();
+ const context={id:'cancel',signal:controller.signal,report:(p:{phase:string})=>{if(p.phase==='reading')controller.abort();},throwIfCancelled:()=>controller.signal.throwIfAborted(),beginFinalizing:()=>{throw new Error('unexpected commit');}};
+ await expect(f.service.scan(context)).rejects.toMatchObject({code:'SCAN_FAILED'});expect(snapshot(f.db)).toEqual(before);
+});

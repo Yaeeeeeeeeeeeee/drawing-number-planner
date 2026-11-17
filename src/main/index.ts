@@ -1,3 +1,4 @@
+import { createAitChooser } from './ait-chooser.js';
 import { acquireDesktopInstance } from './single-instance.js';
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import { existsSync, readFileSync } from 'node:fs';
@@ -11,7 +12,7 @@ import { createQrManualHandlers } from './qr-manual-actions.js';
 import { LocalServiceController } from './local-service-controller.js';
 import { minimumOuterSize } from './window-layout.js';
 import { loadDesktopSurface } from './desktop-startup.js';
-import { createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
+import { createOpenPdfHandler, createQrFileActionHandler, createShowBomAssetInFolderHandler, createShowFileInFolderHandler } from './open-file-location.js';
 import { createChooseOutboundDirectoryHandler, createShowOutboundPackageHandler } from './outbound-file-actions.js';
 import { RecoveryController, createNativeRecoveryActions, parseRecoveryServiceResponse, type RecoverableTask } from './recovery-controller.js';
 
@@ -190,29 +191,42 @@ async function reselectDatabase(): Promise<{ok:true;cancelled:boolean}> {
           properties:['openFile'], filters:[{name:'图号规划器数据库 planner.db',extensions:['db']}]});
         return result.canceled ? null : result.filePaths[0] ?? null;
       },
+      confirmDatabase: async (summary: {path:string;schemaVersion:number}) => {
+        const result = await dialog.showMessageBox(mainWindow!, {type:'question', title:'确认切换数据库',
+          message:'兼容性检查通过，确认切换数据库？',
+          detail:`数据库：${summary.path}\nSchema 版本：${summary.schemaVersion}（受支持）`,
+          buttons:['取消','确认切换'], defaultId:0, cancelId:0});
+        return result.response === 1;
+      },
       beforeSwitch,
       verifyStartup: async (data: string) => {
         await oldService.stop();
         candidate = new LocalServiceController({entryPath:fileURLToPath(new URL('../service/entry.js',import.meta.url)),
           diagnosticsPath:join(data,'logs','service-startup.jsonl'),
           config:{dataDir:data,requireExistingDatabase:true,...(devUrl ? {allowedOrigins:[new URL(devUrl).origin]} : {rendererDir:join(app.getAppPath(),'dist','renderer')})}});
-        await candidate.start();
+        const connection = await candidate.start();
+        for (const path of ['/api/products','/api/boms/query','/api/files']) {
+          const response = await fetch(`${connection.url}${path}`, {headers:{origin:connection.url}});
+          if (!response.ok) throw new Error(`候选数据库核心读取失败：${path} (${response.status})`);
+          await response.json();
+        }
+      },
+      activate: async (data: string) => {
+        localService = candidate;
+        app.setPath('userData',data);
+        const connection = await candidate!.start();
+        await mainWindow!.loadURL(devUrl ?? connection.url);
       },
     }),
     restore: async () => {
-      await candidate?.stop(); localService = oldService;
-      const connection = await oldService.restart();
-      await mainWindow!.loadURL(devUrl ?? connection.url);
+      try { await candidate?.stop(); } finally {
+        localService = oldService;
+        app.setPath('userData',oldData);
+        const connection = await oldService.restart();
+        await mainWindow!.loadURL(devUrl ?? connection.url);
+      }
     },
   });
-  if (!selected.cancelled && candidate) {
-    localService = candidate;
-    // profile.json was atomically committed only after candidate.start() succeeded.
-    const connection = await candidate.start();
-    const {dataDir} = JSON.parse(readFileSync(join(app.getPath('appData'),'DrawingNumberPlanner','profile.json'),'utf8'));
-    app.setPath('userData',dataDir);
-    await mainWindow.loadURL(devUrl ?? connection.url);
-  }
   return selected;
 }
 
@@ -222,6 +236,11 @@ const primaryInstance = acquireDesktopInstance(app, () => {
   mainWindow.show(); mainWindow.focus();
 });
 if (primaryInstance) void app.whenReady().then(() => {
+  ipcMain.handle('planner:open-pdf', createOpenPdfHandler({
+    isTrustedEvent: event => {const sender=event as Electron.IpcMainInvokeEvent;return Boolean(mainWindow && sender.sender===mainWindow.webContents && sender.senderFrame===mainWindow.webContents.mainFrame);},
+    resolvePdfFilePath: id => {if(!localService) throw new Error('本机文件服务尚未启动');return localService.resolvePdfFilePath(id);},
+    openPath: path => shell.openPath(path),
+  }));
   ipcMain.handle('planner:show-file-in-folder', createShowFileInFolderHandler({
     resolvePdfFilePath: (id) => {
       if (!localService) throw new Error('本机文件服务尚未启动');
@@ -252,6 +271,11 @@ if (primaryInstance) void app.whenReady().then(() => {
     openPath: path => shell.openPath(path),
     showItemInFolder: path => shell.showItemInFolder(path),
   });
+  ipcMain.handle('planner:select-ait', createAitChooser({
+    isTrustedEvent: event => {const sender=event as Electron.IpcMainInvokeEvent;return Boolean(mainWindow && sender.sender===mainWindow.webContents && sender.senderFrame===mainWindow.webContents.mainFrame);},
+    choose: async () => {const result=await dialog.showOpenDialog(mainWindow!,{title:'选择 AIT 原始文件',properties:['openFile'],filters:[{name:'AIT',extensions:['ait']}]});return result.canceled?null:result.filePaths[0]??null;},
+    select: path => {if(!localService)throw new Error('本机文件服务尚未启动');return localService.selectAitTrusted(path);},
+  }));
   ipcMain.handle('planner:qr-manual-select', event => manualQr.select(event));
   ipcMain.handle('planner:qr-manual-action', manualQr.action);
   ipcMain.handle('planner:qr-file-action', createQrFileActionHandler({

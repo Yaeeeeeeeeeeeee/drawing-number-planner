@@ -92,6 +92,7 @@ test('V5.2 real indexed tables keep width, alignment, icon actions and frozen co
     await page.setViewportSize({width:1920,height:900});
    }
    if(label==='PDF 文件中心'){
+    await section.getByRole('button',{name:'全选已加载文件',exact:true}).click();
     const toolbar=section.getByRole('region',{name:'PDF 索引管理'});const buttons=toolbar.getByRole('button');expect(await buttons.count()).toBe(6);
     const rects=await buttons.evaluateAll(nodes=>nodes.map(node=>({y:node.getBoundingClientRect().y,h:node.getBoundingClientRect().height,icon:!!node.querySelector('svg'),text:node.textContent})));
     expect(Math.max(...rects.map(r=>r.y))-Math.min(...rects.map(r=>r.y))).toBeLessThan(2);

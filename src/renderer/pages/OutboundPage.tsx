@@ -1,6 +1,6 @@
 import './outbound/outbound-v2.css';
 import { PageHeader } from '../components/PageHeader';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CreatedOutboundPackageView, PlannerApi } from '../data/client';
 import { PackageResult } from './outbound/PackageResult';
 import { MailConfiguration } from './outbound/MailConfiguration';
@@ -20,7 +20,11 @@ function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard, target
   const [completedContext, setCompletedContext] = useState<OutboundMailContext | null>(null);
   const [settings, setSettings] = useState(false);
   const leaveGuard = useRef<LeaveGuard | null>(null);
-  const registerLeaveGuard = useCallback((guard: LeaveGuard | null) => { leaveGuard.current = guard; registerOuterGuard?.(guard); }, [registerOuterGuard]);
+  const draftGuard = useRef<LeaveGuard | null>(null);
+  const activeSettings = useRef(settings);activeSettings.current=settings;
+  const registerLeaveGuard = useCallback((guard: LeaveGuard | null) => { leaveGuard.current = guard; }, []);
+  const registerDraftGuard = useCallback((guard: LeaveGuard | null) => { draftGuard.current = guard; }, []);
+  useEffect(()=>{registerOuterGuard?.(()=> (activeSettings.current?leaveGuard.current:draftGuard.current)?.() ?? true);return()=>registerOuterGuard?.(null);},[registerOuterGuard]);
   const [refreshRevision, setRefreshRevision] = useState(0);
   const [createdPackage,setCreatedPackage] = useState<CreatedOutboundPackageView|null>(null);
 
@@ -50,8 +54,8 @@ function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard, target
       <section className="ob-step" aria-label="邮件编辑步骤"><h2><span aria-hidden="true">04</span> 邮件草稿</h2>
           {!mailContext && <p className="muted-text">ZIP 成功生成后，点击“生成邮件草稿”带入本次外发资料。</p>}
           <details className="ob-workbench-mail" open={mailContext !== null}>
-            <summary>编辑邮件草稿</summary>
-            <EmailComposer api={api} mailContext={mailContext} refreshRevision={refreshRevision} />
+            <summary onClick={event => { if ((event.currentTarget.parentElement as HTMLDetailsElement).open && draftGuard.current && !draftGuard.current()) event.preventDefault(); }}>编辑邮件草稿</summary>
+            <EmailComposer api={api} mailContext={mailContext} refreshRevision={refreshRevision} registerLeaveGuard={registerDraftGuard} />
           </details>
       </section>
       </div>

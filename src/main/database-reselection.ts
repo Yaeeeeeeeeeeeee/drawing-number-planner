@@ -14,7 +14,7 @@ export async function performDatabaseReselection(dependencies: SelectionDependen
   } catch (error) {
     if (paused) {
       try { await dependencies.restore(); }
-      catch (restoreError) { throw new Error(`${error instanceof Error ? error.message : error}；原配置已保留，但原服务恢复失败：${restoreError instanceof Error ? restoreError.message : restoreError}。请使用安全恢复重试或重新选择数据库。`); }
+      catch (restoreError) { throw new Error(`${error instanceof Error ? error.message : error}；恢复原服务失败：${restoreError instanceof Error ? restoreError.message : restoreError}。请使用安全恢复重试或重新选择数据库。`); }
     }
     throw error;
   }

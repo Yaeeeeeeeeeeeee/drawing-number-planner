@@ -97,3 +97,14 @@ describe('packaging workflow',()=>{
 
   });
 });
+
+it('shows conflict candidates and selected template evidence before generation',async()=>{
+ const api=fixture();const first={id:9,name:'标准模板',status:'active',mainCategoryId:2,projectItemId:3,productIds:[],brandIds:[],fields:[],fileName:'标准.ait',assetRelativePath:'/原始/标准.ait'};const second={...first,id:10,name:'备选模板',fileName:'备选.ait'};
+ api.packaging.getCatalog.mockResolvedValue({templates:[first,second],dimensions:[],rules:[{id:1,name:'范围',templateId:9,conditions:[{key:'width',operator:'between',value:50,max:100}],allowLengthWidthSwap:true,status:'active'}],configs:[{projectItemId:3,mode:'ait',parameters:[{key:'width',label:'宽',type:'number',axis:'width',required:true}]}]});
+ const aitItem={...item,mode:'ait',state:'pending',templateId:9,templateName:'标准模板',match:{status:'multiple',templateIds:[9,10],missingParameters:[]}};api.packaging.getTask.mockResolvedValue({...task,items:[aitItem]});
+ render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));const card=await screen.findByRole('region',{name:`${item.fullCode} 铭牌`});fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));
+ const conflicts=within(card).getByRole('region',{name:'匹配冲突列表'});const selected=within(card).getByRole('region',{name:'生成前模板信息'});expect(within(conflicts).getByText('备选模板')).toBeVisible();expect(within(conflicts).getByText(/宽 介于 50 至 100/)).toBeVisible();expect(within(selected).getByText(/原始\/标准.ait/)).toBeVisible();expect(within(conflicts).getAllByText(/匹配原因/)).toHaveLength(2);
+});
+it('shows why a formal PDF cannot be opened for Illustrator editing while keeping preview available',async()=>{
+ const api=fixture(),formal={...task,items:[{...item,mode:'existing',state:'completed',relativePath:'冰柜/T40/02.未转曲源文件/铭牌.pdf'}]};api.packaging.getTask.mockResolvedValue(formal);render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));const card=await screen.findByRole('region',{name:'02.0404.010.0401001 铭牌'});fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));expect(within(card).getByRole('button',{name:'预览 PDF'})).toBeEnabled();expect(within(card).queryByRole('button',{name:'在 Illustrator 中检查 / 修改'})).not.toBeInTheDocument();expect(within(card).getByText(/修改正式文件.*临时副本/)).toBeVisible();
+});

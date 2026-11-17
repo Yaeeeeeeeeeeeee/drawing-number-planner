@@ -4,8 +4,8 @@ const path=require('node:path');
 const {createHash}=require('node:crypto');
 const {createRequire}=require('node:module');
 
-/** Real UI/HTTP/SQLite/filesystem acceptance. The upload fixture is not an Adobe template. */
-module.exports=async function verify({page,app,source,workspace,evidence,databaseFile,snapshot,writePdf,go}){
+/** Real UI/HTTP/SQLite/filesystem acceptance. The original-reference fixture is not an Adobe template. */
+module.exports=async function verify({page,app,source,workspace,evidence,databaseFile,snapshot,writePdf,go,nativeDialog}){
  const {expect}=createRequire(path.join(source,'package.json'))('@playwright/test');
  fs.mkdirSync(evidence,{recursive:true});page.setDefaultTimeout(15000);
  const before=snapshot(databaseFile),hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -63,12 +63,15 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  const editor=page.getByRole('form',{name:'AIT 模板编辑',exact:true});
  await editor.getByLabel('模板名称',{exact:true}).fill('AIT上传验收');await editor.getByRole('combobox',{name:'资料类别',exact:true}).selectOption(String(main.id));await editor.getByRole('combobox',{name:'项目明细',exact:true}).selectOption(String(templateProject.id));
  const aitBytes=Buffer.from('%!PS-Adobe-3.0\n%%Creator: upload-only anonymous contract fixture; not an Illustrator acceptance template\n');
- await editor.locator('input[type=file]').setInputFiles({name:'upload-contract.ait',mimeType:'application/octet-stream',buffer:aitBytes});
+ const originalAit=path.join(path.dirname(databaseFile),'ait-original-reference.ait');fs.writeFileSync(originalAit,aitBytes);
+ const picker=app?nativeDialog('ait',originalAit,'ait-original-reference'):null;
+ try{await editor.getByRole('button',{name:'选择 AIT 原始文件',exact:true}).click();if(picker)await picker.done;await editor.getByText(originalAit,{exact:true}).waitFor();}finally{picker?.child.kill();}
+ await editor.getByRole('button',{name:'添加图号映射',exact:true}).click();
  await expect(editor.getByRole('button',{name:'保存模板',exact:true})).toBeEnabled();
  await editor.getByLabel('AIT 对象名称 1',{exact:true}).fill('DRAWING_NO');await expect(editor.getByLabel('填入内容 1',{exact:true})).toHaveValue('DRAWING_NO');assert.deepEqual(await editor.getByLabel('填入内容 1',{exact:true}).locator('option').allTextContents(),['完整图号']);assert.equal(await editor.getByRole('textbox',{name:'数据字段',exact:true}).count(),0);
  await editor.getByRole('button',{name:'保存模板',exact:true}).click();await editor.waitFor({state:'detached'});
  let catalog=await request('/api/packaging/catalog');const template=catalog.templates.find(item=>item.name==='AIT上传验收');assert.ok(template);assert.deepEqual(template.fields,[{objectName:'DRAWING_NO',sourceKey:'DRAWING_NO',required:true}]);
- const asset=path.join(path.dirname(databaseFile),template.assetRelativePath),aitHash=createHash('sha256').update(aitBytes).digest('hex');assert.equal(hash(asset),aitHash);
+ const asset=path.isAbsolute(template.assetRelativePath)?template.assetRelativePath:path.join(path.dirname(databaseFile),template.assetRelativePath),aitHash=createHash('sha256').update(aitBytes).digest('hex');assert.equal(hash(asset),aitHash);
  if(!app){await page.getByRole('button',{name:'本机检查',exact:true}).click();await page.getByRole('alert').filter({hasText:/Illustrator|Windows/u}).waitFor();}
  await page.getByRole('tab',{name:'模板匹配规则',exact:true}).click();await page.getByRole('button',{name:'新增匹配规则',exact:true}).click();
  const rule=page.getByRole('form',{name:'模板匹配规则编辑',exact:true});await rule.getByLabel('规则名称',{exact:true}).fill('验收尺寸范围');await rule.getByRole('combobox',{name:'目标模板',exact:true}).selectOption(String(template.id));
@@ -83,7 +86,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  await page.getByRole('combobox',{name:'第 1 行主类别',exact:true}).selectOption(String(main.id));await page.getByRole('combobox',{name:'第 1 行项目明细',exact:true}).selectOption(String(templateProject.id));await page.getByRole('combobox',{name:'第 1 行颜色',exact:true}).selectOption(String(color.id));
  // This fixture color is named 验收白色, not a real white dictionary entry.
  // Explicit independent numbering avoids inventing a white sharing baseline.
- await page.getByRole('checkbox',{name:'第 1 行其他颜色共用白色图号',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'第 1 行独立占号',exact:true}).check();
  assert.equal(await page.getByRole('group',{name:/本次尺寸/u}).count(),0);assert.equal(await page.getByRole('spinbutton').count(),0);assert.equal(await page.getByRole('button',{name:'生成文件',exact:true}).count(),0);
  await page.getByRole('button',{name:'下一步',exact:true}).click();await page.getByText('可占用',{exact:true}).waitFor();
  await capture('UI16-图号规划四步检查',{responsive:true});
@@ -195,5 +198,5 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  await page.getByRole('button',{name:'刷新任务记录',exact:true}).click();await capture('UI15-任务历史删除与文件保留',{responsive:true});
  const after=snapshot(databaseFile);for(const[table,rows]of Object.entries(before)){if(table==='schema_migrations')continue;const original=observations.businessRows(before,table,rows,scope),current=observations.businessRows(before,table,after[table],scope);assert.deepEqual(observations.existingRows(original,current),original,`Original ${table} row changed`);}
  fs.writeFileSync(path.join(evidence,'UI15-layout-geometry.json'),JSON.stringify(geometry,null,2));
- return{actualHttpAndDom:true,actualInstalledHttpAndDom:Boolean(app),menuOrder:true,independentTaskMenu:true,numberOnlyMappingUi:true,planningNoDimensions:true,exactDrawingFocus:true,flatTemporaryDirectory:true,completedDeletionPreservesFiles:true,unfinishedDeletionReleasesLock:true,catalogSavedThroughUi:true,matchingBasisChoicesThroughUi:true,rangeRuleAndSwapSaved:true,reservationToTask:true,singleProductTask:true,watcherDetectedWithoutClick:true,manualAssociation:true,reviewHash:true,newArchiveAndScopedIndex:true,formalEditCopyOnly:true,formalBackupHashPreserved:true,backupReadableThroughRegisteredId:true,taskCleanupOnly:true,taskHistoryRetained:true,originalAitHashPreserved:true,protectedBusinessRowsPreserved:true,unfinishedTaskId:unfinished.id,unfinishedTaskMode:unfinished.items[0].mode,unfinishedTaskParameters:unfinished.items[0].parameters,pdfIndexIds:indexed.map(file=>file.id),productDirectory:task.productDirectory,productId:product.id,realIllustratorGeneration:false,editablePdfReopenVerified:false,aitFixtureUploadOnly:true,limitations:'No licensed Illustrator or real AIT was provided; actual Adobe generation/editability/font/layout acceptance remains local.'};
+ return{actualHttpAndDom:true,actualInstalledHttpAndDom:Boolean(app),menuOrder:true,independentTaskMenu:true,numberOnlyMappingUi:true,planningNoDimensions:true,exactDrawingFocus:true,flatTemporaryDirectory:true,completedDeletionPreservesFiles:true,unfinishedDeletionReleasesLock:true,catalogSavedThroughUi:true,matchingBasisChoicesThroughUi:true,rangeRuleAndSwapSaved:true,reservationToTask:true,singleProductTask:true,watcherDetectedWithoutClick:true,manualAssociation:true,reviewHash:true,newArchiveAndScopedIndex:true,formalEditCopyOnly:true,formalBackupHashPreserved:true,backupReadableThroughRegisteredId:true,taskCleanupOnly:true,taskHistoryRetained:true,originalAitHashPreserved:true,protectedBusinessRowsPreserved:true,unfinishedTaskId:unfinished.id,unfinishedTaskMode:unfinished.items[0].mode,unfinishedTaskParameters:unfinished.items[0].parameters,pdfIndexIds:indexed.map(file=>file.id),productDirectory:task.productDirectory,productId:product.id,realIllustratorGeneration:false,editablePdfReopenVerified:false,aitFixtureReferenceOnly:true,limitations:'No licensed Illustrator or real AIT was provided; actual Adobe generation/editability/font/layout acceptance remains local.'};
 };

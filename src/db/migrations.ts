@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { PlannerDatabase } from './database.js';
 import { schemaVersionTwentyOne } from './schema-v21-force-release.js';
 import { schemaVersionTwentyTwo } from './schema-v22-email.js';
@@ -779,10 +780,26 @@ export function applyAppearanceVersionSchema(database: PlannerDatabase): void {
   database.pragma('defer_foreign_keys = OFF');
 }
 
+export const CURRENT_SCHEMA_VERSION = 26;
+
+/** Bound preservation checks by one row, including BLOBs in large existing databases. */
+function tableContentDigest(database: PlannerDatabase, table: string): string {
+  const digest=createHash('sha256');let count=0;
+  for(const row of database.prepare(`select * from ${quoteIdentifier(table)} order by rowid`).raw().iterate() as Iterable<Array<unknown>>) {
+    digest.update('row:');count++;
+    for(const value of row) {
+      if(value===null){digest.update('null;');continue;}
+      const bytes=Buffer.isBuffer(value)?value:Buffer.from(String(value));
+      digest.update(`${Buffer.isBuffer(value)?'blob':typeof value}:${bytes.length}:`);digest.update(bytes);digest.update(';');
+    }
+  }
+  return `${count}:${digest.digest('hex')}`;
+}
+
 export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafety): MigrationResult {
   const from = currentVersion(database);
-  if (from > 25) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 25`);
-  if (from >= 25) {
+  if (from > CURRENT_SCHEMA_VERSION) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 ${CURRENT_SCHEMA_VERSION}`);
+  if (from >= CURRENT_SCHEMA_VERSION) {
     const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
@@ -1028,7 +1045,28 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
       }
       if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('V5迁移引用校验失败');
     }
+    if (from < 26) {
+      const tables=(database.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%' and name<>'schema_migrations' order by name").all() as {name:string}[]).map(row=>row.name);
+      const before=Object.fromEntries(tables.map(table=>[table,tableContentDigest(database,table)]));
+      for(const table of ['packaging_project_configs','packaging_task_items']) {
+        const sql=(database.prepare("select sql from sqlite_master where type='table' and name=?").get(table) as {sql:string}).sql;
+        const changed=sql.replace("CHECK(mode IN ('ait','manual','none'))", "CHECK(mode IN ('ait','manual','none','existing'))");
+        if(changed===sql)throw new Error('项目生成方式迁移未找到预期约束');
+        const objects=database.prepare("select sql from sqlite_master where tbl_name=? and type in ('index','trigger') and sql is not null order by type,name").all(table) as {sql:string}[];
+        const sequence=(database.prepare('select seq from sqlite_sequence where name=?').get(table) as {seq:number}|undefined)?.seq;
+        const copy=quoteIdentifier(`v26_copy_${table}`);
+        const columns=(database.pragma(`table_info(${quoteIdentifier(table)})`) as {name:string}[]).map(column=>quoteIdentifier(column.name)).join(',');
+        database.exec(`create temp table ${copy} as select ${columns} from ${quoteIdentifier(table)} order by rowid`);
+        database.exec(`drop table ${quoteIdentifier(table)}`);database.exec(changed);
+        database.exec(`insert into ${quoteIdentifier(table)}(${columns}) select ${columns} from temp.${copy} order by rowid; drop table temp.${copy}`);
+        for(const object of objects)database.exec(object.sql);
+        if(sequence!==undefined)restoreAutoincrementHighWater(database,table,sequence);
+      }
+      database.prepare('insert into schema_migrations(version,applied_at) values(26,?)').run(new Date().toISOString());
+      for(const table of tables)if(tableContentDigest(database,table)!==before[table])throw new Error('项目生成方式迁移历史内容校验失败');
+      if((database.pragma('foreign_key_check') as unknown[]).length)throw new Error('项目生成方式迁移引用校验失败');
+    }
   })();
   } finally { database.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`); }
-  return { from, to: 25 };
+  return { from, to: CURRENT_SCHEMA_VERSION };
 }

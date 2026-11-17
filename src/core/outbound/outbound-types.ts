@@ -95,6 +95,8 @@ export interface OutboundPackageMailFacts {
 }
 
 export interface CreatedOutboundPackage {
+  independentFiles?: Array<{pdfFileId:number;fileName:string;relativePath:string;contentSha256:string|null;sizeBytes:number;reason:string}>;
+  excludedFiles?: Array<{pdfFileId:number|null;fileName:string|null;reason:string}>;
   mailFacts?: OutboundPackageMailFacts;
   parts?: Array<{ partNumber: number; zipRelativePath: string; sizeBytes: number; fileCount?:number;contentSha256?:string;files?:Array<{fileName:string;contentSha256:string;pdfFileId:number}> }>;
   id: number;

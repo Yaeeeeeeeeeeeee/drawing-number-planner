@@ -1,3 +1,4 @@
+import type {PixelComparison} from '../../data/image-pixels';
 import type { BomItemAssetView, BomItemView } from '../../data/client';
 
 type ExtendedItem = BomItemView & { quantity?: number };
@@ -20,16 +21,18 @@ export const assetRoles: AssetRole[] = ['image', 'diagram'];
 export type AttachmentComparison = { kind: 'none' | 'added' | 'removed' | 'replaced' | 'association' | 'unchanged' | 'unknown'; changed: boolean; uncertain: boolean; label: string };
 const digest = (value: string) => /^[a-f0-9]{64}$/i.test(value) ? value.toLowerCase() : null;
 
-/** Compare stored attachment associations/content digests, never infer live disk availability. */
-export function compareAttachments(previous: BomItemAssetView[], selected: BomItemAssetView[]): AttachmentComparison {
+/** Different encoded digests alone do not establish different pixels or live disk availability. */
+export const attachmentPixelKey=(a:BomItemAssetView,b:BomItemAssetView)=>`${a.assetId}:${a.contentSha256}:${b.assetId}:${b.contentSha256}`;
+export function compareAttachments(previous: BomItemAssetView[], selected: BomItemAssetView[], pixels?:PixelComparison): AttachmentComparison {
   if (previous.length > 1 || selected.length > 1) return { kind: 'unknown', changed: false, uncertain: true, label: '同类型附件不唯一，待确认关联' };
   if (!previous.length && !selected.length) return { kind: 'none', changed: false, uncertain: false, label: '未关联' };
   if (!previous.length) return { kind: 'added', changed: true, uncertain: false, label: '新增关联' };
   if (!selected.length) return { kind: 'removed', changed: true, uncertain: false, label: '删除关联' };
   const a = previous[0], b = selected[0], oldHash = digest(a.contentSha256), newHash = digest(b.contentSha256);
   if (oldHash && newHash && oldHash === newHash) return { kind: 'unchanged', changed: false, uncertain: false, label: '内容摘要一致' };
-  if (oldHash && newHash && oldHash !== newHash) return { kind: 'replaced', changed: true, uncertain: false, label: '记录内容摘要不同 · 替换' };
-  return { kind: 'unknown', changed: false, uncertain: true, label: '内容摘要不足，不能确认内容一致' };
+  if(pixels==='equal')return {kind:'unchanged',changed:false,uncertain:false,label:'图片像素一致'};
+  if(pixels==='different')return {kind:'replaced',changed:true,uncertain:false,label:'图片像素不同 · 替换'};
+  return { kind: 'unknown', changed: false, uncertain: true, label: pixels==='unavailable'?'图片像素无法核实，待确认':'待比较图片像素' };
 }
 
 export type HistoryKind = 'added' | 'removed' | 'modified' | 'unchanged' | 'pending' | 'first';
@@ -43,7 +46,8 @@ export const snapshotItems = (items: BomItemView[], kind: 'first' | 'pending', r
 }));
 
 /** projectItemId is unique within a BOM version in the current schema; fail closed on bad payloads. */
-export function compareBomItems(selected: BomItemView[], previous: BomItemView[]) {
+export function compareBomItems(selected: BomItemView[], previous: BomItemView[], pixelResults:Readonly<Record<string,PixelComparison>>={}) {
+  const compareRole=(a:BomItemAssetView[],b:BomItemAssetView[])=>compareAttachments(a,b,a.length===1&&b.length===1?pixelResults[attachmentPixelKey(a[0],b[0])]:undefined);
   const group = (items: BomItemView[]) => {
     const result = new Map<number, BomItemView[]>();
     for (const item of items) result.set(item.projectItemId, [...(result.get(item.projectItemId) ?? []), item]);
@@ -55,7 +59,7 @@ export function compareBomItems(selected: BomItemView[], previous: BomItemView[]
   selected.forEach((item, index) => {
     if (ambiguous(item.projectItemId)) { rows.push(pending(item, 'selected', index)); return; }
     const old = oldGroups.get(item.projectItemId)?.[0];
-    const attachments = Object.fromEntries(assetRoles.map(role => [role, compareAttachments(old?.assets.filter(asset => asset.role === role) ?? [], item.assets.filter(asset => asset.role === role))])) as HistoryItem['attachments'];
+    const attachments = Object.fromEntries(assetRoles.map(role => [role, compareRole(old?.assets.filter(asset => asset.role === role) ?? [], item.assets.filter(asset => asset.role === role))])) as HistoryItem['attachments'];
     if (!old) { rows.push({ key: `project:${item.projectItemId}`, kind: 'added', selected: item, changedFields: [], attachments }); return; }
     const changedFields = bomFields.filter(field => JSON.stringify(field.value(item)) !== JSON.stringify(field.value(old))).map(field => field.key);
     const changed = changedFields.length > 0 || assetRoles.some(role => attachments[role].changed);

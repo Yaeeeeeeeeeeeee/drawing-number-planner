@@ -1,4 +1,4 @@
-import type { PackagingParameter } from '../../../core/packaging/packaging-types';
+import type { PackagingCatalog, PackagingParameter, PackagingTemplate } from '../../../core/packaging/packaging-types';
 
 export type DimensionAxis = NonNullable<PackagingParameter['axis']>;
 export type MatchingBasis = '0' | '2' | '3';
@@ -24,4 +24,11 @@ export function dimensionLabel(parameters:PackagingParameter[],key:string):strin
   const parameter=parameters.find(p=>p.key===key);
   const axis=parameter&&resolveParameterAxis(parameter);
   return axis?axisLabels[axis]:parameter?.label??'历史条件';
+}
+
+export function templateRanges(catalog:PackagingCatalog, template:PackagingTemplate):string[] {
+  const parameters=catalog.configs.find(c=>c.projectItemId===template.projectItemId)?.parameters??[];
+  const rules=catalog.rules.filter(r=>r.templateId===template.id&&r.status==='active');
+  if(!rules.length)return ['无启用尺寸规则'];
+  return rules.map(r=>`${r.name}：${r.conditions.map(c=>`${dimensionLabel(parameters,c.key)} ${{lt:'<',lte:'≤',gt:'>',gte:'≥',eq:'=',between:'介于'}[c.operator]} ${c.value}${c.operator==='between'?` 至 ${c.max}`:''}`).join('；')||'固定模板（无尺寸条件）'}${r.allowLengthWidthSwap?'；允许长宽互换':''}`);
 }

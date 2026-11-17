@@ -22,6 +22,9 @@ export class DictionaryService {
       if (!parent || parent.type !== 'main_category') {
         throw new DictionaryError('INVALID_PARENT', '项目明细必须属于主类别');
       }
+      if (parent.status !== 'active' || parent.deletedAt) {
+        throw new DictionaryError('INVALID_PARENT', '请选择未删除且启用中的主类别后再新增项目明细');
+      }
     }
     try {
       return this.repository.create({ ...input, code: input.code.trim(), name: input.name.trim() });

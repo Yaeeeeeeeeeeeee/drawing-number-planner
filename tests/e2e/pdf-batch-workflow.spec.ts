@@ -1,4 +1,4 @@
-import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
+import {existsSync,mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from 'vite';
@@ -7,6 +7,7 @@ import {startServer} from '../../src/server/start-server';
 import {openDatabase} from '../../src/db/database';
 import {DictionaryService} from '../../src/core/dictionaries/dictionary-service';
 import {ProductService} from '../../src/core/products/product-service';
+if(existsSync('/usr/bin/chromium')) test.use({launchOptions:{executablePath:'/usr/bin/chromium'}});
 
 test('real category scan and501-file selection use two guarded batches without touching files or occupation',async({page})=>{
   test.setTimeout(90_000);
@@ -39,7 +40,7 @@ test('real category scan and501-file selection use two guarded batches without t
       await table.evaluate(element=>{element.scrollTop=element.scrollHeight;element.dispatchEvent(new Event('scroll'));});
       await expect(page.getByText(`已加载 ${count} / 501 条`,{exact:true})).toBeVisible();
     }
-    await page.getByRole('button',{name:'全选',exact:true}).click();await expect(page.getByText('已选 501 条',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'全选已加载文件',exact:true}).click();await expect(page.getByText('已选 501 条',{exact:true})).toBeVisible();
     await page.getByRole('button',{name:'排除所选文件',exact:true}).click();const dialog=page.getByRole('dialog',{name:'PDF 管理预览'});
     await expect(dialog.getByText('预检完成：2 / 2 批',{exact:true})).toBeVisible();expect(preflight.map(ids=>ids.length)).toEqual([500,1]);expect(applied).toHaveLength(0);
     await dialog.getByRole('textbox',{name:'PDF 管理确认短语'}).fill('暂不纳入 PDF');await dialog.getByRole('button',{name:'确认处理',exact:true}).click();

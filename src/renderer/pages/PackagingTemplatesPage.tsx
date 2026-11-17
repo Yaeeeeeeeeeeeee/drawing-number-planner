@@ -6,7 +6,7 @@ import type { PackagingCatalog, PackagingTemplate, TemplateRule } from '../../co
 import { ConfigEditor, RuleEditor, TemplateEditor, type PackagingLookups } from './packaging/PackagingEditors';
 import './packaging/packaging.css';
 import './packaging/packaging-catalog.css';
-import { dimensionLabel } from './packaging/packaging-dimensions';
+import { dimensionLabel, templateRanges } from './packaging/packaging-dimensions';
 
 const emptyCatalog:PackagingCatalog={templates:[],dimensions:[],rules:[],configs:[]};
 const emptyLookups:PackagingLookups={products:[],projects:[],mains:[],brands:[]};
@@ -15,6 +15,7 @@ export function PackagingTemplatesPage({api,active=true}:{api:PlannerApi;active?
   const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState('');const [search,setSearch]=useState('');const [project,setProject]=useState('');const [status,setStatus]=useState('all');
   const [templateEditor,setTemplateEditor]=useState<PackagingTemplate|null|false>(false);const [ruleEditor,setRuleEditor]=useState<TemplateRule|null|false>(false);
   const [feedback,setFeedback]=useState<{id:number;message:string;error?:boolean}|null>(null);const [busy,setBusy]=useState(false);
+  const [fileStatus,setFileStatus]=useState<Record<number,string>>({});
   const [hasData,setHasData]=useState(false);const loadRequest=useRef(0);
   const packaging=api.packaging;
   const [automation,setAutomation]=useState<{available:boolean;message:string;blocked?:boolean}|null>(null);
@@ -26,7 +27,7 @@ export function PackagingTemplatesPage({api,active=true}:{api:PlannerApi;active?
       const results=await Promise.allSettled([packaging.getCatalog(),api.listProducts({status:'all'}),api.listDictionaries('project_item'),api.listDictionaries('main_category'),api.listDictionaries('brand')]);
       if(request!==loadRequest.current)return;
       const [next,products,projects,mains,brands]=results;
-      if(next.status==='fulfilled'){setCatalog(next.value);setHasData(true);}
+      if(next.status==='fulfilled'){setCatalog(next.value);setHasData(true); if(packaging.templateStatus) void Promise.all(next.value.templates.map(async t=>{try {const result=await packaging.templateStatus(t.id);return [t.id,result.available?'可读取':result.message??'原始文件不可读取'] as const;}catch {return [t.id,'状态检查失败'] as const;}})).then(entries=>{if(request===loadRequest.current)setFileStatus(Object.fromEntries(entries));});}
       setLookups(previous=>({products:products.status==='fulfilled'?products.value:previous.products,projects:projects.status==='fulfilled'?projects.value:previous.projects,mains:mains.status==='fulfilled'?mains.value:previous.mains,brands:brands.status==='fulfilled'?brands.value:previous.brands}));
       const failures=results.flatMap((result,index)=>result.status==='rejected'?[`${['模板与规则','产品','项目','类别','品牌'][index]}：${result.reason instanceof Error?result.reason.message:'读取失败'}`]:[]);
       if(failures.length)throw new Error(failures.join('；'));
@@ -43,12 +44,12 @@ export function PackagingTemplatesPage({api,active=true}:{api:PlannerApi;active?
       <div role="tablist" aria-label="包材资料分类" className="pkg-tabs">{[['templates','AIT 模板管理'],['rules','模板匹配规则'],['config','项目生成设置']].map(([key,label])=><button type="button" role="tab" id={`pkg-tab-${key}`} aria-controls={`pkg-panel-${key}`} aria-selected={tab===key} key={key} onClick={()=>setTab(key as typeof tab)}>{label}</button>)}</div>
       <div className="pkg-filters" hidden={tab==='config'}><label>搜索<input value={search} placeholder="按名称搜索" onChange={event=>setSearch(event.target.value)}/></label><label>项目明细<select value={project} onChange={event=>setProject(event.target.value)}><option value="">全部项目</option>{lookups.projects.map(p=><option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</select></label><label>状态<select value={status} onChange={event=>setStatus(event.target.value)}><option value="all">全部状态</option><option value="active">启用</option><option value="inactive">停用</option></select></label><button type="button" disabled={busy} onClick={async()=>{setBusy(true);setFeedback(null);try{await reload();}catch(e){setLoadError(e instanceof Error?e.message:'刷新失败');}finally{setBusy(false);}}}>刷新资料</button></div>
       <section role="tabpanel" id="pkg-panel-templates" aria-labelledby="pkg-tab-templates" hidden={tab!=='templates'}><div className="pkg-section-heading"><h2>AIT 模板管理</h2><button type="button" onClick={()=>setTemplateEditor(null)}>新增 AIT 模板</button></div>
-        {templateEditor!==false&&<TemplateEditor key={templateEditor?.id??'new-template'} api={packaging} initial={templateEditor??undefined} lookups={lookups} onSaved={async()=>{await reload();setTemplateEditor(false);}} onCancel={()=>setTemplateEditor(false)}/>}
+        {templateEditor!==false&&<TemplateEditor key={templateEditor?.id??'new-template'} api={packaging} initial={templateEditor??undefined} catalog={catalog} lookups={lookups} onSaved={async()=>{await reload();setTemplateEditor(false);}} onCancel={()=>setTemplateEditor(false)}/>}
         <DataTable tableId="packaging-templates" items={catalog.templates.filter(visible)} columns={[
           {key:'name',label:'模板 / 原始文件',width:220,render:t=><><strong>{t.name}</strong><small>{t.fileName}</small></>},
           {key:'project',label:'资料类别 / 项目',width:180,render:t=><>{lookups.mains.find(m=>m.id===t.mainCategoryId)?.name}<small>{projectName(t.projectItemId)}</small></>},
           {key:'products',label:'适用范围',width:220,render:t=><>{t.brandIds.length?t.brandIds.map(id=>lookups.brands.find(b=>b.id===id)?.name??`品牌 #${id}`).join('、'):'全部品牌'}<small>{t.productIds.length?t.productIds.map(id=>lookups.products.find(p=>p.id===id)?.model??`产品 #${id}`).join('、'):'全部型号'}</small></>},
-          {key:'mapping',label:'字段映射',width:100,render:t=>`${t.fields.filter(f=>f.sourceKey==='DRAWING_NO').length} 项图号`},{key:'status',label:'状态',width:85,render:t=>t.status==='active'?'启用':'停用'},
+          {key:'range',label:'尺寸范围',width:240,render:t=><>{templateRanges(catalog,t).map((range,index)=><small key={index}>{range}</small>)}</>},{key:'fileStatus',label:'原始文件状态',width:150,render:t=>fileStatus[t.id]??'待检查'},{key:'status',label:'状态',width:85,render:t=>t.status==='active'?'启用':'停用'},
           {key:'actions',label:'操作',width:190,render:t=><div><div className="pkg-actions"><button type="button" disabled={busy} onClick={()=>setTemplateEditor(t)}>编辑 / 替换 AIT</button><button type="button" disabled={busy} onClick={async()=>{setBusy(true);setFeedback(null);try{const result=await packaging.inspectTemplate(t.id);const issues=result.issues??[];const errors=issues.filter(i=>i.severity==='error');setFeedback({id:t.id,error:errors.length>0,message:`${errors.length?'检查未通过':'本机模板检查完成'}。${issues.map(i=>i.message).join('；')} 对象：${result.fields.map(f=>`${f.objectName} ${f.matches} 个${f.editable?'可编辑':'不可编辑'}`).join('、')}。字体仅检查声明及打开后可观察到的字体，仍需人工核对原始字体。`});}catch(e){setFeedback({id:t.id,error:true,message:e instanceof Error?e.message:'检查失败'});}finally{setBusy(false);}}}>本机检查</button></div>{feedback?.id===t.id&&<small role={feedback.error?'alert':'status'} className={feedback.error?'pkg-error':''}>{feedback.message}</small>}</div>},
         ]}/>{catalog.templates.length>0&&!catalog.templates.some(visible)&&<p className="pkg-empty">没有符合筛选条件的 AIT 模板。</p>}{!catalog.templates.length&&<p className="pkg-empty">暂无 AIT 模板。上传 AIT，选择需要填入完整图号的文字对象。</p>}
       </section>

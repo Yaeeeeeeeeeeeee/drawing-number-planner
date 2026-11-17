@@ -7,6 +7,8 @@ export interface DesktopFileResult {
 
 declare global {
   interface PlannerDesktop {
+    selectAitFile?(): Promise<{token:string;fileName:string;displayPath:string}|null>;
+    openPdfInDefaultApp?(pdfFileId: number | DrawingObservedFileRequest): Promise<DesktopFileResult>;
     showFileInFolder(pdfFileId: number | DrawingObservedFileRequest): Promise<DesktopFileResult>;
     showBomAssetInFolder?(assetId: number): Promise<DesktopFileResult>;
     chooseOutboundDirectory?(): Promise<DesktopFileResult & { cancelled?: boolean; path?: string }>;
@@ -69,4 +71,10 @@ export async function openDrawingFileLocation(request: DrawingObservedFileReques
     return { ok: false, error: { code: 'OPEN_FILE_LOCATION_FAILED',
       message: error instanceof Error ? error.message : '打开文件位置失败' } };
   }
+}
+
+export async function openPdfInDefaultApp(id: number | DrawingObservedFileRequest): Promise<DesktopFileResult> {
+  if (!window.plannerDesktop?.openPdfInDefaultApp) return {ok:false,error:{code:'DESKTOP_ONLY',message:'请在 Windows 桌面版使用默认程序打开'}};
+  try { return await window.plannerDesktop.openPdfInDefaultApp(id); }
+  catch(error) { return {ok:false,error:{code:'OPEN_PDF_FAILED',message:error instanceof Error?error.message:'打开 PDF 失败'}}; }
 }

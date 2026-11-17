@@ -160,6 +160,7 @@ export class OutboundPackageService {
     const paths=selected.flatMap(item=>item.pdfFileId!==null&&preview.liveFiles.has(item.pdfFileId)?[preview.liveFiles.get(item.pdfFileId)!.absolutePath]:[]);
     if(new Set(paths.map(path=>process.platform==='win32'?path.toLowerCase():path)).size!==paths.length)blockingErrors.push({code:'DUPLICATE_ACTUAL_PATH',message:'所选文件索引指向同一实际文件'});
     const warnings=[...(preview.warnings??[])];
+    for (const item of selected) if ((item.sizeBytes ?? 0) > OUTBOUND_ZIP_LIMIT_BYTES) warnings.push(`${item.fileName} 超过 50MB，需独立传输，不纳入 ZIP`);
     const skipped=preview.items.filter(item=>!item.selectable&&(item.pdfFileId===null||!ids.has(item.pdfFileId)));
     if(skipped.length)warnings.push(`${skipped.length} 个未选项目存在缺失或待确认事项，请核对是否遗漏`);
     return {previewToken:input.previewToken,packageName:preview.packageName,selectedCount:ids.size,normalCount:selected.filter(item=>item.selectable).length,
@@ -205,7 +206,12 @@ export class OutboundPackageService {
     }
     const entries = selected.map((item) => ({ sourcePath: preview.liveFiles.get(item.pdfFileId!)!.absolutePath,
       archiveName: item.fileName!, item, sizeBytes: statSync(preview.liveFiles.get(item.pdfFileId!)!.absolutePath).size }));
-    const groups = partitionOutboundFiles(entries);
+    const independent = entries.filter(entry => entry.sizeBytes > OUTBOUND_ZIP_LIMIT_BYTES);
+    const included = entries.filter(entry => entry.sizeBytes <= OUTBOUND_ZIP_LIMIT_BYTES);
+    if (!included.length) throw new OutboundPackageError('FILE_TOO_LARGE', '所选文件均超过50MB，需独立传输；没有可生成 ZIP 的文件。');
+    const independentFiles = independent.map(({item,sizeBytes}) => ({pdfFileId:item.pdfFileId!,fileName:item.fileName!,relativePath:item.relativePath!,contentSha256:item.contentSha256 ?? null,sizeBytes,reason:'原始 PDF 超过50MB，需独立传输'}));
+    const excludedFiles = preview.items.filter(item => item.pdfFileId === null || !selectedIds.has(item.pdfFileId)).map(item => ({pdfFileId:item.pdfFileId,fileName:item.fileName,reason:item.selectable ? '未选择' : (item.detail ?? '不可选择')}));
+    const groups = partitionOutboundFiles(included);
     const prepareParts = () => groups.map((group, index) => {
       const zipRelativePath = `${preview.packageName}${groups.length > 1 ? `-${index + 1}` : ''}.zip`;
       const finalPath = resolveWorkspacePath(outputRoot, zipRelativePath, { requireExistingParent: true });
@@ -274,13 +280,15 @@ export class OutboundPackageService {
         const indexed = preview.liveFiles.get(item.pdfFileId!)!.indexed;
         return { ...item, partNumber: part.partNumber, drawingId: indexed.drawingId, historicalDrawingId: indexed.historicalDrawingId };
       }));
+      const independentSnapshots = independent.map(({item}) => { const indexed = preview.liveFiles.get(item.pdfFileId!)!.indexed; return {...item, sizeBytes: statSync(preview.liveFiles.get(item.pdfFileId!)!.absolutePath).size, disposition:'independent', drawingId:indexed.drawingId, historicalDrawingId:indexed.historicalDrawingId, partNumber:1}; });
+      const allSnapshots = [...snapshots.map(item => ({...item, disposition:'included'})), ...independentSnapshots];
       const product = (preview.appearanceFacts as { product?: { id: number; brand: string; model: string; productCategory: string } } | undefined)?.product ?? this.repository.getProduct(input.productId)!;
       const mailFacts: NonNullable<CreatedOutboundPackage['mailFacts']> = {
         product: {id:product.id,brandName:product.brand,model:product.model,productCategory:product.productCategory},
         batchName: (preview.appearanceFacts as { batch?: { name: string } } | undefined)?.batch?.name
           ?? snapshots[0]?.sourceBatchName ?? '',
         materialType: input.materialType, packageMode: input.packageMode, createdAt,
-        items: snapshots.map(item => {
+        items: allSnapshots.map(item => {
           const parts = item.fullCode ? parseDrawingCode(item.fullCode) : null;
           const main = parts ? this.db.prepare("select name from dictionary_items where type='main_category' and code=? and parent_id is null").get(parts.mainCategoryCode) as {name:string}|undefined : undefined;
           return {pdfFileId:item.pdfFileId!,projectItemName:item.projectItemName,mainCategoryName:main?.name??'未识别',
@@ -289,13 +297,13 @@ export class OutboundPackageService {
       };
       const result = this.db.transaction(() => { const saved = this.repository.saveCompleted({ productId: input.productId, materialType: input.materialType,
         packageMode: input.packageMode, selectedMaterialBatchId: input.selectedMaterialBatchId,
-        workflowVersion:input.workflowVersion, appearanceFacts:preview.appearanceFacts, packageName: preview.packageName, zipRelativePath: parts[0].zipRelativePath, createdAt,
+        workflowVersion:input.workflowVersion, appearanceFacts:{...preview.appearanceFacts as object, independentFiles, excludedFiles}, packageName: preview.packageName, zipRelativePath: parts[0].zipRelativePath, createdAt,
         parts: parts.map(({ partNumber, zipRelativePath, sizeBytes }) => ({ partNumber, zipRelativePath, sizeBytes })), items: snapshots });
       if(input.workflowVersion===2){
         const partFacts=parts.map(part=>({partNumber:part.partNumber,absolutePath:part.finalPath,zipRelativePath:part.zipRelativePath,sizeBytes:part.sizeBytes,contentSha256:createHash('sha256').update(readFileSync(part.finalPath)).digest('hex'),fileCount:part.group.length,files:part.group.map(({item})=>({pdfFileId:item.pdfFileId!,fileName:item.fileName!,contentSha256:item.contentSha256!}))}));
-        this.db.prepare('insert into outbound_v2_snapshots(package_id,context_json,files_json,parts_json) values(?,?,?,?)').run(saved.id,JSON.stringify({...preview.appearanceFacts as object,request:input,createdAt}),JSON.stringify(snapshots),JSON.stringify(partFacts));
-        return {...saved,parts:partFacts,mailFacts};
-      }return {...saved,mailFacts};}).immediate();
+        this.db.prepare('insert into outbound_v2_snapshots(package_id,context_json,files_json,parts_json) values(?,?,?,?)').run(saved.id,JSON.stringify({...preview.appearanceFacts as object,request:input,createdAt,independentFiles,excludedFiles}),JSON.stringify(allSnapshots),JSON.stringify(partFacts));
+        return {...saved,fileCount:allSnapshots.length,parts:partFacts,mailFacts,independentFiles,excludedFiles};
+      }return {...saved,fileCount:allSnapshots.length,mailFacts,independentFiles,excludedFiles};}).immediate();
       this.tokens.delete(input.previewToken);
       return result;
     } catch (error) {
@@ -307,6 +315,37 @@ export class OutboundPackageService {
     } finally {
       for (const part of parts) if (part.claimed) this.safeRemoveClaim(part.claimPath);
     }
+  }
+
+  private validDraftContext(packageId: number, value: unknown): boolean {
+    const row = this.db.prepare("select product_id as productId, selected_material_batch_id as batchId, created_at as createdAt from outbound_packages where id=? and status='completed'").get(packageId) as {productId:number;batchId:number;createdAt:string}|undefined;
+    const context = value as {packageId?:number;product?:{id?:number};selectedMaterialBatchId?:number;createdAt?:string;items?:Array<{pdfFileId?:number}>}|null;
+    if (!row || context?.packageId !== packageId || context.product?.id !== row.productId || context.selectedMaterialBatchId !== row.batchId || context.createdAt !== row.createdAt || !Array.isArray(context.items)) return false;
+    const files = this.repository.historyDetail(packageId)?.files as Array<{pdfFileId?:number;pdf_file_id?:number}> | undefined;
+    if (!files) return false;
+    const expected = files.map(file => file.pdfFileId ?? file.pdf_file_id).sort((a,b) => Number(a)-Number(b));
+    const actual = context.items.map(item => item.pdfFileId).sort((a,b) => Number(a)-Number(b));
+    return expected.length === actual.length && expected.every((id,index) => id === actual[index]);
+  }
+
+  saveEmailDraft(draft: {packageId:number;context:unknown;to:string;cc:string;subject:string;body:string}) {
+    if (!draft.subject.trim() || !draft.body.trim()) throw new OutboundPackageError('INVALID_SELECTION', '请填写主题和正文后保存草稿。');
+    if (!this.validDraftContext(draft.packageId, draft.context)) throw new OutboundPackageError('INVALID_SELECTION', '草稿与外发任务的产品、批次、文件或时间不一致，请重新核对。');
+    const savedAt = this.now().toISOString();
+    // Existing recipients JSON is an array; this private envelope retains the immutable task context alongside the editable address.
+    this.db.prepare(`insert into outbound_email_drafts(package_id,recipients_json,cc_json,subject,body,created_at,updated_at) values(?,?,?,?,?,?,?)`)
+      .run(draft.packageId, JSON.stringify([{address:draft.to, context:draft.context}]), JSON.stringify([draft.cc]), draft.subject, draft.body, savedAt, savedAt);
+    return {...draft,savedAt};
+  }
+
+  latestEmailDraft() {
+    const rows = this.db.prepare('select package_id as packageId, recipients_json as recipients, cc_json as cc, subject, body, updated_at as savedAt from outbound_email_drafts order by id desc').all() as Array<{packageId:number;recipients:string;cc:string;subject:string;body:string;savedAt:string}>;
+    for (const row of rows) {
+      const recipients = JSON.parse(row.recipients); const cc = JSON.parse(row.cc);
+      if (recipients[0]?.context && !this.validDraftContext(row.packageId, recipients[0].context)) throw new OutboundPackageError('INVALID_SELECTION', '已保存草稿的任务关联无法确认，请核对。');
+      if (recipients[0]?.context) return {packageId:row.packageId,context:recipients[0].context,to:recipients[0].address,cc:cc[0] ?? '',subject:row.subject,body:row.body,savedAt:row.savedAt};
+    }
+    return null;
   }
 
   prepareRegeneration(id:number) {
