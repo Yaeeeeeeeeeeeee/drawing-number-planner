@@ -1,1 +1,15 @@
 .pdf-reader{display:flex;flex-direction:column;min-height:calc(100vh - 80px);background:#e8ebee;color:#25313b}.pdf-reader:fullscreen{height:100vh;background:#e8ebee}.pdf-reader header,.pdf-reader-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px;background:white;border-bottom:1px solid #d3dae0}.pdf-reader header strong{flex:1;overflow-wrap:anywhere}.pdf-reader-toolbar input[type=number]{width:60px}.pdf-reader-toolbar input{max-width:160px}.pdf-reader-body{display:flex;flex:1;min-height:65vh;overflow:hidden}.pdf-reader-body aside{width:130px;overflow:auto;background:#d7dce0}.pdf-reader-body aside button{display:grid;justify-items:center;width:100%;padding:8px}.pdf-reader-body canvas{max-width:none;background:white;box-shadow:0 2px 8px #0003}.pdf-reader-page{flex:1;overflow:auto;text-align:center;padding:20px}.pdf-reader-info{width:230px;background:white;padding:12px;overflow-wrap:anywhere}.pdf-reader-info:not([open]){width:auto}.pdf-reader-info summary{cursor:pointer;writing-mode:horizontal-tb}.pdf-reader [role=alert]{color:#a22;background:#fff1f1;padding:8px}
+.pdf-reader{height:calc(100dvh - 48px);min-height:0;min-width:0;border:1px solid var(--ws-line);border-radius:10px;overflow:hidden;font-size:14px;line-height:1.5}
+.pdf-reader:fullscreen{height:100dvh;border:0;border-radius:0}
+.pdf-reader header,.pdf-reader-toolbar{flex-shrink:0;padding:12px 14px;gap:8px}
+.pdf-reader header strong{min-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.pdf-reader .secondary-button{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:5px 12px;border-radius:6px;font:inherit;font-size:13px;white-space:nowrap}
+.pdf-reader-toolbar label{display:inline-flex;align-items:center;gap:6px;color:var(--ws-muted)}
+.pdf-reader-toolbar input{height:34px;min-height:34px;padding:5px 8px;border-radius:6px}
+.pdf-reader-body{min-height:0;min-width:0}
+.pdf-reader-body aside{flex-shrink:0;padding:6px}
+.pdf-reader-body aside .secondary-button{display:grid;gap:5px;margin-bottom:6px;border:1px solid transparent;border-radius:6px;background:transparent}
+.pdf-reader-body aside .secondary-button[aria-current=page]{border-color:#91a9bc;background:#edf3f8;color:#34566f}
+.pdf-reader-body canvas{display:block;margin-inline:auto}
+.pdf-reader-page{min-width:0;min-height:0}
+.pdf-reader-info{flex-shrink:0;color:var(--ws-muted)}
