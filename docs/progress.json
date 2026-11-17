@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-11-17T10:39:14.704442+08:00",
+  "updatedAt": "2026-11-17T10:51:24.571661+08:00",
   "branch": "codex/v16-corrections-20261111",
-  "lastCommit": "8a2f251",
+  "lastCommit": "d040099",
   "execution": "V1.6本轮44项修正实施中；旧30项完成率仅为历史记录",
-  "current": "Windows44003898163源码编译通过、打包锁文件换行校验失败已修正，准备复跑",
-  "recent": "复现git-show trim与完整锁文件摘要差异：守卫RED→4项GREEN；实际UI保存草稿专项通过，并补充桌面进程重启恢复验收",
+  "current": "用户两项决定已确认并接入；Windows旧筛选验收脚本同步修正",
+  "recent": "Windows44004575899已通过安装/桌面路径/1GB启动，业务检查在旧左筛选选择器超时，未作为通过；QR首面及唯一02优先已获明确答复",
   "next": "固定候选提交并推送独立分支运行Windows安装升级验证；等待两项业务答复，不发布未完成Release",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
@@ -953,9 +953,9 @@
     "schema": 26,
     "productionDatabaseOperations": "none",
     "unresolved": [
-      "QR PDF像素比较页面范围待用户答复",
-      "同图号多正式PDF候选自动完成规则待用户答复",
-      "真实Windows/Adobe验收尚未完成"
+      "QR第一页像素比较正在实施",
+      "多候选唯一02优先正在实施",
+      "真实Adobe与用户现场仍未验证"
     ],
     "unit": "240 files / 2075 passed",
     "typecheck": "passed",
@@ -963,13 +963,12 @@
     "candidateVersion": "1.6.2",
     "browser": "25 passed",
     "windows": {
-      "run": 44003898163,
-      "status": "failed-before-installer",
-      "cause": "git-show trim omitted final LF in approved lock digest; fixed with failing regression",
-      "applicationSourceBuild": "passed",
-      "installedAcceptance": "not run"
+      "run": 44004575899,
+      "status": "failed-native-verifier-old-filter-selector",
+      "buildInstallerDesktopLargeDb": "passed",
+      "installedBusinessAcceptance": "incomplete"
     },
-    "candidateCommit": "8a2f25142381cd3398f145c74edbc77c7fe9ca99",
+    "candidateCommit": "d04009957929b41c9671bf35cdea5da1537cd810",
     "readerVisual": "actual screenshot reviewed; impacted3 browser tests and types passed"
   },
   "taskLog": [

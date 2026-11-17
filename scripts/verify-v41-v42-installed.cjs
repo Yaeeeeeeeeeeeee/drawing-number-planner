@@ -86,11 +86,11 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   await go(page, 'PDF 文件中心');
   await scan();
   const initialCatalog = await showCatalog();
-  const fileFilters = initialCatalog.locator('.pdf-nav-filters');
-  if (await fileFilters.getAttribute('open') === null) await fileFilters.locator('summary').click();
-  await initialCatalog.getByRole('textbox', { name: '文件关键词', exact: true }).fill('');
-  for (const [label, value] of [['匹配状态', ''], ['转曲类型', ''], ['存在状态', 'all'], ['纳入范围', 'included']]) await initialCatalog.getByRole('combobox', { name: label, exact: true }).selectOption(value);
-  await page.getByRole('button', { name: '筛选 PDF', exact: true }).click();
+  await page.getByRole('button',{name:'筛选',exact:true}).click();
+  const fileFilters = page.getByRole('complementary',{name:'PDF 筛选',exact:true});
+  await fileFilters.getByRole('textbox', { name: '文件关键词', exact: true }).fill('');
+  for (const [label, value] of [['匹配状态', ''], ['转曲类型', ''], ['存在状态', 'all'], ['纳入范围', 'included']]) await fileFilters.getByRole('combobox', { name: label, exact: true }).selectOption(value);
+  await fileFilters.getByRole('button',{name:'关闭',exact:true}).click();
   await initialCatalog.getByRole('button', { name: '全部文件', exact: true }).click();
   let batches = items(await get('/api/material-batches'));
   const protectedBatch = batches.find(batch => batch.relativePath.includes('01.V42保护批次'));
@@ -100,10 +100,11 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   assert.ok(historical && historical.origin === 'historical');
 
   // Six actions, two groups, one row; only the toolbar scrolls at the narrow viewport.
+  await page.getByRole('button',{name:'全选已加载文件',exact:true}).click();
   const toolbar = page.getByRole('region', { name: 'PDF 索引管理', exact: true });
   assert.deepEqual(await toolbar.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['全选', '取消选择', '人工归纳', '排除所选文件', '恢复所选文件', '移除文件记录']);
   assert.ok(await toolbar.getByRole('button').evaluateAll(buttons => buttons.every(button => !button.textContent.trim() && button.title === button.getAttribute('aria-label'))));
-  assert.equal(await toolbar.getByRole('group').count(), 2);
+  assert.deepEqual(await toolbar.getByRole('group').evaluateAll(groups=>groups.map(group=>group.querySelectorAll('button').length).filter(count=>count>0)),[3,3]);
   assert.equal(await page.getByRole('button', { name: '恢复默认表格布局', exact: true }).count(), 1);
   const toolbarGeometry = [];
   for (const width of [1920, 720]) {
@@ -181,7 +182,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   await page.waitForFunction(id => document.querySelector(`.pdf-nav-product[data-product-id="${id}"] button[data-navigation-select]`)?.getAttribute('aria-current') === 'page', product.id);
   assert.ok(fs.existsSync(heldDisposable) && fs.existsSync(path.dirname(disposablePdf)));
   fs.renameSync(heldDisposable,disposablePdf);
-  await page.waitForFunction(() => [...document.querySelectorAll('.files-management-toolbar button')].find(button => button.getAttribute('aria-label') === '全选')?.disabled === false);
+  await page.getByRole('button',{name:'全选已加载文件',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'全选已加载文件',exact:true}).isEnabled(),true);
   await scan();
   batches = items(await get('/api/material-batches'));
   assert.ok(batches.some(batch => batch.relativePath === emptyBatch.relativePath), 'Externally restored fixture PDF must be rediscovered in the allowed scan scope');

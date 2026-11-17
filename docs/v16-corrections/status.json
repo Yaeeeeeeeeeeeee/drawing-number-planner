@@ -166,11 +166,11 @@
       "id": "AIT-PROJECT-001",
       "module": "包材模板",
       "title": "每项目独立配置AIT/现成/人工",
-      "decision": "已确认",
+      "decision": "已确认；多候选优先唯一02（2026-11-17）",
       "implementation": "existing模式和唯一正式索引自动确认已实施",
       "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
       "tests": "任务、迁移及保护专项；PHASE3_PLANNING_AIT.md",
-      "remaining": "多02/03候选完成策略待用户答复"
+      "remaining": "唯一02优先策略接入/测试中；Windows"
     },
     {
       "id": "AIT-MATCH-001",
@@ -356,11 +356,11 @@
       "id": "QR-001",
       "module": "二维码",
       "title": "手动上传、启用、产品上下文、像素比较",
-      "decision": "已确认",
+      "decision": "已确认；PDF只比第一页（2026-11-17）",
       "implementation": "新增未启用/手动关联/无QR产品上下文已修复",
       "evidence": "src/core/qr/；src/renderer/pages/QrCodesPage.tsx",
       "tests": "QR5文件65项，旧URL/状态/PDF保持",
-      "remaining": "QR PDF像素比较页面范围待答复；Windows"
+      "remaining": "第一页解码像素比较接入/测试中；Windows"
     },
     {
       "id": "QR-RECIPE-001",
@@ -443,7 +443,7 @@
       "remaining": "Windows；不新增完整备份中心"
     }
   ],
-  "updatedAt": "2026-11-17T10:29:47.025299+08:00",
+  "updatedAt": "2026-11-17T10:51:24.573364+08:00",
   "currentVerification": "完整240文件2075项、Chromium25项、类型与1.6.2构建通过；Windows待运行",
   "candidateVersion": "1.6.2 / Schema26"
 }
