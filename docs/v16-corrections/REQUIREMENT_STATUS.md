@@ -1,8 +1,8 @@
 # V1.6 本轮需求状态
 
-基线：27c45a0 / v1.6.1 / Schema25。来源：[原始任务书](../requirements/v16-corrections-20261111.md)。候选：1.6.2 / Schema26。
+基线：27c45a0 / v1.6.1 / Schema25。候选：1.6.2 / Schema26。来源：[原始任务书](../requirements/v16-corrections-20261111.md)，[2026-11-17补充决定](DECISIONS_20261117.md)。
 
-完整240文件2075项、Chromium25项、类型与构建通过。专项用隔离数据，尚无本轮Windows/Adobe验收；决策、实现、测试、剩余分别记录，不以测试数量宣称44项用户验收全部完成。
+含两项新决定：完整241文件2100项、Chromium26项通过；补目录分组后51项/真实4PDF通过，最终整套复跑中；Windows待完成。全部使用隔离数据；决策、实现、测试和剩余分别记录，不能把自动化通过说成用户验收通过。
 
 | 需求 | 内容 | 决策 | 实现 | 代码依据 | 测试证据 | 剩余/限制 |
 |---|---|---|---|---|---|---|
@@ -22,7 +22,7 @@
 | PLAN-CHECK-001 | 查重/占号/生成依赖保护 | 已确认 | 已有查重与正式占号依赖保护，复用 | src/core/planning/；src/renderer/pages/PlanningPage.tsx | 规划服务/API/页面专项 | 最终Windows |
 | AIT-STRUCT-001 | AIT管理/匹配/项目设置职责分离 | 已确认 | 现有管理/规则/项目职责复用，范围直接编辑已补齐 | src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx | AIT目录原子保存及组件专项 | 真实Windows/Adobe |
 | AIT-FILE-001 | 直接引用AIT原路径 | 已确认 | 原路径选择/重新定位/队列哈希保护已实施 | src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx | 原路径67项，队列回归39项（交叉）；独立复核 | 真实Windows/Adobe验证 |
-| AIT-PROJECT-001 | 每项目独立配置AIT/现成/人工 | 已确认 | existing模式和唯一正式索引自动确认已实施 | src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx | 任务、迁移及保护专项；PHASE3_PLANNING_AIT.md | 多02/03候选完成策略待用户答复 |
+| AIT-PROJECT-001 | 每项目独立配置AIT/现成/人工 | 已确认；多候选优先唯一02（2026-11-17） | AIT/现成/人工及多候选唯一02优先已实现 | src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx | 任务与监听2文件71项、整合2100/26；DECISIONS_20261117.md | 本轮新Windows及用户现场 |
 | AIT-MATCH-001 | 品牌/尺寸自动匹配及冲突处理 | 已确认 | 完全等尺寸优先及冲突来源保护已实施 | src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx | 匹配与任务2文件50项；范围原子保存专项 | 最终跨模块/真实模板验收 |
 | AIT-REPLACE-001 | 只替换完整图号文本对象 | 已确认 | 整段相同图号全对象替换与结果校验已实施 | src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx | VM及驱动集成专项；PHASE3_PLANNING_AIT.md | 真实Adobe字体/版式/重开验证 |
 | AIT-OUTPUT-001 | 只生成可编辑PDF、不覆盖 | 已确认 | 仅PDF及已有目标阻止已实施 | src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx | 自动化/目标冲突专项 | 真实可编辑PDF验收 |
@@ -34,14 +34,14 @@
 | TASK-ARCHIVE-001 | 安全归档、部分失败重试 | 已确认 | 已有安全归档/部分失败/保留文件结束，复用 | src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx | 任务服务、P0、归档保护专项 | Windows，保留多候选待确认 |
 | PDF-SCAN-001 | 02/03监听、当前类别扫描 | 已确认 | 现有02/03监听/型号类别全库扫描复用，接入进度 | src/core/files/；src/renderer/pages/FilesPage.tsx | 扫描范围与任务注册专项；PHASE4_PDF_BOM.md | 最终目录/Windows回归 |
 | PDF-PROGRESS-001 | >500分批、真实进度、状态区分 | 已确认 | 三种扫描范围已接任务进度，专项通过 | src/core/files/；src/renderer/pages/FilesPage.tsx | 任务/保护/页面专项，pdf-progress-report.md | 跳过/访问失败文件数不确定时如实未知；最终回归 |
-| PDF-LIST-001 | 筛选、分组、选择和现场保持 | 已确认 | 分组/即时筛选/选择保持已实施，专项通过 | src/core/files/；src/renderer/pages/FilesPage.tsx | 3文件50项、真实3PDF浏览器及501条分批 | 真实大资料库滚动体验及Windows；宽度/滚动/501条流程已在Chromium验证 |
+| PDF-LIST-001 | 筛选、分组、选择和现场保持 | 已确认 | 目录隔离分组/即时筛选/选择保持已实现 | src/core/files/；src/renderer/pages/FilesPage.tsx | 目录分组3文件51项、4份真实PDF浏览器、501条流程及整合26项 | 最终整套复跑与Windows，用户大资料库体验 |
 | PDF-VIEW-001 | 内置只读PDF阅读器 | 已确认 | 只读阅读工作区及资源打包已实施，专项通过 | src/core/files/；src/renderer/pages/FilesPage.tsx | dev/build真实文本PDF浏览器2项，类型/构建及API专项 | Windows默认程序/实际打印、CJK真实文件 |
 | PDF-META-001 | 业务日期、人工归属、索引安全 | 已确认 | 现有业务批次日期/人工归属/安全索引复用 | src/core/files/；src/renderer/pages/FilesPage.tsx | 文件服务与管理专项、501条实际浏览器 | Windows |
 | BOM-EDIT-001 | 保存后重开加载最新数据 | 已确认 | 已有准确ID重开/最新持久资产身份，复用 | src/core/bom/；src/renderer/pages/BomPage.tsx | bom-page重开/存储身份/失败回归；PHASE4_PDF_BOM.md | Windows |
 | BOM-CREATE-001 | 新增入口明显、表单重置 | 已确认 | 已有明显新增/成功重置/失败保留，复用 | src/core/bom/；src/renderer/pages/BomPage.tsx | bom-page专项；PHASE4_PDF_BOM.md | Windows |
 | BOM-QUERY-001 | 查询筛选、历史和附件保护 | 已确认 | 类别列和精确RGBA像素比较已实施，专项通过 | src/renderer/pages/bom/BomQuery.tsx；BomHistoryComparison.tsx；src/renderer/data/image-pixels.ts | 5文件92项；真实PNG相同/alpha/RGB浏览器 | Windows |
 | PRODUCT-001 | 品牌·型号显示和安全停用/删除 | 已确认 | 品牌·型号显示及菜谱上下文修正；安全规则复用 | src/renderer/pages/ProductsPage.tsx | 产品页面及QR专项；PHASE5_PRODUCTS_QR_DICTIONARY.md | Windows |
-| QR-001 | 手动上传、启用、产品上下文、像素比较 | 已确认 | 新增未启用/手动关联/无QR产品上下文已修复 | src/core/qr/；src/renderer/pages/QrCodesPage.tsx | QR5文件65项，旧URL/状态/PDF保持 | QR PDF像素比较页面范围待答复；Windows |
+| QR-001 | 手动上传、启用、产品上下文、像素比较 | 已确认；PDF只比第一页（2026-11-17） | 手动启用/上下文及PDF首页像素比较已实现，专项通过 | src/core/qr/；src/renderer/pages/QrCodesPage.tsx | QR6文件64项、首面真实PDF浏览器、整合2100/26；DECISIONS_20261117.md | 本轮新Windows首页比较及用户现场 |
 | QR-RECIPE-001 | 菜谱按产品类别控制 | 已确认：仅空气炸锅（2026-11-11用户补充） | 新菜谱仅空气炸锅，历史关联可维护已实施 | src/core/qr/qr-applicability.ts；qr-service.ts；qr-manual-service.ts；QrCodesPage.tsx | API/人工预览/广泛旧配置绕过/页面专项65项 | Windows |
 | DICT-001 | 项目明细搜索、父级停用后端校验 | 已确认 | 子项目搜索/停用父级服务拒绝/引用示例已实施 | src/core/dictionaries/dictionary-service.ts；src/renderer/pages/DictionariesPage.tsx | 7文件57项、密度2项、最终页面20项 | Windows |
 | MIG-EMAIL-001 | 邮件模板导入入口和解析保护 | 已确认 | 已有入口与解析复用；原始XLSX再次只读验证 | src/renderer/pages/ImportPage.tsx；src/core/import/ | 原XLSX25候选、2支持/2不支持工作表、无主体厂家、原件SHA不变 | 全套导入事务回归与Windows |

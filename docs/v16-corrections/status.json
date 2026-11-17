@@ -167,10 +167,10 @@
       "module": "包材模板",
       "title": "每项目独立配置AIT/现成/人工",
       "decision": "已确认；多候选优先唯一02（2026-11-17）",
-      "implementation": "existing模式和唯一正式索引自动确认已实施",
+      "implementation": "AIT/现成/人工及多候选唯一02优先已实现",
       "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
-      "tests": "任务、迁移及保护专项；PHASE3_PLANNING_AIT.md",
-      "remaining": "唯一02优先策略接入/测试中；Windows"
+      "tests": "任务与监听2文件71项、整合2100/26；DECISIONS_20261117.md",
+      "remaining": "本轮新Windows及用户现场"
     },
     {
       "id": "AIT-MATCH-001",
@@ -287,10 +287,10 @@
       "module": "PDF中心",
       "title": "筛选、分组、选择和现场保持",
       "decision": "已确认",
-      "implementation": "分组/即时筛选/选择保持已实施，专项通过",
+      "implementation": "目录隔离分组/即时筛选/选择保持已实现",
       "evidence": "src/core/files/；src/renderer/pages/FilesPage.tsx",
-      "tests": "3文件50项、真实3PDF浏览器及501条分批",
-      "remaining": "真实大资料库滚动体验及Windows；宽度/滚动/501条流程已在Chromium验证"
+      "tests": "目录分组3文件51项、4份真实PDF浏览器、501条流程及整合26项",
+      "remaining": "最终整套复跑与Windows，用户大资料库体验"
     },
     {
       "id": "PDF-VIEW-001",
@@ -357,10 +357,10 @@
       "module": "二维码",
       "title": "手动上传、启用、产品上下文、像素比较",
       "decision": "已确认；PDF只比第一页（2026-11-17）",
-      "implementation": "新增未启用/手动关联/无QR产品上下文已修复",
+      "implementation": "手动启用/上下文及PDF首页像素比较已实现，专项通过",
       "evidence": "src/core/qr/；src/renderer/pages/QrCodesPage.tsx",
-      "tests": "QR5文件65项，旧URL/状态/PDF保持",
-      "remaining": "第一页解码像素比较接入/测试中；Windows"
+      "tests": "QR6文件64项、首面真实PDF浏览器、整合2100/26；DECISIONS_20261117.md",
+      "remaining": "本轮新Windows首页比较及用户现场"
     },
     {
       "id": "QR-RECIPE-001",
@@ -443,7 +443,7 @@
       "remaining": "Windows；不新增完整备份中心"
     }
   ],
-  "updatedAt": "2026-11-17T10:51:24.573364+08:00",
-  "currentVerification": "完整240文件2075项、Chromium25项、类型与1.6.2构建通过；Windows待运行",
+  "updatedAt": "2026-11-17T11:17:38.039015+08:00",
+  "currentVerification": "含两项新决定：完整241文件2100项、Chromium26项通过；补目录分组后51项/真实4PDF通过，最终整套复跑中；Windows待完成",
   "candidateVersion": "1.6.2 / Schema26"
 }

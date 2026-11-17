@@ -8,9 +8,10 @@ import { QrManualError, validateQrManualFilename, qrUrlTail } from './qr-manual-
 export interface QrManualSelection { token: string; fileName: string; path: string }
 export interface QrManualInput { token: string; qrCodeId?: number; productId: number; purposeId: number; name: string; targetUrl: string; appearanceVersionId?: number | null }
 export interface QrManualPreview { previewId: string; fileName: string; path: string; tail: string; issues: string[]; revision: string }
+export type QrManualComparisonBytes = {status:'ready';selectedPdfBase64:string;currentPdfBase64:string} | {status:'not-compared'} | {status:'unavailable';message:string};
 interface Fingerprint { path: string; fileName: string; size: number; modified: number; changed: number; device: number; inode: number; hash: string }
 interface Prepared { input: QrManualInput; file: Fingerprint; issues: string[]; revision: string; expires: number }
-function fingerprint(path: string): Fingerprint {
+function readPdf(path: string): {file:Fingerprint;bytes:Buffer} {
   if (lstatSync(path).isSymbolicLink()) throw new QrManualError('UNSAFE_FILE', '不能选择符号链接');
   const canonical = realpathSync(path);
   // Shell opening uses the real filename's extension. A PDF header cannot make
@@ -24,14 +25,15 @@ function fingerprint(path: string): Fingerprint {
     if (realpathSync(canonical)!==canonical || check.ino!==stat.ino || check.dev!==stat.dev) throw new QrManualError('FILE_CHANGED','文件路径在读取期间改变');
     const bytes = readFileSync(fd);
     if (!/^%PDF-[12]\.[0-9]/.test(bytes.subarray(0, 8).toString('ascii'))) throw new QrManualError('INVALID_PDF', '文件内容不是PDF');
-    return { path: canonical, fileName: basename(canonical), size: stat.size, modified: stat.mtimeMs, changed: stat.ctimeMs, device: stat.dev, inode: stat.ino, hash: createHash('sha256').update(bytes).digest('hex') };
+    return {bytes,file:{ path: canonical, fileName: basename(canonical), size: stat.size, modified: stat.mtimeMs, changed: stat.ctimeMs, device: stat.dev, inode: stat.ino, hash: createHash('sha256').update(bytes).digest('hex') }};
   } finally { closeSync(fd); }
 }
+function fingerprint(path:string):Fingerprint { return readPdf(path).file; }
 export class QrManualService {
   private selections = new Map<string, { file: Fingerprint; expires: number }>();
   private previews = new Map<string, Prepared>();
   private repository: QrRepository;
-  constructor(private db: PlannerDatabase) { this.repository = new QrRepository(db); }
+  constructor(private db: PlannerDatabase, private resolveLegacyFile?: (relativePath:string)=>{path:string;mimeType:string}) { this.repository = new QrRepository(db); }
   /** Trusted desktop RPC only. Never expose path registration through HTTP. */
   selectTrustedFile(path: string): QrManualSelection {
     const file = fingerprint(path); const token = randomUUID();
@@ -80,6 +82,31 @@ export class QrManualService {
     const revision = this.revision(input); const previewId = randomUUID();
     this.previews.set(previewId, { input: { ...input }, file: current, issues, revision, expires: Date.now() + 10 * 60_000 });
     return { previewId, fileName: current.fileName, path: current.path, tail: qrUrlTail(input.targetUrl), issues, revision };
+  }
+  /** Private desktop capability: bytes come only from the prepared selection and live current link. No path input. */
+  comparisonBytes(previewId:string):QrManualComparisonBytes {
+    const prepared=this.previews.get(previewId);
+    if(!prepared||prepared.expires<Date.now())throw new QrManualError('PREVIEW_EXPIRED','预检已过期，请重新校验');
+    if(this.revision(prepared.input)!==prepared.revision)throw new QrManualError('RECORD_CHANGED','二维码记录在预检后改变，请重新校验');
+    const selected=readPdf(prepared.file.path);
+    if(JSON.stringify(selected.file)!==JSON.stringify(prepared.file))throw new QrManualError('FILE_CHANGED','文件在预检后改变，请重新选择');
+    const files=prepared.input.qrCodeId?this.repository.get(prepared.input.qrCodeId)!.files:[];
+    if(!files.length)return {status:'not-compared'};
+    if(files.length!==1)return {status:'unavailable',message:'当前关联多个文件，无法确定比较对象'};
+    try {
+      const linked=files[0];let current:{file:Fingerprint;bytes:Buffer};
+      if(linked.externalFileId){
+        const row=this.db.prepare('select absolute_path,content_sha256 from qr_manual_files where id=?').get(linked.externalFileId) as {absolute_path:string;content_sha256:string};
+        current=readPdf(row.absolute_path);
+        if(current.file.hash!==row.content_sha256)throw new QrManualError('FILE_CHANGED','当前关联文件内容已变化，请重新关联');
+      }else{
+        if(!this.resolveLegacyFile)throw new Error('当前关联文件无法读取');
+        const resolved=this.resolveLegacyFile(linked.relativePath);
+        if(resolved.mimeType!=='application/pdf')throw new Error('当前关联文件不是PDF');
+        current=readPdf(resolved.path);
+      }
+      return {status:'ready',selectedPdfBase64:selected.bytes.toString('base64'),currentPdfBase64:current.bytes.toString('base64')};
+    }catch(error){return {status:'unavailable',message:error instanceof Error?error.message:'当前关联文件无法读取'};}
   }
   commit(previewId: string, exception?: { confirmed: boolean; reason: string }) {
     const prepared = this.previews.get(previewId);

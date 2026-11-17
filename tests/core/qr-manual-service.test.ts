@@ -28,6 +28,38 @@ function preview(fileName='ZU70SD-User Manual（c2hg2h8）.pdf') {
 }
 function count(table:string){return (db.prepare(`select count(*) as n from ${table}`).get() as {n:number}).n;}
 describe('manual PDF association persistence',()=>{
+ it('reads comparison bytes only for a live preview and its single current link, preserving all files and history',()=>{
+  const first=preview();manual.commit(first.result.previewId);const original=readFileSync(first.path);
+  const next=preview('ZU70SD-User Manual(c2hg2h8).pdf');
+  const tables=['qr_manual_files','qr_manual_links','qr_manual_audit'].map(table=>db.prepare(`select * from ${table}`).all());
+  const result=manual.comparisonBytes(next.result.previewId);
+  expect(result).toEqual({status:'ready',selectedPdfBase64:original.toString('base64'),currentPdfBase64:original.toString('base64')});
+  expect(readFileSync(first.path)).toEqual(original);expect(readFileSync(next.path)).toEqual(original);
+  expect(['qr_manual_files','qr_manual_links','qr_manual_audit'].map(table=>db.prepare(`select * from ${table}`).all())).toEqual(tables);
+  expect(()=>manual.comparisonBytes('../../../secret')).toThrowError(expect.objectContaining({code:'PREVIEW_EXPIRED'}));
+  new QrService(db).deactivate(codeId);
+  expect(()=>manual.comparisonBytes(next.result.previewId)).toThrowError(expect.objectContaining({code:'RECORD_CHANGED'}));
+ });
+ it('reports no previous association separately from unavailable or changed files and keeps the selection',()=>{
+  const first=preview();expect(manual.comparisonBytes(first.result.previewId)).toEqual({status:'not-compared'});manual.commit(first.result.previewId);
+  const next=preview('ZU70SD-User Manual(c2hg2h8).pdf');writeFileSync(first.path,PDF+'% tampered');
+  expect(manual.comparisonBytes(next.result.previewId)).toMatchObject({status:'unavailable'});
+  rmSync(first.path);expect(()=>manual.comparisonBytes(next.result.previewId)).toThrowError(expect.objectContaining({code:'RECORD_CHANGED'}));
+  const missing=manual.preview({token:next.selected.token,qrCodeId:codeId,productId,purposeId,name:'Original',targetUrl:'https://qrs.ly/c2hg2h8'});expect(manual.comparisonBytes(missing.previewId)).toMatchObject({status:'unavailable'});
+  expect(new QrService(db).get(codeId)).toMatchObject({status:'active',name:'Original',targetUrl:'https://qrs.ly/c2hg2h8'});
+  writeFileSync(next.path,PDF+'% changed selection');expect(()=>manual.comparisonBytes(missing.previewId)).toThrowError(expect.objectContaining({code:'FILE_CHANGED'}));
+  expect(count('qr_manual_links')).toBe(1);
+ });
+ it('compares only the current indexed legacy file through the existing resolver and refuses ambiguous current links',()=>{
+  const legacy=join(dir,'legacy.pdf');writeFileSync(legacy,PDF);
+  db.prepare(`insert into qr_code_files(relative_path,path_key,file_name,mime_type,size_bytes,modified_at,qr_code_id,match_status,first_seen_at,last_seen_at) values('legacy.pdf','legacy.pdf','legacy.pdf','application/pdf',1,'2026-01-01',?,'matched','2026-01-01','2026-01-01')`).run(codeId);
+  const original=db.prepare('select * from qr_code_files').all(),resolved:string[]=[];
+  manual=new QrManualService(db,path=>{resolved.push(path);return {path:legacy,mimeType:'application/pdf'};});
+  const next=preview();expect(manual.comparisonBytes(next.result.previewId)).toMatchObject({status:'ready'});expect(resolved).toEqual(['legacy.pdf']);
+  expect(db.prepare('select * from qr_code_files').all()).toEqual(original);expect(count('qr_manual_links')).toBe(0);expect(count('qr_manual_audit')).toBe(0);
+  db.prepare(`insert into qr_code_files(relative_path,path_key,file_name,mime_type,size_bytes,modified_at,qr_code_id,match_status,first_seen_at,last_seen_at) values('second.pdf','second.pdf','second.pdf','application/pdf',1,'2026-01-01',?,'matched','2026-01-01','2026-01-01')`).run(codeId);
+  const ambiguous=manual.preview({token:next.selected.token,qrCodeId:codeId,productId,purposeId,name:'Original',targetUrl:'https://qrs.ly/c2hg2h8'});expect(manual.comparisonBytes(ambiguous.previewId)).toMatchObject({status:'unavailable'});expect(resolved).toEqual(['legacy.pdf']);
+ });
  it('links a real lowercase Warranty PDF without changing existing QR metadata or disk bytes',()=>{
   db.prepare('update products set model=? where id=?').run('B500',productId);
   const qr=new QrService(db),warranty=qr.listPurposes().items.find(p=>p.englishName==='Warranty')!;

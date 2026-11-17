@@ -1,9 +1,10 @@
 import { notifyPlannerMutation } from './query-cache';
-import type { QrManualInput, QrManualPreview, QrManualSelection } from '../../core/qr/qr-manual-service';
+import type { QrManualInput, QrManualPreview, QrManualSelection, QrManualComparisonBytes } from '../../core/qr/qr-manual-service';
 import type { ProductQrCodeView } from './client';
 export interface QrManualHistory { legacyItems?: Array<{id:number;fileName:string;relativePath:string;mimeType:string;isPresent:number}>; revision: string; items: Array<{id:number;file_id:string;file_name:string;absolute_path:string;linked_at:string;unlinked_at:string|null;exception_reason:string|null}> }
 export interface QrManualApi {
   qrManualPreview?(input: QrManualInput): Promise<QrManualPreview>;
+  qrManualComparison?(previewId:string):Promise<QrManualComparisonBytes>;
   qrManualCommit?(previewId: string, exception?: {confirmed:boolean;reason:string}): Promise<ProductQrCodeView>;
   qrManualHistory?(id: number): Promise<QrManualHistory>;
   qrManualUnlink?(id: number, revision: string): Promise<ProductQrCodeView>;
@@ -19,6 +20,7 @@ export function createQrManualApi(request: <T>(path:string, init?:RequestInit)=>
   }
   return {
     qrManualPreview: input => desktop('preview',input),
+    qrManualComparison: previewId => desktop('comparison',{previewId}),
     qrManualCommit: async (previewId,exception) => { const code=await desktop<ProductQrCodeView>('commit',{previewId,exception});notifyPlannerMutation();return code; },
     qrManualHistory: id => request(`/api/qr-codes/${id}/manual-history`),
     qrManualUnlink: async (id,revision) => {const code=await request<ProductQrCodeView>(`/api/qr-codes/${id}/manual-link`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision})});notifyPlannerMutation();return code;},

@@ -265,6 +265,64 @@ it('accepts the indexed production-change directory as a formal file',async()=>{
  const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode:'existing',parameters:[]});const task=await f.create();const path=join(f.root,task.productDirectory,'03.量产后的变更文件（已量产的产品看最新日期）','2026-01-01',`${f.drawing.fullCode}.pdf`);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,pdf);await f.files.scanProducts([task.productDirectory]);const item=(await f.service.discover(task.id)).items[0];expect(item.state).toBe('completed');expect(item.relativePath?.replaceAll('\\','/')).toContain('/03.量产后的变更文件');
 });
 
+it.each(['manual','existing'] as const)('prefers the unique reliable 02 source over several 03 files for a new %s task without rewriting files or history',async mode=>{
+ const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode,parameters:[]});const task=await f.create();
+ const paths=['02.未转曲源文件/设计稿','03.量产后的变更文件（已量产的产品看最新日期）/2026-01-01','03.量产后的变更文件（已量产的产品看最新日期）/2026-11-17'].map(folder=>join(f.root,task.productDirectory,folder,`${f.drawing.fullCode}.pdf`));
+ for(const [i,path]of paths.entries()){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,pdf.replace('%%EOF',`% retained ${i}\n%%EOF`));}
+ await f.files.scanProducts([task.productDirectory]);
+ const bytes=paths.map(path=>readFileSync(path)),indices=f.db.prepare('select * from pdf_files order by id').all(),drawings=f.db.prepare('select * from drawing_numbers').all(),batches=f.db.prepare('select * from material_batches order by id').all(),history=f.db.prepare('select * from drawing_force_releases').all();
+ for(let refresh=0;refresh<2;refresh++){
+  const discovered=await f.service.discover(task.id);expect(discovered.items[0]).toMatchObject({mode,state:'completed',relativePath:join(task.productDirectory,'02.未转曲源文件','设计稿',`${f.drawing.fullCode}.pdf`)});
+  expect(await f.service.filePath(task.id,discovered.items[0].id)).toBe(paths[0]);
+ }
+ expect((await f.service.archivePreview(task.id)).ready).toBe(true);
+ expect(paths.map(path=>readFileSync(path))).toEqual(bytes);expect(f.db.prepare('select * from pdf_files order by id').all()).toEqual(indices);expect(f.db.prepare('select * from drawing_numbers').all()).toEqual(drawings);expect(f.db.prepare('select * from material_batches order by id').all()).toEqual(batches);expect(f.db.prepare('select * from drawing_force_releases').all()).toEqual(history);expect(f.db.prepare('select * from packaging_archive_journal').all()).toEqual([]);
+});
+
+it.each([0,2])('keeps several reliable 03 files pending when there are %i reliable 02 sources',async sourceCount=>{
+ const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode:'existing',parameters:[]});const task=await f.create();
+ const folders=[...Array.from({length:sourceCount},(_,i)=>`02.未转曲源文件/source${i}`),'03.量产后的变更文件（已量产的产品看最新日期）/2026-01-01','03.量产后的变更文件（已量产的产品看最新日期）/2026-11-17'];
+ const paths=folders.map(folder=>join(f.root,task.productDirectory,folder,`${f.drawing.fullCode}.pdf`));for(const path of paths){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,pdf);}
+ await f.files.scanProducts([task.productDirectory]);const indices=f.db.prepare('select * from pdf_files order by id').all();
+ const item=(await f.service.discover(task.id)).items[0];expect(item.state).toBe('awaiting_upload');expect(item.relativePath).toBeUndefined();expect((await f.service.archivePreview(task.id)).ready).toBe(false);
+ expect(f.db.prepare('select * from pdf_files order by id').all()).toEqual(indices);expect(paths.map(path=>readFileSync(path,'utf8'))).toEqual(paths.map(()=>pdf));
+});
+
+it.each(['ignored','unmatched','wrong drawing','multiple codes','warning','changed hash','missing file','not present'] as const)('excludes an unreliable 02 source (%s) before applying unique-source priority',async unreliable=>{
+ const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode:'existing',parameters:[]});const task=await f.create();
+ const paths=['02.未转曲源文件/reliable','02.未转曲源文件/unreliable','03.量产后的变更文件（已量产的产品看最新日期）/2026-01-01','03.量产后的变更文件（已量产的产品看最新日期）/2026-11-17'].map(folder=>join(task.productDirectory,folder,`${f.drawing.fullCode}.pdf`));
+ for(const path of paths){mkdirSync(dirname(join(f.root,path)),{recursive:true});writeFileSync(join(f.root,path),pdf);}
+ await f.files.scanProducts([task.productDirectory]);const suspect=paths[1];
+ if(unreliable==='ignored')f.db.prepare("update pdf_files set management_state='ignored' where relative_path=?").run(suspect);
+ if(unreliable==='unmatched')f.db.prepare("update pdf_files set match_status='pending',drawing_id=null where relative_path=?").run(suspect);
+ if(unreliable==='wrong drawing'){
+  const color=new DictionaryService(f.db).create({type:'color',code:'1',name:'黑色'}),input={...f.input,rows:[{...f.input.rows[0],colorId:color.id}]},preview=f.plan.preview(input),other=f.plan.reserve({...input,rows:[{...input.rows[0],expectedFullCode:preview.rows[0].fullCode}]})[0];
+  f.db.prepare('update pdf_files set drawing_id=? where relative_path=?').run(other.id,suspect);
+ }
+ if(unreliable==='multiple codes')f.db.prepare('update pdf_files set detected_codes_json=? where relative_path=?').run(JSON.stringify([f.drawing.fullCode,'02.0305.001.0000001']),suspect);
+ if(unreliable==='warning')f.db.prepare("update pdf_files set classification_warning='needs-confirmation' where relative_path=?").run(suspect);
+ if(unreliable==='changed hash')writeFileSync(join(f.root,suspect),pdf.replace('%%EOF','% changed after scan\n%%EOF'));
+ if(unreliable==='missing file')rmSync(join(f.root,suspect));
+ if(unreliable==='not present')f.db.prepare('update pdf_files set is_present=0 where relative_path=?').run(suspect);
+ const item=(await f.service.discover(task.id)).items[0];expect(item.state).toBe('completed');expect(item.relativePath).toBe(paths[0]);
+});
+
+it('never prefers a force-detached 02 source over several reliable 03 files after the code is reused',async()=>{
+ const f=fixture(),original=join(f.root,'冰柜','SKU1-M1','02.未转曲源文件',`${f.drawing.fullCode}.pdf`);mkdirSync(dirname(original),{recursive:true});writeFileSync(original,pdf);await f.files.scanProducts(['冰柜/SKU1-M1']);
+ const release=new DrawingForceReleaseService(f.db),impact=release.preview(f.drawing.id);release.confirm({signedId:f.drawing.id,fingerprint:impact.fingerprint,confirmed:true});
+ const preview=f.plan.preview(f.input),drawing=f.plan.reserve({...f.input,rows:[{...f.input.rows[0],expectedFullCode:preview.rows[0].fullCode}]})[0];expect(drawing.fullCode).toBe(f.drawing.fullCode);
+ f.catalog.saveConfig({projectItemId:f.project.id,mode:'existing',parameters:[]});const task=await f.service.createTask({productId:f.product.id,type:'new',drawings:[{origin:'planned',id:drawing.id}]});
+ for(const date of ['2026-01-01','2026-11-17']){const path=join(f.root,task.productDirectory,'03.量产后的变更文件（已量产的产品看最新日期）',date,`${drawing.fullCode}.pdf`);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,pdf);}
+ await f.files.scanProducts([task.productDirectory]);const indices=f.db.prepare('select * from pdf_files order by id').all(),history=f.db.prepare('select * from drawing_force_releases').all(),isolated=f.db.prepare('select * from drawing_force_release_files').all();
+ const item=(await f.service.discover(task.id)).items[0];expect(item.state).toBe('awaiting_upload');expect(item.relativePath).toBeUndefined();expect(readFileSync(original,'utf8')).toBe(pdf);expect(f.db.prepare('select * from pdf_files order by id').all()).toEqual(indices);expect(f.db.prepare('select * from drawing_force_releases').all()).toEqual(history);expect(f.db.prepare('select * from drawing_force_release_files').all()).toEqual(isolated);
+});
+
+it('preserves legacy none mode when a unique 02 source and several 03 files are indexed',async()=>{
+ const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode:'none',parameters:[]});const task=await f.create();
+ for(const folder of ['02.未转曲源文件','03.量产后的变更文件（已量产的产品看最新日期）/2026-01-01','03.量产后的变更文件（已量产的产品看最新日期）/2026-11-17']){const path=join(f.root,task.productDirectory,folder,`${f.drawing.fullCode}.pdf`);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,pdf);}
+ await f.files.scanProducts([task.productDirectory]);expect((await f.service.discover(task.id)).items[0]).toMatchObject({mode:'none',state:'none'});expect(f.service.store.task(task.id).items[0].relativePath).toBeUndefined();
+});
+
 it('does not choose a conflicting saved dimension source when creating an AIT task',async()=>{
  const f=fixture();f.catalog.saveConfig({projectItemId:f.project.id,mode:'ait',parameters:[{key:'length',label:'长',axis:'length',type:'number',required:true,unit:'mm'}]});
  const dimension={projectItemId:f.project.id,scope:'specific' as const,productIds:[f.product.id],isDefault:true,status:'active' as const};

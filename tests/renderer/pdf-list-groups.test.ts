@@ -11,4 +11,14 @@ describe('PDF list groups',()=>{
   const groups=groupPdfFiles([file(1,{fullCode:null,historicalFullCode:'OLD'}),file(2,{fullCode:'OLD'}),file(3,{fullCode:null}),file(4,{fullCode:null})]);
   expect(groups.map(g=>g.files.map(f=>f.id))).toEqual([[1,2],[3],[4]]);
  });
+ it('keeps02 and03 separate even when a production PDF has no outlined filename marker',()=>{
+  const source='冰柜/SKDZU070JP-ZU70SD/02.未转曲源文件/';
+  const production='冰柜/SKDZU070JP-ZU70SD/03.量产后的变更文件（已量产的产品看最新日期）/';
+  const groups=groupPdfFiles([
+   file(1,{conversionType:'source',relativePath:source+'铭牌.pdf'}),file(2,{conversionType:'source',relativePath:source+'旧铭牌.pdf'}),
+   file(3,{conversionType:'source',relativePath:production+'00.首批大货/铭牌.pdf'}),file(4,{conversionType:'source',relativePath:production+'01.20261117/铭牌.pdf'}),
+   file(5,{conversionType:'outlined',relativePath:production+'01.20261117/铭牌（转曲）.pdf'}),
+  ]);
+  expect(groups.map(g=>g.files.map(f=>f.id))).toEqual([[1,2],[3,4],[5]]);
+ });
 });

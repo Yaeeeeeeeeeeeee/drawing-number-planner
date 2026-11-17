@@ -53,7 +53,8 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   // All-active monitoring may register the historical code before this manual scan.
   const registered=await request.get('/api/drawings?keyword=02.0404.010.0401007');
   expect((await registered.json()).items.filter((row:{origin:string})=>row.origin==='historical')).toHaveLength(1);
-  await expect(page.getByText('1 待确认')).toBeVisible();
+  // A later scoped watcher scan may replace the top summary; verify this exact indexed row.
+  await expect(page.getByRole('row').filter({has:page.getByRole('checkbox',{name:'选择 02.0404.010.0401000-invalid.pdf',exact:true})}).getByRole('cell',{name:'待确认',exact:true})).toBeVisible();
   const pendingResponse = await request.get('/api/files?keyword=02.0404.010.0401000');
   expect((await pendingResponse.json()).items).toEqual([expect.objectContaining({matchStatus:'pending',classificationWarning:expect.stringContaining('invalid-format')})]);
   expect(before.map(({ path, size, mtime }) => ({ path, size: statSync(path).size, mtime: statSync(path).mtimeMs })))

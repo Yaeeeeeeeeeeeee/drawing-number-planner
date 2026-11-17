@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
   selectAitFile() { return ipcRenderer.invoke('planner:select-ait'); },
   qrManualSelectFile() { return ipcRenderer.invoke('planner:qr-manual-select'); },
   qrManualAction(action: unknown, input: unknown) {
-    if (!['preview','commit','history','unlink','open','show'].includes(String(action))) return Promise.reject(new Error('INVALID_QR_MANUAL_ACTION'));
+    if (!['preview','comparison','commit','history','unlink','open','show'].includes(String(action))) return Promise.reject(new Error('INVALID_QR_MANUAL_ACTION'));
     return ipcRenderer.invoke('planner:qr-manual-action', action, input);
   },
   chooseOutboundDirectory() { return ipcRenderer.invoke('planner:choose-outbound-directory'); },

@@ -44,7 +44,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  await go(page,'包材模板');
  const navigation=page.getByRole('navigation',{name:'主导航'}),daily=await navigation.locator('.nav-group').first().getByRole('button').allTextContents(),sources=await navigation.locator('.nav-group').last().getByRole('button').allTextContents();
  assert.equal(daily[daily.indexOf('图号规划 / 更新包材')+1],'制图任务');assert.equal(sources[sources.indexOf('PDF 文件中心')+1],'包材模板');
- assert.deepEqual(await page.getByRole('tab').allTextContents(),['AIT 模板管理','模板匹配规则','项目生成设置']);
+ await expect(page.getByRole('tab')).toHaveText(['AIT 模板管理','模板匹配规则','项目生成设置']);
  assert.equal(await page.getByRole('tab',{name:'尺寸档案',exact:true}).count(),0);assert.equal(await page.getByText('批量创建临时文件夹',{exact:true}).count(),0);
  // Configure the supported 0/2/3D choices through the simplified UI before creating a dimension rule.
  await page.getByRole('tab',{name:'项目生成设置',exact:true}).click();

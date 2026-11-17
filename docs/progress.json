@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-17T10:51:24.571661+08:00",
+  "updatedAt": "2026-11-17T11:17:38.039015+08:00",
   "branch": "codex/v16-corrections-20261111",
-  "lastCommit": "d040099",
+  "lastCommit": "f014f6a",
   "execution": "V1.6本轮44项修正实施中；旧30项完成率仅为历史记录",
-  "current": "用户两项决定已确认并接入；Windows旧筛选验收脚本同步修正",
-  "recent": "Windows44004575899已通过安装/桌面路径/1GB启动，业务检查在旧左筛选选择器超时，未作为通过；QR首面及唯一02优先已获明确答复",
-  "next": "固定候选提交并推送独立分支运行Windows安装升级验证；等待两项业务答复，不发布未完成Release",
+  "current": "两项补充规则已完成并专项/整合通过，最终目录分组补强后复跑；准备新Windows",
+  "recent": "241文件2100项及Chromium26项通过；目录隔离51项和四份真实命名PDF通过，Schema仍26，无生产操作",
+  "next": "固定包含二维码首页和唯一02优先的候选提交，Windows复跑；等最终整套结果后整理安装包/报告",
   "blockers": [
     "当前环境没有安装Adobe Illustrator，也未提供真实AIT；不能宣称真实版式、字体替代和PDF重新编辑验收。",
     "用户本地正式业务库和物理DPI不在开发环境。"
@@ -953,23 +953,25 @@
     "schema": 26,
     "productionDatabaseOperations": "none",
     "unresolved": [
-      "QR第一页像素比较正在实施",
-      "多候选唯一02优先正在实施",
-      "真实Adobe与用户现场仍未验证"
+      "最终整套复跑",
+      "Windows完整安装后业务验收",
+      "真实Adobe与用户现场尚未验证"
     ],
-    "unit": "240 files / 2075 passed",
+    "unit": "241 files / 2100 passed; final rerun after directory grouping in progress",
     "typecheck": "passed",
     "build": "1.6.2 source build passed",
     "candidateVersion": "1.6.2",
-    "browser": "25 passed",
+    "browser": "26 passed; additional4-file directory-group browser passed",
     "windows": {
-      "run": 44004575899,
-      "status": "failed-native-verifier-old-filter-selector",
-      "buildInstallerDesktopLargeDb": "passed",
-      "installedBusinessAcceptance": "incomplete"
+      "run": 44006007207,
+      "status": "failed-native-assertion-before-AIT-tabs-load",
+      "sourceInstallerDesktopLargeDb": "passed",
+      "observedScreenshot": "AIT page and all3 tabs present after immediate assertion",
+      "next": "await actual tab list; rerun newest source"
     },
-    "candidateCommit": "d04009957929b41c9671bf35cdea5da1537cd810",
-    "readerVisual": "actual screenshot reviewed; impacted3 browser tests and types passed"
+    "candidateCommit": "f014f6a88c1713b3cf480b3f06e9b841530dcc62",
+    "readerVisual": "actual screenshot reviewed; impacted3 browser tests and types passed",
+    "decisions": "both answered and implemented"
   },
   "taskLog": [
     {

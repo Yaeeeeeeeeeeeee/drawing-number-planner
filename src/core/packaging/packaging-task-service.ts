@@ -6,7 +6,7 @@ import {DrawingRepository} from '../drawings/drawing-repository.js';
 import type {DrawingRecord} from '../drawings/drawing-types.js';
 import type {FileService} from '../files/file-service.js';
 import {resolveWorkspacePath,toWorkspacePathKey} from '../files/workspace-paths.js';
-import {isMaterialDirectory} from '../files/material-directory-policy.js';
+import {isMaterialDirectory,SOURCE_MATERIAL_DIRECTORY} from '../files/material-directory-policy.js';
 import {resolveCanonicalProductId} from '../products/appearance-identity.js';
 import {PackagingCatalogService} from './packaging-catalog.js';
 import {matchPackagingTemplates,resolvePackagingDimensions} from './packaging-matcher.js';
@@ -69,11 +69,17 @@ export class PackagingTaskService {
  async formalFile(task:PackagingTask,item:PackagingTaskItem){
   this.drawing(item.drawing,task.productId);
   const rows=this.db.prepare(`select relative_path as path,content_sha256 as hash,detected_codes_json as codes,drawing_id as drawingId,historical_drawing_id as historicalId,management_state as management,match_status as status,classification_warning as warning from pdf_files where is_present=1`).all() as Array<{path:string;hash:string;codes:string;drawingId:number|null;historicalId:number|null;management:string;status:string;warning:string|null}>;
-  const candidates=rows.filter(row=>this.isFormalPath(task,row.path)&&(()=>{try{const codes=JSON.parse(row.codes);return Array.isArray(codes)&&codes.includes(item.fullCode);}catch{return false;}})());
-  if(candidates.length!==1)return undefined;
-  const row=candidates[0];let codes:unknown;try{codes=JSON.parse(row.codes);}catch{return undefined;}
-  if(!Array.isArray(codes)||codes.length!==1||row.management!=='included'||row.status!=='matched'||row.warning||(item.drawing.origin==='planned'?row.drawingId!==item.drawing.id||row.historicalId!==null:row.historicalId!==item.drawing.id||row.drawingId!==null)||this.db.prepare('select 1 from drawing_force_release_files where path_key=? and full_code=?').get(toWorkspacePathKey(row.path),item.fullCode))return undefined;
-  try{const fact=await pdfFact(this.taskPath(task.id,row.path));return fact.sha256===row.hash?row:undefined;}catch{return undefined;}
+  const candidates:typeof rows=[];
+  for(const row of rows){
+   if(!this.isFormalPath(task,row.path))continue;
+   let codes:unknown;try{codes=JSON.parse(row.codes);}catch{continue;}
+   if(!Array.isArray(codes)||codes.length!==1||codes[0]!==item.fullCode||row.management!=='included'||row.status!=='matched'||row.warning||(item.drawing.origin==='planned'?row.drawingId!==item.drawing.id||row.historicalId!==null:row.historicalId!==item.drawing.id||row.drawingId!==null)||this.db.prepare('select 1 from drawing_force_release_files where path_key=? and full_code=?').get(toWorkspacePathKey(row.path),item.fullCode))continue;
+   try{const fact=await pdfFact(this.taskPath(task.id,row.path));if(fact.sha256===row.hash)candidates.push(row);}catch{continue;}
+  }
+  if(candidates.length===1)return candidates[0];
+  const sourcePrefix=`${task.productDirectory.replaceAll('\\','/')}/${SOURCE_MATERIAL_DIRECTORY}/`;
+  const sources=candidates.filter(row=>row.path.replaceAll('\\','/').startsWith(sourcePrefix));
+  return sources.length===1?sources[0]:undefined;
  }
  private async refreshFormalFiles(task:PackagingTask){if(task.type!=='new')return;for(const item of task.items){
   if(!['manual','existing'].includes(item.mode)||item.relativePath&&!this.isFormalPath(task,item.relativePath))continue;

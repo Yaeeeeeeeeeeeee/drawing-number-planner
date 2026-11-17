@@ -12,8 +12,12 @@ export function createQrManualHandlers(deps: Dependencies) {
     async select(event?: unknown) { if(deps.isTrustedEvent&&!deps.isTrustedEvent(event))throw new Error('UNTRUSTED_QR_SENDER'); const path = await deps.choosePdf(); return path ? deps.execute('select', { path }) : null; },
     async action(_event: unknown, action: unknown, input: unknown) {
       if(deps.isTrustedEvent&&!deps.isTrustedEvent(_event))throw new Error('UNTRUSTED_QR_SENDER');
-      if (!['preview','commit','history','unlink','open','show'].includes(String(action)) || !input || typeof input !== 'object') throw new Error('INVALID_QR_MANUAL_ACTION');
+      if (!['preview','comparison','commit','history','unlink','open','show'].includes(String(action)) || !input || typeof input !== 'object') throw new Error('INVALID_QR_MANUAL_ACTION');
       const data = input as Record<string, unknown>;
+      if(action==='comparison'){
+        if(Object.keys(data).length!==1||typeof data.previewId!=='string'||!/^[0-9a-f-]{36}$/i.test(data.previewId))throw new Error('INVALID_QR_PREVIEW');
+        return deps.execute('comparison',{previewId:data.previewId});
+      }
       if (action === 'open' || action === 'show') {
         if (typeof data.fileId !== 'string' || !/^[0-9a-f-]{36}$/i.test(data.fileId)) throw new Error('INVALID_QR_FILE_ID');
         const file = await deps.execute('resolve', { fileId: data.fileId }) as { path: string };

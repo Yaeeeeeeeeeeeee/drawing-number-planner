@@ -176,7 +176,23 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerDictionaryRoutes(server, new DictionaryService(database));
     registerProductRoutes(server, new ProductService(database), new ProductCleanupService(database,
       () => tasks.list().some((task) => ['queued', 'running', 'finalizing'].includes(task.status))));
-    const qrManual = new QrManualService(database);
+    const resolveQrFilePath = (relativePath:string) => {
+      const indexed = qrRepository.getIndexedQrFile(relativePath);
+      if (!indexed) throw qrFileError('QR_FILE_NOT_FOUND', '未找到已关联的二维码文件');
+      if (!indexed.isPresent) throw qrFileError('QR_FILE_MISSING', '二维码文件已缺失，请重新扫描资料库');
+      const workspaceRoot = workspaceSettings.get().workspaceRoot;
+      if (!workspaceRoot) throw qrFileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
+      const resolved = resolveWorkspacePath(workspaceRoot, indexed.relativePath, { requireExistingParent: true });
+      try {
+        const canonical = realpathSync.native(resolved);
+        if (!statSync(canonical).isFile()) throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
+        return { path: canonical, mimeType: indexed.mimeType };
+      } catch (error) {
+        if (error instanceof QrFileResolverError) throw error;
+        throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
+      }
+    };
+    const qrManual = new QrManualService(database,resolveQrFilePath);
     registerAppearanceRoutes(server, new AppearanceService(database));
     registerQrCodeRoutes(server, new QrService(database), qrManual);
     const drawingQueryService = new DrawingQueryService(database, () => workspaceSettings.get().workspaceRoot);
@@ -246,6 +262,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
         switch (action) {
           case 'select': if (typeof data.path !== 'string') throw new Error('INVALID_QR_FILE'); return qrManual.selectTrustedFile(data.path);
           case 'preview': return qrManual.preview(data as unknown as QrManualInput);
+          case 'comparison': if(Object.keys(data).length!==1||typeof data.previewId!=='string')throw new Error('INVALID_QR_PREVIEW'); return qrManual.comparisonBytes(data.previewId);
           case 'commit': if (typeof data.previewId !== 'string') throw new Error('INVALID_QR_PREVIEW'); return qrManual.commit(data.previewId, data.exception as {confirmed:boolean;reason:string}|undefined);
           case 'history': return qrManual.history(Number(data.id));
           case 'unlink': return qrManual.unlink(Number(data.id), String(data.revision));
@@ -274,22 +291,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
           throw qrFileError('BOM_ASSET_UNAVAILABLE', 'BOM 附件当前不可用');
         }
       },
-      resolveQrFilePath: (relativePath) => {
-        const indexed = qrRepository.getIndexedQrFile(relativePath);
-        if (!indexed) throw qrFileError('QR_FILE_NOT_FOUND', '未找到已关联的二维码文件');
-        if (!indexed.isPresent) throw qrFileError('QR_FILE_MISSING', '二维码文件已缺失，请重新扫描资料库');
-        const workspaceRoot = workspaceSettings.get().workspaceRoot;
-        if (!workspaceRoot) throw qrFileError('WORKSPACE_NOT_CONFIGURED', '请先设置资料根目录');
-        const resolved = resolveWorkspacePath(workspaceRoot, indexed.relativePath, { requireExistingParent: true });
-        try {
-          const canonical = realpathSync.native(resolved);
-          if (!statSync(canonical).isFile()) throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
-          return { path: canonical, mimeType: indexed.mimeType };
-        } catch (error) {
-          if (error instanceof QrFileResolverError) throw error;
-          throw qrFileError('QR_FILE_UNAVAILABLE', '二维码文件当前不可用，请重新扫描资料库');
-        }
-      },
+      resolveQrFilePath,
       setOutboundOutputRoot: (path) => workspaceSettings.setOutboundOutputRoot(path),
       resolveOutboundPackagePath: (id, partNumber) => {
         if (!Number.isInteger(id) || Number(id) <= 0) throw new Error('外发压缩包编号无效');

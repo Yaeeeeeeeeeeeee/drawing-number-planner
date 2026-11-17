@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import {StrictMode} from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QrCodesPage } from '../../src/renderer/pages/QrCodesPage';
+vi.mock('../../src/renderer/data/qr-first-page-pixels',()=>({compareQrFirstPagePixels:vi.fn().mockResolvedValue('equal')}));
 const purpose={id:1,key:'user_manual',englishName:'User Manual',displayName:'说明书',status:'active',defaultForAll:true,productCategories:[]};
 const warranty={...purpose,id:2,key:'warranty',englishName:'Warranty',displayName:'售后'};
 const product={id:3,sku:'SKU-Q1',model:'ZU70SD',productCategory:'冰柜',status:'active'};
@@ -11,6 +12,19 @@ function desktop(){const result={token:'picker-token',fileName:manual.files[0].f
 async function expand(){fireEvent.click(await screen.findByRole('button',{name:'展开 ZU70SD 的二维码用途'}));return document.querySelector('.qr-manual-subtable') as HTMLElement;}
 afterEach(()=>{Object.defineProperty(window,'plannerDesktop',{configurable:true,value:undefined});localStorage.clear();});
 describe('manual QR page',()=>{
+ it('shows first-page equality as advice and never skips confirmation or enables the record',async()=>{
+  desktop();const api={...apiFor(),qrManualComparison:vi.fn().mockResolvedValue({status:'ready',selectedPdfBase64:'selected',currentPdfBase64:'current'})};render(<QrCodesPage api={api as never}/>);
+  const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));
+  expect(await within(dialog).findByText('首页像素相同')).toBeVisible();expect(within(dialog).getByText(/仅比较PDF首页；后续页面不参与/)).toBeVisible();expect(api.qrManualCommit).not.toHaveBeenCalled();expect(api.activateQrCode).not.toHaveBeenCalled();expect(within(dialog).getByRole('button',{name:'确认关联'})).toBeEnabled();
+ });
+ it('discards validation and comparison for metadata changed while the preview is pending',async()=>{
+  desktop();const api={...apiFor([]),qrManualComparison:vi.fn()};const preview=await api.qrManualPreview();let finish!:(value:typeof preview)=>void;api.qrManualPreview.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));render(<QrCodesPage api={api as never}/>);
+  const sub=await expand();fireEvent.click(within(sub).getAllByRole('button',{name:'新增用途'})[0]);const dialog=screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('手动二维码网址'),{target:{value:'https://qrs.ly/c2hg2h8'}});fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));
+  await waitFor(()=>expect(finish).toBeDefined());fireEvent.change(within(dialog).getByLabelText('手动二维码网址'),{target:{value:'https://qrs.ly/changed'}});await act(async()=>finish(preview));
+  expect(within(dialog).getByRole('button',{name:'确认关联'})).toBeDisabled();expect(api.qrManualComparison).not.toHaveBeenCalled();expect(within(dialog).getByLabelText('手动二维码网址')).toHaveValue('https://qrs.ly/changed');expect(within(dialog).getByText(manual.files[0].fileName)).toBeVisible();
+ });
  it('finds unconfigured products through filters and offers only applicable purposes',async()=>{
   const recipe={...purpose,id:3,key:'recipe',englishName:'Recipe',displayName:'菜谱',defaultForAll:true,productCategories:['空气炸锅','冰柜']};
   desktop();const api=apiFor([]);api.listQrPurposes.mockResolvedValue({items:[recipe,purpose,warranty]});render(<QrCodesPage api={api as never}/>);
@@ -92,7 +106,7 @@ describe('manual QR page',()=>{
   const bridge=desktop(),api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await waitFor(()=>expect(bridge.qrManualSelectFile).toHaveBeenCalledOnce());expect(await within(dialog).findByText(manual.files[0].fileName)).toBeVisible();fireEvent.click(within(dialog).getByRole('button',{name:'取消'}));expect(api.qrManualCommit).not.toHaveBeenCalled();expect(api.qrManualPreview).not.toHaveBeenCalled();expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
  });
  it('requires preview and sends native capability instead of renderer path to commit',async()=>{
-  desktop();const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');expect(within(dialog).getByRole('button',{name:'确认关联'})).toBeDisabled();fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));await within(dialog).findByText('型号、用途、网址尾码与PDF内容校验通过。');expect(api.qrManualPreview).toHaveBeenCalledWith(expect.objectContaining({token:'picker-token',qrCodeId:11,name:manual.name,targetUrl:manual.targetUrl}));expect(api.qrManualPreview.mock.calls[0][0]).not.toHaveProperty('path');fireEvent.click(within(dialog).getByRole('button',{name:'确认关联'}));await waitFor(()=>expect(api.qrManualCommit).toHaveBeenCalledWith('preview',undefined));
+  desktop();const api=apiFor();render(<QrCodesPage api={api as never}/>);const sub=await expand();fireEvent.click(within(sub).getByRole('button',{name:'更换文件'}));const dialog=screen.getByRole('dialog');expect(within(dialog).getByRole('button',{name:'确认关联'})).toBeDisabled();fireEvent.click(within(dialog).getByRole('button',{name:'选择本地PDF'}));await within(dialog).findByText(manual.files[0].fileName);fireEvent.click(within(dialog).getByRole('button',{name:'校验文件'}));await within(dialog).findByText('型号、用途、网址尾码与PDF文件校验通过。');expect(api.qrManualPreview).toHaveBeenCalledWith(expect.objectContaining({token:'picker-token',qrCodeId:11,name:manual.name,targetUrl:manual.targetUrl}));expect(api.qrManualPreview.mock.calls[0][0]).not.toHaveProperty('path');fireEvent.click(within(dialog).getByRole('button',{name:'确认关联'}));await waitFor(()=>expect(api.qrManualCommit).toHaveBeenCalledWith('preview',undefined));
  });
  it('retains selected filename after failed save and requires reasoned explicit exception',async()=>{
   desktop();const api=apiFor();api.qrManualPreview.mockResolvedValue({...await api.qrManualPreview(),issues:['文件尾码与网址不一致']});api.qrManualCommit.mockRejectedValue(new Error('文件在预检后改变'));
