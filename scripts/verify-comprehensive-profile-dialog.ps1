@@ -77,7 +77,7 @@ try{
   $report.nativeMessageBox=$true
   Save-Stage 'mode-button-posted'
  }
- if($Mode -in @('existing','qr','reselect','reselect-cancel')){
+ if($Mode -in @('existing','qr','reselect','reselect-cancel','ait')){
   if($Mode -ne 'reselect-cancel' -and !(Test-Path -LiteralPath $DatabasePath)){throw 'Selected verification file missing'}
   $title=if($Mode -eq 'ait'){'选择 AIT 原始文件'}elseif($Mode -eq 'qr'){'选择二维码原始PDF'}elseif($Mode -in @('reselect','reselect-cancel')){'重新选择数据库（保留当前数据库和全部原文件）'}else{'选择旧版数据目录中的 planner.db'}
   Save-Stage 'waiting-for-file-picker'

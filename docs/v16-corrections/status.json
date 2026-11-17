@@ -169,7 +169,7 @@
       "decision": "已确认；多候选优先唯一02（2026-11-17）",
       "implementation": "AIT/现成/人工及多候选唯一02优先已实现",
       "evidence": "src/core/packaging/packaging-catalog.ts；packaging-matcher.ts；src/renderer/pages/PackagingTemplatesPage.tsx",
-      "tests": "任务与监听2文件71项、整合2100/26；DECISIONS_20261117.md",
+      "tests": "任务与监听2文件71项、整合2101/26；DECISIONS_20261117.md",
       "remaining": "本轮新Windows及用户现场"
     },
     {
@@ -230,7 +230,7 @@
       "implementation": "原流程复用，新增方式及正式文件编辑保护已修复",
       "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
       "tests": "安全修复2文件51项，独立复核通过",
-      "remaining": "Windows/多文件策略"
+      "remaining": "Windows最终业务及用户现场；多候选策略已专项通过"
     },
     {
       "id": "TASK-CREATE-001",
@@ -240,7 +240,7 @@
       "implementation": "已有占号关联/临时目录/人工文件，补existing方式",
       "evidence": "src/core/packaging/packaging-task-lifecycle.ts；src/renderer/pages/packaging/PackagingTaskPanel.tsx",
       "tests": "任务服务/文件保护2文件51项",
-      "remaining": "同图号多正式候选完成策略待答复"
+      "remaining": "规则已明确并测试：多可靠候选优先唯一02，否则待确认；Windows最终业务及用户现场"
     },
     {
       "id": "TASK-EDIT-PDF-001",
@@ -290,7 +290,7 @@
       "implementation": "目录隔离分组/即时筛选/选择保持已实现",
       "evidence": "src/core/files/；src/renderer/pages/FilesPage.tsx",
       "tests": "目录分组3文件51项、4份真实PDF浏览器、501条流程及整合26项",
-      "remaining": "最终整套复跑与Windows，用户大资料库体验"
+      "remaining": "Windows完整业务及用户大资料库体验"
     },
     {
       "id": "PDF-VIEW-001",
@@ -359,7 +359,7 @@
       "decision": "已确认；PDF只比第一页（2026-11-17）",
       "implementation": "手动启用/上下文及PDF首页像素比较已实现，专项通过",
       "evidence": "src/core/qr/；src/renderer/pages/QrCodesPage.tsx",
-      "tests": "QR6文件64项、首面真实PDF浏览器、整合2100/26；DECISIONS_20261117.md",
+      "tests": "QR6文件64项、首面真实PDF浏览器、整合2101/26；DECISIONS_20261117.md",
       "remaining": "本轮新Windows首页比较及用户现场"
     },
     {
@@ -443,7 +443,7 @@
       "remaining": "Windows；不新增完整备份中心"
     }
   ],
-  "updatedAt": "2026-11-17T11:17:38.039015+08:00",
-  "currentVerification": "含两项新决定：完整241文件2100项、Chromium26项通过；补目录分组后51项/真实4PDF通过，最终整套复跑中；Windows待完成",
+  "updatedAt": "2026-11-17T11:27:25.524263+08:00",
+  "currentVerification": "完整241文件2101项通过，Chromium26项及最终目录分组专项1项通过；Windows安装/1GB及QR首页像素通过，原生AIT验收脚本分支修复后待复跑",
   "candidateVersion": "1.6.2 / Schema26"
 }
