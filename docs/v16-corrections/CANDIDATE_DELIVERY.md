@@ -26,3 +26,7 @@ Windows工件只在源码固定提交、构建、安装、旧库升级和原生�
 5. 物理Windows DPI、跨显示器、实际打印机及用户原T40数据库未接触。
 
 本轮逐项依据、实现与未验证状态见[需求矩阵](REQUIREMENT_STATUS.md)，不得把自动化通过解释为全部44项用户验收完成。
+
+## Windows首轮记录
+
+[44003898163](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/actions/runs/44003898163) 已实际运行：源码类型检查与构建通过，打包在严格依赖摘要校验处失败，尚未生成安装包。原因是git-show调用去掉末尾换行；已用相同输入先复现失败，再只补回缺少的LF，四项交付守卫通过，其他依赖与锁文件内容仍严格拒绝。还补入明确保存草稿后真正关闭并重开Electron的验收步骤；UI保存专项先在Chromium通过，Windows重启结果仍等待复跑，不能预先标成通过。

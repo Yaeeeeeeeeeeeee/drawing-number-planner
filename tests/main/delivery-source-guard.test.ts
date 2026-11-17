@@ -14,6 +14,7 @@ it('accepts exactly pinned renderer icons/PDF reader and rejects unrelated packa
   const candidateLock = readFileSync('pnpm-lock.yaml','utf8');
   const check = (pkg = candidatePackage, lock = candidateLock) => assertRendererIconDependencyOnly(old('package.json'), pkg, old('pnpm-lock.yaml'), lock);
   expect(() => check()).not.toThrow();
+  expect(() => assertRendererIconDependencyOnly(old('package.json').trim(),candidatePackage.trim(),old('pnpm-lock.yaml').trim(),candidateLock.trim())).not.toThrow();
   const releasePackage=JSON.parse(candidatePackage);releasePackage.version='1.0.0';
   expect(() => check(JSON.stringify(releasePackage))).not.toThrow();
   releasePackage.version='2.0.0';

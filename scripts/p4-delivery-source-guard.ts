@@ -23,7 +23,8 @@ export function assertRendererIconDependencyOnly(basePackage: string, candidateP
   if(reader!==undefined){
     // Exact reviewed lock pair includes PDF.js's optional canvas packages; none are substituted
     // into the reused Electron/SQLite runtime. Any transitive or integrity change needs review.
-    const hash=(value:string)=>createHash('sha256').update(normalize(value)).digest('hex');
+    // The repacker's git-show helper trims its output; restore only a missing final LF.
+    const hash=(value:string)=>{const text=normalize(value);return createHash('sha256').update(text.endsWith('\n')?text:text+'\n').digest('hex');};
     if(hash(baseLock)!=='b483ff9b5cb90f9301856a61902fa3ae2d152a16205e7053db41cf6bd98cf83d'||hash(candidateLock)!=='9016baaf4defd07798c3078900ea8ce8fdd8b920cee3d874d8018d6c47081ba9')throw new Error('Unexpected lockfile change beyond pinned renderer icons and PDF reader');
     return;
   }
