@@ -2,10 +2,10 @@
 
 用于包材图号规划、产品档案、BOM、PDF 文件整理、二维码和外发资料打包的 Windows 桌面工具。所有业务数据保存在用户选择的本地数据目录。
 
-## 当前版本 v1.6.1 · 本地服务启动修复
+## 当前版本 v1.6.2 · V1.6 本轮修正
 
-- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.1/DrawingNumberPlanner-1.6.1-Windows-x64-Setup.exe)
-- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.1)
+- [下载 Windows 中文安装包](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/download/v1.6.2/DrawingNumberPlanner-1.6.2-Windows-x64-Setup.exe)
+- [版本说明、校验文件及运行报告](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.6.2)
 - [安装、升级和恢复说明](docs/install-and-upgrade.md)
 - [维护和发布方式](docs/maintenance.md)
 - [上一版 v1.3.0（Schema23）](https://github.com/Yaeeeeeeeeeeeee/drawing-number-planner/releases/tag/v1.3.0)
@@ -15,7 +15,13 @@
 
 Windows 10 1809 及以上、x64；中文向导支持自定义路径，包括桌面下的中文文件夹。选择桌面根目录时安装至其中独立的 `DrawingNumberPlanner` 文件夹。安装目录只存程序，安装包不包含示例业务数据库或 PDF。
 
-## 本轮增量修复
+## 本轮增量修正
+
+AIT原路径引用和严格尺寸匹配、真实覆盖式右抽屉、模块工作现场保留、02/03隔离分组及只读PDF阅读器、BOM精确像素对比、QR首页像素比较、空气炸锅菜谱限制、>50MB独立传输、持久邮件草稿与安全数据库重选。已有正确的任务安全结束、规划事务及历史保护继续复用。
+
+完整241文件2101项、Chromium26项及Windows实际安装/旧库升级/业务流程通过；窗口与原生选择、约1GB启动重启、邮件真实进程重启恢复、两次重装选择及数据库切回均有证据。真实Adobe字体/版式/可编辑PDF、用户原库及物理DPI仍需本机验收。详见[v1.6.2说明](docs/release-1.6.2.md)、[44项矩阵](docs/v16-corrections/REQUIREMENT_STATUS.md)和[完整验证报告](docs/v16-corrections/FINAL_REPORT.md)。发行Tag固定已验证源码，默认分支未自动合并或切换。
+
+## v1.6.1 历史启动修复
 
 修复大数据库初始化被15秒统一限额中断，以及停止期间再次启动的进程竞态。现在分阶段等待并保留总时限，就绪前验证实际HTTP健康；失败提示显示阶段、数据库路径及日志位置。不会自动切换、重建或合并数据库。Windows安装版约1GB测试首次启动29.3秒、重启3.4秒，完整1981项、浏览器18项及原生安装/升级验证通过。详见[v1.6.1说明](docs/release-1.6.1.md)及[验证记录](docs/startup-repair-verification-20261110.md)。
 
@@ -74,7 +80,7 @@ Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 
 ## 数据安全与升级
 
-每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema25：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
+每次安装或升级后首次启动先选择旧库或新库，日常重启沿用选择。新库自动创建在独立目录，无需选择文件，原库保留。升级前关闭旧程序并备份完整数据目录，再选择原 `planner.db`，核对资料根目录及外发输出目录。本版迁移到 Schema26（兼容独立existing制作方式，旧none保留）：升级前创建并校验备份，失败回滚事务；不会重新初始化旧库。
 
 移除 PDF 记录或删除内部空批次不会删除原始文件及磁盘文件夹。已用图号、BOM、产品归并及外发历史的引用继续受保护。普通取消占号继续执行原资格检查。新增的「强制取消占号并删除图号」是独立危险操作：显示真实影响后确认，释放当前占用但保留原身份、历史快照和审计；原 PDF 不删除，重扫旧同号文件不会自动关联到重新占用的号码。用户正式数据库及实际显示器 DPI 仍应在本地核对。
 
@@ -82,7 +88,7 @@ Schema25为增量升级，保留旧业务记录和备份，不改占号/BOM/历�
 
 ```sh
 git fetch --tags
-git switch --detach v1.6.0
+git switch --detach v1.6.2
 pnpm install
 pnpm typecheck
 pnpm test

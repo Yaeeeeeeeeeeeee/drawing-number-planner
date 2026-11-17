@@ -1,0 +1,86 @@
+{
+  "source": "0610c06e8d73c2e616b5b2c0b0364ecb55aba784",
+  "note": "Linux日志及对应阶段实际截图。截图产生于对应已记录阶段，不宣称是Windows截图；Windows原生证据另附。整套测试后仅修改交付验收脚本，邮件抄送字段专项再通过。",
+  "files": [
+    {
+      "path": "bom-different-alpha-pixels.png",
+      "bytes": 115776,
+      "sha256": "fa61e5475ea2b1c8bda017ee9985f49969f09656ac2b38fb89acfff558307d99"
+    },
+    {
+      "path": "bom-same-pixels-different-encoding.png",
+      "bytes": 92405,
+      "sha256": "0c83a33dd186c04e9b7816c76b3ba58d836cb0358a0a55ffa60b3e637907f63b"
+    },
+    {
+      "path": "full-browser-decisions-final-1117.log",
+      "bytes": 6890,
+      "sha256": "79725e64d08086037cb6672fdb1c2ece37087daf66dee0b7985fb9e57a0f2ab7"
+    },
+    {
+      "path": "full-regression-final-1117.log",
+      "bytes": 920,
+      "sha256": "4ce49191e5c8e79fd11dfb55263f8c600618725ca3a6defabecc95de0d832d1d"
+    },
+    {
+      "path": "mail-cc-recovery-browser.log",
+      "bytes": 345,
+      "sha256": "516a66ddb02e664a5ed0f42f22bf54b4a56cfd69a8320d52dd8af1b592b27b04"
+    },
+    {
+      "path": "p0-terminated-history-1920.png",
+      "bytes": 92449,
+      "sha256": "cbcc51f7bf3d069bbe0d32b8a32697bbf4f40055d0840ec85a45ec5330a476d8"
+    },
+    {
+      "path": "p0-termination-confirmation-1920.png",
+      "bytes": 131316,
+      "sha256": "9a42c322ac355aafb4fd4e836279e22bd9564be4cbae0f0c88120d64cf3119b6"
+    },
+    {
+      "path": "pdf-directory-groups-browser.log",
+      "bytes": 335,
+      "sha256": "666aea0d2e0240a3b280dd9ac197d513e65ca61b1098bd3a9905318725ab5882"
+    },
+    {
+      "path": "pdf-list-folded.png",
+      "bytes": 102701,
+      "sha256": "d8fc7f0c49af3421208f3bb522a7b8d39b9bc62dc5fb2719dca06312f90041de"
+    },
+    {
+      "path": "pdf-reader-1920.png",
+      "bytes": 69013,
+      "sha256": "c15aec0f578e439226a846c700e55b09f6ec560b4ae7454504a1f277758bfd67"
+    },
+    {
+      "path": "phase2-ait-drawer-1920.png",
+      "bytes": 125891,
+      "sha256": "2ffc271a0d2fec48ab1851c148fc761d0fd7990332afddefc0dce3476db74d06"
+    },
+    {
+      "path": "phase2-ait-drawer-600.png",
+      "bytes": 52561,
+      "sha256": "8d00571879175ed1019bd54a113a774d526d54d7d30c93c6f561c7f7348e0c96"
+    },
+    {
+      "path": "pre-final-candidate-build.log",
+      "bytes": 1691,
+      "sha256": "9a6cc593ad9bbadb1da4c1ef6a3f910e55564f293bf5901a927a21950af2691e"
+    },
+    {
+      "path": "pre-final-candidate-typecheck.log",
+      "bytes": 378,
+      "sha256": "27cc486234199e48a3015a4cc483fc5ec7abbd9103d29893e4d0bf9ebe145b4c"
+    },
+    {
+      "path": "release-final-typecheck.log",
+      "bytes": 378,
+      "sha256": "27cc486234199e48a3015a4cc483fc5ec7abbd9103d29893e4d0bf9ebe145b4c"
+    },
+    {
+      "path": "windows-ait-script-regression.log",
+      "bytes": 254,
+      "sha256": "d10924454a50779866d600853f7e68c5500bc6e55434d1ced2c5449e5053bce3"
+    }
+  ]
+}
