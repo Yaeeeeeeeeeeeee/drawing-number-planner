@@ -227,7 +227,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   assert.equal(resumed.items[0].mode,report.aitPackaging.unfinishedTaskMode);assert.deepEqual(resumed.items[0].parameters,report.aitPackaging.unfinishedTaskParameters);
   report.aitPackaging.realProcessRestartPreservesTask=true;
   await go(page,'外发资料');await page.getByText('编辑邮件草稿',{exact:true}).click();await page.getByRole('button',{name:'恢复已保存草稿',exact:true}).click();
-  for(const [field,value]of [['主题',report.v51.savedDraft.subject],['正文',report.v51.savedDraft.body],['收件人文本',report.v51.savedDraft.to],['抄送人文本',report.v51.savedDraft.cc]])await expect(page.getByLabel(field,{exact:true})).toHaveValue(value);
+  for(const [field,value]of [['主题',report.v51.savedDraft.subject],['正文',report.v51.savedDraft.body],['收件人文本',report.v51.savedDraft.to],['抄送文本',report.v51.savedDraft.cc]])await expect(page.getByLabel(field,{exact:true})).toHaveValue(value);
   const reopenedDraft=await page.evaluate(async()=>await(await fetch('/api/outbound-email-drafts/latest')).json());assert.deepEqual(reopenedDraft,report.v51.savedDraft);
   await page.screenshot({path:path.join(evidence,'Windows-外发草稿-实际进程重启恢复.png')});report.outboundDraftRestart={actualProcessRestart:true,restoredThroughUi:true,packageId:reopenedDraft.packageId,productId:reopenedDraft.context.product.id,selectedBatchId:reopenedDraft.context.selectedMaterialBatchId,allSavedFieldsPreserved:true,noArchiveRegeneration:true};
  }finally{await app.close();}

@@ -29,6 +29,6 @@ test('restores and saves a real SQLite draft through the browser after reload', 
   await page.getByRole('button',{name:'恢复已保存草稿'}).click();await expect(page.getByLabel('主题',{exact:true})).toHaveValue('原主题');
   await page.getByLabel('主题',{exact:true}).fill('浏览器修改主题');await page.getByLabel('正文',{exact:true}).fill('浏览器修改正文');await page.getByRole('button',{name:'保存草稿',exact:true}).click();await expect(page.getByText('草稿已保存')).toBeVisible();
   await page.reload();await page.getByRole('button',{name:/外发资料/}).click();await page.getByText('编辑邮件草稿',{exact:true}).click();await page.getByRole('button',{name:'恢复已保存草稿'}).click();
-  await expect(page.getByLabel('主题',{exact:true})).toHaveValue('浏览器修改主题');await expect(page.getByLabel('正文',{exact:true})).toHaveValue('浏览器修改正文');await expect(page.getByLabel('收件人文本')).toHaveValue('before@example.com');
+  await expect(page.getByLabel('主题',{exact:true})).toHaveValue('浏览器修改主题');await expect(page.getByLabel('正文',{exact:true})).toHaveValue('浏览器修改正文');await expect(page.getByLabel('收件人文本')).toHaveValue('before@example.com');await expect(page.getByLabel('抄送文本',{exact:true})).toHaveValue('cc@example.com');
   }finally{if(db.open)db.close();await vite.close();await server.close();rmSync(dataDir,{recursive:true,force:true});}
 });
