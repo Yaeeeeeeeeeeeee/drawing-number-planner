@@ -11,7 +11,7 @@ const updateNameSchema = z.object({ name: z.string().trim().min(1) }).strict();
 export function registerDictionaryRoutes(app: FastifyInstance, service: DictionaryService): void {
   const sendDomainError = (error: unknown, reply: FastifyReply) => {
     if (error instanceof DictionaryError) {
-      const status = error.code === 'DUPLICATE_CODE' || error.code === 'DICTIONARY_ITEM_REFERENCED' ? 409 : 400;
+      const status = ['DUPLICATE_CODE','DICTIONARY_ITEM_REFERENCED','PERMANENT_DELETE_NOT_ALLOWED','DICTIONARY_CHANGED'].includes(error.code) ? 409 : 400;
       return reply.code(status).send({ error: { code: error.code, message: error.message } });
     }
     throw error;
@@ -63,5 +63,20 @@ export function registerDictionaryRoutes(app: FastifyInstance, service: Dictiona
     if (!params.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: '无效字典编号' } });
     try { service.deleteUnused(params.data.id); return reply.code(204).send(); }
     catch (error) { return sendDomainError(error, reply); }
+  });
+
+  app.get('/api/dictionaries/items/:id/permanent-deletion', async (request, reply) => {
+    const params = z.object({id:z.coerce.number().int().positive()}).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'无效字典编号'}});
+    try { return service.previewPermanentDeletion(params.data.id); }
+    catch (error) { return sendDomainError(error,reply); }
+  });
+
+  app.delete('/api/dictionaries/items/:id/permanent', async (request, reply) => {
+    const params = z.object({id:z.coerce.number().int().positive()}).safeParse(request.params);
+    const body = z.object({confirmationCode:z.string().min(1),expectedName:z.string().min(1),expectedDeletedAt:z.string().min(1)}).strict().safeParse(request.body);
+    if (!params.success || !body.success) return reply.code(400).send({error:{code:'INVALID_REQUEST',message:'永久删除需要完整编码及已核对的记录信息'}});
+    try { service.deletePermanently(params.data.id,body.data); return reply.code(204).send(); }
+    catch (error) { return sendDomainError(error,reply); }
   });
 }

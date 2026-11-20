@@ -5,7 +5,7 @@ export type HistoricalDrawingStatus = 'active' | 'inactive';
 export type DrawingStatus = PlannedDrawingStatus | HistoricalDrawingStatus | 'historical';
 export type DrawingOrigin = 'planned' | 'historical';
 export type FilePresenceFilter = 'present' | 'missing' | 'all';
-export type DrawingDeletionState = 'normal' | 'deleted-retained' | 'deleted-released' | 'all';
+export type DrawingDeletionState = 'normal' | 'deleted' | 'deleted-retained' | 'deleted-released' | 'all';
 
 export interface DrawingRecord {
   id: number;
@@ -109,6 +109,7 @@ export interface DrawingSearchFilters {
   model?: string;
   sku?: string;
   productCategory?: string;
+  navigationProductCategory?: string;
   brandId?: number;
   appearanceId?: number;
   mainCategoryId?: number;
@@ -117,7 +118,7 @@ export interface DrawingSearchFilters {
   materialBatchId?: number;
   productId?: number;
   usageBatchId?: number;
-  associationState?: 'pending';
+  associationState?: 'pending' | 'unassociated';
   status?: DrawingStatus;
   sourcePresence?: FilePresenceFilter;
   outlinedPresence?: FilePresenceFilter;
@@ -132,4 +133,14 @@ export interface PagedDrawingResult {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/** Counts use the same read-only record identity and predicates as the list. */
+export interface DrawingNavigationCounts {
+  total: number;
+  categories: Array<{ name: string; count: number }>;
+  products: Array<{ productId: number; count: number }>;
+  batches: Array<{ materialBatchId: number; productId: number; count: number }>;
+  unassociated: number;
+  recycle: number;
 }

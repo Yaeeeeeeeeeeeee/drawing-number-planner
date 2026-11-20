@@ -15,12 +15,15 @@ const searchSchema = z.object({
   keyword: z.string().max(500).optional(),
   productId: z.coerce.number().int().positive().optional(),
   materialBatchId: z.coerce.number().int().positive().optional(),
+  productCategory: z.string().min(1).max(500).optional(),
+  unassociatedProduct: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
   matchStatus: z.enum(['matched', 'pending', 'unmatched', 'conflict']).optional(),
   conversionType: z.enum(['source', 'outlined']).optional(),
   presence: z.enum(['present', 'missing', 'all']).optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 }).strict();
+const navigationSchema = searchSchema.pick({ keyword: true, matchStatus: true, conversionType: true, presence: true }).strict();
 const clearIndexSchema = z.object({ confirmation: z.string() }).strict();
 const scanIdSchema = z.object({ id: z.coerce.number().int().positive() }).strict();
 
@@ -98,6 +101,13 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService, t
       const result = service.scanChanges(params.data.id);
       return result ?? reply.code(404).send({ error: { code: 'SCAN_NOT_FOUND', message: '扫描记录不存在' } });
     } catch (error) { return sendFileError(reply, error); }
+  });
+
+  app.get('/api/files/navigation', async (request, reply) => {
+    const query = navigationSchema.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'PDF 导航筛选条件无效' } });
+    try { return service.navigation(query.data); }
+    catch (error) { return sendFileError(reply, error); }
   });
 
   app.get('/api/files', async (request, reply) => {

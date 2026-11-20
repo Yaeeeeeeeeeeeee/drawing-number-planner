@@ -1,4 +1,10 @@
-import type { ProductCleanupPreview } from '../../core/products/product-cleanup-service.js';
+import type { DrawingNavigationCounts } from '../../core/drawings/drawing-types.js';
+import type { FileNavigationResult } from '../../core/files/file-types.js';
+export type PdfNavigationCounts = FileNavigationResult;
+import type { ProductCleanupPreview, ProductCleanupSelection } from '../../core/products/product-cleanup-service.js';
+export type { ProductCleanupSelection } from '../../core/products/product-cleanup-service.js';
+import type { DictionaryDeletionPreview, PermanentDictionaryDeletionInput } from '../../core/dictionaries/dictionary-types.js';
+export type { DictionaryDeletionPreview } from '../../core/dictionaries/dictionary-types.js';
 import type { OutboundBomContext } from '../../core/outbound/outbound-bom-context.js';
 export type ProductCleanupPreviewView = ProductCleanupPreview;
 export interface DictionaryItemView {
@@ -255,6 +261,7 @@ export interface LocalTaskView {
 }
 
 export interface PlannerApi {
+  getDrawingNavigationCounts?(filters?: Record<string, string | number | boolean | undefined>): Promise<DrawingNavigationCounts>;
   getDrawingNavigation?(): Promise<{ batches: DrawingNavigationBatchView[] }>;
   searchDrawings(filters?: Record<string, string | number | boolean | undefined>): Promise<{ items: DrawingView[]; total: number; page: number; pageSize: number }>;
   getDrawing(id: number): Promise<DrawingDetailView>;
@@ -279,6 +286,8 @@ export interface PlannerApi {
   deactivateDictionary(id: number): Promise<DictionaryItemView>;
   activateDictionary(id: number): Promise<DictionaryItemView>;
   deleteDictionary(id: number): Promise<void>;
+  previewPermanentDictionaryDeletion(id: number): Promise<DictionaryDeletionPreview>;
+  permanentlyDeleteDictionary(id: number, input: PermanentDictionaryDeletionInput): Promise<void>;
   listProducts(filters?: Record<string, string | number | undefined>): Promise<ProductView[]>;
   createProduct(input: Record<string, unknown>): Promise<ProductView>;
   updateProduct(id: number, input: Record<string, unknown>): Promise<ProductView>;
@@ -286,7 +295,7 @@ export interface PlannerApi {
   activateProduct(id: number): Promise<ProductView>;
   deleteProduct(id: number): Promise<{ deleted: true }>;
   previewProductCleanup(id: number): Promise<ProductCleanupPreviewView>;
-  cleanupProduct(id: number, confirmedModel: string): Promise<ProductCleanupPreviewView>;
+  cleanupProduct(id: number, confirmedModel: string, selection?: ProductCleanupSelection): Promise<ProductCleanupPreviewView>;
   listQrCodes(filters?: ProductQrCodeFilters): Promise<{ items: ProductQrCodeView[] }>;
   listQrPurposes(): Promise<{ items: QrPurposeView[] }>;
   createQrPurpose(input: { key: string; englishName: string; displayName: string; defaultForAll: boolean;
@@ -362,6 +371,7 @@ export interface PlannerApi {
   cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
   getFileIndexClearPreview(): Promise<FileIndexClearPreviewView>;
   clearFileIndex(confirmation: string): Promise<FileIndexClearResultView>;
+  getPdfFileNavigation?(filters?: Record<string, string | number | undefined>): Promise<PdfNavigationCounts>;
   searchPdfFiles(filters?: Record<string, string | number | undefined>): Promise<{
     items: PdfFileView[]; total: number; page: number; pageSize: number;
   }>;
@@ -501,6 +511,7 @@ async function runLocalTask<T>(kind: 'workspace_scan' | 'index_clear' | 'excel_i
 export const apiClient: PlannerApi = {
   searchDrawings: (filters = {}) => request(`/api/drawings${queryString(filters)}`),
   getDrawingNavigation: () => request('/api/drawings/navigation'),
+  getDrawingNavigationCounts: (filters = {}) => request(`/api/drawings/navigation-counts${queryString(filters)}`),
   getDrawing: (id) => request(`/api/drawings/${id}`),
   activateDrawing: (id) => request(`/api/drawings/${id}/activate`, json('POST', { confirmed: true })),
   voidDrawing: (id) => request(`/api/drawings/${id}/void`, json('POST', { confirmed: true })),
@@ -528,6 +539,8 @@ export const apiClient: PlannerApi = {
   deactivateDictionary: (id) => request(`/api/dictionaries/items/${id}/deactivate`, json('POST')),
   activateDictionary: (id) => request(`/api/dictionaries/items/${id}/activate`, json('POST')),
   deleteDictionary: (id) => request(`/api/dictionaries/items/${id}`, { method: 'DELETE' }),
+  previewPermanentDictionaryDeletion: (id) => request(`/api/dictionaries/items/${id}/permanent-deletion`),
+  permanentlyDeleteDictionary: (id,input) => request(`/api/dictionaries/items/${id}/permanent`, json('DELETE',input)),
   listProducts: async (filters = {}) => (await request<{ items: ProductView[] }>(`/api/products${queryString(filters)}`)).items,
   createProduct: (input) => request('/api/products', json('POST', input)),
   updateProduct: (id, input) => request(`/api/products/${id}`, json('PUT', input)),
@@ -535,7 +548,7 @@ export const apiClient: PlannerApi = {
   activateProduct: (id) => request(`/api/products/${id}/activate`, json('POST')),
   deleteProduct: (id) => request(`/api/products/${id}`, { method: 'DELETE' }),
   previewProductCleanup: (id) => request(`/api/products/${id}/cleanup-preview`),
-  cleanupProduct: (id, confirmedModel) => request(`/api/products/${id}/cleanup`, json('POST', { confirmed: true, confirmedModel })),
+  cleanupProduct: (id, confirmedModel, selection) => request(`/api/products/${id}/cleanup`, json('POST', { confirmed: true, confirmedModel, ...(selection ? {selection} : {}) })),
   listQrCodes: (filters = {}) => request(`/api/qr-codes${queryString(filters)}`),
   listQrPurposes: () => request('/api/qr-purposes'),
   createQrPurpose: (input) => request('/api/qr-purposes', json('POST', input)),
@@ -621,6 +634,7 @@ export const apiClient: PlannerApi = {
   cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),
   getFileIndexClearPreview: () => request('/api/files/index/clear-preview'),
   clearFileIndex: (confirmation) => runLocalTask('index_clear', { confirmation }),
+  getPdfFileNavigation: (filters = {}) => request(`/api/files/navigation${queryString(filters)}`),
   searchPdfFiles: (filters = {}) => request(`/api/files${queryString(filters)}`),
   checkServiceHealth: () => request('/api/health'),
   listLocalTasks: async () => (await request<{ tasks: LocalTaskView[] }>('/api/tasks')).tasks,

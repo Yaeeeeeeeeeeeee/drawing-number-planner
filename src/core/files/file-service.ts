@@ -4,7 +4,7 @@ import { FileRepository, type FileIndexClearResult } from './file-repository.js'
 import { classifyHistoricalPdf } from './historical-file-classifier.js';
 import { parseMaterialBatch } from './material-batch-parser.js';
 import { scanPdfWorkspace, type ScannedPdfFile } from './pdf-scanner.js';
-import type { FileScanChangesView, FileScanComparison, FileScanRunView, FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
+import type { FileNavigationFilters, FileNavigationResult, FileScanChangesView, FileScanComparison, FileScanRunView, FileSearchFilters, FileSearchResult, FileScanRecord, HistoricalDrawingScanRecord } from './file-types.js';
 import { WorkspaceSettingsStore } from './workspace-settings.js';
 import { toWorkspacePathKey, validateWorkspaceRoot } from './workspace-paths.js';
 import { scanQrWorkspace } from '../qr/qr-file-scanner.js';
@@ -47,6 +47,8 @@ export class FileService {
   }
 
   search(filters: FileSearchFilters = {}): FileSearchResult { return this.repository.search(filters); }
+
+  navigation(filters: FileNavigationFilters = {}): FileNavigationResult { return this.repository.navigation(filters); }
 
   latestScan(): FileScanRunView | null { return this.repository.latestScan(); }
 

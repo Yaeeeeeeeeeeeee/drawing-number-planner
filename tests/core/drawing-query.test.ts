@@ -414,6 +414,10 @@ describe('exact drawing business usage', () => {
     f.item(f.first, f.older, history, true);
     expect(drawings.search().items.filter((row) => row.fullCode === '02.0209.010.0401001').map((row) => row.id)).toEqual([ids.first]);
     expect(drawings.search({ usageBatchId: f.older }).items.map((row) => row.id)).toEqual([-history]);
+    const counts = drawings.navigationCounts();
+    expect(counts.total).toBe(drawings.search().total);
+    expect(counts.products.find((row) => row.productId === f.productId)?.count).toBe(drawings.search({ productId: f.productId }).total);
+    expect(counts.batches).toContainEqual({ materialBatchId: f.older, productId: f.otherProductId, count: 1 });
     expect(drawings.get(-history).currentBomUsage).toEqual([expect.objectContaining({ bomVersionId: f.first, productId: f.otherProductId })]);
     expect(drawings.get(ids.first).businessUsage).toEqual([]);
     expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.confirmedDrawingCount).toBe(1);
@@ -476,5 +480,49 @@ describe('exact drawing business usage', () => {
     expect(drawings.get(ids.second).businessUsage).toEqual([]);
     expect(drawings.search({ usageBatchId: f.older }).total).toBe(0);
     expect(drawings.navigation().batches.find((batch) => batch.id === f.older)?.confirmedDrawingCount).toBe(0);
+  });
+});
+
+
+describe('drawing catalog counts', () => {
+  it('counts exact unique identities with matching category/product/batch scopes, manual filters and no writes', () => {
+    const f = usageFixture();
+    db.prepare("update products set product_category = '空气炸锅' where id = ?").run(f.otherProductId);
+    f.item(f.first, f.older); f.item(f.second, f.newest);
+    const before = db.serialize(); db.pragma('query_only = ON');
+    try {
+      const counts = drawings.navigationCounts({});
+      expect(counts.total).toBe(2);
+      expect(counts.unassociated).toBe(0); // owning a product does not require a batch
+      expect(counts.products).toContainEqual({ productId: f.otherProductId, count: 1 });
+      expect(counts.categories).toContainEqual({ name: '空气炸锅', count: 1 });
+      expect(counts.batches).toContainEqual({ materialBatchId: f.older, productId: f.otherProductId, count: 1 });
+      expect(counts.batches).not.toContainEqual(expect.objectContaining({ materialBatchId: f.storage }));
+      expect(drawings.search({ navigationProductCategory: '空气炸锅' }).total).toBe(1);
+      expect(drawings.search({ navigationProductCategory: '空气炸锅', productCategory: '不匹配' }).total).toBe(0);
+      expect(drawings.search({ associationState: 'unassociated' }).total).toBe(0);
+      const filtered = drawings.navigationCounts({ keyword: '说明书' });
+      expect(filtered.total).toBe(1); expect(filtered.products).not.toContainEqual(expect.objectContaining({ productId: f.otherProductId }));
+      expect(db.serialize().equals(before)).toBe(true);
+    } finally { db.pragma('query_only = OFF'); }
+  });
+
+  it('separates unassociated history, recycle records and normal navigation without page limits', () => {
+    const now = 'now';
+    db.prepare(`insert into historical_drawing_numbers (full_code, brand_code, product_size_code, appearance_code,
+      color_code, main_category_code, project_item_code, sequence, first_seen_at, last_seen_at)
+      values ('02.0209.010.0401099', '02', '0209', '01', '0', '04', '01', 99, ?, ?)`).run(now, now);
+    db.prepare("update drawing_numbers set deleted_at = 'now', deletion_mode = 'retain_occupied' where id = ?").run(ids.second);
+    const counts = drawings.navigationCounts({ page: 99, pageSize: 1 });
+    expect(counts).toMatchObject({ total: 2, unassociated: 1, recycle: 1 });
+    expect(drawings.search({ associationState: 'unassociated' }).items).toHaveLength(1);
+    expect(drawings.search({ deletionState: 'deleted-retained' }).total).toBe(counts.recycle);
+    db.prepare("update drawing_numbers set deleted_at = 'now', deletion_mode = 'release' where id = ?").run(ids.first);
+    expect(drawings.search({ deletionState: 'deleted' }).total).toBe(drawings.navigationCounts().recycle);
+    expect(drawings.search({ deletionState: 'deleted' }).total).toBe(2);
+    expect(drawings.navigationCounts({ deletionState: 'deleted-retained' }).recycle).toBe(1);
+    expect(drawings.navigationCounts({ deletionState: 'deleted-released' }).recycle).toBe(1);
+    expect(drawings.navigationCounts({ deletionState: 'normal' }).recycle).toBe(2);
+    expect(drawings.navigationCounts({ deletionState: 'all' }).total).toBe(drawings.search({ deletionState: 'all' }).total);
   });
 });

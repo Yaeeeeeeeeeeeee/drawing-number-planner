@@ -13,6 +13,7 @@
 - A drawing release requires exact full-code confirmation and reference checks. Deleting a record must not implicitly release its number.
 - Product exit is a coordinated, transactional operation. Block on active references from other products rather than silently changing them.
 - Protect historical BOM, outbound, asset, and identity snapshots from current-record cleanup.
+- The later explicit 2026-10-19 product-exit choice allows clearing the specifically disclosed, owned BOM/QR/batch/outbound/draft business records only after the user selects permanent history clearing and confirms it. Keep other-product/shared references, file indexes, original disk files, drawing records and exit audit; recheck impact fingerprints and actual foreign keys in the same transaction. This narrow exception does not authorize clearing history in other workflows or executing deletions on real user data during development. See `docs/p4-product-corrections-20261019.md`.
 - When migrating or archiving an attachment, prefer copy → verify hash → update association. Keep the source and preserve retry/recovery information.
 
 ## Database changes

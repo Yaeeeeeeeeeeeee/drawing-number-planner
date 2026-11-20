@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ProductCleanupPreviewView } from '../data/client';
 
-export function ProductExitWorksheet({preview}:{preview:ProductCleanupPreviewView}) {
+export function ProductExitWorksheet({preview,selectable=false}:{preview:ProductCleanupPreviewView;selectable?:boolean}) {
   const [expanded,setExpanded]=useState<string|null>(null);
   const rows: Array<[string,number|string,string,string]> = [
     ['正式图号',preview.owned.drawings,'退出记录，保留占号','不会释放图号。正式图号与历史图号占用保持原规则；释放必须使用原有独立安全流程。'],
@@ -16,5 +16,5 @@ export function ProductExitWorksheet({preview}:{preview:ProductCleanupPreviewVie
     ['历史邮件草稿',preview.classification?.preservedDrafts ?? '未提供','保留，不阻止退出','保留历史业务记录，不提供误导性的删除入口。'],
     ['历史产品身份','保留','保留身份与退出事件','退出不是抹除历史身份，原业务关联保护仍执行。'],
   ];
-  return <div className="product-exit-work"><h3>关联检查与退出指引</h3><table><thead><tr>{['关联项目','数量 / 摘要','处理规则','操作'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{rows.map(([label,count,rule,guide])=><tr key={label}><td>{label}</td><td><strong>{count}</strong></td><td>{rule}{expanded===label && <p className="exit-guide">{guide}仅下方真实阻塞信息决定是否需先处理。</p>}</td><td><button className="text-button" type="button" aria-expanded={expanded===label} onClick={()=>setExpanded(expanded===label?null:label)}>{expanded===label?'收起规则':'查看规则'}</button></td></tr>)}</tbody></table><p>预检结论：<strong>{preview.blockers.length?'需先处理':'可退出'}</strong>。最终确认仍由原服务校验。</p></div>;
+  return <div className="product-exit-work"><h3>关联检查与退出指引</h3><table><thead><tr>{['关联项目','数量 / 摘要','处理规则','操作'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{rows.map(([label,count,rule,guide])=><tr key={label}><td>{label}</td><td><strong>{count}</strong></td><td>{selectable?'见下方处理选项及影响说明':rule}{expanded===label && <p className="exit-guide">{selectable?'图号占用与业务历史分别选择；共享文件索引、实际文件及必要审计保留。':guide}仅下方真实阻塞信息决定是否需先处理。</p>}</td><td><button className="text-button" type="button" aria-expanded={expanded===label} onClick={()=>setExpanded(expanded===label?null:label)}>{expanded===label?'收起规则':'查看规则'}</button></td></tr>)}</tbody></table><p>预检结论：<strong>{preview.blockers.length?'需先处理':'可退出'}</strong>。最终确认仍由原服务校验。</p></div>;
 }

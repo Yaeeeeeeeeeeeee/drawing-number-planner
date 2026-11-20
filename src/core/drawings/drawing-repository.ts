@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingBusinessUsage, DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
+import type { DrawingBusinessUsage, DrawingBomUsage, DrawingDetailRecord, DrawingFileRecord, DrawingRecord, DrawingNavigationCounts, DrawingSearchFilters, HistoricalDrawingStatus } from './drawing-types.js';
 
 interface DrawingRow {
   id: number; origin: DrawingRecord['origin']; sku: string | null; full_code: string; display_name: string;
@@ -140,6 +140,7 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
   const conditions: string[] = []; const values: Array<string | number> = [];
   const deletionState = filters.deletionState ?? 'normal';
   if (deletionState === 'normal') conditions.push('record.deleted_at is null');
+  else if (deletionState === 'deleted') conditions.push('record.deleted_at is not null');
   else if (deletionState === 'deleted-retained') conditions.push("record.deleted_at is not null and record.deletion_mode = 'retain_occupied'");
   else if (deletionState === 'deleted-released') conditions.push("record.deleted_at is not null and record.deletion_mode = 'release'");
   if (filters.drawingNumber?.trim()) {
@@ -149,6 +150,14 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
   if (filters.sku?.trim()) { conditions.push('record.sku like ?'); values.push(`%${filters.sku.trim()}%`); }
   if (filters.model?.trim()) { conditions.push('record.model like ?'); values.push(`%${filters.model.trim()}%`); }
   if (filters.productCategory?.trim()) { conditions.push('record.product_category like ?'); values.push(`%${filters.productCategory.trim()}%`); }
+  if (filters.navigationProductCategory !== undefined) {
+    conditions.push(`(exists(select 1 from products navigation_product where navigation_product.id = record.product_id
+      and navigation_product.product_category = ?) or exists(select 1 from business_usage usage
+      join products navigation_product on navigation_product.id = usage.product_id
+      where ${exactUsageIdentity} and navigation_product.product_category = ?))`);
+    values.push(filters.navigationProductCategory, filters.navigationProductCategory);
+  }
+  if (filters.associationState === 'unassociated') conditions.push('record.product_id is null');
   if (filters.brandId !== undefined) { conditions.push('record.brand_id = ?'); values.push(filters.brandId); }
   if (filters.appearanceId !== undefined) { conditions.push('record.appearance_id = ?'); values.push(filters.appearanceId); }
   if (filters.mainCategoryId !== undefined) { conditions.push('record.main_category_id = ?'); values.push(filters.mainCategoryId); }
@@ -200,13 +209,54 @@ export class DrawingRepository {
   search(filters: DrawingSearchFilters, page: number, pageSize: number): { items: DrawingRecord[]; total: number } {
     const condition = buildConditions(filters);
     const cte = unifiedCte(filters.productId !== undefined || filters.usageBatchId !== undefined
-      || filters.associationState !== undefined);
+      || filters.associationState !== undefined || filters.navigationProductCategory !== undefined);
     const total = (this.db.prepare(`${cte} select count(*) as total from drawing_records record${condition.sql}`)
       .get(...condition.values) as { total: number }).total;
     const rows = this.db.prepare(`${cte} select * from drawing_records record${condition.sql}
       order by record.created_at desc, record.id desc limit ? offset ?`)
       .all(...condition.values, pageSize, (page - 1) * pageSize) as DrawingRow[];
     return { items: rows.map(mapRow), total };
+  }
+
+  navigationCounts(filters: DrawingSearchFilters): DrawingNavigationCounts {
+    // Navigation ranges must not leak into global counts. All compatible manual filters remain.
+    const { productId: _product, usageBatchId: _batch, navigationProductCategory: _category,
+      associationState: _association, page: _page, pageSize: _size, deletionState: _deletion, ...manual } = filters;
+    const base = { ...manual, deletionState: _deletion === 'all' ? 'all' as const : 'normal' as const };
+    return this.db.transaction(() => {
+      const count = (scope: DrawingSearchFilters = {}) => {
+        const condition = buildConditions({ ...base, ...scope });
+        const scoped = scope.productId !== undefined || scope.usageBatchId !== undefined
+          || scope.associationState !== undefined || scope.navigationProductCategory !== undefined;
+        return (this.db.prepare(`${unifiedCte(scoped)} select count(distinct record.id) as total
+          from drawing_records record${condition.sql}`).get(...condition.values) as { total: number }).total;
+      };
+      const manualCondition = buildConditions(base);
+      const catalogCte = `${unifiedCte(true)}, filtered_records as (
+        select record.* from drawing_records record${manualCondition.sql}
+      ), product_associations as (
+        select record.id as drawing_id, record.product_id from filtered_records record where record.product_id is not null
+        union
+        select record.id, usage.product_id from filtered_records record join business_usage usage
+          on ${exactUsageIdentity} where usage.product_id is not null
+      )`;
+      const products = this.db.prepare(`${catalogCte} select product_id as productId,
+        count(distinct drawing_id) as count from product_associations group by product_id order by product_id`)
+        .all(...manualCondition.values) as DrawingNavigationCounts['products'];
+      const categories = this.db.prepare(`${catalogCte} select product.product_category as name,
+        count(distinct association.drawing_id) as count from product_associations association
+        join products product on product.id = association.product_id group by product.product_category order by product.product_category`)
+        .all(...manualCondition.values) as DrawingNavigationCounts['categories'];
+      const batches = this.db.prepare(`${catalogCte} select usage.product_id as productId,
+        usage.batch_id as materialBatchId, count(distinct record.id) as count
+        from filtered_records record join business_usage usage on ${exactUsageIdentity}
+        where usage.product_id is not null and usage.batch_id is not null
+        group by usage.product_id, usage.batch_id order by usage.product_id, usage.batch_id`)
+        .all(...manualCondition.values) as DrawingNavigationCounts['batches'];
+      return { total: count(), categories, products, batches,
+        unassociated: count({ associationState: 'unassociated' }),
+        recycle: count({ deletionState: _deletion === 'deleted-retained' || _deletion === 'deleted-released' ? _deletion : 'deleted' }) };
+    }).deferred();
   }
 
   get(id: number): DrawingRecord | undefined {

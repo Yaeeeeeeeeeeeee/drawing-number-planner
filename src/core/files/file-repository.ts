@@ -1,5 +1,5 @@
 import type { PlannerDatabase } from '../../db/database.js';
-import type { DrawingCodeReference, FileScanChangesView, FileScanRecord, FileScanRunView, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
+import type { DrawingCodeReference, FileNavigationFilters, FileNavigationResult, FileScanChangesView, FileScanRecord, FileScanRunView, FileSearchFilters, FileSearchResult, HistoricalDrawingScanRecord, PdfFileView } from './file-types.js';
 import { FileError } from './file-errors.js';
 import { diffFileScan, type IndexedFileSnapshot } from './file-scan-diff.js';
 import { MaterialBatchRepository } from './material-batch-repository.js';
@@ -47,6 +47,35 @@ function toView(row: FileRow): PdfFileView {
     brandName: row.brand_name, projectItemName: row.project_item_name, colorName: row.color_name,
     pathKey: row.path_key, materialBatchId: row.material_batch_id, materialBatchName: row.material_batch_name,
     materialBatchStatus: row.material_batch_status };
+}
+
+const FILE_SEARCH_JOINS = `from pdf_files file
+      left join drawing_numbers drawing on drawing.id = file.drawing_id
+      left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
+      left join products product on product.id = coalesce(drawing.product_id, historical.product_id)
+      left join dictionary_items brand on brand.id = product.brand_id
+      left join dictionary_items project on project.id = drawing.project_item_id
+      left join dictionary_items color on color.id = drawing.color_id
+      left join material_batches batch on batch.id = file.material_batch_id`;
+
+function fileSearchPredicate(filters: FileSearchFilters): { whereSql: string; parameters: Record<string, unknown> } {
+  const where: string[] = []; const parameters: Record<string, unknown> = {};
+  if (filters.keyword?.trim()) {
+    where.push(`(file.relative_path like @keyword escape '\\' or file.file_name like @keyword escape '\\'
+      or drawing.full_code like @keyword escape '\\')`);
+    parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
+  }
+  if (filters.productId != null) { where.push('coalesce(drawing.product_id, historical.product_id) = @productId'); parameters.productId = filters.productId; }
+  if (filters.materialBatchId != null) { where.push('file.material_batch_id = @materialBatchId'); parameters.materialBatchId = filters.materialBatchId; }
+  if (filters.productCategory != null) { where.push('product.product_category = @productCategory'); parameters.productCategory = filters.productCategory; }
+  if (filters.unassociatedProduct != null) { where.push(`product.id is ${filters.unassociatedProduct ? '' : 'not '}null`); }
+  if (filters.matchStatus) { where.push('file.match_status = @matchStatus'); parameters.matchStatus = filters.matchStatus; }
+  if (filters.conversionType) { where.push('file.conversion_type = @conversionType'); parameters.conversionType = filters.conversionType; }
+  const presence = filters.presence ?? 'present';
+  if (presence !== 'all') { where.push('file.is_present = @isPresent'); parameters.isPresent = presence === 'present' ? 1 : 0; }
+  const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+
+  return { whereSql, parameters };
 }
 
 export class FileRepository {
@@ -344,36 +373,41 @@ export class FileRepository {
     };
   }
 
+  navigation(filters: FileNavigationFilters = {}): FileNavigationResult {
+    // DEFERRED starts a read snapshot on the first SELECT without reserving a write lock.
+    return this.db.transaction(() => {
+      // Explicitly pick manual filters so a navigation selection cannot narrow its own counts.
+      const { whereSql, parameters } = fileSearchPredicate({ keyword: filters.keyword, matchStatus: filters.matchStatus,
+        conversionType: filters.conversionType, presence: filters.presence });
+      const scope = `${FILE_SEARCH_JOINS} ${whereSql}`;
+      const totals = this.db.prepare(`select count(distinct file.id) as total,
+        count(distinct case when product.id is null then file.id end) as unassociatedProducts ${scope}`)
+        .get(parameters) as Pick<FileNavigationResult, 'total' | 'unassociatedProducts'>;
+      const categories = this.db.prepare(`select product.product_category as name, count(distinct file.id) as count
+        ${scope} ${whereSql ? 'and' : 'where'} product.id is not null
+        group by product.product_category order by product.product_category collate nocase`)
+        .all(parameters) as FileNavigationResult['categories'];
+      const products = this.db.prepare(`select product.id as productId, count(distinct file.id) as count
+        ${scope} ${whereSql ? 'and' : 'where'} product.id is not null group by product.id order by product.id`)
+        .all(parameters) as FileNavigationResult['products'];
+      const batches = this.db.prepare(`select file.material_batch_id as materialBatchId, product.id as productId,
+        count(distinct file.id) as count ${scope} ${whereSql ? 'and' : 'where'} file.material_batch_id is not null
+        group by file.material_batch_id, product.id order by file.material_batch_id, product.id`)
+        .all(parameters) as FileNavigationResult['batches'];
+      return { ...totals, categories, products, batches };
+    }).deferred();
+  }
+
   search(filters: FileSearchFilters = {}): FileSearchResult {
     const page = Math.max(1, filters.page ?? 1); const pageSize = Math.min(200, Math.max(1, filters.pageSize ?? 50));
-    const where: string[] = []; const parameters: Record<string, unknown> = {};
-    if (filters.keyword?.trim()) {
-      where.push(`(file.relative_path like @keyword escape '\\' or file.file_name like @keyword escape '\\'
-        or drawing.full_code like @keyword escape '\\')`);
-      parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
-    }
-    if (filters.productId != null) { where.push('coalesce(drawing.product_id, historical.product_id) = @productId'); parameters.productId = filters.productId; }
-    if (filters.materialBatchId != null) { where.push('file.material_batch_id = @materialBatchId'); parameters.materialBatchId = filters.materialBatchId; }
-    if (filters.matchStatus) { where.push('file.match_status = @matchStatus'); parameters.matchStatus = filters.matchStatus; }
-    if (filters.conversionType) { where.push('file.conversion_type = @conversionType'); parameters.conversionType = filters.conversionType; }
-    const presence = filters.presence ?? 'present';
-    if (presence !== 'all') { where.push('file.is_present = @isPresent'); parameters.isPresent = presence === 'present' ? 1 : 0; }
-    const whereSql = where.length ? `where ${where.join(' and ')}` : '';
-    const joins = `from pdf_files file
-      left join drawing_numbers drawing on drawing.id = file.drawing_id
-      left join historical_drawing_numbers historical on historical.id = file.historical_drawing_id
-      left join products product on product.id = coalesce(drawing.product_id, historical.product_id)
-      left join dictionary_items brand on brand.id = product.brand_id
-      left join dictionary_items project on project.id = drawing.project_item_id
-      left join dictionary_items color on color.id = drawing.color_id
-      left join material_batches batch on batch.id = file.material_batch_id`;
-    const total = (this.db.prepare(`select count(*) as total ${joins} ${whereSql}`).get(parameters) as { total: number }).total;
+    const { whereSql, parameters } = fileSearchPredicate(filters);
+    const total = (this.db.prepare(`select count(*) as total ${FILE_SEARCH_JOINS} ${whereSql}`).get(parameters) as { total: number }).total;
     const rows = this.db.prepare(`select file.*, coalesce(drawing.full_code, historical.full_code) as full_code,
         historical.full_code as historical_full_code, drawing.display_name, product.id as product_id, product.sku, product.model,
         product.product_category,
         brand.name as brand_name, project.name as project_item_name, color.name as color_name,
         batch.name as material_batch_name, batch.recognition_status as material_batch_status
-      ${joins} ${whereSql} order by file.file_name collate nocase, file.id limit @limit offset @offset`)
+      ${FILE_SEARCH_JOINS} ${whereSql} order by file.file_name collate nocase, file.id limit @limit offset @offset`)
       .all({ ...parameters, limit: pageSize, offset: (page - 1) * pageSize }) as FileRow[];
     return { items: rows.map(toView), total, page, pageSize };
   }

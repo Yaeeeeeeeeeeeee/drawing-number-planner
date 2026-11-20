@@ -1,4 +1,7 @@
 import type { PlannerDatabase } from '../../db/database.js';
+import { DrawingDeletionError, DrawingDeletionService } from '../drawings/drawing-deletion-service.js';
+import { productCleanupChoices, productHistoryPlan, purgeProductHistory, type ProductCleanupChoices, type ProductCleanupSelection } from './product-cleanup-options.js';
+export type { ProductCleanupSelection } from './product-cleanup-options.js';
 
 export class ProductCleanupError extends Error {
   constructor(public readonly code: 'PRODUCT_NOT_FOUND' | 'PRODUCT_CLEANUP_BLOCKED' | 'PRODUCT_CONFIRMATION_MISMATCH' | 'TASK_RUNNING',
@@ -10,6 +13,7 @@ export interface ProductCleanupPreview {
   owned: { drawings: number; historicalDrawings: number; bomRecords: number; qrCodes: number; batches: number };
   preservedSnapshots: number;
   classification: { alreadyDeleted: number; presentPdfIndexes: number; missingPdfIndexes: number; preservedDrafts: number };
+  choices?: ProductCleanupChoices;
 }
 export class ProductCleanupService {
   constructor(private readonly db: PlannerDatabase, private readonly isTaskRunning: () => boolean = () => false) {}
@@ -46,7 +50,7 @@ export class ProductCleanupService {
     const fileOwnership = `(file.drawing_id in (select id from drawing_numbers where product_id = @id)
       or file.historical_drawing_id in (select id from historical_drawing_numbers where product_id = @id)
       or file.material_batch_id in (select id from material_batches where product_id = @id))`;
-    return { productId, ...product, blockers,
+    return { productId, ...product, blockers, choices: productCleanupChoices(this.db, productId),
       classification: {
         alreadyDeleted: ['drawing_numbers', 'historical_drawing_numbers', 'bom_versions', 'product_qr_codes']
           .reduce((sum, table) => sum + count(`select count(*) as n from ${table} where product_id = @id and deleted_at is not null`), 0),
@@ -63,11 +67,29 @@ export class ProductCleanupService {
         batches: count('select count(*) as n from material_batches where product_id = @id'),
       }, preservedSnapshots: count('select count(*) as n from outbound_packages where product_id = @id') };
   }
-  cleanup(productId: number, input: { confirmedModel: string }): ProductCleanupPreview {
+  cleanup(productId: number, input: { confirmedModel: string; selection?: ProductCleanupSelection }): ProductCleanupPreview {
     return this.db.transaction(() => {
       const preview = this.preview(productId);
       if (input.confirmedModel !== preview.model) throw new ProductCleanupError('PRODUCT_CONFIRMATION_MISMATCH', '请准确输入要退出的产品型号');
       if (preview.blockers.length) throw new ProductCleanupError('PRODUCT_CLEANUP_BLOCKED', preview.blockers.join('；'));
+      const selection = input.selection;
+      const choices = preview.choices!;
+      if (selection) {
+        if (selection.expectedFingerprint !== choices.fingerprint) throw new ProductCleanupError('PRODUCT_CLEANUP_BLOCKED', '关联资料已变化，请重新检查并确认处理选项');
+        if (selection.history === 'purge') {
+          if (selection.confirmedHistory !== '永久清除历史') throw new ProductCleanupError('PRODUCT_CONFIRMATION_MISMATCH', '请输入“永久清除历史”确认历史处理');
+          if (choices.purgeBlockers.length) throw new ProductCleanupError('PRODUCT_CLEANUP_BLOCKED', choices.purgeBlockers.join('；'));
+        }
+        if (selection.occupancy === 'release') {
+          const confirmations = selection.confirmedCodes ?? [];
+          if (confirmations.length !== choices.occupiedDrawings.length || new Set(confirmations.map(row=>row.signedId)).size !== confirmations.length
+            || choices.occupiedDrawings.some(row=>!confirmations.some(value=>value.signedId===row.signedId && value.confirmedCode===row.fullCode))) {
+            throw new ProductCleanupError('PRODUCT_CONFIRMATION_MISMATCH', '请逐条准确输入完整图号，确认释放范围');
+          }
+        }
+      }
+      // Capture exact ownership before the existing exit detaches batches.
+      const history = productHistoryPlan(this.db, productId);
       const now = new Date().toISOString(); const values = { id: productId, now };
       this.db.prepare('delete from bom_current where product_id = ?').run(productId);
       this.db.prepare('update bom_versions set deleted_at = @now where product_id = @id and deleted_at is null').run(values);
@@ -84,14 +106,22 @@ export class ProductCleanupService {
         classification_warning = '产品已退出当前业务'
         where drawing_id in (select id from drawing_numbers where product_id = @id)
           or historical_drawing_id in (select id from historical_drawing_numbers where product_id = @id)`).run({ id: productId });
-      this.db.prepare(`update material_batches set product_id = null, recognition_status = 'pending',
+      if (selection?.history !== 'purge') this.db.prepare(`update material_batches set product_id = null, recognition_status = 'pending',
         classification_warning = '产品已退出当前业务' where product_id = ?`).run(productId);
       this.db.prepare(`update product_qr_codes set deleted_at = @now, status = 'inactive', updated_at = @now
         where product_id = @id and deleted_at is null`).run(values);
       this.db.prepare(`update products set deleted_at = @now, deletion_reason = '产品集中退出', status = 'inactive',
         deactivated_at = @now where id = @id`).run(values);
+      if (selection?.history === 'purge') purgeProductHistory(this.db, productId, history.queries);
+      if (selection?.occupancy === 'release') {
+        const drawings = new DrawingDeletionService(this.db);
+        for (const row of choices.occupiedDrawings) {
+          try { drawings.delete({signedId:row.signedId, mode:'release', confirmedCode:row.fullCode, reason:'产品退出时明确选择释放占号'}); }
+          catch (error) { if (error instanceof DrawingDeletionError) throw new ProductCleanupError('PRODUCT_CLEANUP_BLOCKED', `${row.fullCode}：${error.message}；本次操作已回滚`);throw error; }
+        }
+      }
       this.db.prepare(`insert into product_cleanup_events(product_id, identity_json, summary_json, created_at)
-        values (?, ?, ?, ?)`).run(productId, JSON.stringify({ model: preview.model, sku: preview.sku }), JSON.stringify(preview), now);
+        values (?, ?, ?, ?)`).run(productId, JSON.stringify({ model: preview.model, sku: preview.sku }), JSON.stringify({...preview, selection:selection ? {occupancy:selection.occupancy,history:selection.history} : {occupancy:'retain_occupied',history:'retain'}}), now);
       return preview;
     }).immediate();
   }
