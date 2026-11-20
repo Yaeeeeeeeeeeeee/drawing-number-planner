@@ -99,7 +99,7 @@ export async function archivePackagingTask(service:PackagingTaskService,id:strin
   }
   service.store.state(id,'awaiting_index');
   service.assertWorkspace(id);
-  const scan=await service.options.files.scanProducts([task.productDirectory]);
+  const scan=await service.options.files.scanProducts([task.productDirectory], undefined, { source: 'archive', packagingTaskId: task.id });
   service.db.transaction(()=>{
    service.validateTaskDrawings(service.store.task(id));
    for(const journal of journals){

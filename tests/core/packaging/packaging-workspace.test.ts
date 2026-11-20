@@ -10,3 +10,17 @@ it('discovers exact existing category/SKU-model directories and adds sibling00 w
 it('rejects ambiguous and shared physical directories rather than selecting or constructing another',()=>{const f=fixture();mkdirSync(join(f.dir,'category','ONE-MODEL'),{recursive:true});f.db.prepare("insert into material_batches(relative_path,product_directory,product_id,detected_product_category,detected_sku,detected_model,name,recognition_status,is_present,first_seen_at,last_seen_at) values('legacy/ONE-MODEL/02.未转曲源文件','legacy/ONE-MODEL',?,'category','ONE','MODEL','base','recognized',1,'now','now')").run(f.first);mkdirSync(join(f.dir,'legacy','ONE-MODEL'),{recursive:true});expect(f.workspace.productDirectories(f.first)).toHaveLength(2);expect(()=>f.workspace.resolveProductDirectory(f.first)).toThrow();expect(f.workspace.resolveProductDirectory(f.first,'legacy/ONE-MODEL').relativePath).toBe('legacy/ONE-MODEL');f.db.prepare("update products set sku='ONE',model='MODEL',product_category='category' where id=?").run(f.second);expect(()=>f.workspace.resolveProductDirectory(f.first,'category/ONE-MODEL')).toThrow();});
 it('rejects traversal, symlink ancestors and case aliases while allowing new canonical directories',()=>{const f=fixture();expect(f.workspace.resolveProductDirectory(f.first)).toMatchObject({relativePath:'category/ONE-MODEL',exists:false});for(const path of ['../x','category/../x','C:\\x','/x','category//x','category/file:stream'])expect(()=>f.workspace.path(path)).toThrow();mkdirSync(join(f.dir,'Category'));expect(()=>f.workspace.path('category/ONE-MODEL')).toThrow();symlinkSync(f.dir,join(f.dir,'linked'));expect(()=>f.workspace.path('linked/escape.pdf')).toThrow();expect(()=>f.workspace.createTaskDirectory('category/ONE-MODEL','../bad','task')).toThrow();});
 it('treats merged raw product directory claims as one identity',()=>{const f=fixture();f.db.prepare("update products set sku='OLD',model='MODEL' where id=?").run(f.second);f.db.prepare('insert into product_identity_members(raw_product_id,canonical_product_id) values(?,?) on conflict(raw_product_id) do update set canonical_product_id=excluded.canonical_product_id').run(f.second,f.first);mkdirSync(join(f.dir,'category','OLD-MODEL'),{recursive:true});expect(f.workspace.productDirectories(f.first)).toContainEqual({productId:f.first,relativePath:'category/OLD-MODEL',exists:true});});
+
+
+it('keeps archived paths and rejects shared ownership in the asynchronous scan lookup', async () => {
+  const f = fixture();
+  mkdirSync(join(f.dir, 'legacy', 'ARCHIVE'), { recursive: true });
+  f.db.prepare(`insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,is_present,first_seen_at,last_seen_at)
+    values('legacy/ARCHIVE/03.批次','legacy/ARCHIVE',?,'base','recognized',1,'now','now')`).run(f.first);
+  await expect(f.workspace.directoriesForScan([f.first], f.dir, {})).resolves.toEqual([
+    { productId: f.first, relativePath: 'legacy/ARCHIVE', exists: true },
+  ]);
+  f.db.prepare(`insert into material_batches(relative_path,product_directory,product_id,name,recognition_status,is_present,first_seen_at,last_seen_at)
+    values('legacy/ARCHIVE/03.另一个批次','legacy/ARCHIVE',?,'other','recognized',1,'now','now')`).run(f.second);
+  await expect(f.workspace.directoriesForScan([f.first], f.dir, {})).rejects.toMatchObject({ code: 'PACKAGING_DIRECTORY_SHARED' });
+});

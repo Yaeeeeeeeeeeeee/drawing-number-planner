@@ -1,3 +1,4 @@
+import { scanExecutionLabel, scanExecutionProgress, useOwnedScanProgress } from '../useScanProgress';
 import { templateRanges } from './packaging-dimensions';
 import { isMaterialDirectory } from '../../../core/files/material-directory-policy';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -77,7 +78,7 @@ export function PackagingTasks({api,catalog,lookups,target,onCatalogChanged,acti
     finally{if(request===mutationRequest.current)mutation.current=false;}
   };
   return <section className="pkg-tasks" aria-label="制图任务管理"><div className="pkg-section-heading"><h2>{selected?'任务详情':'创建与任务记录'}</h2><button type="button" disabled={busy} onClick={async()=>{setBusy(true);setError('');setMessage('');try{if(await refresh())setMessage('任务记录已刷新');}catch(e){setError(errorText(e));}finally{setBusy(false);}}}>刷新任务记录</button></div>
-    {selected?<TaskDetail active={active} refreshTask={refreshTask} runTask={runTask} key={selected.id} packaging={packaging} task={selected} catalog={catalog} brands={lookups.brands} productId={selected.productId} productTitle={`${lookups.products.find(p=>p.id===selected.productId)?.brandName??''} · ${selected.model}`} onCatalogChanged={onCatalogChanged} onBack={()=>{detailRequest.current++;setSelected(null);void refresh().catch(e=>setError(errorText(e)));}}/>:<>
+    {selected?<TaskDetail readScanStatus={api.getPdfScanStatus} active={active} refreshTask={refreshTask} runTask={runTask} key={selected.id} packaging={packaging} task={selected} catalog={catalog} brands={lookups.brands} productId={selected.productId} productTitle={`${lookups.products.find(p=>p.id===selected.productId)?.brandName??''} · ${selected.model}`} onCatalogChanged={onCatalogChanged} onBack={()=>{detailRequest.current++;setSelected(null);void refresh().catch(e=>setError(errorText(e)));}}/>:<>
       <div className="pkg-editor pkg-task-create"><h3>{product?`${product.brandName} · ${product.model}`:'创建制图任务'}</h3><div className="pkg-fields"><label>产品型号<select value={productId||''} disabled={busy||Boolean(target)} onChange={event=>{setProductId(Number(event.target.value));setRefs([]);}}><option value="">请选择产品</option>{lookups.products.map(product=><option key={product.id} value={product.id}>{productLabel(product)}</option>)}</select></label>{!fromPlanning&&<label>任务类型<select value={type} disabled={busy} onChange={event=>{setType(event.target.value as 'new'|'modify');setRefs([]);setSourceChoices({});}}><option value="new">新建文件</option><option value="modify">修改正式文件</option></select></label>}{productId>0&&(directories.length!==1||!directories[0]?.exists)&&<label>实际产品目录<select value={directory} disabled={busy} onChange={event=>setDirectory(event.target.value)}><option value="">{directories.length>1?'存在多个目录，请明确选择':'请核对目录'}</option>{directories.map((d,index)=><option key={`${d.relativePath}-${index}`} value={d.relativePath}>{d.relativePath}{d.exists?'':'（尚未建立）'}</option>)}</select></label>}</div>
       {productId>0&&directories.length===0&&<p className="pkg-muted">未找到实际产品目录，请在 PDF 文件中心扫描或核对产品档案。</p>}
       {activeTask?<div className="pkg-active-notice"><strong>{activeTask.model} 已有未完成制图任务</strong><span className="pkg-state">{taskLabel(activeTask)}</span><button type="button" disabled={busy} onClick={()=>void openTask(activeTask.id)}>继续任务</button></div>:<>
@@ -103,12 +104,29 @@ export function localTime(value:string):string {
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
 }
 
-function TaskDetail({packaging,task,catalog,brands,productId,productTitle,onBack,onCatalogChanged,active,refreshTask,runTask}:{active:boolean;refreshTask(id:string):Promise<void>;runTask(operation:()=>Promise<PackagingTask>):Promise<void>;packaging:PackagingApi;task:PackagingTask;catalog:PackagingCatalog;brands:PackagingLookups['brands'];productId:number;productTitle:string;onBack():void;onCatalogChanged():Promise<void>}) {
+function TaskDetail({readScanStatus,packaging,task,catalog,brands,productId,productTitle,onBack,onCatalogChanged,active,refreshTask,runTask}:{readScanStatus:PlannerApi['getPdfScanStatus'];active:boolean;refreshTask(id:string):Promise<void>;runTask(operation:()=>Promise<PackagingTask>):Promise<void>;packaging:PackagingApi;task:PackagingTask;catalog:PackagingCatalog;brands:PackagingLookups['brands'];productId:number;productTitle:string;onBack():void;onCatalogChanged():Promise<void>}) {
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [preview,setPreview]=useState<PackagingArchivePreview|null>(null);const [confirmed,setConfirmed]=useState(false);const [previewItem,setPreviewItem]=useState<number|null>(null);const [links,setLinks]=useState<Record<number,string>>({});
   const [dirtyItems,setDirtyItems]=useState<Record<number,boolean>>({});
   const onDirty=useCallback((id:number,dirty:boolean)=>{setDirtyItems(current=>current[id]===dirty?current:{...current,[id]:dirty});if(dirty){setPreview(null);setConfirmed(false);}},[]);
   const hasDrafts=Object.values(dirtyItems).some(Boolean);
   const generating=task.items.some(item=>item.state==='generating');const completed=Boolean(task.endedAt)||task.state==='completed';
+  const indexScan = useOwnedScanProgress(readScanStatus, active && !completed);
+  const ownsIndexScan = (scan: NonNullable<typeof indexScan.status>['active']) =>
+    scan?.source === 'archive' && scan.packagingTaskId === task.id;
+  const activeIndex = indexScan.status?.active ?? null;
+  const recentIndex = indexScan.status?.recent ?? null;
+  const ownActiveIndex = ownsIndexScan(activeIndex) ? activeIndex : null;
+  const ownRecentIndex = ownsIndexScan(recentIndex) ? recentIndex : null;
+  const fileItems = task.items.filter(item => item.mode !== 'none');
+  const confirmedFiles = fileItems.filter(item => item.reviewedSha256 && item.reviewedSha256 === item.sha256).length;
+  const indexLabel = ownActiveIndex
+    ? `${scanExecutionLabel(ownActiveIndex)} · ${scanExecutionProgress(ownActiveIndex)}`
+    : task.state === 'completed' && !task.endedAt ? '已完成'
+    : indexScan.error && task.state === 'awaiting_index' ? '状态未知，正在重试查询'
+    : task.state === 'awaiting_index'
+      ? activeIndex ? '等待当前扫描结束'
+        : ownRecentIndex?.status === 'failed' ? '本次索引扫描失败，可重试' : '等待索引核验，可重试'
+      : '尚未进入归档索引';
   const wasActive=useRef(active);
   useEffect(()=>{
     let live=true;
@@ -121,6 +139,10 @@ function TaskDetail({packaging,task,catalog,brands,productId,productTitle,onBack
   useEffect(()=>{setPreview(null);setConfirmed(false);},[fileVersion,task.state]);
   const act=async(operation:()=>Promise<PackagingTask>,success='')=>{setBusy(true);setError('');setMessage('');setPreview(null);setConfirmed(false);try{await runTask(operation);setMessage(success);}catch(e){setError(errorText(e));}finally{setBusy(false);}};
   return <section className="pkg-task-detail" aria-label="当前制图任务"><div className="pkg-section-heading"><div><h3>{productTitle}</h3><div className="pkg-task-counters"><span>{taskLabel(task)}</span><span>本次文件 {task.items.filter(i=>i.mode!=='none').length}</span><span>已完成 {task.items.filter(i=>i.mode!=='none'&&i.state==='completed').length}</span><span>待处理 {task.items.filter(i=>i.state!=='completed'&&i.state!=='none').length}</span></div></div><button type="button" disabled={busy} onClick={onBack}>返回任务记录</button></div><details className="pkg-diagnostics"><summary>任务诊断信息</summary><p className="pkg-path">任务标识：{task.id}</p><p className="pkg-path">任务目录：{task.taskDirectory}</p></details>{task.error&&<p role="alert" className="pkg-error">{task.error}</p>}
+    <div className="pkg-task-counters" aria-label="制图核验与索引进度">
+      <span>文件核验：{confirmedFiles} / {fileItems.length}</span>
+      <span role="status">资料库索引：{indexLabel}</span>
+    </div>
     <div className="pkg-actions"><button type="button" disabled={busy} onClick={()=>void act(()=>packaging.getTask(task.id),'任务已刷新')}>刷新当前任务</button>{!completed&&<><button type="button" disabled={busy||generating||hasDrafts||task.state!=='active'} onClick={()=>void act(()=>packaging.generate(task.id))}>批量生成待处理项目</button><button type="button" disabled={busy||generating||task.state!=='active'} onClick={()=>void act(()=>packaging.discover(task.id),'已重新检查临时文件')}>识别人工文件</button>{task.state==='awaiting_index'&&<button type="button" disabled={busy||generating||hasDrafts} onClick={()=>void act(()=>packaging.archive(task.id),'归档索引状态已更新')}>重试归档索引</button>}<button type="button" disabled={busy||generating||hasDrafts} onClick={async()=>{setBusy(true);setError('');setConfirmed(false);try{setPreview(await packaging.archivePreview(task.id));}catch(e){setError(errorText(e));}finally{setBusy(false);}}}>归档预览</button></>}</div>
     {hasDrafts&&<p className="pkg-muted">有尚未保存的项目设置，请先保存后批量生成或归档。</p>}{error&&error!==task.error&&<p role="alert" className="pkg-error">{error}</p>}{message&&<p role="status">{message}</p>}
     <div className="pkg-task-table"><div className="pkg-task-columns" aria-hidden="true"><span>完整图号</span><span>项目明细</span><span>颜色</span><span>制作方式</span><span>模板匹配</span><span>文件状态</span><span>操作</span></div><div className="pkg-task-items">{task.items.map(item=><TaskItem key={item.id} packaging={packaging} task={task} item={item} catalog={catalog} brands={brands} productId={productId} disabled={busy||completed||generating||task.state!=='active'} onCatalogChanged={onCatalogChanged} onAction={act} onDirty={onDirty} onPreview={()=>setPreviewItem(item.id)}/>)}</div></div>

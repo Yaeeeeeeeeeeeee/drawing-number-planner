@@ -1,10 +1,10 @@
 import {groupPdfFiles, type PdfFileGroup} from './pdf-list-groups';
-import {useScanProgress} from './useScanProgress';
+import {scanExecutionLabel, scanExecutionProgress, useOwnedScanProgress, useScanProgress} from './useScanProgress';
 import type { FileScanRunView } from '../../core/files/file-types';
 import { ListChecks, Square, FolderInput, CircleOff, RotateCcw, Trash2 } from 'lucide-react';
 import { isSourcePdfPath } from '../../core/files/material-directory-policy';
 import type { AppearanceApi } from '../data/appearance-client';
-import { plannerQueryCache, queryKey } from '../data/query-cache';
+import { plannerQueryCache, publishSuccessfulFileScan, queryKey, scanRunFromSummary, useSuccessfulFileScan } from '../data/query-cache';
 import type { MaterialBatchDeletionPreview, PdfManagementApi, PdfManagementPreview, PdfManagementInput } from '../data/pdf-management-client';
 import './files-management.css';
 import './v4-files.css';
@@ -160,15 +160,23 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const [scanIncomplete,setScanIncomplete]=useState(false);
   const [latestScan,setLatestScan]=useState<FileScanRunView|null>(null);
   const latestScanRequest=useRef(0);
-  const observedScanId=useRef<number|null>(null);
+  const latestKnownScanId=useRef<number | null>(null);
   const currentScan:FileScanRunView|null=latestScan&&(!summary||latestScan.id>summary.scanId)?latestScan:summary?{...summary.comparison,id:summary.scanId,currentTotal:summary.currentTotal,completedAt:summary.scannedAt}:latestScan;
   const productScan=currentScan?.scope?.kind==='products';
   const currentSummary=summary?.scanId===currentScan?.id?summary:null;
+  const changesRequest = useRef(0);
   const [scanChanges, setScanChanges] = useState<FileScanChangesView | null>(null);
   const [showChanges, setShowChanges] = useState(false);
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [scanning, setScanning] = useState(false);
-  const scanProgress=useScanProgress(api.listLocalTasks,active,scanning);
-  const taskActive=!!scanProgress.task&&['queued','running','finalizing'].includes(scanProgress.task.status);
+  const [scanRetry, setScanRetry] = useState<{ productId?: number; category?: string } | null>(null);
+  const [cancellingScan, setCancellingScan] = useState(false);
+  const readOwnedScan = mock ? undefined : api.getPdfScanStatus;
+  const ownedScan = useOwnedScanProgress(readOwnedScan, active, scanning);
+  const scanProgress = useScanProgress(readOwnedScan ? undefined : api.listLocalTasks, active, scanning);
+  const visibleExecution = ownedScan.status?.active ?? ownedScan.status?.recent;
+  const taskActive = readOwnedScan ? Boolean(ownedScan.status?.active) : !!scanProgress.task&&['queued','running','finalizing'].includes(scanProgress.task.status);
+  const scanUnavailable = saving || scanning || taskActive || !settings.configured || !settings.available
+    || Boolean(readOwnedScan && !ownedScan.status);
   const [selectedIds, setSelectedIds] = useState<number[]>([]); const [pendingCleanupIds, setPendingCleanupIds] = useState<number[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [indexClearPreview, setIndexClearPreview] = useState<FileIndexClearPreviewView | null>(null);
@@ -179,7 +187,13 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
 
   const refreshLatestScan=async()=>{
     if(!api.getLatestFileScan)return;const request=++latestScanRequest.current;
-    try{const next=await api.getLatestFileScan();if(request!==latestScanRequest.current)return;setLatestScan(next);metadataSuccess('最近扫描记录');if(observedScanId.current!==next?.id){observedScanId.current=next?.id??null;setScanChanges(null);setShowChanges(false);}}
+    try {
+      const next = await api.getLatestFileScan();
+      if (request !== latestScanRequest.current) return;
+      if (mock) setLatestScan(next);
+      else if (next) publishSuccessfulFileScan(api, next);
+      metadataSuccess('最近扫描记录');
+    }
     catch(reason){if(request===latestScanRequest.current)metadataFailure('最近扫描记录',reason);}
   };
 
@@ -194,7 +208,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     const key=queryKey('pdf:scope',{cacheScope,values,scope});
     currentQueryKey.current=key; loadingMore.current=false; exhaustedQuery.current=null; setLoadMoreError('');
     latestSearch.current = { values, scope, page: requestedPage };
-    const request = ++searchRequest.current; setLoading(true);setError('');
+    const request = ++searchRequest.current; navigationRequest.current++; setLoading(true);setError('');
     try {
       const result = await loadChunks(values,scope,requestedPage);
       if (request !== searchRequest.current) return;
@@ -218,22 +232,13 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     finally{if(request===searchRequest.current)loadingMore.current=false;}
   };
 
-  const previousScanTask=useRef<{id:string;status:string}|null>(null);
-  useEffect(()=>{
-    const task=scanProgress.task;const previous=previousScanTask.current;
-    previousScanTask.current=task?{id:task.id,status:task.status}:null;
-    if(active&&task?.status==='completed'&&previous?.id===task.id&&previous.status!=='completed'&&!scanInFlight.current){
-      plannerQueryCache.invalidate('pdf:');void search(latestSearch.current.values,latestSearch.current.page,latestSearch.current.scope);void refreshLatestScan();void refreshMetadata();
-    }
-  },[active,scanProgress.task]);
-
   useEffect(() => {
     if (!active) return;
     let live = true;
     const request = ++searchRequest.current; setLoading(true); setError('');
     void refreshNavigation();
-    void refreshLatestScan();
     void refreshMetadata();
+    if (mock) void refreshLatestScan();
     currentQueryKey.current=queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope});
     void loadChunks(latestSearch.current.values,latestSearch.current.scope,latestSearch.current.page).then(result => {
       if (!live || request !== searchRequest.current) return;
@@ -243,6 +248,19 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     return () => { live = false; searchRequest.current++; navigationRequest.current++; metadataRequest.current++; latestScanRequest.current++; };
   }, [api, active]);
 
+  useSuccessfulFileScan(api, active && !mock, scan => {
+    const current = latestSearch.current;
+    latestKnownScanId.current = scan.id;
+    setLatestScan(scan);
+    changesRequest.current++;
+    setScanChanges(null);
+    setLoadingChanges(false);
+    if (showChanges) void readScanChanges(scan.id);
+    metadataSuccess('最近扫描记录');
+    void search(current.values, current.page, current.scope);
+    void refreshMetadata();
+  });
+
   useEffect(() => {
     if (!active || processedTarget.current === JSON.stringify(initialTarget)) return;
     processedTarget.current = JSON.stringify(initialTarget);
@@ -251,7 +269,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   }, [initialTarget, active]);
 
   useEffect(() => {
-    const refresh = () => { if (!active || localMutation.current > 0) return; plannerQueryCache.invalidate('pdf:'); void search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope);void refreshLatestScan(); };
+    const refresh = () => { if (!active || localMutation.current > 0) return; plannerQueryCache.invalidate('pdf:'); void search(latestSearch.current.values, latestSearch.current.page, latestSearch.current.scope); };
     window.addEventListener('planner:data-changed', refresh);
     return () => window.removeEventListener('planner:data-changed', refresh);
   }, [api, pageSize, active]);
@@ -327,26 +345,55 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   };
   const scan = async (productId?:number,category?:string) => {
     if(scanInFlight.current)return;scanInFlight.current=true;
+    setScanRetry(null);
     setScanning(true); setError(''); setMessage('');setScanIncomplete(false);
     try {
-      const result = await locally(() => category&&api.packaging?.scanCategory?api.packaging.scanCategory(category):productId&&api.packaging?.scanProduct?api.packaging.scanProduct(productId):api.scanPdfFiles()); plannerQueryCache.invalidate('pdf:'); setSummary(result);setLatestScan({...result.comparison,id:result.scanId,currentTotal:result.currentTotal,completedAt:result.scannedAt});observedScanId.current=result.scanId; setScanChanges(null); setShowChanges(false); setMessage(category?'当前类别扫描完成':productId?'当前型号扫描完成':'资料库扫描完成');
+      const result = await locally(() => category && api.packaging?.scanCategory
+        ? api.packaging.scanCategory(category)
+        : productId && api.packaging?.scanProduct ? api.packaging.scanProduct(productId) : api.scanPdfFiles());
+      if (result.scanId >= (latestKnownScanId.current ?? 0) || mock) setSummary(result);
+      publishSuccessfulFileScan(api, scanRunFromSummary(result));
+      if (mock) {
+        plannerQueryCache.invalidate('pdf:');
+        const current = latestSearch.current;
+        await Promise.all([search(current.values, current.page, current.scope), refreshMetadata()]);
+      }
+      setMessage(category ? '当前类别扫描完成' : productId ? '当前型号扫描完成' : '资料库扫描完成');
     }
-    catch (reason) {setScanIncomplete(true);setError(`扫描未完成：${reason instanceof Error?reason.message:'资料库扫描失败'}`);setScanning(false);scanInFlight.current=false;return;}
-    try {
-      const [, batchItems] = await Promise.all([search(), api.listMaterialBatches({})]);
-      setBatches(batchItems);
-      try { const usage = await api.getDrawingNavigation?.(); setUsageBatches(usage?.batches ?? []);metadataSuccess('图号导航'); } catch(reason) { metadataFailure('图号导航',reason); }
+    catch (reason) {
+      setScanIncomplete(true);
+      setError(`扫描未完成：${reason instanceof Error ? reason.message : '资料库扫描失败'}`);
+      if (readOwnedScan) {
+        setScanRetry({ productId, category });
+        ownedScan.refresh();
+      }
+    } finally {
+      setScanning(false);
+      scanInFlight.current = false;
     }
-    catch (reason) { setError(`扫描已完成，列表刷新失败：${reason instanceof Error?reason.message:'请重新加载列表'}`); }
-    finally { setScanning(false);scanInFlight.current=false; }
   };
-  const viewChanges = async () => {
+  const cancelScan = async (taskId: string) => {
+    setCancellingScan(true);
+    try { await api.cancelLocalTask(taskId); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '扫描取消未受理'); }
+    finally { ownedScan.refresh(); setCancellingScan(false); }
+  };
+  const readScanChanges = async (scanId: number) => {
+    const request = ++changesRequest.current;
+    setLoadingChanges(true);
+    try {
+      const changes = await api.getFileScanChanges(scanId);
+      if (request === changesRequest.current) setScanChanges(changes);
+    } catch (reason) {
+      if (request === changesRequest.current) setError(reason instanceof Error ? reason.message : '扫描变化加载失败');
+    } finally {
+      if (request === changesRequest.current) setLoadingChanges(false);
+    }
+  };
+  const viewChanges = () => {
     if (!currentScan) return;
-    if (scanChanges) { setShowChanges((visible) => !visible); return; }
-    setLoadingChanges(true); setError('');
-    try { setScanChanges(await api.getFileScanChanges(currentScan.id)); setShowChanges(true); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '扫描变化加载失败'); }
-    finally { setLoadingChanges(false); }
+    setShowChanges(!showChanges);
+    if (!showChanges && scanChanges?.scan.id !== currentScan.id) void readScanChanges(currentScan.id);
   };
   const applyFilters=(values:typeof initialFilters)=>{if(values.modifiedFrom&&values.modifiedTo&&values.modifiedFrom>values.modifiedTo){setError('文件变更日期的结束日期不能早于开始日期');return;}setError('');setSelectedIds([]);setSelectedRowId(null);setFilters(values);void search(values,1);};
   const submit = (event: FormEvent) => { event.preventDefault();applyFilters(filters); };
@@ -403,7 +450,8 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       setExpandedPathId(null);
       setFilters(nextFilters);
       setFiles([]); setTotal(0); setBatches([]); setUsageBatches([]);
-      setSummary(null);setLatestScan(null);observedScanId.current=null; setScanChanges(null); setShowChanges(false);setScanIncomplete(false);
+      changesRequest.current++; setLoadingChanges(false);
+      setSummary(null);setLatestScan(null); ownedScan.refresh(); setScanChanges(null); setShowChanges(false);setScanIncomplete(false);
       setMessage(`已清空 ${result.pdfFiles} 条 PDF 索引、${result.qrCodeFiles} 条二维码索引、${result.materialBatches} 个资料批次、${result.scanChanges} 条扫描变化和 ${result.scanRuns} 次扫描记录`);
       await refreshAfterIndexClear(nextFilters); void refreshNavigation(nextFilters);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '清空资料库索引失败'); }
@@ -448,7 +496,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   return <section className="page-surface page-enter files-page">
     <div className="page-sticky-controls"><PageHeader title="PDF 文件中心" description="按产品与资料批次管理 PDF 文件。">
       <span className="record-count">{total} 个索引文件</span></PageHeader>
-    <div className="files-scan-toolbar"><span className="files-root-path" title={settings.workspaceRoot??''}>{settings.workspaceRoot??'尚未设置资料根目录'}</span><span>PDF {navigationCounts?.total??total}</span><span>未匹配 {unmatchedCount??'—'}</span><button className="text-button" type="button" aria-expanded={showScanDetails} onClick={()=>setShowScanDetails(!showScanDetails)}>详细信息</button><button className="text-button" type="button" onClick={()=>{resetTableLayouts('pdf-files');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button>{api.packaging?.scanProduct&&<button type="button" disabled={saving||scanning||taskActive||!settings.configured||!settings.available||!navigationScope.productId} onClick={()=>void scan(navigationScope.productId)}>扫描当前型号</button>}{api.packaging?.scanCategory&&<button type="button" disabled={saving||scanning||taskActive||!settings.configured||!settings.available||!currentCategory} onClick={()=>void scan(undefined,currentCategory)}>扫描当前类别</button>}<button className="primary-button" type="button" disabled={saving||scanning||taskActive||!settings.configured||!settings.available} onClick={()=>void scan()}>{scanning?'扫描中…':'扫描资料库'}</button></div></div>
+    <div className="files-scan-toolbar"><span className="files-root-path" title={settings.workspaceRoot??''}>{settings.workspaceRoot??'尚未设置资料根目录'}</span><span>PDF {navigationCounts?.total??total}</span><span>未匹配 {unmatchedCount??'—'}</span><button className="text-button" type="button" aria-expanded={showScanDetails} onClick={()=>setShowScanDetails(!showScanDetails)}>详细信息</button><button className="text-button" type="button" onClick={()=>{resetTableLayouts('pdf-files');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button>{api.packaging?.scanProduct&&<button type="button" disabled={scanUnavailable||!navigationScope.productId} onClick={()=>void scan(navigationScope.productId)}>扫描当前型号</button>}{api.packaging?.scanCategory&&<button type="button" disabled={scanUnavailable||!currentCategory} onClick={()=>void scan(undefined,currentCategory)}>扫描当前类别</button>}<button className="primary-button" type="button" disabled={scanUnavailable} onClick={()=>void scan()}>{scanning?(readOwnedScan ? (taskActive ? '扫描中…' : '正在请求扫描…') : '扫描中…'):'扫描资料库'}</button></div></div>
     <details className="files-scan-details" open={showScanDetails}>
     <section className="workspace-strip" aria-label="资料根目录设置">
       <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
@@ -468,7 +516,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
         <span>{currentScan.unchanged} 无变化</span>{currentSummary&&<span>0 扫描失败</span>}</div>
         <button className="text-button" type="button" disabled={loadingChanges} aria-expanded={showChanges}
           aria-controls="scan-change-details" onClick={() => void viewChanges()}>{loadingChanges ? '加载变化中…' : showChanges ? '收起本次变化' : '查看本次变化'}</button></section>
-      {showChanges && scanChanges && <section id="scan-change-details" className="scan-change-details" aria-label="本次扫描变化详情">
+      {showChanges && scanChanges?.scan.id === currentScan.id && <section id="scan-change-details" className="scan-change-details" aria-label="本次扫描变化详情">
         <p className="files-stat-scope">{scanScopeLabel((scanChanges.scan as FileScanRunView).scope??currentScan.scope,'变化范围')}</p>
         {([['新增', scanChanges.changes.added], ['删除/缺失', scanChanges.changes.missing], ['变化', scanChanges.changes.changed]] as const)
           .map(([label, items]) => <div className="scan-change-group" key={label}><strong>{label}</strong>
@@ -481,6 +529,19 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     {metadataLoading&&<p role="status">加载 PDF 辅助资料…</p>}{Object.keys(metadataErrors).length>0&&<p role="alert" className="error-banner">PDF 辅助资料加载失败：{Object.entries(metadataErrors).map(([name,reason])=>`${name}：${reason}`).join("；")}<button type="button" onClick={()=>{void refreshMetadata();void refreshNavigation(latestSearch.current.values);void refreshLatestScan();}}>重试 PDF 辅助资料</button></p>}
     {error && <p className="error-banner" role="alert">{error}<button type="button" onClick={()=>void search()}>重新加载 PDF</button></p>}{message && <p className="success-banner" role="status"><strong>{message}</strong></p>}
     {scanIncomplete&&<p className="files-stat-scope" role="status">本次扫描未完成；新增、变化、确认缺失和失败文件数尚未确定。</p>}
+    {scanRetry && <button type="button" disabled={scanUnavailable} onClick={() => void scan(scanRetry.productId, scanRetry.category)}>按原范围重试</button>}
+    {ownedScan.error && <p role="alert">扫描状态未知：{ownedScan.error} <button type="button" onClick={ownedScan.refresh}>重试</button></p>}
+    {visibleExecution && <section className="scan-comparison" role="status" aria-label="扫描任务进度">
+      <strong>{scanExecutionLabel(visibleExecution)}</strong>
+      <span>范围：{visibleExecution.scope.kind === 'workspace' ? '整个资料库' : visibleExecution.scope.productDirectories.join('、')
+        || (visibleExecution.category ?? (visibleExecution.productId ? `型号 #${visibleExecution.productId}` : '正在检查目录'))}</span>
+      <span>开始：{new Date(visibleExecution.startedAt).toLocaleString()}</span>
+      {ownedScan.status?.active && <span>{scanExecutionProgress(visibleExecution)}</span>}
+      {visibleExecution.status === 'running' && visibleExecution.taskId &&
+        <button type="button" disabled={cancellingScan} onClick={() => void cancelScan(visibleExecution.taskId!)}>取消扫描</button>}
+      {visibleExecution.status === 'failed' && <span>{visibleExecution.error} · 上次成功索引保留</span>}
+      {visibleExecution.result && <span>扫描记录 #{visibleExecution.result.scanId} · 新增 {visibleExecution.result.comparison.added} · 更新 {visibleExecution.result.comparison.changed} · 未变化 {visibleExecution.result.comparison.unchanged} · 移动 {visibleExecution.result.comparison.moved}</span>}
+    </section>}
     {scanProgress.error && <p role="alert">扫描状态获取失败：{scanProgress.error} <button type="button" onClick={scanProgress.refresh}>重试</button></p>}
     {scanProgress.task && (!scanning || taskActive) && <section className="scan-comparison" role="status" aria-label="扫描任务进度">
       <strong>{({workspace_scan:'资料库',product_scan:'当前型号',category_scan:'当前类别'} as Record<string,string>)[scanProgress.task.kind]}扫描：{({queued:'等待开始',running:'进行中',finalizing:'写入结果',completed:'已完成',failed:'失败',cancelled:'已取消'} as Record<string,string>)[scanProgress.task.status]}</strong>

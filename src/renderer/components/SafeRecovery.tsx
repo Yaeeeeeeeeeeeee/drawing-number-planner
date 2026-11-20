@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LocalTaskView, PlannerApi } from '../data/client';
 import { resetApiSession } from '../data/client';
 
-type SurfaceStatus = { service: 'stopped' | 'starting' | 'running' | 'failed'; activeTask: LocalTaskView | null };
+type SurfaceStatus = { service: 'stopped' | 'starting' | 'stopping' | 'running' | 'failed'; activeTask: LocalTaskView | null };
 type RecoveryAction = 'terminateTask' | 'reloadRenderer' | 'restartService' | 'relaunchApp' | 'reselectDatabase';
 
 const active = (tasks: LocalTaskView[]) => tasks.find((task) => ['queued', 'running', 'finalizing'].includes(task.status)) ?? null;
@@ -103,9 +103,10 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
   const serviceUnavailable = status.service === 'failed' || status.service === 'stopped';
   const statusText = serviceUnavailable
     ? '本地服务异常'
+    : status.service === 'stopping' ? '正在等待旧服务退出…'
     : status.service === 'starting' ? '正在启动本地服务…'
       : status.activeTask ? `正在${status.activeTask.progress?.message || '处理任务'}…` : '系统正常';
-  const statusBusy = status.service === 'starting' || Boolean(status.activeTask);
+  const statusBusy = status.service === 'starting' || status.service === 'stopping' || Boolean(status.activeTask);
 
   return <div className="safe-recovery integrated-recovery">
     <div className={`system-status ${serviceUnavailable ? 'failed' : statusBusy ? 'busy' : ''}`}>
@@ -118,6 +119,7 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('terminateTask')}>终止当前任务</button>
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('reloadRenderer')}>重新加载界面</button>
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('restartService')}>重启本地服务</button>
+      {busy === 'restartService' && status.service === 'stopping' && <p role="status">旧服务仍在停止，退出后将重新启动。</p>}
       <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('relaunchApp')}>完整恢复应用</button>
       <button type="button" disabled={!desktop?.reselectDatabase || Boolean(busy)} onClick={() => void run('reselectDatabase')}>重新选择数据库</button>
       {message && <p className="recovery-message">{message}</p>}

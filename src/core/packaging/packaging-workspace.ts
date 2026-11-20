@@ -1,4 +1,6 @@
 import { lstatSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
+import { lstat, readdir, realpath } from 'node:fs/promises';
+import type { ScanDirectoryObservation } from '../files/file-service.js';
 import { isAbsolute, join, parse, relative, resolve, win32 } from 'node:path';
 import type { PlannerDatabase } from '../../db/database.js';
 import { buildProductDirectory } from '../files/directory-policy.js';
@@ -16,6 +18,42 @@ export function packagingPathSegments(value:string):string[]{
   return segments;
 }
 function maybeStat(path:string){try{return lstatSync(path);}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return undefined;throw error;}}
+function assertUniqueName(names: string[], segment: string): void {
+  const aliases = names.filter(name => key(name) === key(segment));
+  if (aliases.length > 1 || (aliases.length === 1 && aliases[0] !== segment)) {
+    fail('PACKAGING_PATH_COLLISION', '文件路径存在大小写冲突');
+  }
+}
+
+/** Keep the filesystem request in flight until it actually settles. */
+async function observe<T>(observation: ScanDirectoryObservation, read: () => Promise<T>): Promise<T> {
+  observation.signal?.throwIfAborted();
+  const result = await read();
+  observation.signal?.throwIfAborted();
+  observation.onActivity?.();
+  return result;
+}
+
+async function statForScan(path: string, observation: ScanDirectoryObservation) {
+  return observe(observation, async () => {
+    try { return await lstat(path); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
+  });
+}
+
+async function inspectPathForScan(base: string, segments: string[], observation: ScanDirectoryObservation) {
+  let path = base, stats = await statForScan(path, observation);
+  for (const segment of segments) {
+    if (!stats) return undefined;
+    if (!stats.isDirectory() || stats.isSymbolicLink()) fail('PACKAGING_PATH_INVALID', '文件路径经过链接或非目录');
+    assertUniqueName(await observe(observation, () => readdir(path)), segment);
+    path = join(path, segment);
+    stats = await statForScan(path, observation);
+    if (stats?.isSymbolicLink()) fail('PACKAGING_PATH_INVALID', '文件路径不允许符号链接');
+  }
+  return stats;
+}
+
 /** Validate every existing component, including case aliases on case-sensitive hosts. */
 export function assertSafeAbsolutePath(input:string):string{
   if(!isAbsolute(input))fail('PACKAGING_PATH_INVALID','文件操作需要绝对路径');
@@ -23,8 +61,7 @@ export function assertSafeAbsolutePath(input:string):string{
   for(const segment of relative(current,absolute).split(/[\\/]/u).filter(Boolean)){
     const parent=maybeStat(current);
     if(parent){if(!parent.isDirectory()||parent.isSymbolicLink())fail('PACKAGING_PATH_INVALID','文件路径经过链接或非目录');
-      const aliases=readdirSync(current).filter(name=>key(name)===key(segment));
-      if(aliases.length>1||(aliases.length===1&&aliases[0]!==segment))fail('PACKAGING_PATH_COLLISION','文件路径存在大小写冲突');}
+      assertUniqueName(readdirSync(current),segment);}
     current=join(current,segment);const stats=maybeStat(current);
     if(stats?.isSymbolicLink())fail('PACKAGING_PATH_INVALID','文件路径不允许符号链接');
   }
@@ -52,8 +89,8 @@ export class PackagingWorkspace {
     const row=this.products().find(p=>p.id===productId);if(!row||row.deletedAt||row.status!=='active')return fail('PACKAGING_PRODUCT_INVALID','产品型号不存在或已停用');
     const{id,brandId,brandName,sku,model,productCategory}=row;return{id,brandId,brandName,sku,model,productCategory};
   }
-  private claims():Claim[]{
-    const products=this.products(),canonical=new Map(products.map(p=>[p.id,p.canonicalId]));const result:Claim[]=[];
+  private storedClaims(products: ProductRow[]): Claim[]{
+    const canonical=new Map(products.map(p=>[p.id,p.canonicalId]));const result:Claim[]=[];
     // Existing persisted associations preserve real directory names, including pre-rename paths.
     const rows=this.db.prepare(`select product_directory as path,product_id as productId from material_batches where product_id is not null
       union all select f.relative_path,coalesce(a.product_id,d.product_id,h.product_id,b.product_id) from pdf_files f
@@ -61,6 +98,10 @@ export class PackagingWorkspace {
       left join historical_drawing_numbers h on h.id=f.historical_drawing_id left join material_batches b on b.id=f.material_batch_id
       where coalesce(a.product_id,d.product_id,h.product_id,b.product_id) is not null`).all() as {path:string;productId:number}[];
     for(const row of rows){const segments=packagingPathSegments(row.path);if(segments.length>=2)result.push({path:segments.slice(0,2).join('/'),productId:canonical.get(row.productId)??row.productId});}
+    return result;
+  }
+  private claims():Claim[]{
+    const products=this.products(),result=this.storedClaims(products);
     const root=this.root();
     for(const category of readdirSync(root,{withFileTypes:true})){
       if(!category.isDirectory()&&!category.isSymbolicLink())continue;
@@ -91,6 +132,81 @@ export class PackagingWorkspace {
     if(claims.some(c=>key(c.path)===key(selected.relativePath)&&c.productId!==canonical))fail('PACKAGING_DIRECTORY_SHARED','该资料目录同时属于其他产品型号，不能自动使用');
     this.path(selected.relativePath);return selected;
   }
+  async rootForScan(configured = this.rootGetter(), observation: ScanDirectoryObservation = {}): Promise<string> {
+    if (!configured || !isAbsolute(configured)) return fail('PACKAGING_WORKSPACE_INVALID', '请先配置本机资料根目录');
+    const absolute = resolve(configured);
+    const anchor = parse(absolute).root;
+    const stats = await inspectPathForScan(anchor, relative(anchor, absolute).split(/[\\/]/u).filter(Boolean), observation);
+    if (!stats?.isDirectory()) return fail('PACKAGING_WORKSPACE_INVALID', '资料根目录不可用');
+    return observe(observation, () => realpath(absolute));
+  }
+
+  async directoriesForScan(productIds: number[], workspaceRoot: string, observation: ScanDirectoryObservation,
+    options: { requested?: string; onRejected?: (error: unknown) => void } = {}): Promise<PackagingProductDirectory[]> {
+    const products = this.products();
+    const selected = productIds.map(id => {
+      const product = products.find(row => row.id === id);
+      if (!product || product.deletedAt || product.status !== 'active') return fail('PACKAGING_PRODUCT_INVALID', '产品型号不存在或已停用');
+      return product;
+    });
+    if (!selected.length) return [];
+    const root = await this.rootForScan(workspaceRoot, observation);
+    const claims = this.storedClaims(products);
+    for (const category of await observe(observation, () => readdir(root, { withFileTypes: true }))) {
+      if (!category.isDirectory() && !category.isSymbolicLink()) continue;
+      const matching = products.filter(product => key(product.productCategory) === key(category.name));
+      if (!matching.length) continue;
+      const segments = packagingPathSegments(category.name);
+      if (!(await inspectPathForScan(root, segments, observation))?.isDirectory()) continue;
+      const path = join(root, ...segments);
+      for (const folder of await observe(observation, () => readdir(path, { withFileTypes: true }))) {
+        if (!folder.isDirectory() && !folder.isSymbolicLink()) continue;
+        for (const owner of matching.filter(product => product.sku && key(`${product.sku}-${product.model}`) === key(folder.name))) {
+          claims.push({ path: `${category.name}/${folder.name}`, productId: owner.canonicalId });
+        }
+      }
+    }
+    const canonicalPath = (product: ProductRow) => buildProductDirectory(product).replaceAll('\\', '/');
+    const ownership = new Map<string, Set<number>>();
+    for (const claim of [...claims, ...products.map(product => ({ path: canonicalPath(product), productId: product.canonicalId }))]) {
+      const path = key(claim.path);
+      if (!ownership.has(path)) ownership.set(path, new Set());
+      ownership.get(path)!.add(claim.productId);
+    }
+
+    const result: PackagingProductDirectory[] = [];
+    for (const product of selected) {
+      const directories = new Map(claims.filter(claim => claim.productId === product.canonicalId).map(claim => [key(claim.path), claim.path]));
+      if (!directories.size) {
+        if (!product.sku) {
+          const error = new PackagingFileError('PACKAGING_PRODUCT_INVALID', '产品缺少 SKU，不能自动创建资料目录');
+          if (!options.onRejected) throw error;
+          options.onRejected(error);
+          continue;
+        }
+        const path = canonicalPath(product);
+        directories.set(key(path), path);
+      }
+      if (options.requested && !directories.has(key(options.requested))) {
+        fail('PACKAGING_DIRECTORY_AMBIGUOUS', '产品资料目录不唯一，请明确选择现有目录');
+      }
+      for (const [pathKey, path] of directories) {
+        if (options.requested && pathKey !== key(options.requested)) continue;
+        try {
+          const stats = await inspectPathForScan(root, packagingPathSegments(path), observation);
+          if (stats && !stats.isDirectory()) fail('PACKAGING_PATH_INVALID', '产品资料路径不是目录');
+          if ((ownership.get(pathKey)?.size ?? 0) > 1) fail('PACKAGING_DIRECTORY_SHARED', '该资料目录同时属于其他产品型号，不能自动使用');
+          result.push({ productId: product.id, relativePath: path, exists: Boolean(stats) });
+        } catch (error) {
+          observation.signal?.throwIfAborted();
+          if (!options.onRejected || !(error instanceof PackagingFileError)) throw error;
+          options.onRejected(error);
+        }
+      }
+    }
+    return result;
+  }
+
   createTemporaryDirectories(productIds:number[]):{items:{productId:number;relativePath?:string;created?:boolean;error?:string}[]}{
     return{items:[...new Set(productIds)].map(productId=>{try{const product=this.resolveProductDirectory(productId);const relativePath=`${product.relativePath}/00.临时文件`;const absolute=this.path(relativePath),created=!maybeStat(absolute);ensureSafeDirectory(absolute);return{productId,relativePath,created};}catch(error){return{productId,error:error instanceof Error?error.message:String(error)};}})};
   }

@@ -202,7 +202,7 @@ function buildConditions(filters: DrawingSearchFilters): { sql: string; values: 
     conditions.push(`(record.product_id is null or not exists(select 1 from business_usage usage
       where ${exactUsageIdentity} and usage.batch_id is not null))`);
   }
-  if (filters.status === 'inactive') conditions.push("record.status in ('reserved', 'voided', 'inactive')");
+  if (filters.status === 'inactive') conditions.push("record.status in ('voided', 'inactive')");
   else if (filters.status !== undefined) { conditions.push('record.status = ?'); values.push(filters.status); }
   if (filters.sourcePresence && filters.sourcePresence !== 'all') {
     conditions.push('record.has_source_file = ?'); values.push(filters.sourcePresence === 'present' ? 1 : 0);

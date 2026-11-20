@@ -13,7 +13,7 @@ const create=z.object({productId:numberId,name:z.string().trim().min(1).max(150)
 const item=z.object({templateId:numberId.optional(),dimensionProfileId:numberId.optional(),mode:z.enum(['ait','manual','none','existing']).optional(),ratioLocked:z.boolean().optional(),parameters:z.record(z.string().min(1).max(100).refine(key=>!['__proto__','prototype','constructor'].includes(key)),z.union([z.string().max(1000),z.number().finite()])).optional()}).strict();
 function parsed<T>(schema:z.ZodType<T>,value:unknown):T{const result=schema.safeParse(value);if(!result.success)throw Object.assign(new Error('制图请求参数无效，请核对所选记录和输入内容'),{code:'INVALID_PACKAGING_REQUEST'});return result.data;}
 export function registerPackagingTaskRoutes(app:FastifyInstance,service:PackagingTaskService,automation:WindowsIllustratorAutomation,tasks?:TaskRegistry){
- const failure=(reply:FastifyReply,error:unknown)=>{const value=error as {code?:string;message?:string;details?:unknown};if(!value.code)throw error;const status=/NOT_FOUND/u.test(value.code)?404:/UNAVAILABLE|TIMEOUT|UNSETTLED/u.test(value.code)?503:/BUSY|EXISTS|CHANGED|CONFLICT|IN_PROGRESS/u.test(value.code)?409:422;return reply.code(status).send({error:{code:value.code,message:value.message??'制图操作未完成',details:value.details}});};
+ const failure=(reply:FastifyReply,error:unknown)=>{const value=error as {code?:string;message?:string;details?:unknown};if(!value.code)throw error;const status=/NOT_FOUND/u.test(value.code)?404:/UNAVAILABLE|TIMEOUT|UNSETTLED|SCAN_STOPPING/u.test(value.code)?503:/BUSY|EXISTS|CHANGED|CONFLICT|IN_PROGRESS/u.test(value.code)?409:422;return reply.code(status).send({error:{code:value.code,message:value.message??'制图操作未完成',details:value.details}});};
  const execute=(work:(request:any,reply:FastifyReply)=>unknown)=>async(request:any,reply:FastifyReply)=>{try{return await work(request,reply);}catch(error){return failure(reply,error);}};
  const status=()=>{const blocked=existsSync(join(service.options.dataDir,'illustrator-operations','active-operation.json'));return{platform:process.platform,available:process.platform==='win32'&&!blocked,blocked,message:blocked?'上次 Illustrator 操作尚未核实结束，请执行中断核对':process.platform==='win32'?'将在本机调用 Illustrator；真实模板和字体需在本机检查':'Illustrator 自动制图仅支持已安装 Illustrator 的 Windows 本机；模板和人工文件任务仍可管理'};};
  app.get('/api/packaging/automation',async()=>status());
@@ -21,7 +21,12 @@ export function registerPackagingTaskRoutes(app:FastifyInstance,service:Packagin
  app.post('/api/packaging/templates/:templateId/inspect',execute(async request=>{const id=parsed(z.coerce.number().int().positive(),request.params.templateId),asset=service.options.catalog.templateAsset(id);return automation.inspect({templatePath:asset.absolutePath,expectedTemplateSha256:asset.sha256,fields:asset.template.fields,requiredFonts:asset.template.requiredFonts});}));
  app.get('/api/packaging/product-directories',execute(request=>{const {productId}=parsed(z.object({productId:z.coerce.number().int().positive()}).strict(),request.query);return{items:service.workspace.productDirectories(productId)};}));
  app.post('/api/packaging/create-temporary-directories',execute(request=>{const{productIds}=parsed(z.object({productIds:z.array(numberId).min(1).max(1000)}).strict(),request.body);return service.workspace.createTemporaryDirectories(productIds);}));
- const scanProduct=async (body:unknown,context?:TaskContext)=>{const{productId}=parsed(z.object({productId:numberId}).strict(),body);const directories=service.workspace.productDirectories(productId).map(directory=>service.workspace.resolveProductDirectory(productId,directory.relativePath).relativePath);return service.options.files.scanProducts(directories,context);};
+ const scanProduct=async (body:unknown,context?:TaskContext)=>{
+  const {productId}=parsed(z.object({productId:numberId}).strict(),body);
+  return service.options.files.scanProducts(async (root, observation) =>
+   (await service.workspace.directoriesForScan([productId], root, observation)).map(directory => directory.relativePath),
+   context, {source:'product', productId});
+ };
  const scanCategory=async (body:unknown,context?:TaskContext)=>{
   const{category}=parsed(z.object({category:z.string().trim().min(1).max(500)}).strict(),body);
   const products=service.db.prepare(`select product.id from products product
@@ -29,14 +34,22 @@ export function registerPackagingTaskRoutes(app:FastifyInstance,service:Packagin
    where product.product_category=? and product.status='active' and product.deleted_at is null
     and coalesce(identity.canonical_product_id,product.id)=product.id order by product.id`).all(category) as {id:number}[];
   if(!products.length)throw Object.assign(new Error('当前类别没有可扫描的启用产品'),{code:'PACKAGING_CATEGORY_EMPTY'});
-  const directories=[...new Set(products.flatMap(product=>service.workspace.productDirectories(product.id)
-   .map(directory=>service.workspace.resolveProductDirectory(product.id,directory.relativePath).relativePath)))];
-  return service.options.files.scanProducts(directories,context);
+  return service.options.files.scanProducts(async (root, observation) =>
+   (await service.workspace.directoriesForScan(products.map(product => product.id), root, observation)).map(directory => directory.relativePath),
+   context, {source:'category', category});
  };
  tasks?.register('product_scan',scanProduct);
  tasks?.register('category_scan',scanCategory);
- app.post('/api/packaging/scan-product',execute(request=>scanProduct(request.body)));
- app.post('/api/packaging/scan-category',execute(request=>scanCategory(request.body)));
+ const runScan = async (kind: 'product_scan' | 'category_scan', body: unknown) => {
+  if (!tasks) return kind === 'product_scan' ? scanProduct(body) : scanCategory(body);
+  // Keep the synchronous HTTP response contract while using the same cancellable task as the renderer.
+  const task = await tasks.wait(tasks.create(kind, body).id);
+  if (task.status === 'completed') return task.result;
+  if (task.status === 'cancelled') throw Object.assign(new Error('扫描已取消'), {code: 'SCAN_CANCELLED'});
+  throw Object.assign(new Error(task.error?.message ?? '资料库扫描未完成'), {code: task.error?.code ?? 'SCAN_FAILED'});
+ };
+ app.post('/api/packaging/scan-product',execute(request=>runScan('product_scan', request.body)));
+ app.post('/api/packaging/scan-category',execute(request=>runScan('category_scan', request.body)));
  app.get('/api/packaging/tasks',execute(request=>{const {productId}=parsed(z.object({productId:z.coerce.number().int().positive().optional()}).strict(),request.query);return{items:service.listTasks(productId)};}));
  app.post('/api/packaging/tasks',execute((request,reply)=>service.createTask(parsed(create,request.body)).then(task=>reply.code(201).send(task))));
  app.get('/api/packaging/tasks/:id',execute(request=>service.getTask(parsed(params,request.params).id)));

@@ -74,6 +74,16 @@ describe('desktop recovery controller', () => {
     expect(calls).toEqual(['cancel', 'wait', 'restart', 'notify', 'relaunch', 'exit']);
   });
 
+  it('waits for a scan that is already stopping without submitting another cancellation', async () => {
+    const { controller, dependencies, calls } = fixture({
+      listTasks: vi.fn(async () => [{ id: 'draining', status: 'running', progress: { phase: 'stopping' } }]),
+    });
+    await controller.relaunchApp();
+    expect(dependencies.cancelTask).not.toHaveBeenCalled();
+    expect(dependencies.waitForTask).toHaveBeenCalledWith('draining', 5_000);
+    expect(calls).toEqual(['wait', 'restart', 'notify', 'relaunch', 'exit']);
+  });
+
   it('recovers a failed service without trying to query tasks through it first', async () => {
     const { controller, dependencies, calls } = fixture({
       serviceHealth: vi.fn(() => ({ status: 'failed' as const, restartAttempts: 2, error: 'service exited' })),

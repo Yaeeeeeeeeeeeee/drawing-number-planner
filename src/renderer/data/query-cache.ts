@@ -1,3 +1,6 @@
+import { useEffect, useRef } from 'react';
+import type { FileScanRunView, PdfScanSummaryView } from './client';
+
 interface Cached {value:unknown;expires:number;epoch:number}
 export class QueryCache {
  private results=new Map<string,Cached>();
@@ -23,3 +26,78 @@ export function readPageSize(module:string,fallback=50):number{try{const value=N
 export function savePageSize(module:string,value:number):void{if(!sizes.includes(value))return;try{localStorage.setItem('planner:page-size:'+module,String(value));}catch{/* Browsers may deny storage; query operation remains available. */}}
 export const plannerQueryCache=new QueryCache();
 export function notifyPlannerMutation():void{plannerQueryCache.invalidate();if(typeof window!=='undefined')window.dispatchEvent(new Event('planner:data-changed'));}
+
+type ScanReader = { getLatestFileScan?(): Promise<FileScanRunView | null> };
+type ScanListener = (scan: FileScanRunView) => void;
+interface ScanObservation {
+  latest?: FileScanRunView;
+  listeners: Set<ScanListener>;
+  timer?: ReturnType<typeof setInterval>;
+  reading: boolean;
+}
+const scanObservations = new WeakMap<ScanReader, ScanObservation>();
+
+function scanObservation(api: ScanReader): ScanObservation {
+  let observation = scanObservations.get(api);
+  if (!observation) {
+    observation = { listeners: new Set(), reading: false };
+    scanObservations.set(api, observation);
+  }
+  return observation;
+}
+
+export function publishSuccessfulFileScan(api: ScanReader, scan: FileScanRunView): void {
+  const observation = scanObservation(api);
+  if (!Number.isSafeInteger(scan.id) || scan.id <= (observation.latest?.id ?? 0)) return;
+  observation.latest = scan;
+  plannerQueryCache.invalidate('pdf:');
+  plannerQueryCache.invalidate('drawing:');
+  for (const listener of observation.listeners) listener(scan);
+}
+
+export function scanRunFromSummary(summary: PdfScanSummaryView): FileScanRunView {
+  return { ...summary.comparison, id: summary.scanId, currentTotal: summary.currentTotal, completedAt: summary.scannedAt };
+}
+
+export function observeSuccessfulFileScans(api: ScanReader, listener: ScanListener): () => void {
+  const observation = scanObservation(api);
+  observation.listeners.add(listener);
+  if (observation.latest) listener(observation.latest);
+  if (!observation.timer && api.getLatestFileScan) {
+    const read = async () => {
+      if (observation.reading) return;
+      observation.reading = true;
+      try {
+        const scan = await api.getLatestFileScan!();
+        if (scan) publishSuccessfulFileScan(api, scan);
+      } catch {
+        // Keep the last successful scan and retry while a consumer is visible.
+      } finally {
+        observation.reading = false;
+      }
+    };
+    void read();
+    observation.timer = setInterval(() => void read(), 1500);
+  }
+  return () => {
+    observation.listeners.delete(listener);
+    if (!observation.listeners.size) {
+      clearInterval(observation.timer);
+      observation.timer = undefined;
+    }
+  };
+}
+
+export function useSuccessfulFileScan(api: ScanReader, active: boolean, onScan: ScanListener): void {
+  const callback = useRef(onScan);
+  useEffect(() => { callback.current = onScan; }, [onScan]);
+  const applied = useRef<{ api: ScanReader; id: number } | undefined>(undefined);
+  useEffect(() => {
+    if (!active) return;
+    return observeSuccessfulFileScans(api, scan => {
+      if (applied.current?.api === api && applied.current.id >= scan.id) return;
+      applied.current = { api, id: scan.id };
+      callback.current(scan);
+    });
+  }, [api, active]);
+}

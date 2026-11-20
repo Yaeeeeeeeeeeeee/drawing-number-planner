@@ -523,6 +523,41 @@ describe('PDF quick filters and scan scope',()=>{
     expect(screen.getByText('4 个所选产品范围 PDF 索引')).toBeVisible();
     expect(screen.getByText('1 确认缺失')).toBeVisible();expect(screen.getByText('0 扫描失败')).toBeVisible();
   });
+  it('keeps retry disabled until the stopped scan releases ownership, then retries the same product', async () => {
+    const api = apiFixture(true);
+    const activeScan = {
+      id: 'execution', taskId: 'task', status: 'running', source: 'product',
+      scope: { kind: 'products', productDirectories: ['冰柜/ZC100'] },
+      startedAt: '2026-11-19T00:00:00Z', progress: { phase: 'reading', processed: 0, total: 1, message: '读取' },
+    };
+    let snapshot: unknown = { active: null, recent: null };
+    let reject!: (error: Error) => void;
+    const scanProduct = vi.fn().mockImplementationOnce(() => {
+      snapshot = { active: activeScan, recent: null };
+      return new Promise((_, fail) => { reject = fail; });
+    }).mockRejectedValue(new Error('fixture only'));
+    const cancelLocalTask = vi.fn(async () => {
+      snapshot = { active: { ...activeScan, status: 'stopping' }, recent: null };
+    });
+    Object.assign(api, { packaging: { scanProduct }, getPdfScanStatus: async () => snapshot, cancelLocalTask });
+    render(<FilesPage api={api as never} initialTarget={{productId: 9}} />);
+    const scan = await screen.findByRole('button', { name: '扫描当前型号' });
+    await waitFor(() => expect(scan).toBeEnabled());
+    fireEvent.click(scan);
+    fireEvent.click(await screen.findByRole('button', { name: '取消扫描' }));
+    await screen.findByText('当前型号扫描：停止中');
+    expect(scan).toBeDisabled();
+    expect(cancelLocalTask).toHaveBeenCalledWith('task');
+    expect(scanProduct).toHaveBeenCalledTimes(1);
+    snapshot = { active: null, recent: { ...activeScan, status: 'cancelled' } };
+    reject(new ApiError('TASK_CANCELLED', '任务已取消'));
+    const retry = await screen.findByRole('button', { name: '按原范围重试' });
+    await waitFor(() => expect(retry).toBeEnabled());
+    fireEvent.click(retry);
+    expect(scanProduct.mock.calls).toEqual([[9], [9]]);
+    expect(api.scanPdfFiles).not.toHaveBeenCalled();
+  });
+
   it('keeps the last successful summary and reports unknown counts after an incomplete scan',async()=>{
     const api=apiFixture(true);api.scanPdfFiles.mockRejectedValueOnce(new Error('目录不可访问，上次索引未更改'));
     api.getLatestFileScan.mockResolvedValue({id:10,currentTotal:12,completedAt:'2026-10-30',added:2,missing:3,moved:0,changed:1,unchanged:9});

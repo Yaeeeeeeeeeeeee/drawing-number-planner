@@ -60,16 +60,113 @@ describe('FileService', () => {
       return [];
     };
     settings.setWorkspaceRoot(dataDir);
-    const service = new FileService(repository, settings, scanner);
+    const diagnostic = vi.fn();
+    const service = new FileService(repository, settings, scanner, undefined, diagnostic);
     const registry = new TaskRegistry();
     registry.register('workspace_scan', (_payload, context) => service.scan(context));
     const task = registry.create('workspace_scan', {});
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(registry.get(task.id)?.progress).toMatchObject({ processed: 1, total: 2, phase: 'traversing' });
-    registry.cancel(task.id); release(); await registry.wait(task.id);
+    const owner = service.scanStatus().active;
+    expect(owner?.taskId).toBe(task.id);
+    expect(owner?.id).not.toBe(task.id);
+    registry.cancel(task.id);
+    expect(service.scanStatus().active).toMatchObject({ id: owner?.id, status: 'stopping' });
+    release(); await registry.wait(task.id);
+    expect(diagnostic.mock.calls.map(([entry]) => entry.event)).toEqual(['started', 'cancel-requested', 'cancelled', 'released']);
     expect(registry.get(task.id)?.status).toBe('cancelled');
     expect(repository.latestScan()).toBeNull();
   });
+  it('keeps a timed-out scan in stopping until the current I/O resolves and allows the original scope to retry', async () => {
+    settings.setWorkspaceRoot(dataDir);
+    const completed = await new FileService(repository, settings).scan();
+    let release!: () => void;
+    const io = new Promise<void>(resolve => { release = resolve; });
+    let calls = 0;
+    const service = new FileService(repository, settings, async () => {
+      if (++calls === 1) await io;
+      return [];
+    }, undefined, undefined, {stallTimeoutMs: 25});
+    const originalScope = ['测试/SKU-M'];
+    const registry = new TaskRegistry();
+    registry.register('product_scan', (_, context) => service.scanProducts(originalScope, context));
+    const first = registry.create('product_scan', {});
+    try {
+      await vi.waitFor(() => expect(service.scanStatus().active).toMatchObject({ status: 'stopping', taskId: first.id, stopReason: 'timeout' }));
+      await expect(service.scanProducts(originalScope)).rejects.toMatchObject({ code: 'SCAN_IN_PROGRESS' });
+      expect(() => registry.cancel(first.id)).toThrow(/停止/);
+      expect(repository.latestScan()?.id).toBe(completed.scanId);
+    } finally {
+      release();
+      await registry.wait(first.id);
+    }
+    expect(registry.get(first.id)).toMatchObject({ status: 'failed', error: { code: 'SCAN_TIMEOUT' } });
+    expect(service.scanStatus()).toMatchObject({ active: null, recent: { status: 'failed', stopReason: 'timeout' } });
+    expect(repository.latestScan()?.id).toBe(completed.scanId);
+    const retry = registry.create('product_scan', {});
+    await registry.wait(retry.id);
+    expect(retry.id).not.toBe(first.id);
+    expect(registry.get(retry.id)).toMatchObject({ status: 'completed', result: { scanId: completed.scanId + 1, comparison: {scope: {productDirectories: originalScope}} } });
+  });
+
+  it('keeps waiting past candidate thresholds when no stall timeout is configured', async () => {
+    settings.setWorkspaceRoot(dataDir);
+    let release!: () => void;
+    const reading = new Promise<void>(resolve => { release = resolve; });
+    const service = new FileService(repository, settings, async () => { await reading; return []; });
+    vi.useFakeTimers();
+    const scan = service.scan();
+    try {
+      await vi.advanceTimersByTimeAsync(180_000);
+      expect(service.scanStatus().active?.status).toBe('running');
+      expect(repository.latestScan()).toBeNull();
+    } finally {
+      release();
+      await scan;
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the previous index when cancellation arrives immediately before finalizing', async () => {
+    settings.setWorkspaceRoot(dataDir);
+    const service = new FileService(repository, settings);
+    const previous = await service.scan();
+    const controller = new AbortController();
+    const reason = new Error('cancel at write boundary');
+    const beginFinalizing = vi.fn();
+    await expect(service.scan({
+      id: 'before-commit', signal: controller.signal, beginFinalizing,
+      throwIfCancelled: () => controller.signal.throwIfAborted(),
+      report: progress => { if (progress.phase === 'writing') controller.abort(reason); },
+    })).rejects.toMatchObject({code: 'SCAN_CANCELLED', cause: reason});
+    expect(beginFinalizing).not.toHaveBeenCalled();
+    expect(repository.latestScan()).toEqual(previous.comparison);
+    expect(service.scanStatus().recent?.status).toBe('cancelled');
+  });
+
+  it.each([false, true])('keeps cancellation out of the commit boundary (rollback: %s)', async rollback => {
+    settings.setWorkspaceRoot(dataDir);
+    const service = new FileService(repository, settings);
+    const previous = await service.scan();
+    const registry = new TaskRegistry();
+    registry.register('workspace_scan', (_, context) => service.scan(context));
+    const replace = repository.replaceScan.bind(repository);
+    const task = registry.create('workspace_scan', {});
+    const committing = vi.spyOn(repository, 'replaceScan').mockImplementation((...args) => {
+      expect(service.scanStatus().active).toMatchObject({status: 'finalizing', taskId: task.id});
+      expect(() => registry.cancel(task.id)).toThrow(/不能取消/);
+      if (!rollback) return replace(...args);
+      db.exec(`create temp trigger p02_commit_fail after insert on file_scan_runs
+        begin select raise(abort, 'fixture transaction rollback'); end`);
+      try { return replace(...args); }
+      finally { db.exec('drop trigger temp.p02_commit_fail'); }
+    });
+    await registry.wait(task.id);
+    expect(committing).toHaveBeenCalledOnce();
+    expect(registry.get(task.id)?.status).toBe(rollback ? 'failed' : 'completed');
+    expect(repository.latestScan()?.id).toBe(previous.scanId + (rollback ? 0 : 1));
+  });
+
   it('registers reliable history and leaves malformed or ambiguous codes pending', async () => {
     const workspace = join(dataDir, 'library');
     const source = join(workspace, '01.洗碗机', 'SKDWT040JP-T40', '02.未转曲源文件');
@@ -83,6 +180,35 @@ describe('FileService', () => {
     expect(db.prepare('select full_code from historical_drawing_numbers').all())
       .toEqual([{ full_code: '02.0404.010.0401007' }]);
     expect(service.search({ matchStatus: 'pending' }).items).toHaveLength(2);
+  });
+  it.each([
+    { source: 'watcher' },
+    { source: 'archive', packagingTaskId: 'archive-task-fixture' },
+  ] as const)('keeps the actual $source owner visible after competing scans are rejected', async origin => {
+    settings.setWorkspaceRoot(dataDir);
+    let release!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    const service = new FileService(repository, settings, async (_root, options) => {
+      options?.onProgress?.(1, 2, 'test.pdf');
+      await barrier;
+      return [];
+    });
+    const running = service.scanProducts(['测试/SKU-M'], undefined, origin);
+    try {
+      const owner = service.scanStatus().active;
+      expect(owner).toMatchObject({ ...origin, status: 'running', progress: { processed: 1 } });
+      for (const directories of [['测试/SKU-M'], ['测试/SKU-OTHER']]) {
+        await expect(service.scanProducts(directories)).rejects.toMatchObject({ code: 'SCAN_IN_PROGRESS' });
+        expect(service.scanStatus()).toEqual({ active: owner, recent: null });
+        expect(repository.latestScan()).toBeNull();
+      }
+    } finally {
+      release();
+      await running;
+    }
+    expect(service.scanStatus()).toMatchObject({
+      active: null, recent: { ...origin, status: 'completed', result: { scanId: repository.latestScan()?.id } },
+    });
   });
   it('requires a configured workspace before scanning', async () => {
     await expect(new FileService(repository, settings).scan())
@@ -111,7 +237,12 @@ describe('FileService', () => {
     [], '2026-08-25T00:00:00.000Z');
     const scanner = vi.fn().mockRejectedValue(new Error('access denied'));
 
-    await expect(new FileService(repository, settings, scanner).scan()).rejects.toMatchObject({ code: 'SCAN_FAILED' });
+    const diagnostic = vi.fn();
+    const service = new FileService(repository, settings, scanner, undefined, diagnostic);
+    await expect(service.scan()).rejects.toMatchObject({ code: 'SCAN_FAILED' });
+    expect(service.scanStatus()).toMatchObject({ active: null, recent: { status: 'failed', progress: { phase: 'traversing' } } });
+    expect(diagnostic.mock.calls[1][0]).toMatchObject({ event: 'failed', cause: { message: 'access denied' } });
+    expect(repository.latestScan()?.id).toBe(1);
     expect(repository.search({ presence: 'present' }).items).toEqual([expect.objectContaining({ fileName: 'kept.pdf' })]);
   });
 
@@ -158,7 +289,7 @@ describe('FileService', () => {
     const workspace = join(dataDir, 'library'); mkdirSync(workspace); const material = join(workspace,'测试','SKU-M','02.未转曲源文件'); mkdirSync(material,{recursive:true}); const service = new FileService(repository, settings);
     service.updateSettings({ workspaceRoot: workspace }); rmSync(workspace, { recursive: true }); writeFileSync(workspace, 'not a directory');
 
-    expect(service.getSettings()).toMatchObject({ configured: true, available: false });
+    return expect(service.getSettings()).resolves.toMatchObject({ configured: true, available: false });
   });
 
   it('does not rename, move, or rewrite scanned PDF files', async () => {

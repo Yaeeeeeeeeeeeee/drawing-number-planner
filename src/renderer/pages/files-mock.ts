@@ -1,4 +1,5 @@
-import type { PlannerApi, PdfFileView, MaterialBatchView, ProductView, LocalTaskView, PdfScanSummaryView } from '../data/client';
+import type { PlannerApi, PdfFileView, MaterialBatchView, ProductView, LocalTaskView, PdfScanSummaryView, FileScanRunView } from '../data/client';
+import { scanRunFromSummary } from '../data/query-cache';
 
 export const filesScenarios = { normal: '大量文件 / 多批次', long: '超长文件名与路径', anomalies: '缺失 / 匹配异常', empty: '无数据', 'no-results': '无搜索结果', loading: '加载中', error: '加载失败', 'scan-error': '扫描失败' } as const;
 export type FilesScenario = keyof typeof filesScenarios;
@@ -31,6 +32,7 @@ export function createFilesMockApi(scenario: FilesScenario): PlannerApi {
   let qrCount = 12;
   let scanCount = 1;
   let task: LocalTaskView | null = null;
+  let latestScan: FileScanRunView | null = null;
   const counts = () => ({ pdfFiles: rows.length, qrCodeFiles: qrCount, materialBatches: batches.length, scanChanges: scanCount ? 3 : 0, scanRuns: scanCount });
   const filterRows = (filters: Record<string, any>) => {
       const keyword = String(filters.keyword ?? '').trim().toLowerCase();
@@ -71,14 +73,16 @@ export function createFilesMockApi(scenario: FilesScenario): PlannerApi {
       task.status = 'completed'; task.progress.processed = rows.length; scanCount++;
       const present = rows.filter(row => row.isPresent);
       const summary: PdfScanSummaryView = { total: present.length, currentTotal: present.length + qrCount, matched: present.filter(row => row.matchStatus === 'matched').length, pending: present.filter(row => row.matchStatus === 'pending').length, unmatched: present.filter(row => row.matchStatus === 'unmatched').length, conflict: present.filter(row => row.matchStatus === 'conflict').length, historicalRegistered: 0, source: present.filter(row => row.conversionType === 'source').length, outlined: present.filter(row => row.conversionType === 'outlined').length, missing: rows.filter(row => !row.isPresent).length, scanId: -901, scannedAt: '2026-10-01T09:00:00Z', comparison: { added: 1, missing: 1, moved: 0, changed: 1, unchanged: Math.max(0, present.length + qrCount - 2) } };
+      latestScan = scanRunFromSummary(summary);
       return clone(summary);
     },
+    getLatestFileScan: async () => clone(latestScan),
     listLocalTasks: async () => clone(task ? [task] : []),
     cancelLocalTask: async (id: string) => { if (!task || id !== task.id || task.status !== 'running') throw new Error('Mock：没有可取消的内存任务'); task.cancelRequested = true; return clone(task); },
     getFileScanChanges: async () => ({ scan: { id: -901, completedAt: '2026-10-01T09:00:00Z', currentTotal: rows.filter(row => row.isPresent).length + qrCount, added: 1, missing: 1, moved: 0, changed: 1, unchanged: Math.max(0, rows.filter(row => row.isPresent).length + qrCount - 2) }, changes: { added: [{ id: -1, type: 'added', indexKind: 'qr', fileName: '二维码-预览.png', relativePath: 'MOCK_ONLY/二维码-预览.png', previousRelativePath: null, fullCode: null }], missing: [{ id: -2, type: 'missing', indexKind: 'pdf', fileName: '旧文件-预览.pdf', relativePath: 'MOCK_ONLY/旧文件-预览.pdf', previousRelativePath: null, fullCode: null }], changed: [{ id: -3, type: 'changed', indexKind: 'pdf', fileName: '修改文件-预览.pdf', relativePath: 'MOCK_ONLY/修改文件-预览.pdf', previousRelativePath: null, fullCode: null }] } }),
     getFileIndexClearPreview: async () => ({ workspaceRoot: root, counts: counts() }),
     cleanupPdfFiles: async (ids: number[]) => { if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !rows.some(row => row.id === id && !row.isPresent))) throw new Error('Mock：只能清理已缺失的内存索引'); rows = rows.filter(row => !ids.includes(row.id)); return { cleaned: ids.length }; },
-    clearFileIndex: async (confirmation: string) => { if (confirmation !== '清空资料库索引') throw new Error('Mock：确认短语不正确'); const result = counts(); rows = []; batches = []; qrCount = 0; scanCount = 0; return result; },
+    clearFileIndex: async (confirmation: string) => { if (confirmation !== '清空资料库索引') throw new Error('Mock：确认短语不正确'); const result = counts(); rows = []; batches = []; qrCount = 0; scanCount = 0; latestScan = null; return result; },
   };
   return new Proxy(Object.create(null), { get: (_, name) => ['previewPdfManagement','applyPdfManagement','renameMaterialBatch','diagnoseMaterialBatches'].includes(String(name)) ? undefined : methods[String(name)] ?? (async () => { throw new Error(`Mock 已隔离：${String(name)} 未启用，不会调用真实服务。`); }) }) as PlannerApi;
 }

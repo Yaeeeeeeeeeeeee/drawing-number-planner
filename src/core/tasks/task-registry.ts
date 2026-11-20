@@ -59,15 +59,19 @@ export class TaskRegistry {
     if (task.status !== 'queued' && task.status !== 'running') {
       throw new TaskRegistryError('TASK_NOT_CANCELLABLE', '任务已经进入提交或终结状态，不能取消');
     }
+    if (task.progress.phase === 'stopping') {
+      throw new TaskRegistryError('TASK_NOT_CANCELLABLE', '任务正在停止，请等待读取结束');
+    }
     task.cancelRequested = true;
     task.controller.abort(new TaskRegistryError('TASK_NOT_CANCELLABLE', '任务已由用户取消'));
     return this.snapshot(task);
   }
 
-  async wait(id: string): Promise<void> {
+  async wait(id: string): Promise<LocalTaskView> {
     const task = this.tasks.get(id);
     if (!task) throw new TaskRegistryError('TASK_NOT_FOUND', '任务不存在或已经过期');
     await task.done;
+    return this.snapshot(task);
   }
 
   private async run(task: InternalTask, payload: unknown, handler: LocalTaskHandler): Promise<void> {

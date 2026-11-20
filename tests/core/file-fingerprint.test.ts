@@ -53,4 +53,28 @@ describe('file fingerprints', () => {
     expect(maximumActive).toBeLessThanOrEqual(FINGERPRINT_CONCURRENCY);
     expect(results).toEqual(Array.from({ length: FINGERPRINT_CONCURRENCY * 2 + 3 }, (_, index) => index * 2));
   });
+  it('preserves the first failure and waits for an already issued read without starting another', async () => {
+    let release!: () => void;
+    const reading = new Promise<void>(resolve => { release = resolve; });
+    const started: number[] = [];
+    const firstError = new Error('read failed');
+    let outcome: unknown;
+    const result = mapWithConcurrency([0, 1, 2], 2, async value => {
+      started.push(value);
+      if (value === 0) throw firstError;
+      await reading;
+      return value;
+    }).catch(error => { outcome = error; });
+    try {
+      await new Promise(resolve => setImmediate(resolve));
+      expect(outcome).toBeUndefined();
+      expect(started).toEqual([0, 1]);
+    } finally {
+      release();
+      await result;
+    }
+    expect(outcome).toBe(firstError);
+    expect(started).toEqual([0, 1]);
+  });
+
 });

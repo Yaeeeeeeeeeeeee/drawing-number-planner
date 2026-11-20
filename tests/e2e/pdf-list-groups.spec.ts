@@ -24,7 +24,12 @@ test('groups actual scanned files and retains checked files through folding',asy
   const stream='BT /F1 12 Tf 20 100 Td (SAMKYO ZU70SD material) Tj ET',objects=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
   let pdf='%PDF-1.4\n';const offsets:number[]=[];objects.forEach((object,i)=>{offsets.push(Buffer.byteLength(pdf));pdf+=`${i+1} 0 obj\n${object}\nendobj\n`;});const xref=Buffer.byteLength(pdf);pdf+=`xref\n0 6\n0000000000 65535 f \n${offsets.map(n=>`${String(n).padStart(10,'0')} 00000 n \n`).join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;const bytes=Buffer.from(pdf);
   const paths=dirs.map((dir,i)=>join(dir,names[i]));paths.forEach(path=>writeFileSync(path,bytes));
-  const response=await fetch(server.url+'/api/packaging/scan-category',{method:'POST',headers:{'content-type':'application/json','x-planner-token':server.token,origin:'http://127.0.0.1:5176'},body:JSON.stringify({category:'冰柜'})});expect(response.status).toBe(200);
+  // Startup's watcher can acquire the scan before the manual category request.
+  await expect.poll(async () => {
+    const response=await fetch(server.url+'/api/packaging/scan-category',{method:'POST',headers:{'content-type':'application/json','x-planner-token':server.token,origin:'http://127.0.0.1:5176'},body:JSON.stringify({category:'冰柜'})});
+    if(response.status!==409) expect(response.status, await response.text()).toBe(200);
+    return response.status;
+  }).toBe(200);
   await vite.listen();await page.setViewportSize({width:1600,height:900});await page.goto('http://127.0.0.1:5176/');
   const nav=page.getByRole('navigation',{name:'主导航'});if(!await nav.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await nav.getByRole('button',{name:'PDF 文件中心',exact:true}).click();
   const group=page.getByRole('button',{name:/已加载 2 个版本/});await expect(group).toBeVisible();await expect(page.getByRole('checkbox',{name:`选择 ${names[0]}`,exact:true})).toHaveCount(2);const before=db.prepare('select * from pdf_files order by id').all();await expect(page.getByRole('checkbox',{name:`选择 ${names[2]}`})).toHaveCount(0);

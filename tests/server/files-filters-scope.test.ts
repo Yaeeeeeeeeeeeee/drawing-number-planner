@@ -64,7 +64,7 @@ describe('PDF list date filters and independent scanning',()=>{
     for(const item of records){const path=join(root,...item.relativePath.split('/'));mkdirSync(dirname(path),{recursive:true});writeFileSync(path,`%PDF preserve ${item.fileName}`);}
     const temporary=join(root,...productDirectory.split('/'),'00.临时文件','temporary.pdf');mkdirSync(dirname(temporary),{recursive:true});writeFileSync(temporary,'%PDF temporary');
     await service.scanProducts([productDirectory]);
-    registerPackagingTaskRoutes(app,{options:{files:service},workspace:{productDirectories:()=>[{relativePath:productDirectory}],resolveProductDirectory:()=>({relativePath:productDirectory})}} as never,{} as never);
+    registerPackagingTaskRoutes(app,{options:{files:service},workspace:{directoriesForScan:async()=>[{relativePath:productDirectory}]}} as never,{} as never);
     const latestBatch=repository.search({presence:'all'}).items.find(item=>item.fileName==='new-batch（转曲）.pdf')!.materialBatchId!;
     expect((await app.inject(`/api/files?materialBatchId=${latestBatch}&conversionType=outlined&modifiedFrom=2020-01-01T00%3A00%3A00Z`)).json().total).toBe(1);
     const removed=join(root,...records[1].relativePath.split('/'));unlinkSync(removed);

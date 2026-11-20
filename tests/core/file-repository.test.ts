@@ -172,7 +172,7 @@ describe('FileRepository', () => {
     const drawing = drawingFixture();
 
     expect(repository.replaceScan(records(drawing.id), [], '2026-08-25T04:00:00.000Z'))
-      .toEqual({ missing: 0, historicalRegistered: 0 });
+      .toMatchObject({ missing: 0, historicalRegistered: 0, scan: { id: expect.any(Number) } });
     const result = repository.search({ presence: 'all', page: 1, pageSize: 20 });
 
     expect(result.total).toBe(3);
@@ -283,7 +283,7 @@ describe('FileRepository', () => {
     const updated = { ...records(drawing.id)[0], sizeBytes: 999, modifiedAt: '2026-08-25T05:00:00.000Z' };
 
     expect(repository.replaceScan([updated], [], '2026-08-25T06:00:00.000Z'))
-      .toEqual({ missing: 2, historicalRegistered: 0 });
+      .toMatchObject({ missing: 2, historicalRegistered: 0, scan: { id: 2, currentTotal: 1 } });
 
     expect(repository.search({ presence: 'present', page: 1, pageSize: 20 })).toMatchObject({ total: 1,
       items: [expect.objectContaining({ sizeBytes: 999, scannedAt: '2026-08-25T06:00:00.000Z', isPresent: true })] });
@@ -313,20 +313,24 @@ describe('FileRepository', () => {
     const kept = { ...records(0)[1], relativePath: '测试\\SKU-M\\02.未转曲源文件\\kept.pdf', fileName: 'kept.pdf', contentSha256: 'hash-kept' };
     repository.replaceScan([kept], [], '2026-08-25T04:00:00.000Z');
     const historical = parseDrawingCode('02.0404.010.0401007')!;
-    const before = {
-      files: repository.search({ presence: 'all' }),
-      runs: db.prepare('select count(*) as count from file_scan_runs').get(),
-      historical: db.prepare('select count(*) as count from historical_drawing_numbers').get(),
-    };
-    db.exec(`create trigger reject_scan_change before insert on file_scan_changes
+    const snapshot = () => ({
+      schema: db.prepare('select type,name,sql from sqlite_schema order by name').all(),
+      tables: Object.fromEntries([
+        'schema_migrations', 'pdf_files', 'file_scan_runs', 'file_scan_changes', 'material_batches',
+        'historical_drawing_numbers', 'drawing_numbers', 'drawing_appearance_bindings', 'drawing_association_audit',
+        'pdf_product_assignments', 'pdf_product_assignment_audit', 'qr_code_files',
+      ].map(table => [table, db.prepare(`select * from ${table} order by rowid`).all()])),
+    });
+    const before = snapshot();
+    db.exec(`create temp trigger reject_scan_change before insert on file_scan_changes
       begin select raise(abort, 'scan change rejected'); end`);
 
     expect(() => repository.replaceScan([{ ...kept, relativePath: '测试\\SKU-M\\02.未转曲源文件\\replacement.pdf', fileName: 'replacement.pdf', contentSha256: 'hash-next' }],
       [{ ...historical, directoryContext: null }], '2026-08-26T04:00:00.000Z')).toThrow('scan change rejected');
 
-    expect(repository.search({ presence: 'all' })).toEqual(before.files);
-    expect(db.prepare('select count(*) as count from file_scan_runs').get()).toEqual(before.runs);
-    expect(db.prepare('select count(*) as count from historical_drawing_numbers').get()).toEqual(before.historical);
+    expect(snapshot()).toEqual(before);
+    expect(repository.latestScan()?.id).toBe(1);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
   });
 
   it('exposes canonical product identity for planned and historical PDFs and filters by product ID', () => {

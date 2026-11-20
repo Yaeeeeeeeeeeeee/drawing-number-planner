@@ -94,5 +94,5 @@ it('cancels before index replacement and retains the previous scan',async()=>{
  const f=fixture();pdf(f.root,'类/SKU-M/02.未转曲源文件/a.pdf');await f.service.scan();const before=snapshot(f.db);
  pdf(f.root,'类/SKU-M/02.未转曲源文件/b.pdf');const controller=new AbortController();
  const context={id:'cancel',signal:controller.signal,report:(p:{phase:string})=>{if(p.phase==='reading')controller.abort();},throwIfCancelled:()=>controller.signal.throwIfAborted(),beginFinalizing:()=>{throw new Error('unexpected commit');}};
- await expect(f.service.scan(context)).rejects.toMatchObject({code:'SCAN_FAILED'});expect(snapshot(f.db)).toEqual(before);
+ await expect(f.service.scan(context)).rejects.toMatchObject({code:'SCAN_CANCELLED'});expect(snapshot(f.db)).toEqual(before);
 });

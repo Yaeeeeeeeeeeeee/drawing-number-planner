@@ -1,3 +1,4 @@
+import { drawingBusinessState } from './drawing-library-presentation';
 import type { DrawingDetailView, DrawingFileView, DrawingView, PlannerApi } from '../data/client';
 
 export const DRAWING_LIBRARY_MOCK_QUERY = 'mock=drawing-library';
@@ -66,7 +67,7 @@ export function createDrawingLibraryMockApi(_api?: PlannerApi): PlannerApi {
     const filtered = rows.filter((row) => (!needle || `${row.fullCode} ${row.displayName} ${row.model} ${row.sku ?? ''}`.toLowerCase().includes(needle))
       && (filters.deletionState === 'all' || !filters.deletionState || (filters.deletionState === 'normal' ? !row.deletedAt
         : filters.deletionState === 'deleted-retained' ? row.deletionMode === 'retain_occupied' : row.deletionMode === 'release'))
-      && (!filters.status || row.status === filters.status)
+      && (!filters.status || (filters.status === 'inactive' ? drawingBusinessState(row.status) === 'inactive' : row.status === filters.status))
       && (filters.sourcePresence !== 'missing' || !row.hasSourceFile) && (filters.sourcePresence !== 'present' || row.hasSourceFile)
       && (filters.outlinedPresence !== 'missing' || !row.hasOutlinedFile) && (filters.outlinedPresence !== 'present' || row.hasOutlinedFile));
     const pageSize = Number(filters.pageSize ?? 20); const page = Number(filters.page ?? 1); const start = (page - 1) * pageSize;

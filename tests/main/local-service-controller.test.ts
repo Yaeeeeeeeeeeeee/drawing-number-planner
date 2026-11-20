@@ -319,4 +319,28 @@ describe('LocalServiceController', () => {
     expect(failure?.message).toContain('数据库完整性校验');
     expect(child.killedWith).toContain('SIGTERM');child.emit('exit',null,'SIGTERM');
   });
+  it('does not start a second child while a failed startup is still exiting', async () => {
+    vi.useFakeTimers();
+    const old = new FakeChild(), fresh = new FakeChild();
+    const spawn = vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(fresh);
+    const controller = new LocalServiceController({ entryPath: 'entry.js', config, spawn, startupTimeoutMs: 50 });
+    const failure = controller.start().catch(error => error);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(await failure).toBeInstanceOf(Error);
+    const next = controller.start();
+    void next.catch(() => undefined);
+    try {
+      expect(controller.health().status).toBe('stopping');
+      expect(spawn).toHaveBeenCalledTimes(1);
+    } finally {
+      old.emit('exit', null, 'SIGTERM');
+      await vi.advanceTimersByTimeAsync(0);
+      fresh.emit('message', { type: 'ready', url: 'http://127.0.0.1:4317', token: 'new' });
+      await expect(next).resolves.toMatchObject({ token: 'new' });
+      const stopping = controller.stop();
+      fresh.emit('exit', 0, null);
+      await stopping;
+    }
+  });
+
 });

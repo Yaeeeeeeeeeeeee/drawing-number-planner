@@ -1,7 +1,7 @@
 import type { LocalServiceConnection, LocalServiceHealth } from './local-service-controller.js';
 
 type RecoverableTaskStatus = 'queued' | 'running' | 'finalizing' | 'completed' | 'failed' | 'cancelled';
-export interface RecoverableTask { id: string; status: RecoverableTaskStatus; createdAt: string; kind?: string; progress?: { message?: string } }
+export interface RecoverableTask { id: string; status: RecoverableTaskStatus; createdAt: string; kind?: string; progress?: { message?: string; phase?: string } }
 
 export class RecoveryError extends Error {
   constructor(readonly code: 'TASK_NOT_CANCELLABLE' | 'TASK_CANCEL_TIMEOUT' | 'RECOVERY_BUSY' | 'RECOVERY_FAILED', message: string) {
@@ -87,7 +87,7 @@ export class RecoveryController {
     const tasks = this.dependencies.serviceHealth().status === 'running'
       ? activeTasks(await this.dependencies.listTasks()) : [];
     if (tasks.length > 0) {
-      await Promise.all(tasks.filter((task) => task.status !== 'finalizing')
+      await Promise.all(tasks.filter((task) => task.status !== 'finalizing' && task.progress?.phase !== 'stopping')
         .map((task) => this.dependencies.cancelTask(task.id)));
       const stopped = await Promise.all(tasks.map((task) => this.dependencies.waitForTask(task.id, 5_000)));
       if (stopped.some((done) => !done)) {

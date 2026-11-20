@@ -2,7 +2,7 @@
 
 interface DesktopRecoveryResult { ok: boolean; cancelled?: boolean; error?: { code: string; message: string } }
 interface DesktopRecoveryStatus {
-  service: 'stopped' | 'starting' | 'running' | 'failed';
+  service: 'stopped' | 'starting' | 'stopping' | 'running' | 'failed';
   activeTask: import('./data/client').LocalTaskView | null;
 }
 interface PlannerDesktop {

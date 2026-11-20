@@ -1,4 +1,5 @@
-import {lstatSync,watch,type FSWatcher} from 'node:fs';
+import {watch,type FSWatcher} from 'node:fs';
+import {lstat} from 'node:fs/promises';
 import {join} from 'node:path';
 import type {FileService} from '../files/file-service.js';
 import {isMaterialDirectory} from '../files/material-directory-policy.js';
@@ -68,10 +69,11 @@ export class PackagingMonitor {
   const work=this.drain().catch(error=>{this.error=message(error);});this.inFlight=work;
   void work.finally(()=>{this.inFlight=undefined;if(this.rerun&&!this.closed)this.schedule();});
  }
- private refreshRoot():boolean{
+ private async refreshRoot():Promise<boolean>{
   let root:string;
-  try{root=this.service.workspace.root();}
+  try{root=await this.service.workspace.rootForScan();}
   catch(error){this.watcher?.close();this.watcher=undefined;this.root=null;this.error=message(error);return false;}
+  if(this.closed)return false;
   if(root!==this.lastRoot){
    this.watcher?.close();this.watcher=undefined;this.scans.clear();this.discoveries.clear();this.known.clear();this.tasks.clear();
    this.lastRoot=root;this.catchup=true;
@@ -81,7 +83,7 @@ export class PackagingMonitor {
    try{
     const watcher=watch(root,{recursive:true,persistent:false},(_event,fileName)=>{
      if(this.closed||this.root!==root)return;
-     this.signal(fileName?.toString());
+     void this.signal(root,fileName?.toString()).catch(error=>{this.error=message(error);});
     });
     watcher.on('error',error=>{if(this.closed||this.watcher!==watcher)return;this.error=message(error);watcher.close();this.watcher=undefined;this.catchup=true;});
     this.watcher=watcher;
@@ -89,27 +91,23 @@ export class PackagingMonitor {
   }
   return true;
  }
- private refreshKnown():void{
+ private async refreshKnown(root:string):Promise<void>{
   const products=this.service.db.prepare(`select product.id from products product
    left join product_identity_members identity on identity.raw_product_id=product.id
    where product.deleted_at is null and product.status='active'
     and coalesce(identity.canonical_product_id,product.id)=product.id order by product.id`).all() as Array<{id:number}>;
   const allTasks=this.service.listTasks();
   const claims=new Map<string,{directory:ProductDirectory;owners:Set<number>}>();
-  for(const product of products){
-   try{
-    for(const directory of this.service.workspace.productDirectories(product.id)){
-     if(!directory.exists)continue;
-     try{
-     // Admission must include retained claims from stopped/deleted products too,
-     // using the same ownership guard as explicit product/category scanning.
-     const resolved=this.service.workspace.resolveProductDirectory(product.id,directory.relativePath);
-     const relativePath=normalizeProductDirectories([resolved.relativePath])[0],key=toWorkspacePathKey(relativePath);
-     const claim=claims.get(key)??{directory:{productId:product.id,relativePath},owners:new Set<number>()};claim.owners.add(product.id);claims.set(key,claim);
-     }catch(error){this.error=message(error);}
-    }
-   }catch(error){this.error=message(error);}
-  }
+  try{
+   const directories=await this.service.workspace.directoriesForScan(products.map(product=>product.id),root,{},
+    {onRejected:error=>{this.error=message(error);}});
+   for(const directory of directories){
+    if(!directory.exists)continue;
+    const relativePath=normalizeProductDirectories([directory.relativePath])[0],key=toWorkspacePathKey(relativePath);
+    const claim=claims.get(key)??{directory:{productId:directory.productId,relativePath},owners:new Set<number>()};
+    claim.owners.add(directory.productId);claims.set(key,claim);
+   }
+  }catch(error){this.error=message(error);}
   // All active products participate in formal02/03 watching. Temporary00 and
   // unfinished tasks only decide discovery work; neither grants scan membership.
   this.known=new Map([...claims].filter(([,claim])=>claim.owners.size===1).map(([key,claim])=>[key,claim.directory]));
@@ -119,16 +117,17 @@ export class PackagingMonitor {
   }).map(task=>[task.id,task]));
   for(const id of this.discoveries)if(!this.tasks.has(id))this.discoveries.delete(id);
  }
- private signal(fileName:string|undefined):void{
+ private async signal(root:string,fileName:string|undefined):Promise<void>{
   if(!fileName){this.catchup=true;this.schedule();return;}
   const segments=fileName.split(/[\\/]/u);
   if(segments.some(segment=>!segment||segment==='.'||segment==='..'))return;
   if(segments.length<3){
    // Category/product directory changes may add a new known scope; ordinary metadata is ignored.
    const relativePath=segments.join('/');let directory=false;
-   try{const stat=lstatSync(join(this.root!,...segments));directory=stat.isDirectory()&&!stat.isSymbolicLink();}catch{
+   try{const stat=await lstat(join(root,...segments));directory=stat.isDirectory()&&!stat.isSymbolicLink();}catch{
     directory=[...this.known.values()].some(known=>known.relativePath===relativePath||known.relativePath.startsWith(`${relativePath}/`));
    }
+   if(this.closed||this.root!==root)return;
    if(directory){this.catchup=true;this.schedule();}return;
   }
   let key:string;
@@ -147,9 +146,10 @@ export class PackagingMonitor {
  private async discoverAfterScan(key:string):Promise<void>{for(const task of this.tasks.values())if(toWorkspacePathKey(task.productDirectory)===key){try{await this.service.discover(task.id);}catch(error){this.error=message(error);this.discoveries.add(task.id);}}}
  private async drain():Promise<void>{
   if(this.closed)return;this.error=undefined;
-  if(!this.refreshRoot())return;
+  if(!await this.refreshRoot())return;
   const root=this.root!;
-  this.refreshKnown();
+  await this.refreshKnown(root);
+  if(this.closed)return;
   if(this.catchup){
    this.catchup=false;
    for(const[key,directory]of this.known)if(!this.scans.has(key))this.scans.set(key,{root,relativePath:directory.relativePath,queuedAt:Date.now()});
@@ -157,13 +157,13 @@ export class PackagingMonitor {
   }
   for(const id of [...this.discoveries]){
    if(this.closed)return;
-   if(!this.refreshRoot()||this.root!==root)return;
+   if(!await this.refreshRoot()||this.root!==root)return;
    this.discoveries.delete(id);if(!this.tasks.has(id))continue;
    try{await this.service.discover(id);}catch(error){this.error=message(error);this.discoveries.add(id);}
   }
   for(const[key,scope]of [...this.scans]){
    if(this.closed)return;
-   if(!this.refreshRoot()||this.root!==root)return;
+   if(!await this.refreshRoot()||this.root!==root)return;
    this.scans.delete(key);
    if(scope.root!==root||!this.known.has(key))continue;
    const latest=this.files.latestScan?.();
@@ -177,8 +177,9 @@ export class PackagingMonitor {
      where product.id=? and product.deleted_at is null and product.status='active'
       and coalesce(identity.canonical_product_id,product.id)=product.id`).get(owner.productId);
     if(!eligible)continue;
-    this.service.workspace.resolveProductDirectory(owner.productId,scope.relativePath);
-    await this.files.scanProducts([scope.relativePath]);
+    await this.files.scanProducts([scope.relativePath], undefined, { source: 'watcher', productId: owner.productId },
+     async (currentRoot, observation)=>(await this.service.workspace.directoriesForScan([owner.productId], currentRoot,
+      observation, {requested:scope.relativePath})).map(directory=>directory.relativePath));
     await this.discoverAfterScan(key);
    }
    catch(error){this.error=message(error);this.scans.set(key,scope);}

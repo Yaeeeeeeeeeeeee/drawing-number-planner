@@ -148,7 +148,7 @@ export class FileRepository {
 
   replaceScan(records: FileScanRecord[], historicalCodes: HistoricalDrawingScanRecord[], scannedAt: string,
     qrRecords?: QrFileScanRecord[], workspaceKey?: string, scope: FileScanScope = { kind: 'workspace' }): {
-    missing: number; historicalRegistered: number;
+    missing: number; historicalRegistered: number; scan: FileScanRunView;
   } {
     const directories = scope.kind === 'products' ? normalizeProductDirectories(scope.productDirectories) : undefined;
     if (directories && qrRecords !== undefined) throw new Error('产品 PDF 扫描不能替换二维码索引');
@@ -410,7 +410,10 @@ export class FileRepository {
       // Scope changes do not authorize index cleanup. Unobserved legacy paths
       // retain their IDs, presence and historical/manual relationships.
       const { missing } = this.db.prepare(`select count(*) as missing from pdf_files file where is_present = 0 and ${materialScopeSql}${productScopeSql}`).get() as { missing: number };
-      return { missing, historicalRegistered };
+      // Read the committed-result candidate while rollback is still possible.
+      const scan = this.history.latest();
+      if (!scan || scan.id !== scanRun.id) throw new Error('扫描结果与本次写入记录不一致');
+      return { missing, historicalRegistered, scan };
     }).immediate();
   }
 

@@ -1,3 +1,4 @@
+import type { ScanStatusView } from '../../core/files/file-service.js';
 import { createPackagingApi, type PackagingApi } from './packaging-client';
 import {createPlanningWorkspaceApi,type PlanningWorkspaceApi} from './planning-client';
 import type { DrawingForceReleasePreview } from '../../core/drawings/drawing-force-release-types';
@@ -6,7 +7,7 @@ import { createBomAppearanceApi, type BomAppearanceApi } from './bom-appearance-
 import { createDrawingAppearanceApi, type DrawingAppearanceApi } from './drawing-appearance-client';
 import { createPdfManagementApi, type PdfManagementApi } from './pdf-management-client';
 import { createQrManualApi, type QrManualApi } from './qr-manual-client';
-import { notifyPlannerMutation } from './query-cache';
+import { notifyPlannerMutation, publishSuccessfulFileScan, scanRunFromSummary } from './query-cache';
 export type AppearanceVersionView = AppearanceVersion;
 import type { DrawingNavigationCounts } from '../../core/drawings/drawing-types.js';
 import type { FileNavigationResult } from '../../core/files/file-types.js';
@@ -45,7 +46,7 @@ export interface DrawingView {
   id: number; origin: 'planned' | 'historical'; sku: string | null; fullCode: string; displayName: string;
   productId: number | null; model: string; productCategory: string; brandName: string;
   colorName: string; mainCategoryName: string; projectItemName: string;
-  status: 'reserved' | 'active' | 'voided' | 'inactive'; hasSourceFile: boolean; hasOutlinedFile: boolean;
+  status: import('../../core/drawings/drawing-types.js').DrawingStatus; hasSourceFile: boolean; hasOutlinedFile: boolean;
   dictionaryMappingStatus: 'mapped' | 'unmapped'; batchUsage?: DrawingBatchUsageView; [key: string]: unknown;
   deletedAt: string | null; deletionMode: 'retain_occupied' | 'release' | null;
   deletedPreviousStatus: string | null; deletedReason: string | null; occupied: boolean;
@@ -454,6 +455,7 @@ export interface PlannerApi extends AppearanceApi, BomAppearanceApi, Partial<Dra
   updateWorkspaceSettings(workspaceRoot: string): Promise<WorkspaceSettingsView>;
   scanPdfFiles(): Promise<PdfScanSummaryView>;
   getPdfFilePresence?(id:number):Promise<PdfPresenceView>;
+  getPdfScanStatus?(): Promise<ScanStatusView>;
   getLatestFileScan(): Promise<FileScanRunView | null>;
   getFileScanChanges(id: number): Promise<FileScanChangesView>;
   cleanupPdfFiles(ids: number[]): Promise<{ cleaned: number }>;
@@ -536,7 +538,8 @@ const queryString = (values: object) => {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = init?.method?.toUpperCase() ?? 'GET';
   const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-  const dataMutation = write && !path.includes('preview') && !path.includes('preflight') && !/\/render(?:[?]|$)/.test(path) && !path.startsWith('/api/tasks/');
+  const dataMutation = write && !path.includes('preview') && !path.includes('preflight') && !/\/render(?:[?]|$)/.test(path) && !path.startsWith('/api/tasks/')
+    && !/^\/api\/packaging\/tasks\/[^/]+\/archive$/.test(path);
   const send = async (token = ''): Promise<{ response: Response; body: ResponseBody }> => {
     const headers = { ...(init?.headers as Record<string, string> | undefined), ...(write && token ? { 'x-planner-token': token } : {}) };
     const response = await fetchLocal(path, { ...init, headers });
@@ -590,11 +593,22 @@ const taskInProgress = (status: LocalTaskStatusView) => ['queued', 'running', 'f
 
 async function runLocalTask<T>(kind: 'workspace_scan' | 'product_scan' | 'category_scan' | 'index_clear' | 'excel_import' | 'outbound_package', payload: unknown): Promise<T> {
   let task = await request<LocalTaskView>(`/api/tasks/${kind}`, json('POST', payload));
+  const isScan = kind === 'workspace_scan' || kind === 'product_scan' || kind === 'category_scan';
   while (taskInProgress(task.status)) {
-    task = await request<LocalTaskView>(`/api/tasks/${task.id}`);
+    try { task = await request<LocalTaskView>(`/api/tasks/${task.id}`); }
+    catch (error) {
+      // Keep observing the same task through a dropped connection. Only the user starts another scan.
+      if (!isScan || !(error instanceof ApiError) || !['SERVICE_UNAVAILABLE', 'SERVICE_STOPPING', 'INVALID_RESPONSE'].includes(error.code)) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 500));
+      continue;
+    }
     if (taskInProgress(task.status)) await new Promise((resolve) => window.setTimeout(resolve, 200));
   }
-  if (task.status === 'completed') { notifyPlannerMutation(); return task.result as T; }
+  if (task.status === 'completed') {
+    if (isScan) publishSuccessfulFileScan(apiClient, scanRunFromSummary(task.result as PdfScanSummaryView));
+    else notifyPlannerMutation();
+    return task.result as T;
+  }
   if (task.status === 'failed') throw new ApiError(task.error?.code ?? 'TASK_FAILED', task.error?.message ?? '任务执行失败');
   throw new ApiError('TASK_CANCELLED', '任务已取消');
 }
@@ -739,6 +753,7 @@ export const apiClient: PlannerApi = {
   updateWorkspaceSettings: (workspaceRoot) => request('/api/files/settings', json('PUT', { workspaceRoot })),
   scanPdfFiles: () => runLocalTask('workspace_scan', {}),
   getPdfFilePresence:id=>request(`/api/files/${id}/presence`),
+  getPdfScanStatus: () => request('/api/files/scans/status'),
   getLatestFileScan: () => request('/api/files/scans/latest'),
   getFileScanChanges: (id) => request(`/api/files/scans/${id}/changes`),
   cleanupPdfFiles: (ids) => request('/api/files/cleanup', json('POST', { ids })),

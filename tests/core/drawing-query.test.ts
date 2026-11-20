@@ -572,20 +572,25 @@ describe('V4.1 drawing business state and legacy index compatibility', () => {
      project_item_code, sequence, first_seen_at, last_seen_at)
     values (?, '02', '0209', '01', ?, '04', '01', 7, 'now', 'now')`).run(fullCode, colorCode).lastInsertRowid);
 
-  it('groups inactive business filters across reserved, stopped formal and stopped historical records without rewriting statuses', () => {
+  it('keeps reserved, active and stopped counts distinct without rewriting statuses', () => {
     const history = insertHistory();
     drawings.updateHistoricalStatus(history, 'inactive');
     drawings.transition(ids.first, 'voided');
     const result = drawings.search({ status: 'inactive' });
-    expect(new Set(result.items.map(record => record.id))).toEqual(new Set([ids.first, ids.second, -history]));
-    expect(result.items.find(record => record.id === ids.second)?.status).toBe('reserved');
+    expect(new Set(result.items.map(record => record.id))).toEqual(new Set([ids.first, -history]));
+    expect(result.total).toBe(2);
     expect(result.items.find(record => record.id === ids.first)?.status).toBe('voided');
     expect(drawings.navigationCounts({ status: 'inactive' }).total).toBe(result.total);
     expect(drawings.search({ status: 'voided' }).items.map(record => record.id)).toEqual([ids.first]);
     expect(drawings.search({ status: 'reserved' }).items.map(record => record.id)).toEqual([ids.second]);
+    expect(drawings.navigationCounts({ status: 'reserved' }).total).toBe(1);
+    expect(drawings.get(ids.second).status).toBe('reserved');
     drawings.transition(ids.first, 'active');
     drawings.updateHistoricalStatus(history, 'active');
-    expect(drawings.search({ status: 'inactive' }).items.map(record => record.id)).toEqual([ids.second]);
+    expect(drawings.search({ status: 'inactive' }).total).toBe(0);
+    expect(drawings.navigationCounts({ status: 'inactive' }).total).toBe(0);
+    expect(drawings.search({ status: 'active' }).total).toBe(2);
+    expect(drawings.navigationCounts({ status: 'active' }).total).toBe(2);
   });
 
   it('uses the exact color dictionary for historical codes and identifies unmapped colors without guessing', () => {

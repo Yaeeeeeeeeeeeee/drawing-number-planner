@@ -1,10 +1,10 @@
 import type {DrawingObservedFileRequest,DrawingObservedSection} from '../../core/files/drawing-file-observation';
 import {DrawingForceRelease} from './DrawingForceRelease';
 import {groupDrawingFileSections} from './drawing-file-selection';
-import {drawingCategoryStyle,drawingBusinessState,drawingBusinessLabel,upgradeDrawingColumnLayout} from './drawing-library-presentation';
+import {drawingCategoryStyle,drawingStatusPresentation,upgradeDrawingColumnLayout} from './drawing-library-presentation';
 import './drawing-library.css';
 import './v41-drawings.css';
-import {plannerQueryCache,queryKey} from '../data/query-cache';
+import {plannerQueryCache,queryKey,useSuccessfulFileScan} from '../data/query-cache';
 import type {DrawingAssociationPreviewView,DrawingAssociationResult} from '../data/drawing-appearance-client';
 import { ProductCatalogNavigation, type CatalogNavigationScope, type CatalogNavigationCounts } from '../components/ProductCatalogNavigation';
 import { Copy, X } from 'lucide-react';
@@ -45,6 +45,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const cacheApiId=useMemo(()=>{let id=cacheApiIds.get(api);if(!id){id=nextCacheApiId++;cacheApiIds.set(api,id);}return id;},[api]);
   const disclosureButtons = useRef(new Map<number, HTMLButtonElement>());
   const detailRequest = useRef(0);
+  const detailRefresh = useRef(0);
   const pdfRequest = useRef(0);
   const listRequest = useRef(0);
   const maintainingRef = useRef(false);
@@ -56,6 +57,32 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const [catalogError,setCatalogError]=useState('');
   const [associationResult,setAssociationResult]=useState<DrawingAssociationResult|null>(null);
   const [repairPreview,setRepairPreview]=useState<DrawingAssociationPreviewView|null>(null);
+  const diagnosis = useRef<{ scope: { signedIds?: number[] }; request: number } | null>(null);
+  const [diagnosisLoading, setDiagnosisLoading] = useState(false);
+  const [diagnosisError, setDiagnosisError] = useState('');
+  const closeDiagnosis = () => {
+    diagnosis.current = null;
+    setRepairPreview(null);
+    setDiagnosisLoading(false);
+    setDiagnosisError('');
+  };
+  const refreshDiagnosis = async () => {
+    const current = diagnosis.current;
+    if (!current || !api.previewDrawingAssociations) return;
+    const request = ++current.request;
+    setDiagnosisLoading(true);
+    try {
+      const next = await api.previewDrawingAssociations(current.scope);
+      if (diagnosis.current === current && request === current.request) { setRepairPreview(next); setDiagnosisError(''); }
+    } catch (reason) {
+      if (diagnosis.current === current && request === current.request) {
+        setDiagnosisError(reason instanceof Error ? reason.message : '关联诊断读取失败');
+      }
+    } finally {
+      if (diagnosis.current === current && request === current.request) setDiagnosisLoading(false);
+    }
+  };
+  useEffect(() => () => { if (diagnosis.current) diagnosis.current.request++; }, [api]);
   const [associationProduct,setAssociationProduct]=useState('');
   const [associationReason,setAssociationReason]=useState('');
   const [products, setProducts] = useState<ProductView[]>([]);
@@ -151,8 +178,8 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     const labels=['产品目录','资料批次','图号使用关系'];
     setCatalogError(results.flatMap((result,index)=>result.status==='rejected'?[`${labels[index]}加载失败：${result.reason instanceof Error?result.reason.message:'请重试'}`]:[]).join('；'));
   };
-  const refreshCurrentQuery = async () => {
-    plannerQueryCache.invalidate('drawing:');
+  const refreshCurrentQuery = async (invalidate = true) => {
+    if (invalidate) plannerQueryCache.invalidate('drawing:');
     const current = appliedQuery.current;
     await Promise.all([search(current.values,current.page,current.pageSize,current.scope,true),refreshCatalog()]);
   };
@@ -208,8 +235,21 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     } catch (reason) { if (request === detailRequest.current) setError(reason instanceof Error ? reason.message : '详情加载失败'); }
   };
   const refreshDetail = async (id: number) => {
-    const epoch = detailRequest.current; const detail = await api.getDrawing(id); if (epoch !== detailRequest.current) return; setSelected(current => current?.id === id ? detail : current);
+    const epoch = detailRequest.current, request = ++detailRefresh.current;
+    const detail = await api.getDrawing(id);
+    if (epoch !== detailRequest.current || request !== detailRefresh.current) return;
+    setSelected(current => current?.id === id ? detail : current);
   };
+  useSuccessfulFileScan(api, active && !mockMode, () => {
+    void refreshCurrentQuery(false);
+    void refreshDiagnosis();
+    if (selected && !maintainingRef.current) {
+      const epoch = detailRequest.current;
+      void refreshDetail(selected.id).catch(reason => {
+        if (detailRequest.current === epoch) setError(reason instanceof Error ? reason.message : '图号详情刷新失败');
+      });
+    }
+  });
   const refreshMutationResult = async (id: number, epoch: number) => {
     try { await refreshDetail(id); }
     finally { if (epoch === detailRequest.current) await refreshCurrentQuery(); }
@@ -368,19 +408,20 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
       if(maintainingRef.current)return;
       setMaintaining(true);setError('');setAssociationResult(null);
       void api.classifyDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})})
-        .then(async result=>{setAssociationResult(result);setRepairPreview(null);if(selected)await refreshMutationResult(selected.id,detailRequest.current);else await refreshCurrentQuery();})
+        .then(async result=>{setAssociationResult(result);closeDiagnosis();if(selected)await refreshMutationResult(selected.id,detailRequest.current);else await refreshCurrentQuery();})
         .catch(reason=>setError(reason instanceof Error?reason.message:'自动归类失败，未保存，请重试'))
         .finally(()=>setMaintaining(false));
     }}>{maintaining?'正在归类…':'自动归类'}</button>}
-    {!mockMode && api.previewDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>void api.previewDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})}).then(setRepairPreview).catch(reason=>setError(reason.message))}>诊断图号关联</button>}</div>;
+    {!mockMode && api.previewDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={() => { diagnosis.current = { scope: checkedIds.length ? { signedIds: checkedIds } : {}, request: 0 }; void refreshDiagnosis(); }}>诊断图号关联</button>}</div>;
   return <section className="page-surface page-enter drawing-library-page">
     <PageHeader title="图号库" description=""><span className="record-count">{total} 条记录</span>{drawingActions}</PageHeader>
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
     {catalogError&&<div className="error-banner" role="alert">{catalogError} <button type="button" className="text-button" onClick={()=>void refreshCatalog()}>重试产品目录</button></div>}
 
+    {diagnosisError && <p role="alert" className="error-banner">{diagnosisError}</p>}
     {repairPreview && <section className="drawing-association-preview" aria-label="关联诊断预览"><h3>关联诊断预览</h3>{repairPreview.summary && <p>历史图号已关联 {repairPreview.summary.historicalAssociated} / {repairPreview.summary.historicalTotal} · 正式图号已关联 {repairPreview.summary.plannedAssociated} / {repairPreview.summary.plannedTotal} · 待确认 {repairPreview.summary.ready} · 歧义 {repairPreview.summary.ambiguous} · 冲突 {repairPreview.summary.conflicts}</p>}<div className="drawing-association-records">{repairPreview.records.map(row=><p key={row.signedId}>{row.fullCode} · {{associated:'已确认',ready:'唯一候选，可直接归类','missing-product':'缺少产品依据','missing-version':'缺少关联依据',ambiguous:'候选有歧义',conflict:'依据冲突'}[row.state]} · {row.evidence.join('；')} · {row.targets.map(target=>products.find(product=>product.id===target.productId)?.model??`产品 #${target.productId}`).join('；')}</p>)}</div>
-      <button type="button" disabled={maintaining||!repairPreview.records.some(row=>row.state==='ready')} onClick={()=>{if(maintainingRef.current)return;setMaintaining(true);const targets=repairPreview.records.filter(row=>row.state==='ready').flatMap(row=>row.targets);void api.confirmDrawingAssociations?.({targets,fingerprint:repairPreview.fingerprint,reason:'核验诊断证据后批量确认',confirmed:true}).then(async(result)=>{setAssociationResult(result);setRepairPreview(null);await refreshCurrentQuery();}).catch(reason=>setError(reason.message)).finally(()=>setMaintaining(false));}}>人工确认候选关联</button><button type="button" onClick={()=>setRepairPreview(null)}>关闭预览</button></section>}
+      <button type="button" disabled={maintaining||diagnosisLoading||Boolean(diagnosisError)||!repairPreview.records.some(row=>row.state==='ready')} onClick={()=>{if(maintainingRef.current)return;setMaintaining(true);const targets=repairPreview.records.filter(row=>row.state==='ready').flatMap(row=>row.targets);void api.confirmDrawingAssociations?.({targets,fingerprint:repairPreview.fingerprint,reason:'核验诊断证据后批量确认',confirmed:true}).then(async(result)=>{setAssociationResult(result);closeDiagnosis();await refreshCurrentQuery();}).catch(reason=>setError(reason.message)).finally(()=>setMaintaining(false));}}>人工确认候选关联</button><button type="button" onClick={closeDiagnosis}>关闭预览</button></section>}
     {associationResult && <p role="status" className="drawing-association-result">已更新 {associationResult.updated} 条关联{associationResult.before && associationResult.after && <> · 历史已关联 {associationResult.before.historicalAssociated} → {associationResult.after.historicalAssociated} / {associationResult.after.historicalTotal} · 正式已关联 {associationResult.before.plannedAssociated} → {associationResult.after.plannedAssociated} / {associationResult.after.plannedTotal}</>}<button className="text-button" type="button" aria-label="关闭关联结果" onClick={()=>setAssociationResult(null)}>关闭</button></p>}
     <ModuleWorkspace drawingWorkspace resizable hideLayoutReset navigation={({ collapseControl }) => <ProductCatalogNavigation products={products} batches={catalogBatches} usageBatches={navigationBatches} counts={navigationCounts} scope={scope} onSelect={navigateScope} mode="drawings" mainCategories={mainCategories} collapseControl={collapseControl} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
     <header className="drawing-list-heading"><h2 className="drawing-scope-title">{scopeTitle}</h2><span>{total} 个图号</span><button className="text-button" type="button" onClick={()=>{resetTableLayouts('drawing-library');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button></header>
@@ -388,7 +429,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
     <form className="filter-bar filter-grid drawing-search-bar" onSubmit={submit}>
       <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('主类别', 'mainCategoryId', 'main_category')}
-      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={event => set('status',event.target.value)}><option value="">全部</option><option value="active">使用中</option><option value="inactive">已停用</option></select></label>
+      <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={event => set('status',event.target.value)}><option value="">全部</option><option value="reserved">待启动</option><option value="active">使用中</option><option value="inactive">已停用</option></select></label>
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '查询中…' : '查询'}</button>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
       <button className="text-button" type="button" onClick={clearFilters} disabled={loading}>清除筛选</button>
@@ -420,7 +461,7 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
         { key: 'category', label: '主类别 / 项目',width:210,minWidth:140,align:'center', render: (item) => <span className="drawing-category-project" title={`${item.mainCategoryName} / ${item.projectItemName}`}><span className="drawing-category-badge" style={drawingCategoryStyle(item)}>{item.mainCategoryName}</span><span className="drawing-category-divider" aria-hidden="true">/</span><span className="drawing-project-name">{item.projectItemName}</span></span> },
         { key: 'origin', label: '来源',width:100,minWidth:90,align:'center', render: (item) => <span className="drawing-origin-cell">{item.origin === 'planned' ? '正式规划' : '历史扫描'}{item.dictionaryMappingStatus === 'unmapped' && <small className="mapping-warning">字典待映射</small>}</span> },
         {key:'product',label:'关联产品',width:120,minWidth:100,align:'center',render:item=>item.productId?item.model:'待关联'}, {key:'color',label:'颜色',width:100,minWidth:85,align:'center',render:item=>item.colorName?.trim()||'未识别'},
-        { key: 'status', label: '图号状态',width:130,minWidth:100,align:'center', render: (item) => <span className="drawing-status-summary"><span className="status-text drawing-business-badge" data-state={drawingBusinessState(item.status)} title={item.status==='reserved'?'仅占号，未正式使用':undefined}>{drawingBusinessLabel(item.status)}</span>{item.deletedAt && <span className="mapping-warning">{item.deletionMode === 'retain_occupied' ? '删除·保留占号' : '删除·已释放'}</span>}</span> },
+        { key: 'status', label: '图号状态',width:130,minWidth:100,align:'center', render: (item) => <DrawingStatusBadge drawing={item} /> },
         {key:'actions',label:'操作',width:125,minWidth:110,align:'center',locked:'end',render:item => <button className="text-button" type="button" onClick={event => {event.stopPropagation(); void openDetail(item);}}>查看 / 管理</button>},
 
       ]} />}
@@ -429,6 +470,12 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   </section>;
 }
 
+
+function DrawingStatusBadge({ drawing }: { drawing: DrawingView }) {
+  const { state, label } = drawingStatusPresentation(drawing);
+  return <span className="status-text drawing-business-badge" data-state={state}
+    title={state === 'reserved' ? '仅占号，未正式使用' : undefined}>{label}</span>;
+}
 
 function DrawingDetailPanel({associationEditor, onNavigateBom, selected, contextBatchId, contextProductId, editing, onManage, onCancelManage, onSave, staged, onNavigatePdf, errorMessage, previewOnly = false, maintaining, pdfKeyword, setPdfKeyword, pdfCandidates, selectedPdfId,
   setSelectedPdfId, onClose, onStatus, onOpen, onSearchPdf, onAssociate, onHistoricalStatus,
@@ -449,12 +496,14 @@ function DrawingDetailPanel({associationEditor, onNavigateBom, selected, context
   onError(message: string): void;
 }) {
 
+  const { state, label } = drawingStatusPresentation(selected);
+  const canChangeStatus = !previewOnly && !maintaining && ['reserved', 'active', 'inactive'].includes(state);
   return <aside id={`drawing-detail-${selected.id}`} className="drawing-maintenance workspace-drawing-detail panel-enter" aria-label="图号详情"
     onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
     <header className="drawing-detail-header">
       <div className="drawing-code-inline"><h2 title={selected.fullCode}>{selected.fullCode}</h2><CopyDrawingCode key={selected.fullCode} code={selected.fullCode} /></div>
       <button className="panel-close drawing-close-icon" aria-label="关闭图号详情" disabled={maintaining} onClick={onClose} type="button"><X size={18} strokeWidth={1.8}/></button>
-      <div className="drawing-detail-badges"><span className="drawing-origin-label">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</span><span className="status-text drawing-business-badge" data-state={drawingBusinessState(selected.status)} title={selected.status==='reserved'?'仅占号，未正式使用':undefined}>{drawingBusinessLabel(selected.status)}</span></div>
+      <div className="drawing-detail-badges"><span className="drawing-origin-label">{selected.origin === 'planned' ? '正式规划' : '历史扫描'}{selected.dictionaryMappingStatus === 'unmapped' ? ' · 字典待映射' : ''}</span><DrawingStatusBadge drawing={selected} /></div>
       {selected.displayName?.trim() && selected.displayName.trim() !== selected.fullCode && <p className="detail-name">{selected.displayName}</p>}
     </header>
     {errorMessage && <p className="error-banner" role="alert">{errorMessage}</p>}
@@ -476,10 +525,18 @@ function DrawingDetailPanel({associationEditor, onNavigateBom, selected, context
       <div><dt>首次 BOM</dt><dd>{selected.firstBom ? <button className="text-button" type="button" disabled={!onNavigateBom||previewOnly||maintaining||!selected.firstBom.productId} onClick={()=>{if(selected.firstBom&&onNavigateBom)onNavigateBom({productId:selected.firstBom.productId,bomVersionId:selected.firstBom.id});}}>{selected.firstBom.model} · {selected.firstBom.businessDate??'未记录日期'}</button> : '未进入 BOM'}</dd></div>
     </dl></section>
     <section className="drawing-detail-group"><h3>04 状态与操作</h3>
-      <label className="drawing-business-status"><span>业务状态</span><select aria-label="图号业务状态" disabled={maintaining||Boolean(selected.deletedAt)} value={drawingBusinessState(selected.status)} onChange={event=>{
-        if(selected.origin==='historical')void onHistoricalStatus(event.target.value==='active'?'active':'inactive');
-        else void onStatus(event.target.value==='active'?'active':'voided');
-      }}><option value="active">使用中</option><option value="inactive">已停用</option></select></label>{associationEditor}
+      <label className="drawing-business-status"><span>业务状态</span><select aria-label="图号业务状态"
+        disabled={!canChangeStatus} value={state} onChange={event=>{
+          const target = event.target.value;
+          if (!canChangeStatus || target === state || (target !== 'active' && target !== 'inactive')) return;
+          if (selected.origin === 'historical') void onHistoricalStatus(target);
+          else void onStatus(target === 'active' ? 'active' : 'voided');
+        }}>
+        {state !== 'active' && state !== 'inactive' && <option value={state} disabled>{label}</option>}
+        {state !== 'deleted' && state !== 'historical' && state !== 'unknown' && <>
+          <option value="active">使用中</option><option value="inactive">已停用</option>
+        </>}
+      </select></label>{associationEditor}
     <div className="drawing-detail-toolbar">{editing ? <><button className="primary-button" disabled={maintaining} onClick={onSave} type="button">保存并返回详情</button><button className="secondary-button" disabled={maintaining} onClick={onCancelManage} type="button">取消编辑</button></> : <button className="secondary-button" disabled={previewOnly} onClick={onManage} type="button">改变产品所属</button>}{onNavigatePdf && <button className="text-button" type="button" onClick={onNavigatePdf}>查看 PDF 文件</button>}</div>    {forceReleaseAction}{<section className={`drawing-detail-section danger-zone${!selected.deletedAt && !deletionPreview ? ' danger-compact' : ''}`}>
       {selected.deletedAt ? <><p>删除方式：{selected.deletionMode === 'release' ? '彻底删除并释放图号' : '删除记录并保留占号'}</p>
         {selected.deletedReason && <p className="muted-text">原因：{selected.deletedReason}</p>}

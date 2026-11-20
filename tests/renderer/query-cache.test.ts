@@ -23,3 +23,33 @@ it('bounds retained query results and evicts the least recently used scope',asyn
  await cache.fetch('pdf:three',async()=>3);
  expect(cache.get('pdf:two')).toBeUndefined();expect(cache.get('pdf:one')).toBe(1);expect(cache.get('pdf:three')).toBe(3);
 });
+
+it('observes committed scans once across subscribers and ignores a late older response', async () => {
+  const { observeSuccessfulFileScans, publishSuccessfulFileScan, plannerQueryCache } = await import('../../src/renderer/data/query-cache');
+  const makeScan = (id: number) => ({ id, completedAt: '2026-11-20', currentTotal: 1, added: 1, missing: 0, moved: 0, changed: 0, unchanged: 0 });
+  let finish!: (scan: ReturnType<typeof makeScan>) => void;
+  const api = { getLatestFileScan: vi.fn().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValue(makeScan(8)) };
+  const files = vi.fn();
+  const drawings = vi.fn();
+  const unsubscribeFiles = observeSuccessfulFileScans(api, files);
+  const unsubscribeDrawings = observeSuccessfulFileScans(api, drawings);
+  try {
+    const load = vi.fn().mockResolvedValue('data');
+    await plannerQueryCache.fetch('pdf:list:scan-test', load);
+    expect(api.getLatestFileScan).toHaveBeenCalledTimes(1);
+    publishSuccessfulFileScan(api, makeScan(8));
+    finish(makeScan(7));
+    await Promise.resolve();
+    publishSuccessfulFileScan(api, makeScan(8));
+    expect(files.mock.calls).toEqual([[makeScan(8)]]);
+    expect(drawings.mock.calls).toEqual([[makeScan(8)]]);
+    await plannerQueryCache.fetch('pdf:list:scan-test', load);
+    expect(load).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(api.getLatestFileScan).toHaveBeenCalledTimes(2), { timeout: 2500 });
+    expect(drawings).toHaveBeenCalledTimes(1);
+  } finally {
+    unsubscribeFiles();
+    unsubscribeDrawings();
+    plannerQueryCache.invalidate();
+  }
+});

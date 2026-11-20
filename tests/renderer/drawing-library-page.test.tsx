@@ -395,7 +395,7 @@ describe('DrawingLibraryPage', () => {
     fireEvent.click(await screen.findByText(row.fullCode));
 
     const panel = await screen.findByRole('complementary', { name: '图号详情' });
-    expect(within(panel).getByRole('combobox',{name:'图号业务状态'})).toHaveValue('inactive');
+    expect(within(panel).getByRole('combobox',{name:'图号业务状态'})).toHaveValue('reserved');
     expect(within(panel).getByText('source.pdf')).toBeVisible();
     expect(within(panel).getByText('存在')).toBeVisible();
     expect(within(panel).getByText('未找到对应文件索引，尚未核验磁盘')).toBeVisible();
@@ -914,9 +914,33 @@ it('keeps a reserved number distinct until the user explicitly marks it in use',
  vi.spyOn(window,'confirm').mockReturnValue(true);
  render(<DrawingLibraryPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:record.fullCode}));
  const selector=await screen.findByRole('combobox',{name:'图号业务状态'});
- expect(selector).toHaveValue('inactive');
+ expect(selector).toHaveValue('reserved');
+ expect(within(selector).getByRole('option',{name:'待启动'})).toBeDisabled();
+ expect(document.querySelectorAll('.drawing-business-badge[data-state="reserved"]')).toHaveLength(2);
+ expect(api.activateDrawing).not.toHaveBeenCalled();
  fireEvent.change(selector,{target:{value:'active'}});
  await waitFor(()=>expect(api.activateDrawing).toHaveBeenCalledWith(5));
+});
+
+it.each([
+  {status:'historical', deletedAt:null, deletionMode:null, label:'历史记录 · 状态待核实', state:'historical'},
+  {status:'future-value', deletedAt:null, deletionMode:null, label:'未知状态', state:'unknown'},
+  {status:'reserved', deletedAt:'2026-11-01', deletionMode:'retain_occupied', label:'删除·保留占号', state:'deleted'},
+  {status:'voided', deletedAt:'2026-11-01', deletionMode:'release', label:'删除·已释放', state:'deleted'},
+])('presents $label in the list and detail without enabling write actions', async ({label,state,...recordState}) => {
+ const record={id:5,fullCode:'STATE-FIXTURE',origin:'planned',sourceFiles:[],outlinedFiles:[],currentBomUsage:[],...recordState};
+ const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[record],total:1}),getDrawing:vi.fn().mockResolvedValue(record),activateDrawing:vi.fn(),voidDrawing:vi.fn()};
+ render(<DrawingLibraryPage api={api as never}/>);
+ const button=await screen.findByRole('button',{name:record.fullCode});
+ expect(button.closest('tr')?.querySelector('.drawing-business-badge')).toHaveAttribute('data-state',state);
+ fireEvent.click(button);
+ const panel=await screen.findByRole('complementary',{name:'图号详情'});
+ expect(panel.querySelector('.drawing-business-badge')).toHaveTextContent(label);
+ const select=within(panel).getByRole('combobox',{name:'图号业务状态'});
+ expect(select).toBeDisabled();
+ fireEvent.change(select,{target:{value:'active'}});
+ expect(api.activateDrawing).not.toHaveBeenCalled();
+ expect(api.voidDrawing).not.toHaveBeenCalled();
 });
 
 it('refreshes saved classification counts even when the open detail reload fails',async()=>{
@@ -988,4 +1012,46 @@ it('opens an exact signed drawing identity after navigation and clears stale lis
   fireEvent.click(screen.getByRole('button',{name:`定位图号 ${other.fullCode}`}));
   await waitFor(()=>expect(api.getDrawing).toHaveBeenCalledWith(10));
   expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({productId:1,keyword:''}));
+});
+
+it('refreshes the open diagnosis using its original selection and rejects older scan responses', async () => {
+  const { publishSuccessfulFileScan } = await import('../../src/renderer/data/query-cache');
+  const record = { id: -702, fullCode: '02.0404.010.0401702', origin: 'historical', status: 'active', readOnly: true };
+  const diagnosis = (message: string) => ({
+    fingerprint: message, records: [{ signedId: record.id, fullCode: record.fullCode, state: 'missing-product', evidence: [message], targets: [] }],
+  });
+  const page = (model: string) => ({ items: [{ ...record, model, productId: 7 }], total: 1 });
+  let finishDiagnosis!: (value: ReturnType<typeof diagnosis>) => void;
+  let finishList!: (value: ReturnType<typeof page>) => void;
+  const api = {
+    getLatestFileScan: vi.fn().mockResolvedValue(null),
+    listDictionaries: vi.fn().mockResolvedValue([]),
+    searchDrawings: vi.fn().mockResolvedValueOnce(page('初始型号'))
+      .mockImplementationOnce(() => new Promise(resolve => { finishList = resolve; })).mockResolvedValue(page('新型号')),
+    previewDrawingAssociations: vi.fn().mockResolvedValueOnce(diagnosis('初始诊断'))
+      .mockImplementationOnce(() => new Promise(resolve => { finishDiagnosis = resolve; })).mockResolvedValue(diagnosis('新诊断')),
+    confirmDrawingAssociations: vi.fn(),
+    classifyDrawingAssociations: vi.fn(),
+  };
+  render(<DrawingLibraryPage api={api as never}/>);
+  await screen.findByRole('button', { name: record.fullCode });
+  const row = screen.getByRole('button', { name: record.fullCode }).closest('tr')!;
+  const selected = within(row).getByRole('checkbox');
+  fireEvent.click(selected);
+  fireEvent.click(screen.getByRole('button', { name: '诊断图号关联' }));
+  await screen.findByText(/初始诊断/);
+  const scan = (id: number) => ({ id, completedAt: '2026-11-20', currentTotal: 1, added: 0, missing: 0, moved: 0, changed: 0, unchanged: 1 });
+  act(() => publishSuccessfulFileScan(api, scan(8)));
+  act(() => publishSuccessfulFileScan(api, scan(9)));
+  await screen.findByText(/新诊断/);
+  await screen.findByText('新型号');
+  await act(async () => { finishDiagnosis(diagnosis('迟到诊断')); finishList(page('迟到型号')); });
+  act(() => publishSuccessfulFileScan(api, scan(9)));
+  expect(screen.queryByText(/迟到诊断|迟到型号/)).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '关联诊断预览' })).toHaveTextContent('新诊断');
+  expect(within(screen.getByRole('button', { name: record.fullCode }).closest('tr')!).getByRole('checkbox')).toBeChecked();
+  expect(api.previewDrawingAssociations.mock.calls).toEqual(Array.from({ length: 3 }, () => [{ signedIds: [record.id] }]));
+  expect(api.searchDrawings).toHaveBeenCalledTimes(3);
+  expect(api.confirmDrawingAssociations).not.toHaveBeenCalled();
+  expect(api.classifyDrawingAssociations).not.toHaveBeenCalled();
 });

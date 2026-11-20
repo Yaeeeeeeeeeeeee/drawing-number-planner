@@ -19,7 +19,7 @@ export interface ServiceChild {
 
 export interface LocalServiceConnection { url: string; token: string }
 export type LocalServiceHealth =
-  | { status: 'stopped' | 'starting'; restartAttempts: number }
+  | { status: 'stopped' | 'starting' | 'stopping'; restartAttempts: number }
   | { status: 'running'; url: string; restartAttempts: number }
   | { status: 'failed'; restartAttempts: number; error: string };
 
@@ -83,6 +83,7 @@ export class LocalServiceController {
     if (this.stopping) return this.stopping.promise.then(()=>this.start());
     if (this.connection && this.state.status === 'running') return Promise.resolve({ ...this.connection });
     if (this.startup) return this.startup.promise;
+    if (this.child) return this.stop().then(() => this.start());
     this.intentionalStop = false;
     this.state = { status: 'starting', restartAttempts: 0 };
     return this.spawnService(true);
@@ -99,13 +100,20 @@ export class LocalServiceController {
     if (this.stopping) return this.stopping.promise;
     const stopping = deferred<void>(); this.stopping = stopping;
     this.clearStartup(new Error('本地服务已停止'));
+    this.state = { status: 'stopping', restartAttempts: this.state.restartAttempts };
+    this.diagnostic('stop-requested');
     try { if (child.connected) child.send({ type: 'stop' }); else child.kill('SIGTERM'); }
     catch { child.kill('SIGTERM'); }
     const terminateTimer = setTimeout(() => {
       if (this.child === child) child.kill('SIGTERM');
-      setTimeout(() => { if (this.child === child) child.kill('SIGKILL'); }, this.options.stopTimeoutMs);
     }, this.options.stopTimeoutMs);
-    return stopping.promise.finally(() => clearTimeout(terminateTimer));
+    const killTimer = setTimeout(() => {
+      if (this.child === child) child.kill('SIGKILL');
+    }, 2 * this.options.stopTimeoutMs);
+    return stopping.promise.finally(() => {
+      clearTimeout(terminateTimer);
+      clearTimeout(killTimer);
+    });
   }
 
   async restart(): Promise<LocalServiceConnection> {
@@ -203,9 +211,16 @@ export class LocalServiceController {
 
   private handleProcessError(child: ServiceChild, error: Error): void {
     if (child !== this.child || this.connection) return;
+    if (this.stopping) {
+      if (child.pid === undefined) this.handleExit(child, null, null);
+      return;
+    }
     this.diagnostic('process-error',{error:error.message});
     this.state = { status: 'failed', restartAttempts: this.state.restartAttempts, error: error.message };
-    this.failedStarts.add(child); this.clearStartup(error); this.terminateUnresponsive(child);
+    this.clearStartup(error);
+    if (child.pid === undefined) { this.child = undefined; return; }
+    this.failedStarts.add(child);
+    this.terminateUnresponsive(child);
   }
 
   private handleExit(child: ServiceChild, code: number | null, signal: NodeJS.Signals | null): void {

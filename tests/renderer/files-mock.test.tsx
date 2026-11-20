@@ -132,9 +132,27 @@ describe('PDF renderer-only preview isolation', () => {
     if (scenario === 'error') await expect(api.searchPdfFiles()).rejects.toThrow(/加载失败/);
     else expect((await api.searchPdfFiles()).total).toBe(0);
   });
+  it('exposes only completed scans as the latest in-memory scan', async () => {
+    const api = createFilesMockApi('normal');
+    await expect(api.getLatestFileScan()).resolves.toBeNull();
+    const completed = await api.scanPdfFiles();
+    const latest = { ...completed.comparison, id: completed.scanId, completedAt: completed.scannedAt, currentTotal: completed.currentTotal };
+    await expect(api.getLatestFileScan()).resolves.toEqual(latest);
+
+    const scan = api.scanPdfFiles();
+    await expect(api.getLatestFileScan()).resolves.toEqual(latest);
+    await api.cancelLocalTask((await api.listLocalTasks())[0].id);
+    await expect(scan).rejects.toThrow(/取消/);
+    await expect(api.getLatestFileScan()).resolves.toEqual(latest);
+
+    await api.clearFileIndex('清空资料库索引');
+    await expect(api.getLatestFileScan()).resolves.toBeNull();
+  });
+
   it('preserves memory indices when a simulated scan fails', async () => {
     const api = createFilesMockApi('scan-error');
     await expect(api.scanPdfFiles()).rejects.toThrow(/未更改/);
+    await expect(api.getLatestFileScan()).resolves.toBeNull();
     expect((await api.searchPdfFiles({ presence: 'all' })).total).toBe(150);
   });
 });

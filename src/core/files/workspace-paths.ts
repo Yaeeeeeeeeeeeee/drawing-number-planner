@@ -1,4 +1,5 @@
 import { existsSync, realpathSync, statSync } from 'node:fs';
+import { realpath, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, relative, resolve, win32 } from 'node:path';
 
 import { FileError } from './file-errors.js';
@@ -26,6 +27,26 @@ export function validateWorkspaceRoot(input: string): string {
     if (!statSync(root).isDirectory()) throw new FileError('WORKSPACE_INVALID', '资料根目录不能是文件');
     return root;
   } catch (error) {
+    if (error instanceof FileError) throw error;
+    throw new FileError('WORKSPACE_INVALID', '资料根目录无法访问', { cause: error });
+  }
+}
+
+export async function validateScanWorkspaceRoot(input: string, signal?: AbortSignal): Promise<string> {
+  const raw = input.trim();
+  if (!isAbsolute(raw)) throw new FileError('WORKSPACE_INVALID', '资料根目录必须是已存在的本机绝对目录');
+  try {
+    const root = await realpath(raw).catch(error => {
+      const trimmed = process.platform === 'win32' ? raw : raw.replace(/\\+$/, '');
+      signal?.throwIfAborted();
+      if (trimmed === raw) throw error;
+      return realpath(trimmed);
+    });
+    signal?.throwIfAborted();
+    if (!(await stat(root)).isDirectory()) throw new FileError('WORKSPACE_INVALID', '资料根目录不能是文件');
+    return root;
+  } catch (error) {
+    signal?.throwIfAborted();
     if (error instanceof FileError) throw error;
     throw new FileError('WORKSPACE_INVALID', '资料根目录无法访问', { cause: error });
   }
@@ -89,6 +110,11 @@ export function toWorkspaceRelativePath(rootInput: string, absolutePath: string)
     throw new FileError('PATH_OUTSIDE_WORKSPACE', '扫描文件必须使用绝对路径');
   }
   const candidate = canonicalizeWithExistingAncestor(resolve(absolutePath));
+  return relativeCanonicalWorkspacePath(root, candidate);
+}
+
+/** Both paths have already been resolved against the filesystem. */
+export function relativeCanonicalWorkspacePath(root: string, candidate: string): string {
   assertInside(root, candidate);
   const result = relative(root, candidate);
   validateWorkspaceRelativePath(result);

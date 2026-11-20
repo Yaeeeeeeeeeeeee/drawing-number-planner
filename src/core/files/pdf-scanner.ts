@@ -2,7 +2,7 @@ import { isMaterialDirectory, isMaterialPdfPath } from './directory-policy.js';
 import { lstat, readdir, realpath } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 
-import { toWorkspaceRelativePath, toWorkspacePathKey, validateWorkspaceRelativePath, validateWorkspaceRoot } from './workspace-paths.js';
+import { relativeCanonicalWorkspacePath, toWorkspacePathKey, validateScanWorkspaceRoot, validateWorkspaceRelativePath } from './workspace-paths.js';
 
 export interface ScannedPdfFile {
   absolutePath: string;
@@ -21,6 +21,7 @@ export interface WorkspaceScanOptions {
   signal?: AbortSignal;
   productDirectories?: string[];
   onDirectoryObserved?(absolutePath: string, snapshot: DirectoryScanSnapshot): void;
+  onActivity?(): void;
   onProgress?(processed: number, total: number | null, relativePath: string): void;
 }
 
@@ -49,14 +50,21 @@ export function isPathInProductDirectories(path: string, directories: string[]):
 /** Resolves only after complete traversal of the current scope. Unknown linked
  * content aborts the scan so callers cannot persist a partial list as absence. */
 export async function scanPdfWorkspace(rootInput: string, options: WorkspaceScanOptions = {}): Promise<ScannedPdfFile[]> {
-  const root = validateWorkspaceRoot(rootInput); const files: ScannedPdfFile[] = [];
+  const observed = <T>(value: T): T => {
+    options.signal?.throwIfAborted();
+    options.onActivity?.();
+    return value;
+  };
+  options.signal?.throwIfAborted();
+  const root = observed(await validateScanWorkspaceRoot(rootInput, options.signal));
+  const files: ScannedPdfFile[] = [];
   const walk = async (directory: string): Promise<void> => {
     options.signal?.throwIfAborted();
-    const directoryStats = await lstat(directory);
+    const directoryStats = observed(await lstat(directory));
     if (!directoryStats.isDirectory() || directoryStats.isSymbolicLink()) throw new Error('资料目录无法完整观察');
     options.onDirectoryObserved?.(directory, { device: directoryStats.dev, inode: directoryStats.ino,
       modifiedAtMs: directoryStats.mtimeMs, changedAtMs: directoryStats.ctimeMs });
-    const entries = await readdir(directory, { withFileTypes: true });
+    const entries = observed(await readdir(directory, { withFileTypes: true }));
     entries.sort((left, right) => left.name.localeCompare(right.name, 'en-US'));
     const depth = relative(root, directory).split(/[\\/]+/).filter(Boolean).length;
     for (const entry of entries) {
@@ -72,15 +80,17 @@ export async function scanPdfWorkspace(rootInput: string, options: WorkspaceScan
       const absolutePath = join(directory, entry.name);
       if (entry.isDirectory()) {
         if (depth === 2 && !isMaterialDirectory(entry.name)) continue;
-        const resolved = await realpath(absolutePath); toWorkspaceRelativePath(root, resolved);
+        const resolved = observed(await realpath(absolutePath));
+        relativeCanonicalWorkspacePath(root, resolved);
         await walk(absolutePath); continue;
       }
       if (!isMaterialPdfPath(relative(root, absolutePath))) continue;
       if (!entry.name.toLocaleLowerCase('en-US').endsWith('.pdf')) continue;
       if (!entry.isFile()) throw new Error(`PDF 路径不是普通文件，扫描不完整：${relative(root, absolutePath)}`);
-      const resolved = await realpath(absolutePath); toWorkspaceRelativePath(root, resolved);
-      const stats = await lstat(absolutePath);
-      files.push({ absolutePath, relativePath: toWorkspaceRelativePath(root, absolutePath), fileName: basename(absolutePath),
+      const resolved = observed(await realpath(absolutePath));
+      const relativePath = relativeCanonicalWorkspacePath(root, resolved);
+      const stats = observed(await lstat(absolutePath));
+      files.push({ absolutePath, relativePath, fileName: basename(absolutePath),
         sizeBytes: stats.size, modifiedAt: stats.mtime.toISOString(),
         fileIdentity: { device: stats.dev, inode: stats.ino, changedAtMs: stats.ctimeMs } });
       options.onProgress?.(files.length, null, files[files.length - 1].relativePath);
@@ -91,9 +101,10 @@ export async function scanPdfWorkspace(rootInput: string, options: WorkspaceScan
       let absolute = root;
       for (const segment of directory.split('/')) {
         absolute = join(absolute, segment);
-        const stats = await lstat(absolute);
+        options.signal?.throwIfAborted();
+        const stats = observed(await lstat(absolute));
         if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error(`产品目录无法完整观察：${directory}`);
-        toWorkspaceRelativePath(root, await realpath(absolute));
+        relativeCanonicalWorkspacePath(root, observed(await realpath(absolute)));
         options.onDirectoryObserved?.(absolute, { device: stats.dev, inode: stats.ino,
           modifiedAtMs: stats.mtimeMs, changedAtMs: stats.ctimeMs });
       }

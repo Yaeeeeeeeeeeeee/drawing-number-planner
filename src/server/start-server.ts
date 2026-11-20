@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { AppearanceService } from '../core/products/appearance-service.js';
 import { registerAppearanceRoutes } from './routes/appearances.js';
 import { QrManualService, type QrManualInput } from '../core/qr/qr-manual-service.js';
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import Fastify, {type FastifyRequest,type FastifyReply,type HookHandlerDoneFunction,type RouteOptions,type FastifyInstance} from 'fastify';
@@ -66,6 +66,7 @@ export interface ServerOptions {
   allowedOrigins?: string[];
   rendererDir?: string;
   requireExistingDatabase?: boolean;
+  scanStallTimeoutMs?: number;
   onStartupProgress?: (phase: StartupPhase) => void;
 }
 
@@ -123,6 +124,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     options.onStartupProgress?.('service-initialization');
     server = Fastify({ logger: false, forceCloseConnections: true });
     let switchingDatabase = false;
+    let shuttingDown = false;
     const activeRequests = new Map<string,{runningHandlers:number;responseEnded:boolean}>();
     const endResponse = (request:FastifyRequest) => {
       const state = activeRequests.get(request.id);
@@ -131,6 +133,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       if (state.runningHandlers === 0) activeRequests.delete(request.id);
     };
     server.addHook('onRequest', async (request:FastifyRequest, reply:FastifyReply) => {
+      if (shuttingDown) return reply.code(503).send({error:{code:'SERVICE_STOPPING',message:'本地服务正在停止'}});
       if (switchingDatabase) return reply.code(503).send({error:{code:'DATABASE_SWITCHING',message:'数据库切换准备中，请稍后重试'}});
       activeRequests.set(request.id,{runningHandlers:0,responseEnded:false});
       reply.raw.once('close',()=>endResponse(request));
@@ -141,6 +144,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       const handler=route.handler;
       route.handler=function(this:FastifyInstance,request:FastifyRequest,reply:FastifyReply){
         // An aborted pre-handler may resume after the request gate closed.
+        if (shuttingDown) return reply.code(503).send({error:{code:'SERVICE_STOPPING',message:'本地服务正在停止'}});
         if (switchingDatabase) return reply.code(503).send({error:{code:'DATABASE_SWITCHING',message:'数据库切换准备中，请稍后重试'}});
         const state=activeRequests.get(request.id)??{runningHandlers:0,responseEnded:reply.raw.destroyed};
         activeRequests.set(request.id,state); state.runningHandlers++;
@@ -197,7 +201,12 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     registerQrCodeRoutes(server, new QrService(database), qrManual);
     const drawingQueryService = new DrawingQueryService(database, () => workspaceSettings.get().workspaceRoot);
     registerDrawingRoutes(server, drawingQueryService);
-    const fileService=new FileService(fileRepository, workspaceSettings,undefined,()=>packagingTasks?.hasOperations()??false);
+    const scanLogDir = join(paths.baseDir, 'logs');
+    const fileService = new FileService(fileRepository, workspaceSettings, undefined,
+      () => packagingTasks?.hasOperations() ?? false, entry => {
+        mkdirSync(scanLogDir, { recursive: true });
+        appendFileSync(join(scanLogDir, 'pdf-scans.jsonl'), JSON.stringify({ pid: process.pid, ...entry }) + '\n');
+      }, { stallTimeoutMs: options.scanStallTimeoutMs });
     registerFileRoutes(server, fileService, tasks, indexedPdfResolver);
     const packagingCatalog=new PackagingCatalogService(database,paths.baseDir);
     const aitSelections=new AitSelections();
@@ -249,7 +258,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       prepareDatabaseSwitch: async () => {
         // Private parent/child IPC only. No HTTP route or renderer-supplied token.
         const busy = () => activeRequests.size > 0 || tasks.list().some(task => ['queued','running','finalizing'].includes(task.status))
-          || Boolean(packagingTasks?.hasOperations()) || Boolean(packagingTasks?.hasUnsettledAutomation());
+          || Boolean(fileService.scanStatus().active) || Boolean(packagingTasks?.hasOperations()) || Boolean(packagingTasks?.hasUnsettledAutomation());
         if (switchingDatabase || busy()) throw Object.assign(new Error('文件生成、归档、索引或 Illustrator 操作尚未结束，请完成后再切换数据库'),{code:'DATABASE_SWITCH_BUSY'});
         // Close the request gate synchronously before yielding so no new work races the check.
         switchingDatabase = true;
@@ -309,10 +318,13 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
         catch { throw new Error('压缩包当前不可用'); }
       },
       close: async () => {
+        shuttingDown = true;
+        const scanDrained = fileService.closeScans();
         server!.server.closeAllConnections();
         const httpClosed=server!.close();
         await packagingMonitor?.close();
         await packagingTasks?.close();
+        await scanDrained;
         await httpClosed;
         if (database.open) database.close();
       },

@@ -30,6 +30,14 @@ test('ends a force-detached T40 task through the real UI, preserving the PDF and
     const index=db.prepare('select id,drawing_id,historical_drawing_id,content_sha256 from pdf_files').all();
     await vite.listen();await page.setViewportSize({width:1920,height:1080});await page.goto('http://127.0.0.1:5174/');
     const nav=page.getByRole('navigation',{name:'主导航'});if(!await nav.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await nav.getByRole('button',{name:'制图任务',exact:true}).click();
+    await page.getByRole('button', { name: '查看记录', exact: true }).click();
+    const progress = page.getByLabel('制图核验与索引进度');
+    await expect(progress.getByText(/^文件核验：/)).toBeVisible();
+    await expect(progress.getByRole('status')).toHaveText(/资料库索引：等待/);
+    const scanEvidence = join(process.cwd(), 'test-results', 'p0-1');
+    mkdirSync(scanEvidence, { recursive: true });
+    await page.screenshot({ path: join(scanEvidence, 'task-file-vs-index.png') });
+    await page.getByRole('button', { name: '返回任务记录', exact: true }).click();
     await page.getByRole('button',{name:'保留文件并结束任务',exact:true}).click();
     const dialog=page.getByRole('dialog',{name:'保留文件并结束任务'});await expect(dialog).toBeVisible();
     const evidence=join(process.cwd(),'test-results','confirmed-requirements');mkdirSync(evidence,{recursive:true});await page.screenshot({path:join(evidence,'p0-termination-confirmation-1920.png'),fullPage:true});

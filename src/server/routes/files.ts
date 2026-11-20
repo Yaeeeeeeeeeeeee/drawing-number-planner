@@ -39,7 +39,7 @@ const scanIdSchema = z.object({ id: z.coerce.number().int().positive() }).strict
 
 function sendFileError(reply: FastifyReply, error: unknown) {
   if (!(error instanceof FileError)) throw error;
-  const status = error.code === 'SCAN_IN_PROGRESS' ? 409 : 422;
+  const status = error.code === 'SCAN_STOPPING' ? 503 : error.code === 'SCAN_IN_PROGRESS' ? 409 : 422;
   return reply.code(status).send({ error: { code: error.code, message: error.message } });
 }
 
@@ -61,8 +61,13 @@ export function registerFileRoutes(app: FastifyInstance, service: FileService, t
     context.throwIfCancelled(); context.beginFinalizing();
     return service.clearIndex(input.data.confirmation);
   });
+  app.get('/api/files/scans/status', async (_request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return service.scanStatus();
+  });
+
   app.get('/api/files/settings', async (_request, reply) => {
-    try { return service.getSettings(); }
+    try { return await service.getSettings(); }
     catch (error) { return sendFileError(reply, error); }
   });
 
