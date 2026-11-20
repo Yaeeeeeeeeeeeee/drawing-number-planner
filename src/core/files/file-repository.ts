@@ -248,6 +248,8 @@ export class FileRepository {
       const suppressedCodes = new Map(deletedRows.filter((row) => !activeCodes.has(row.fullCode))
         .map((row) => [row.fullCode, row]));
       for (const record of records) {
+        // Force-release quarantine already cleared the bindings and carries the more specific warning.
+        if (record.classificationWarning === 'drawing-force-released') continue;
         const suppressed = record.detectedCodes.map((code) => suppressedCodes.get(code)).find(Boolean);
         if (!suppressed) continue;
         record.drawingId = null;

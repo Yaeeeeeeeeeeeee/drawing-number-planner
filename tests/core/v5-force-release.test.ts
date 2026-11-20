@@ -61,6 +61,55 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe('V5 independent force release', () => {
+  it('keeps the force-release diagnostic and isolation during a scoped scan after reopening the database', async () => {
+    const productDirectory = '冰柜/SKU-DELETE-T40';
+    const fileName = `${plannedCode}-old.pdf`;
+    const record = {
+      relativePath: `${productDirectory}/02.未转曲源文件/${fileName}`,
+      fileName,
+      drawingId: plannedId,
+      matchStatus: 'matched' as const,
+      detectedCodes: [plannedCode],
+      conversionType: 'source' as const,
+      sizeBytes: 9,
+      modifiedAt: 'now',
+      contentSha256: requireHash('old bytes'),
+    };
+    new FileRepository(db).replaceScan([{ ...record }], [], 'initial');
+    const force = new DrawingForceReleaseService(db);
+    force.confirm({ signedId: plannedId, fingerprint: force.preview(plannedId).fingerprint, confirmed: true });
+    const pdfFacts = 'select id, drawing_id, historical_drawing_id, match_status, classification_warning, content_sha256 from pdf_files';
+    const before = db.prepare(pdfFacts).get();
+    expect(before).toMatchObject({
+      drawing_id: null,
+      historical_drawing_id: null,
+      match_status: 'pending',
+      classification_warning: 'drawing-force-released',
+      content_sha256: record.contentSha256,
+    });
+    const quarantine = db.prepare('select * from drawing_force_release_files').all();
+    expect(quarantine).toHaveLength(1);
+
+    const dir = mkdtempSync(join(tmpdir(), 'v5-force-scoped-reopen-'));
+    try {
+      const databasePath = join(dir, 'planner.db');
+      await db.backup(databasePath);
+      const reopened = openDatabase(databasePath);
+      try {
+        new FileRepository(reopened).replaceScan(
+          [{ ...record, drawingId: null, matchStatus: 'pending' }],
+          [], 'after restart', undefined, undefined, { kind: 'products', productDirectories: [productDirectory] },
+        );
+        expect(reopened.prepare(pdfFacts).get()).toEqual(before);
+        expect(reopened.prepare('select * from drawing_force_release_files').all()).toEqual(quarantine);
+        expect(reopened.pragma('foreign_key_check')).toEqual([]);
+      } finally {
+        reopened.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
   it('keeps old PDF isolated after force release, same-code reservation, index deletion and rescan',async()=>{
     const refs=db.prepare('select * from drawing_numbers where id=?').get(plannedId) as any;
     const repository=new FileRepository(db);
