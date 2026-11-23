@@ -11,3 +11,18 @@ export function batchInput(draft:PlanningDraftInput):BatchPlanningInput {
 }
 export const planningRowKey=(productId:number,clientId:string)=>`${productId}:${clientId}`;
 export const whiteColorName=(name:string)=>/^(白色?|white)$/iu.test(name.trim());
+
+export const planningWhiteKey=(group:DraftGroup,row:DraftProject)=>
+  [group.productId,group.appearanceId,group.appearanceVersionId,row.mainCategoryId,row.projectItemId].join(':');
+
+export const isConfiguredProject=(row:DraftProject)=>Boolean(row.mainCategoryId&&row.projectItemId&&row.colorId);
+export const hasProjectInput=(row:DraftProject)=>Boolean(row.mainCategoryId||row.projectItemId||row.colorId||row.notes||row.whiteBase||row.shareWhite===false);
+
+export function appendPlanningProjects(group:DraftGroup, rows:DraftProject[]):DraftGroup {
+  return {...group,rows:[...group.rows.filter(hasProjectInput),...rows]};
+}
+
+export function changePlanningAppearance(group:DraftGroup,appearanceId:number|undefined,appearanceVersionId?:number):DraftGroup {
+  if(group.appearanceId===appearanceId&&group.appearanceVersionId===appearanceVersionId)return group;
+  return {...group,appearanceId,appearanceVersionId,rows:group.rows.map(row=>row.whiteBase?{...row,whiteBase:undefined}:row)};
+}

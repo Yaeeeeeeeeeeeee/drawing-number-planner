@@ -39,7 +39,7 @@ module.exports=async function verifyV4({page,app,legacy,evidence,writePdf,snapsh
   console.log('[V4 pointer target]',JSON.stringify({width,grip:r,header:old,...pointerTarget}));assert.equal(pointerTarget.resizer,true,'Real pointer must reach the visible column resizer');
   await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+40,r.y+r.height/2,{steps:6});await page.mouse.up();const next=await header.boundingBox();assert.ok(Math.abs(next.width-old.width-40)<2,`V4 pointer boundary ${width}: ${next.width-old.width}`);
   await table.getByRole('columnheader',{name:'资料批次',exact:true}).press('Alt+ArrowLeft');const order=await table.locator('thead th').evaluateAll(cells=>cells.map(cell=>cell.dataset.columnKey));assert.equal(order[1],'batch');
-  const row=await table.locator('tbody tr:not(.virtual-table-spacer)').first().locator('td').evaluateAll(cells=>cells.map(cell=>cell.dataset.columnKey));assert.deepEqual(row,order);
+  const row=await table.locator('tbody tr:not(.virtual-table-spacer, .table-group-row)').first().locator('td').evaluateAll(cells=>cells.map(cell=>cell.dataset.columnKey));assert.deepEqual(row,order);
   geometry.push({width,before:old.width,after:next.width,order});await page.screenshot({path:path.join(evidence,`Windows-V4-列拖动-${width}.png`)});
  }
  const tableLayout=await page.evaluate(()=>JSON.parse(localStorage.getItem('table-layout:v1:pdf-files')));

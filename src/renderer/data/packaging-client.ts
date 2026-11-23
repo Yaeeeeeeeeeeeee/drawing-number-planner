@@ -1,10 +1,12 @@
 import type { PackagingField, PackagingTaskDeletionPreview, PackagingTaskDeleteInput, DimensionProfile, DimensionProfileInput, PackagingArchivePreview, PackagingCatalog, PackagingProductDirectory, PackagingProjectConfig, PackagingTask, PackagingTaskCreate, PackagingTaskItemInput, PackagingTemplate, PackagingTemplateInput, TemplateRule, TemplateRuleInput, TemplateRangeInput } from '../../core/packaging/packaging-types';
 import type {PdfScanSummaryView} from './client';
 
-export interface PackagingInspectionView {drawingNumber?:{originalText:string;matches:number;replaced?:number};fields:Array<{objectName:string;matches:number;editable:boolean}>;fonts:string[];issues:Array<{severity:'error'|'warning';message:string}>;fontValidation:'declared-and-observed-only';textObjects?:Array<{objectName:string;matches?:number;editable:boolean}>}
+export interface PackagingInspectionView {documentRead?:boolean;fontStatuses?:Array<{name:string;status:'installed'|'missing'|'unknown'}>;drawingNumber?:{originalText:string;matches:number;replaced?:number};fields:Array<{objectName:string;matches:number;editable:boolean}>;fonts:string[];issues:Array<{severity:'error'|'warning';message:string;code?:string}>;fontValidation:'declared-and-observed-only';textObjects?:Array<{objectName:string;matches?:number;editable:boolean}>}
+export interface AitFileReference {token:string;fileName:string;displayPath:string}
 export interface PackagingApi {
   templateStatus(id:number):Promise<{available:boolean;message?:string}>;
-  selectTemplateReference(): Promise<{token:string;fileName:string;displayPath:string}|null>;
+  selectTemplateReference(): Promise<AitFileReference|null>;
+  dropTemplateReference(file:File): Promise<AitFileReference>;
   saveTemplateReference(input:PackagingTemplateInput, token:string, id?:number, range?:TemplateRangeInput):Promise<PackagingTemplate>;
   inspectTemplateReference(token:string,fields?:PackagingField[],requiredFonts?:string[]):Promise<PackagingInspectionView>;
   getAutomation(): Promise<{platform:string;available:boolean;message:string;blocked?:boolean}>;
@@ -44,6 +46,7 @@ export function createPackagingApi(request: <T>(path: string, init?: RequestInit
   return {
     templateStatus:id=>request(`${base}/templates/${id}/status`),
     selectTemplateReference:()=>{if(!window.plannerDesktop?.selectAitFile)throw new Error('请在桌面版选择 AIT 原始文件');return window.plannerDesktop.selectAitFile();},
+    dropTemplateReference:file=>{if(!window.plannerDesktop?.registerDroppedAit)throw new Error('请在桌面版拖入 AIT 原始文件');return window.plannerDesktop.registerDroppedAit(file);},
     saveTemplateReference:(metadata,token,id,range)=>request(`${base}/template-reference`,json('POST',{metadata,token,id,...(range?{range}:{})})),
     inspectTemplateReference:(token,fields,requiredFonts)=>request(`${base}/inspect-template-reference`,json('POST',{token,fields,requiredFonts})),
     getAutomation:()=>request(`${base}/automation`),reconcileAutomation:()=>request(`${base}/automation/reconcile`,json('POST')),

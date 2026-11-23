@@ -63,8 +63,8 @@ it('discards an old incremental response after changing the navigation scope',as
 it('shows unmatched file counts independently of pending product attribution in the compact toolbar',async()=>{
  const api={...fixture(),getPdfFileNavigation:vi.fn().mockImplementation(async(q:any)=>({total:q.matchStatus==='unmatched'?2:8,unassociatedProducts:5,categories:[],products:[],batches:[]}))};
  const view=render(<FilesPage api={api as never}/>);
- await waitFor(()=>expect(view.container.querySelector('.files-scan-toolbar')).toHaveTextContent('未匹配 2'));
- expect(view.container.querySelector('.files-scan-toolbar')).toHaveTextContent('PDF 8');
+ await waitFor(()=>expect(view.container.querySelector('.files-scan-toolbar')).toHaveTextContent('目录未匹配 2'));
+ expect(view.container.querySelector('.files-scan-toolbar')).toHaveTextContent('目录索引 8');
 });
 it('keeps the six management actions in two groups and applies each state-specific action only to eligible selections',async()=>{
  const api={...fixture(),previewPdfClassification:vi.fn(),applyPdfClassification:vi.fn()};

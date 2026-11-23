@@ -41,13 +41,16 @@ test('compares real decoded PNG pixels through saved BOM history without alterin
   await expect(page.getByRole('button',{name:`查看 BOM ${versions[1].id}`,exact:true})).toBeVisible();
   const headers=await page.locator('.bom-history-table').getByRole('columnheader').allTextContents();expect(headers.indexOf('产品类别')).toBeGreaterThanOrEqual(0);expect(headers.indexOf('产品类别')+1).toBe(headers.indexOf('型号'));
   await page.getByRole('button',{name:`查看 BOM ${versions[1].id}`,exact:true}).click();
+  await page.getByRole('button',{name:'版本对比',exact:true}).click();
   await expect(page.getByRole('button',{name:/项目 1 · 铭牌.*未变化/})).toBeVisible();
   await page.getByRole('button',{name:'全部字段',exact:true}).click();await page.getByText('图片像素一致',{exact:true}).scrollIntoViewIfNeeded();
   const evidence=join(process.cwd(),'work','v16-corrections','evidence');mkdirSync(evidence,{recursive:true});await page.screenshot({path:join(evidence,'bom-same-pixels-different-encoding.png'),fullPage:true});
   await page.getByRole('button',{name:`查看 BOM ${versions[2].id}`,exact:true}).click();
+  await page.getByRole('button',{name:'版本对比',exact:true}).click();
   await expect(page.getByRole('button',{name:/项目 1 · 铭牌.*修改/})).toBeVisible();await expect(page.getByText('图片像素不同 · 替换',{exact:true})).toBeVisible();
   await page.screenshot({path:join(evidence,'bom-different-alpha-pixels.png'),fullPage:true});
-  await page.getByRole('button',{name:`查看 BOM ${versions[3].id}`,exact:true}).click();await expect(page.getByRole('button',{name:/项目 1 · 铭牌.*修改/})).toBeVisible();await expect(page.getByText('图片像素不同 · 替换',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:`查看 BOM ${versions[3].id}`,exact:true}).click();
+  await page.getByRole('button',{name:'版本对比',exact:true}).click();await expect(page.getByRole('button',{name:/项目 1 · 铭牌.*修改/})).toBeVisible();await expect(page.getByText('图片像素不同 · 替换',{exact:true})).toBeVisible();
   await page.screenshot({path:join(evidence,'bom-different-pixels.png'),fullPage:true});
   expect(facts()).toEqual(before);paths.forEach((path,i)=>expect(readFileSync(path)).toEqual(sources[i]));expect(db.pragma('foreign_key_check')).toEqual([]);
  }finally{await vite.close();await server.close();db.close();rmSync(data,{recursive:true,force:true});}

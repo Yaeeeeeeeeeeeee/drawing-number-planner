@@ -11,6 +11,7 @@ export interface QrManualApi {
 }
 declare global { interface PlannerDesktop {
   qrManualSelectFile?(): Promise<QrManualSelection | null>;
+  registerDroppedQrPdf?(file: File): Promise<QrManualSelection>;
   qrManualAction?(action:string,input:unknown): Promise<unknown>;
 } }
 export function createQrManualApi(request: <T>(path:string, init?:RequestInit)=>Promise<T>): QrManualApi {

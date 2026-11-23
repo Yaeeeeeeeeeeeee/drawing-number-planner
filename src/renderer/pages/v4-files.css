@@ -3,25 +3,109 @@
 .files-page table.layout-table .file-match .code-cell {display:block;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .files-page .files-scan-toolbar>span:not(.files-root-path){white-space:nowrap;}
 
-.files-page .module-list{position:relative;}.files-page .files-loading-status{position:absolute;right:8px;top:0;z-index:5;margin:0;padding:6px 10px;height:auto;min-height:0;background:#fff;font-size:12px;pointer-events:none;}
 
-:root .engineering-workspace .page-surface .file-cleanup-toolbar.files-management-toolbar {--ws-control-height:34px;}
-.files-page .file-cleanup-toolbar.files-management-toolbar {flex:none;min-width:0;max-width:100%;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:24px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
-.files-page .file-cleanup-toolbar.files-management-toolbar > div {display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:8px;flex-shrink:0;}
-.files-page .files-management-toolbar button {height:34px;min-height:34px;flex:none;padding:6px 12px;white-space:nowrap;}
-.files-page .files-management-toolbar button:disabled {color:var(--ws-muted,#69727d);opacity:1;background:#edf0f2;border-color:#dce0e4;cursor:default;}
-.files-page .files-management-toolbar .files-selection-count {white-space:nowrap;margin-left:4px;}
-.files-page .files-management-toolbar .files-remove-record {color:#a34d4d;border-color:#dbbebe;}
-.files-page .files-management-toolbar .files-remove-record:disabled {color:#8a7474;border-color:#dce0e4;}
-
-/* Keep PDF identities centered inside their actual column, including clamped text. */
-.files-page .files-name-clamp,.files-page .files-batch-code {text-align:center;}
-.files-page .files-management-toolbar .files-management-icon {display:inline-flex;align-items:center;justify-content:center;width:34px;min-width:34px;padding:7px;}
-.files-page .files-management-toolbar .files-management-icon svg {flex:none;}
-.files-page tr[aria-selected=true]{background:#e2edf6}
-.files-page .files-filter-controls,.files-page .files-active-filters {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.files-page .files-filter-overlay {position:fixed;z-index:100;right:0;top:0;bottom:0;width:min(380px,90vw);overflow:auto;background:var(--ws-surface,#fff);box-shadow:-6px 0 24px #0003;padding:20px;}
-.files-page .files-filter-overlay>div {display:flex;justify-content:space-between;align-items:center;}
-.files-page .files-filter-overlay .files-filter {display:flex;flex-direction:column;align-items:stretch;}
-.files-page .files-filter-overlay .files-filter label {display:flex;flex-direction:column;gap:4px;}
-.files-page .files-group-toggle {border:0;background:transparent;font-weight:600;text-align:left;cursor:pointer;}
+.files-page .files-scan-actions,
+.files-page .files-list-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.files-page .files-list-search input {
+  width: min(15rem, 100%);
+  min-width: 0;
+}
+.files-page .module-list .files-filter-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.files-page .files-load-summary {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border-top: 1px solid var(--ws-line);
+  background: var(--ws-panel);
+}
+.files-page .module-list > .table-wrap {
+  flex: 1 1 auto;
+  min-height: 100px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.files-page .layout-table :is(th, td)[data-column-key] { width: auto; }
+.files-page .layout-table .files-name-row {
+  display: grid;
+  justify-content: stretch;
+  gap: 2px;
+}
+.files-page .layout-table .files-name-row .file-primary {
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.files-page .files-file-subtitle {
+  color: var(--ws-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.files-page .layout-table :is(.file-match, .file-product, .files-batch) { justify-content: flex-start; }
+.files-page .layout-table .file-product { display: grid; justify-content: stretch; }
+.files-page .layout-table .files-batch .files-status,
+.files-page .layout-table .file-match.matched .files-match-badge,
+.files-page .layout-table :is(.conversion-label, .presence-label.present) {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--ws-muted);
+  font-weight: 400;
+}
+.files-page .layout-table .table-group-row > td {
+  background: var(--ws-panel);
+  padding-left: 48px;
+}
+.files-page .layout-table .files-group-toggle {
+  display: block;
+  min-height: 30px;
+  padding: 3px 12px;
+  color: var(--ws-text);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.files-page .layout-table .file-row-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 2px;
+}
+.files-page .layout-table .file-row-actions .files-action-icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  text-decoration: none;
+}
+.files-page .layout-table .file-row-actions .files-action-icon:hover:not(:disabled) {
+  color: var(--ws-text);
+  background: var(--ws-hover);
+}
+.files-page .layout-table .file-row-actions .files-action-icon:disabled { opacity: .45; }
+.files-page .layout-table .expanded-table-row > td {
+  padding: 8px 12px;
+  text-align: left;
+  background: var(--ws-panel);
+}

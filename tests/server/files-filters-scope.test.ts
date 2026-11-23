@@ -31,6 +31,18 @@ function record(name:string,modifiedAt:string,batch?:string):FileScanRecord{
   return {relativePath,fileName:`${name}.pdf`,drawingId:null,matchStatus:'unmatched',detectedCodes:[],conversionType:batch?'outlined':'source',sizeBytes:1,modifiedAt,materialBatch:parseMaterialBatch(relativePath)};
 }
 describe('PDF list date filters and independent scanning',()=>{
+  it('limits list search to file names and drawing codes when requested',async()=>{
+    const {app,repository}=fixture();
+    repository.replaceScan([
+      record('UNKNOWN-M-cover','2026-11-01T00:00:00Z'),
+      record('manual','2026-11-01T00:00:00Z'),
+    ],[],'2026-11-02T00:00:00Z');
+    const base = '/api/files?keyword=UNKNOWN-M';
+    expect((await app.inject(base)).json().total).toBe(2);
+    const response = await app.inject(`${base}&keywordIn=file-name-or-code`);
+    expect(response.statusCode).toBe(200);
+    expect(response.json().items.map((item:{fileName:string})=>item.fileName)).toEqual(['UNKNOWN-M-cover.pdf']);
+  });
   it('filters indexed modification instants inclusively with timezone offsets and shares the count predicate',async()=>{
     const {app,repository,db}=fixture();const batch='01.20261030';
     repository.replaceScan([record('before','2026-10-31T15:59:59.999Z'),record('start','2026-11-01T00:00:00+08:00',batch),record('end','2026-11-01T23:59:59.999+08:00',batch),record('after','2026-11-01T16:00:00.000Z',batch)],[],'2026-11-02T00:00:00.000Z');

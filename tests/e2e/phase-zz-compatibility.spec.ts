@@ -66,6 +66,10 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   const historicalResult = page.getByRole('row').filter({
     has: page.getByRole('button', { name: '02.0404.010.0401007', exact: true }),
   });
+  await expect(page.getByRole('columnheader',{name:'来源',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'列设置',exact:true}).click();
+  await page.getByRole('checkbox',{name:'显示来源列'}).check();
+  await page.getByRole('button',{name:'列设置',exact:true}).click();
   await expect(historicalResult.getByRole('cell', { name: '历史扫描', exact: true })).toBeVisible();
   await historicalResult.getByRole('button', { name: '查看 / 管理', exact: true }).click();
   const detail = page.getByRole('complementary', { name: '图号详情' });
@@ -75,7 +79,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
 
   await page.getByRole('button', { name: /图号规划/ }).click();
   await page.getByRole('button',{name:'产品资料',exact:true}).click();
-  await page.getByLabel('产品型号').selectOption(String(productId));
+  await page.getByRole('group',{name:'产品型号',exact:true}).locator(`input[type=radio][value="${productId}"]`).check();
   await page.getByRole('button',{name:'下一步',exact:true}).click();
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(projectId));
@@ -86,8 +90,8 @@ test('compatibility correction scans history, preserves occupancy, and reports c
   unlinkSync(sourceFile); unlinkSync(outlinedFile);
   await page.getByRole('button', { name: /PDF 文件中心/ }).click();
   await scanUi();
+  await page.getByRole('searchbox',{name:'文件关键词',exact:true}).fill('02.0404.010.0401007');
   await page.getByRole('button',{name:'筛选',exact:true}).click();
-  await page.getByLabel('文件关键词').fill('02.0404.010.0401007');
   await page.getByLabel('存在状态').selectOption('missing');
   await page.getByRole('complementary',{name:'PDF 筛选'}).getByRole('button',{name:'关闭',exact:true}).click();
   await expect(page.locator('.file-primary').filter({ hasText: '02.0404.010.0401007' })).toHaveCount(2);
@@ -103,7 +107,7 @@ test('compatibility correction scans history, preserves occupancy, and reports c
 
   await page.getByRole('button', { name: /图号规划/ }).click();
   await page.getByRole('button',{name:'产品资料',exact:true}).click();
-  await page.getByLabel('产品型号').selectOption(String(productId));
+  await page.getByRole('group',{name:'产品型号',exact:true}).locator(`input[type=radio][value="${productId}"]`).check();
   await page.getByRole('button',{name:'下一步',exact:true}).click();
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(projectId));

@@ -7,7 +7,7 @@ import './v41-drawings.css';
 import {plannerQueryCache,queryKey,useSuccessfulFileScan} from '../data/query-cache';
 import type {DrawingAssociationPreviewView,DrawingAssociationResult} from '../data/drawing-appearance-client';
 import { ProductCatalogNavigation, type CatalogNavigationScope, type CatalogNavigationCounts } from '../components/ProductCatalogNavigation';
-import { Copy, X } from 'lucide-react';
+import { Copy, Settings, X } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { materialBatchLabel } from '../../core/files/material-batch-label';
@@ -24,7 +24,7 @@ import type {
   PlannerApi,
 } from '../data/client';
 import { ModuleWorkspace } from '../components/ModuleWorkspace';
-import { DataTable } from '../components/DataTable';
+import { DataTable, type TableColumn } from '../components/DataTable';
 import {resetTableLayouts} from '../components/useTableLayout';
 import './v4-drawings.css';
 import { QueryFeedback, type QueryState } from '../components/QueryFeedback';
@@ -35,6 +35,8 @@ import { createDrawingLibraryMockApi, isDrawingLibraryMockEnabled } from './draw
 
 const cacheApiIds = new WeakMap<object,number>();
 let nextCacheApiId=1;
+const sourceColumnPreference = 'planner:drawings:show-origin';
+const drawingLayoutIds = ['drawing-library', 'drawing-library:product', 'drawing-library:origin', 'drawing-library:product:origin'];
 const emptyFilters = { drawingNumber: '', model: '', keyword: '', sku: '', productCategory: '', sourcePresence: 'all', outlinedPresence: 'all', brandId: '', appearanceId: '', mainCategoryId: '', projectItemId: '', colorId: '', materialBatchId: '', status: '', deletionState: 'normal', exactDrawingNumber: false };
 
 export interface DrawingPdfNavigationTarget { productId?: number; materialBatchId?: number; fullCode: string; }
@@ -97,6 +99,29 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
   const [options, setOptions] = useState<Record<string, DictionaryItemView[]>>({});
   const [items, setItems] = useState<DrawingView[]>([]); const [total, setTotal] = useState(0);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const [showOrigin, setShowOrigin] = useState(() => {
+    try { return localStorage.getItem(sourceColumnPreference) === 'true'; }
+    catch { return false; }
+  });
+  const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
+  const columnSettingsButton = useRef<HTMLButtonElement>(null);
+  const changeSourceVisibility = (visible: boolean) => {
+    setShowOrigin(visible);
+    try {
+      if (visible) localStorage.setItem(sourceColumnPreference, 'true');
+      else localStorage.removeItem(sourceColumnPreference);
+    } catch { /* Storage can be unavailable. */ }
+  };
+  const closeColumnSettings = () => {
+    setColumnSettingsOpen(false);
+    columnSettingsButton.current?.focus();
+  };
+  const resetLayout = () => {
+    drawingLayoutIds.forEach(resetTableLayouts);
+    window.dispatchEvent(new Event('module-workspace:reset-layout'));
+    changeSourceVisibility(false);
+    closeColumnSettings();
+  };
   const [page, setPage] = useState(1); const pageSize=50;
   useEffect(() => { setCheckedIds([]); }, [scope]);
   const [productCategories, setProductCategories] = useState<string[]>([]);
@@ -404,17 +429,21 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
         setDeletionConfirmation={setDeletionConfirmation} onConfirmDelete={confirmDrawingDeletion}
         onCancelDelete={() => setDeletionPreview(null)} onRestore={restoreDrawing} onError={setError} /> : null;
 
+  const selectableIds = items.filter(item => !item.deletedAt).map(item => item.id);
+  const selectedIds = selectableIds.filter(id => checkedIds.includes(id));
+  const selectedCount = selectedIds.length;
+  const actionScope = selectedCount ? `已选 ${selectedCount} 项` : '全库';
   const drawingActions = <div className="drawing-library-tools">{!mockMode && api.classifyDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={()=>{
       if(maintainingRef.current)return;
       setMaintaining(true);setError('');setAssociationResult(null);
-      void api.classifyDrawingAssociations!({...(checkedIds.length?{signedIds:checkedIds}:{})})
+      void api.classifyDrawingAssociations!({...(selectedCount ? {signedIds:selectedIds} : {})})
         .then(async result=>{setAssociationResult(result);closeDiagnosis();if(selected)await refreshMutationResult(selected.id,detailRequest.current);else await refreshCurrentQuery();})
         .catch(reason=>setError(reason instanceof Error?reason.message:'自动归类失败，未保存，请重试'))
         .finally(()=>setMaintaining(false));
-    }}>{maintaining?'正在归类…':'自动归类'}</button>}
-    {!mockMode && api.previewDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={() => { diagnosis.current = { scope: checkedIds.length ? { signedIds: checkedIds } : {}, request: 0 }; void refreshDiagnosis(); }}>诊断图号关联</button>}</div>;
+    }}>{maintaining?`正在归类（${actionScope}）…`:`自动归类（${actionScope}）`}</button>}
+    {!mockMode && api.previewDrawingAssociations && <button className="secondary-button" type="button" disabled={maintaining} onClick={() => { diagnosis.current = { scope: selectedCount ? { signedIds: selectedIds } : {}, request: 0 }; void refreshDiagnosis(); }}>诊断图号关联（{actionScope}）</button>}</div>;
   return <section className="page-surface page-enter drawing-library-page">
-    <PageHeader title="图号库" description=""><span className="record-count">{total} 条记录</span>{drawingActions}</PageHeader>
+    <PageHeader title="图号库" description="">{drawingActions}</PageHeader>
     {mockMode && <p className="info-banner preview-only-banner">开发预览 Mock：维护及磁盘操作已禁用，仅展示内存样例。关闭方式：移除 URL 中的 <code>?mock=drawing-library</code>。</p>}
     {error && !selected && <p className="error-banner" role="alert">{error}</p>}
     {catalogError&&<div className="error-banner" role="alert">{catalogError} <button type="button" className="text-button" onClick={()=>void refreshCatalog()}>重试产品目录</button></div>}
@@ -424,12 +453,24 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
       <button type="button" disabled={maintaining||diagnosisLoading||Boolean(diagnosisError)||!repairPreview.records.some(row=>row.state==='ready')} onClick={()=>{if(maintainingRef.current)return;setMaintaining(true);const targets=repairPreview.records.filter(row=>row.state==='ready').flatMap(row=>row.targets);void api.confirmDrawingAssociations?.({targets,fingerprint:repairPreview.fingerprint,reason:'核验诊断证据后批量确认',confirmed:true}).then(async(result)=>{setAssociationResult(result);closeDiagnosis();await refreshCurrentQuery();}).catch(reason=>setError(reason.message)).finally(()=>setMaintaining(false));}}>人工确认候选关联</button><button type="button" onClick={closeDiagnosis}>关闭预览</button></section>}
     {associationResult && <p role="status" className="drawing-association-result">已更新 {associationResult.updated} 条关联{associationResult.before && associationResult.after && <> · 历史已关联 {associationResult.before.historicalAssociated} → {associationResult.after.historicalAssociated} / {associationResult.after.historicalTotal} · 正式已关联 {associationResult.before.plannedAssociated} → {associationResult.after.plannedAssociated} / {associationResult.after.plannedTotal}</>}<button className="text-button" type="button" aria-label="关闭关联结果" onClick={()=>setAssociationResult(null)}>关闭</button></p>}
     <ModuleWorkspace drawingWorkspace resizable hideLayoutReset navigation={({ collapseControl }) => <ProductCatalogNavigation products={products} batches={catalogBatches} usageBatches={navigationBatches} counts={navigationCounts} scope={scope} onSelect={navigateScope} mode="drawings" mainCategories={mainCategories} collapseControl={collapseControl} />} detail={detailPanel} detailLabel="图号详情" detailIdentity={selected?.id} onCloseDetail={() => {if(maintainingRef.current) return; detailRequest.current++; pdfRequest.current++; setSelected(null);}}>
-    <header className="drawing-list-heading"><h2 className="drawing-scope-title">{scopeTitle}</h2><span>{total} 个图号</span><button className="text-button" type="button" onClick={()=>{resetTableLayouts('drawing-library');window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button></header>
+    <header className="drawing-list-heading"><h2 className="drawing-scope-title">{scopeTitle}</h2><span>{total} 个图号</span><div className="drawing-column-settings" onKeyDown={event => {
+      if (columnSettingsOpen && event.key === 'Escape') {
+        event.stopPropagation();
+        closeColumnSettings();
+      }
+    }}>
+      <button ref={columnSettingsButton} className="text-button" type="button" aria-expanded={columnSettingsOpen} aria-controls="drawing-column-settings" onClick={() => setColumnSettingsOpen(open => !open)}><Settings size={16} aria-hidden="true" />列设置</button>
+      {columnSettingsOpen && <div id="drawing-column-settings" className="drawing-column-settings-panel">
+        <label><input type="checkbox" checked={showOrigin} onChange={event => changeSourceVisibility(event.target.checked)} />显示来源列</label>
+        <button className="text-button" type="button" onClick={resetLayout}>恢复默认表格布局</button>
+      </div>}
+    </div></header>
     {navigationFocus.length>0&&<section className="drawing-list-heading" aria-label="本次图号定位" style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}><strong>本次图号 · {navigationFocus.length}</strong>{navigationFocus.map(item=><button key={item.id} type="button" className="text-button" aria-label={`定位图号 ${item.fullCode??item.id}`} aria-pressed={selected?.id===item.id} onClick={()=>void openDetail(item)}>{item.fullCode??`图号记录 ${item.id}`}</button>)}</section>}
     <form className="filter-bar filter-grid drawing-search-bar" onSubmit={submit}>
-      <label><span>关键词</span><input aria-label="关键词" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
+      <label><span>关键词</span><input aria-label="关键词" placeholder="搜索图号/部件名" value={filters.keyword} onChange={(event) => set('keyword', event.target.value)} /></label>
       {dictionarySelect('主类别', 'mainCategoryId', 'main_category')}
       <label><span>状态</span><select aria-label="状态" value={filters.status} onChange={event => set('status',event.target.value)}><option value="">全部</option><option value="reserved">待启动</option><option value="active">使用中</option><option value="inactive">已停用</option></select></label>
+      {((options.color?.length ?? 0) > 0 || filters.colorId) && dictionarySelect('颜色', 'colorId', 'color')}
       <button className="primary-button" type="submit" disabled={loading}>{loading ? '查询中…' : '查询'}</button>
       <button className="text-button" type="button" onClick={() => setMoreFilters((value) => !value)}>{moreFilters ? '收起筛选' : '更多筛选'}</button>
       <button className="text-button" type="button" onClick={clearFilters} disabled={loading}>清除筛选</button>
@@ -438,29 +479,34 @@ export function DrawingLibraryPage({ api: realApi, active = true, onNavigatePdf,
       <label><span>型号</span><input aria-label="型号" value={filters.model} onChange={(event) => set('model', event.target.value)} /></label>
       <label><span>SKU</span><input aria-label="SKU" value={filters.sku} onChange={(event) => set('sku', event.target.value)} /></label>
 <label><span>产品类别</span><select aria-label="产品类别" value={filters.productCategory} onChange={(event) => set('productCategory', event.target.value)}><option value="">全部</option>{productCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-        {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('颜色', 'colorId', 'color')}{dictionarySelect('外观', 'appearanceId', 'appearance')}
+        {dictionarySelect('品牌', 'brandId', 'brand')}{dictionarySelect('项目明细', 'projectItemId', 'project_item')}{dictionarySelect('外观', 'appearanceId', 'appearance')}
 
         <label><span>删除状态</span><select aria-label="删除状态" value={filters.deletionState} onChange={(event) => set('deletionState', event.target.value)}><option value="normal">正常图号</option><option value="deleted-retained">已删除 / 保留占号</option><option value="deleted-released">已删除 / 已释放</option><option value="all">全部</option></select></label>
         <label><span>源文件</span><select aria-label="源文件" value={filters.sourcePresence} onChange={(event) => set('sourcePresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label>
         <label><span>转曲后文件</span><select aria-label="转曲后文件" value={filters.outlinedPresence} onChange={(event) => set('outlinedPresence', event.target.value)}><option value="all">全部</option><option value="present">已有</option><option value="missing">缺失</option></select></label></div>}
     </form>
-    <div className="batch-toolbar"><label><input type="checkbox" aria-label="全选已加载" checked={items.length > 0 && items.filter((item) => !item.deletedAt).every((item) => checkedIds.includes(item.id))}
-      onChange={(event) => setCheckedIds(event.target.checked ? items.filter((item) => !item.deletedAt).map((item) => item.id) : [])} />全选已加载</label>
-      {mockMode ? <section className="drawing-batch-delete" aria-label="批量删除图号"><button className="text-button danger" type="button" disabled title="Mock 仅用于只读预览">批量删除（已选 {checkedIds.length} 项）</button></section>
-        : <DrawingBatchDeletion ids={checkedIds} api={api} onComplete={async () => { setCheckedIds([]); setSelected(null); await search(filters, page, pageSize); }} />}
+    <div className="batch-toolbar">
+      {mockMode ? selectedCount > 0 && <section className="drawing-batch-delete" aria-label="批量删除图号"><button className="text-button danger" type="button" disabled title="Mock 仅用于只读预览">批量删除（已选 {selectedCount} 项）</button></section>
+        : <DrawingBatchDeletion ids={selectedIds} api={api} onComplete={async () => { setCheckedIds([]); setSelected(null); await refreshCurrentQuery(); }} />}
     </div>
     {loading && items.length>0 && <p className="muted-text" role="status">正在加载所选范围，表格保留上次结果…</p>}
     {queryError && items.length>0 && <p className="error-banner" role="alert">{queryError} · 当前显示上次成功结果</p>}
     {queryState !== 'ready' && items.length===0 ? <QueryFeedback state={queryState} error={queryError} onRetry={() => void search(queriedValues, page, pageSize)}/> : items.length === 0 ? <EmptyState title={Object.entries(queriedValues).some(([key,value]) => value !== emptyFilters[key as keyof typeof emptyFilters]) ? '没有符合查询条件的图号' : '图号库尚无记录'} description="可调整查询条件后重新检索；新增图号请使用图号规划。" /> :
-      <DataTable showLayoutTools={false} tableId="drawing-library" virtualize virtualKey={queryKey('drawing:scope',{values:queriedValues,scope})} onEndReached={()=>{if(loading)return false;void loadMore();return true;}} items={items} onRowClick={(item) => void openDetail(item)} columns={[
-        { key: 'select', label: '选择',width:48,minWidth:48,locked:'start',align:'center', render: (item) => <input type="checkbox" aria-label={`选择图号 ${item.fullCode}`} disabled={Boolean(item.deletedAt)} checked={checkedIds.includes(item.id)}
+      <DataTable showLayoutTools={false} tableId={`drawing-library${scope.productId ? ':product' : ''}${showOrigin ? ':origin' : ''}`} virtualize virtualKey={queryKey('drawing:scope',{values:queriedValues,scope})} onEndReached={()=>{if(loading)return false;void loadMore();return true;}} items={items} onRowClick={(item) => void openDetail(item)} columns={[
+        { key: 'select', label: '选择',width:48,minWidth:48,locked:'start',align:'center',
+          header: <input type="checkbox" aria-label="全选已加载" title="全选已加载图号" disabled={!selectableIds.length}
+            ref={input => { if (input) input.indeterminate = selectedCount > 0 && selectedCount < selectableIds.length; }}
+            checked={selectableIds.length > 0 && selectedCount === selectableIds.length}
+            onChange={event => setCheckedIds(event.target.checked ? selectableIds : [])} />,
+          render: (item) => <input type="checkbox" aria-label={`选择图号 ${item.fullCode}`} disabled={Boolean(item.deletedAt)} checked={checkedIds.includes(item.id)}
           onClick={(event) => event.stopPropagation()} onChange={(event) => setCheckedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /> },
         { key: 'code', label: '完整图号',width:240,minWidth:190,align:'left', render: (item) => <span className="drawing-code-inline"><button className="link-button" type="button"
           ref={(node) => { if (node) disclosureButtons.current.set(item.id, node); else disclosureButtons.current.delete(item.id); }}
           aria-expanded={selected?.id === item.id} aria-controls={`drawing-detail-${item.id}`}>{item.fullCode}</button><CopyDrawingCode code={item.fullCode} /></span> },
-        { key: 'category', label: '主类别 / 项目',width:210,minWidth:140,align:'center', render: (item) => <span className="drawing-category-project" title={`${item.mainCategoryName} / ${item.projectItemName}`}><span className="drawing-category-badge" style={drawingCategoryStyle(item)}>{item.mainCategoryName}</span><span className="drawing-category-divider" aria-hidden="true">/</span><span className="drawing-project-name">{item.projectItemName}</span></span> },
-        { key: 'origin', label: '来源',width:100,minWidth:90,align:'center', render: (item) => <span className="drawing-origin-cell">{item.origin === 'planned' ? '正式规划' : '历史扫描'}{item.dictionaryMappingStatus === 'unmapped' && <small className="mapping-warning">字典待映射</small>}</span> },
-        {key:'product',label:'关联产品',width:120,minWidth:100,align:'center',render:item=>item.productId?item.model:'待关联'}, {key:'color',label:'颜色',width:100,minWidth:85,align:'center',render:item=>item.colorName?.trim()||'未识别'},
+        { key: 'category', label: '主类别 / 项目',width:210,minWidth:140,align:'left', render: (item) => <><span className="drawing-category-project" title={`${item.mainCategoryName} / ${item.projectItemName}`}><span className="drawing-category-badge" style={drawingCategoryStyle(item)}>{item.mainCategoryName}</span><span className="drawing-category-divider" aria-hidden="true">/</span><span className="drawing-project-name">{item.projectItemName}</span></span>{item.dictionaryMappingStatus === 'unmapped' && <small className="mapping-warning">字典待映射</small>}</> },
+        ...(showOrigin ? [{ key: 'origin', label: '来源',width:100,minWidth:90,align:'center', render: (item) => <span className="drawing-origin-cell">{item.origin === 'planned' ? '正式规划' : '历史扫描'}</span> }] satisfies TableColumn<DrawingView>[] : []),
+        ...(scope.productId ? [] : [{key:'product',label:'关联产品',width:120,minWidth:100,align:'center',render:item=>item.productId?item.model:'待关联'}] satisfies TableColumn<DrawingView>[]),
+        {key:'color',label:'颜色',width:100,minWidth:85,align:'center',render:item=>item.colorName?.trim()||'未识别'},
         { key: 'status', label: '图号状态',width:130,minWidth:100,align:'center', render: (item) => <DrawingStatusBadge drawing={item} /> },
         {key:'actions',label:'操作',width:125,minWidth:110,align:'center',locked:'end',render:item => <button className="text-button" type="button" onClick={event => {event.stopPropagation(); void openDetail(item);}}>查看 / 管理</button>},
 

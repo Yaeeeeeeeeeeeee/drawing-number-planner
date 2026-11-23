@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import type { QrManualInput } from '../core/qr/qr-manual-service.js';
 interface Dependencies {
   isTrustedEvent?(event: unknown): boolean;
@@ -10,6 +11,11 @@ interface Dependencies {
 export function createQrManualHandlers(deps: Dependencies) {
   return {
     async select(event?: unknown) { if(deps.isTrustedEvent&&!deps.isTrustedEvent(event))throw new Error('UNTRUSTED_QR_SENDER'); const path = await deps.choosePdf(); return path ? deps.execute('select', { path }) : null; },
+    async drop(event: unknown, path: unknown) {
+      if (deps.isTrustedEvent && !deps.isTrustedEvent(event)) throw new Error('UNTRUSTED_QR_SENDER');
+      if (typeof path !== 'string' || !isAbsolute(path)) throw new Error('INVALID_QR_SELECTION');
+      return deps.execute('select', { path });
+    },
     async action(_event: unknown, action: unknown, input: unknown) {
       if(deps.isTrustedEvent&&!deps.isTrustedEvent(_event))throw new Error('UNTRUSTED_QR_SENDER');
       if (!['preview','comparison','commit','history','unlink','open','show'].includes(String(action)) || !input || typeof input !== 'object') throw new Error('INVALID_QR_MANUAL_ACTION');

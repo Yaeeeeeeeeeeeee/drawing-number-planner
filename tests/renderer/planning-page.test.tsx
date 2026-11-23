@@ -6,11 +6,11 @@ import {planningApiFixture,planningProduct,choosePlanningProduct,fillPlanningPro
 describe('planning business interactions in the approved four-step layout',()=>{
  it('clears an incompatible single-product selection when the product category changes',async()=>{
   const api=planningApiFixture();api.listProducts.mockResolvedValue([planningProduct,{...planningProduct,id:3,model:'F20',productCategory:'空气炸锅'}]);render(<PlanningPage api={api as never}/>);
-  await screen.findByRole('option',{name:/T40/});fireEvent.change(screen.getByLabelText('产品型号'),{target:{value:'1'}});expect(screen.getByLabelText('外观')).toHaveValue('3');
-  fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'空气炸锅'}});expect(screen.getByLabelText('产品型号')).toHaveValue('');expect(screen.queryByLabelText('外观')).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'下一步'})).toBeDisabled();
+  fireEvent.click(await screen.findByRole('radio',{name:/T40/}));expect(screen.getByLabelText('外观')).toHaveValue('3');
+  fireEvent.change(screen.getByLabelText('产品类别'),{target:{value:'空气炸锅'}});expect(screen.queryByRole('radio',{name:/T40/})).not.toBeInTheDocument();expect(screen.getByRole('radio',{name:/F20/})).not.toBeChecked();expect(screen.queryByLabelText('外观')).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'下一步'})).toBeDisabled();
  });
  it('uses dictionary appearances without adding version management or changing the product default',async()=>{
-  const api={...planningApiFixture(),listAppearanceVersions:vi.fn(),updateProduct:vi.fn()};render(<PlanningPage api={api as never}/>);await screen.findByRole('option',{name:/T40/});fireEvent.change(screen.getByLabelText('产品型号'),{target:{value:'1'}});fireEvent.change(screen.getByLabelText('外观'),{target:{value:'12'}});fireEvent.click(screen.getByRole('button',{name:'下一步'}));fillPlanningProject();await checkPlanning();
+  const api={...planningApiFixture(),listAppearanceVersions:vi.fn(),updateProduct:vi.fn()};render(<PlanningPage api={api as never}/>);fireEvent.click(await screen.findByRole('radio',{name:/T40/}));fireEvent.change(screen.getByLabelText('外观'),{target:{value:'12'}});fireEvent.click(screen.getByRole('button',{name:'下一步'}));fillPlanningProject();await checkPlanning();
   expect(api.previewBatchPlan).toHaveBeenCalledWith(expect.objectContaining({groups:[expect.objectContaining({productId:1,appearanceId:12})]}));expect(api.listAppearanceVersions).not.toHaveBeenCalled();expect(api.updateProduct).not.toHaveBeenCalled();expect(screen.queryByLabelText('外观版本')).not.toBeInTheDocument();
  });
  it('adds and removes projects supplied by the dictionary and exposes incomplete rows as errors',async()=>{
@@ -43,11 +43,11 @@ describe('planning business interactions in the approved four-step layout',()=>{
   const api=planningApiFixture();const view=render(<PlanningPage api={api as never} active/>);await choosePlanningProduct();fillPlanningProject();const note=screen.getByLabelText('第 1 行备注');fireEvent.change(note,{target:{value:'未保存的编辑'}});
   view.rerender(<PlanningPage api={api as never} active={false}/>);api.listProducts.mockResolvedValue([planningProduct,{...planningProduct,id:3,model:'新型号'}]);view.rerender(<PlanningPage api={api as never} active/>);
   await waitFor(()=>expect(api.listProducts).toHaveBeenCalledTimes(2));expect(screen.getByLabelText('第 1 行备注')).toBe(note);expect(note).toHaveValue('未保存的编辑');
-  fireEvent.click(screen.getByRole('button',{name:'产品资料'}));expect(await screen.findByRole('option',{name:/新型号/})).toBeInTheDocument();expect(screen.getByLabelText('产品型号')).toHaveValue('1');
+  fireEvent.click(screen.getByRole('button',{name:'产品资料'}));expect(await screen.findByRole('radio',{name:/新型号/})).toBeInTheDocument();expect(screen.getByRole('radio',{name:/T40/})).toBeChecked();
  });
  it('keeps input after a draft save failure and can retry saving',async()=>{
-  const api=planningApiFixture();api.savePlanningDraft.mockRejectedValueOnce(new Error('草稿磁盘不可写'));render(<PlanningPage api={api as never}/>);await screen.findByRole('option',{name:/T40/});fireEvent.change(screen.getByLabelText('产品型号'),{target:{value:'1'}});
-  expect(await screen.findByRole('alert')).toHaveTextContent('草稿磁盘不可写');expect(screen.getByLabelText('产品型号')).toHaveValue('1');fireEvent.click(screen.getByRole('button',{name:'重试保存草稿'}));expect(await screen.findByText('草稿已保存')).toBeVisible();
+  const api=planningApiFixture();api.savePlanningDraft.mockRejectedValueOnce(new Error('草稿磁盘不可写'));render(<PlanningPage api={api as never}/>);fireEvent.click(await screen.findByRole('radio',{name:/T40/}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('草稿磁盘不可写');expect(screen.getByRole('radio',{name:/T40/})).toBeChecked();fireEvent.click(screen.getByRole('button',{name:'重试保存草稿'}));expect(await screen.findByText('草稿已保存')).toBeVisible();
  });
  it('deletes only the selected mode draft without issuing reservation or release operations',async()=>{
   const api=planningApiFixture();render(<PlanningPage api={api as never}/>);await choosePlanningProduct();fillPlanningProject();await waitFor(()=>expect(api.savePlanningDraft).toHaveBeenCalled());fireEvent.click(screen.getByRole('button',{name:'删除当前草稿'}));await screen.findByText('草稿已删除，正式图号保持不变');expect(api.deletePlanningDraft).toHaveBeenCalledWith('new',expect.any(Number));expect(api.reserveBatchPlan).not.toHaveBeenCalled();

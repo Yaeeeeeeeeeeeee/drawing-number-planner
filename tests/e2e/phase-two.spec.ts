@@ -27,7 +27,7 @@ test('Phase 2 previews and atomically reserves a real batch', async ({ page, req
   await page.goto('/');
   await page.getByRole('button', { name: /图号规划/ }).click();
   await page.getByLabel('产品类别', { exact: true }).selectOption('冰柜');
-  await page.getByLabel('产品型号').selectOption(String(productId));
+  await page.getByRole('group',{name:'产品型号',exact:true}).locator(`input[type=radio][value="${productId}"]`).check();
   await page.getByRole('button',{name:'下一步',exact:true}).click();
   await page.getByLabel('第 1 行主类别').selectOption(String(mainId));
   await page.getByLabel('第 1 行项目明细').selectOption(String(itemId));

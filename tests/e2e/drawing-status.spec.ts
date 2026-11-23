@@ -83,7 +83,7 @@ test('new reservations display as pending across app reopen and change only on e
     await page.setViewportSize({ width: 1600, height: 1000 });
     await page.goto(connection.url);
     await navigate(page, '图号规划 / 更新包材');
-    await page.getByRole('combobox', { name: '产品型号', exact: true }).selectOption(String(product.id));
+    await page.getByRole('group',{name:'产品型号',exact:true}).locator(`input[type=radio][value="${product.id}"]`).check();
     const next = page.getByRole('button', { name: '下一步', exact: true });
     await next.click();
     await page.getByRole('combobox', { name: '第 1 行主类别' }).selectOption(String(main.id));

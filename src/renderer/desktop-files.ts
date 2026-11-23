@@ -7,9 +7,11 @@ export interface DesktopFileResult {
 
 declare global {
   interface PlannerDesktop {
+    registerDroppedAit?(file:File): Promise<{token:string;fileName:string;displayPath:string}>;
     selectAitFile?(): Promise<{token:string;fileName:string;displayPath:string}|null>;
     openPdfInDefaultApp?(pdfFileId: number | DrawingObservedFileRequest): Promise<DesktopFileResult>;
     showFileInFolder(pdfFileId: number | DrawingObservedFileRequest): Promise<DesktopFileResult>;
+    exportBomPdf?(id: number, revision: number): Promise<DesktopFileResult & { cancelled?: boolean }>;
     showBomAssetInFolder?(assetId: number): Promise<DesktopFileResult>;
     chooseOutboundDirectory?(): Promise<DesktopFileResult & { cancelled?: boolean; path?: string }>;
     showOutboundPackageInFolder?(packageId: number, partNumber?: number): Promise<DesktopFileResult>;

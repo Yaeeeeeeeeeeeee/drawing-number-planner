@@ -63,19 +63,20 @@ export function ProductCatalogNavigation({ products, batches, counts, scope, onS
   const orphanBatches=batches.filter(batch=>!products.some(product=>belongsToProduct(batch,product.id)));
 
   const count = (value?: number) => <span className="pdf-nav-count" aria-label={value == null && !counts ? '数量暂不可用' : `${value ?? 0} 个${mode === 'files' ? '文件' : '图号'}`}>{value ?? (counts ? 0 : '—')}</span>;
-  const select = (label: string, selected: boolean, next: CatalogNavigationScope, value?: number, title = label, extra?: ReactNode) => <button type="button" data-navigation-select aria-label={label} title={title} aria-current={selected ? 'page' : undefined} onClick={() => onSelect(next)}><NavigationIcon kind={next.kind} mode={mode}/><span className="pdf-nav-label">{title}</span>{extra}{count(value)}</button>;
+  const select = (label: string, selected: boolean, next: CatalogNavigationScope, value?: number, title = label, extra?: ReactNode, extraDescription?: string) => <button type="button" data-navigation-select aria-label={label} aria-description={extraDescription} title={title} aria-current={selected ? 'page' : undefined} onClick={() => onSelect(next)}><NavigationIcon kind={next.kind} mode={mode}/><span className="pdf-nav-label">{title}</span>{extra}{count(value)}</button>;
   const renderBatch = (batch:MaterialBatchView, productId?:number) => {
     const state=batch.currentState;
     const title=batch.displayName||materialBatchLabel(batch.name);
     const amount=counts?.batches.find(item=>item.materialBatchId===batch.id&&(item.productId??undefined)===productId)?.count;
-    const badge=state==='current'||state==='historical'?<small className={`pdf-nav-state ${state}`}>{state==='current'?'当前批次':'历史批次'}</small>:undefined;
+    const stateLabel = state === 'current' ? '当前批次' : state === 'historical' ? '历史批次' : undefined;
+    const badge = stateLabel ? <small className={`pdf-nav-state ${state}`} title={stateLabel}>{stateLabel}</small> : undefined;
     return <div className="pdf-nav-batch" key={batch.id} onContextMenu={mode==='files'&&(onRenameBatch||onDeleteBatch)?event=>{
       event.preventDefault();event.stopPropagation();
       setBatchMenu({batch,x:event.clientX,y:event.clientY,trigger:event.currentTarget.querySelector('button')!});
-    }:undefined}>{select(`批次 ${title}`,scope.kind==='batch'&&scope.batchId===batch.id&&scope.productId===productId,{kind:'batch',...(productId?{productId}:{}),batchId:batch.id},amount,title,badge)}</div>;
+    }:undefined}>{select(`批次 ${title}`,scope.kind==='batch'&&scope.batchId===batch.id&&scope.productId===productId,{kind:'batch',...(productId?{productId}:{}),batchId:batch.id},amount,title,badge,stateLabel)}</div>;
   };
   return <nav className="pdf-product-navigation product-catalog-navigation" aria-label={mode === 'files' ? '资料导航' : '图号导航'}>
-    <header className="pdf-nav-header"><div className="catalog-nav-heading"><h2>产品与批次</h2>{collapseControl}</div><label className="catalog-nav-search"><Search size={18} strokeWidth={1.8} aria-hidden="true"/><input aria-label="搜索产品 SKU 或型号" placeholder="搜索 SKU / 型号 / 产品名称" value={keyword} onChange={event => setKeyword(event.target.value)} /></label></header>
+    <header className="pdf-nav-header"><div className="catalog-nav-heading"><h2>{mode === 'drawings' ? '产品与分类' : '产品类别、型号与批次'}</h2>{collapseControl}</div><label className="catalog-nav-search"><Search size={18} strokeWidth={1.8} aria-hidden="true"/><input aria-label="搜索产品 SKU 或型号" placeholder="搜索 SKU / 型号 / 产品名称" value={keyword} onChange={event => setKeyword(event.target.value)} /></label></header>
     <div className="pdf-nav-scroll">
       {select(mode === 'files' ? '全部文件' : '全部图号', scope.kind === 'all', { kind: 'all' }, counts?.total)}
       {categories.map(category => {

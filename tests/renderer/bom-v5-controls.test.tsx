@@ -42,7 +42,5 @@ it('query reset clears hidden appearance scope',async()=>{
  await screen.findByRole('region',{name:'所选 BOM 记录'});
  fireEvent.click(screen.getByRole('button',{name:'重置'}));
  fireEvent.change(screen.getByLabelText('查询 BOM 产品型号'),{target:{value:'2'}});
- fireEvent.click(screen.getByRole('button',{name:'查询'}));
- await waitFor(()=>expect(api.queryBomVersions).toHaveBeenCalled());
- expect(api.queryBomVersions).toHaveBeenLastCalledWith({productId:2});
+ await waitFor(()=>expect(api.queryBomVersions).toHaveBeenLastCalledWith({productId:2}));
 });

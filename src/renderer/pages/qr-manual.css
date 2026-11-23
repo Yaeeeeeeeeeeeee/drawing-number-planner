@@ -3,25 +3,27 @@
 .qr-manual-page .qr-main-table > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):first-child { text-align: left; }
 .qr-manual-page .qr-main-table > .table-wrap > table > thead > tr > th { width: auto; }
 .qr-manual-page .qr-main-table > .table-wrap > table > thead > tr > th:first-child { width: 24%; }
-.qr-manual-page .qr-manual-subtable { margin: 0; border-right: 1px solid var(--ws-line); border-radius: 4px; }
+.qr-manual-page .qr-manual-subtable { margin: 0 0 0 clamp(8px, 2vw, 24px); border: 1px solid var(--ws-line); border-left-width: 3px; border-radius: 4px; background: var(--ws-bg, #f5f7f8); }
 .qr-manual-page .qr-manual-subtable::before { display: none; }
 .qr-manual-page .qr-manual-subtable table { width: 100%; table-layout: fixed; }
 .qr-manual-page.page-surface .qr-manual-subtable :is(th,td) { padding: 12px; height: 46px; text-align: center; vertical-align: middle; }
 .qr-manual-page.page-surface .qr-manual-subtable th:nth-child(n) { width: auto; }
 .qr-manual-page.page-surface .qr-manual-subtable :is(th,td):nth-child(2) { text-align: left; }
-.qr-manual-page .qr-manual-subtable .row-actions { justify-content: center; gap: 10px; flex-wrap: nowrap; }
+.qr-manual-page .qr-manual-subtable td { background: var(--ws-bg, #f5f7f8); }
+.qr-manual-page .qr-binding-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.qr-manual-page .qr-binding-action { flex: none; }
 .qr-manual-page .qr-filename { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; display: block; }
 .qr-manual-page .qr-stored-url { display: inline-flex; align-items: center; max-width: 100%; gap: 5px; min-width: 0; }
-.qr-manual-page .qr-stored-url a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qr-manual-page .qr-stored-url a { display: inline-flex; align-items: center; padding: 3px; }
 .qr-manual-page .qr-copy { flex: 0 0 22px; min-width: 22px; padding: 0; }
 .qr-manual-page .qr-expand { display: inline-flex; align-items: center; gap: 8px; }
 .qr-manual-page .qr-manual-dialog { max-width: 720px; width: min(720px,90vw); max-height: 88vh; overflow-y: auto; background: #fff; padding: 24px; }
 .qr-manual-page .qr-manual-dialog small { display: block; overflow-wrap: anywhere; }
 .qr-manual-page .qr-manual-file-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 0; }
 .qr-manual-page .qr-manual-file-detail > span { width: 100%; overflow-wrap: anywhere; }
-.qr-manual-page .qr-filter { display: grid; grid-template-columns: minmax(160px,1.4fr) repeat(3,minmax(120px,1fr)) auto; gap: 12px; align-items: end; }
+.qr-manual-page .qr-filter { display: grid; grid-template-columns: minmax(138px,1.4fr) repeat(3,minmax(100px,1fr)) auto auto; gap: 8px; align-items: end; }
 .qr-manual-page .qr-manual-subtable button { min-height: 20px; height: 20px; line-height: 20px; padding-top: 0; padding-bottom: 0; }
-@media (max-width: 1000px) { .qr-manual-page .qr-filter { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 720px) { .qr-manual-page .qr-filter { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 
 .qr-manual-page .modal-backdrop, .qr-manual-modal-root {
   position: fixed;
@@ -62,4 +64,8 @@
 .qr-manual-page .qr-main-table .qr-purpose-summary { display: inline-flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
 .qr-manual-page .qr-url-tail { color: var(--ws-muted, #666); font-size: 12px; align-self: center; }
 
-.qr-manual-subtable .qr-file-empty{display:block;width:100%;text-align:center;}
+.qr-manual-page .qr-status-icon { display: inline-flex; justify-content: center; align-items: center; min-width: 26px; min-height: 26px; padding: 3px; color: var(--ws-muted, #57636d); }
+.qr-manual-page .qr-status-icon[data-active="true"] { color: #25704c; }
+.qr-manual-page .qr-status-icon:focus-visible { outline-offset: 2px; }
+.qr-manual-page .qr-pdf-drop { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 14px 0 10px; padding: 14px; border: 1px dashed var(--ws-line, #aeb7bf); border-radius: 6px; background: var(--ws-bg, #f5f7f8); }
+.qr-manual-page .qr-pdf-drop p { flex-basis: 100%; margin: 0; }

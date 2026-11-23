@@ -36,12 +36,17 @@ export function createFilesMockApi(scenario: FilesScenario): PlannerApi {
   const counts = () => ({ pdfFiles: rows.length, qrCodeFiles: qrCount, materialBatches: batches.length, scanChanges: scanCount ? 3 : 0, scanRuns: scanCount });
   const filterRows = (filters: Record<string, any>) => {
       const keyword = String(filters.keyword ?? '').trim().toLowerCase();
-    return scenario === 'no-results' ? [] : rows.filter(row => (!keyword || [row.fileName, row.relativePath, row.fullCode ?? row.historicalFullCode].some(value => value?.toLowerCase().includes(keyword)))
+    return scenario === 'no-results' ? [] : rows.filter(row => {
+      const fields = filters.keywordIn === 'file-name-or-code'
+        ? [row.fileName, row.fullCode, row.historicalFullCode]
+        : [row.fileName, row.relativePath, row.fullCode ?? row.historicalFullCode];
+      return (!keyword || fields.some(value => value?.toLowerCase().includes(keyword)))
         && (!filters.productId || row.productId === filters.productId) && (!filters.materialBatchId || row.materialBatchId === filters.materialBatchId)
         && (!filters.productCategory || row.productCategory === filters.productCategory)
         && (filters.unassociatedProduct !== 'true' || row.productId === null)
         && (!filters.matchStatus || row.matchStatus === filters.matchStatus) && (!filters.conversionType || row.conversionType === filters.conversionType)
-        && ((filters.presence ?? 'present') === 'all' || row.isPresent === ((filters.presence ?? 'present') === 'present')));
+        && ((filters.presence ?? 'present') === 'all' || row.isPresent === ((filters.presence ?? 'present') === 'present'));
+    });
   };
   const methods: Record<string, (...args: any[]) => Promise<unknown>> = {
     getWorkspaceSettings: async () => ({ workspaceRoot: root, configured: true, available: true }),

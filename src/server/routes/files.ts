@@ -17,6 +17,7 @@ const searchSchema = z.object({
   materialSource: z.enum(['true','false']).transform(value=>value==='true').optional(),
   managementState: z.enum(['included', 'ignored', 'needs_review', 'all']).optional(),
   keyword: z.string().max(500).optional(),
+  keywordIn: z.literal('file-name-or-code').optional(),
   productId: z.coerce.number().int().positive().optional(),
   appearanceVersionId: z.coerce.number().int().positive().optional(),
   materialBatchId: z.coerce.number().int().positive().optional(),

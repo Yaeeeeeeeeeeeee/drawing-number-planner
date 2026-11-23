@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createQrManualHandlers } from '../../src/main/qr-manual-actions';
 describe('trusted manual QR desktop boundary',()=>{
+ it('registers only a native drop path from the trusted frame',async()=>{
+  const execute=vi.fn().mockResolvedValue({token:'drop-capability'});
+  const handlers=createQrManualHandlers({isTrustedEvent:event=>event==='main',choosePdf:vi.fn(),execute,openPath:vi.fn(),showItemInFolder:vi.fn()});
+  await expect(handlers.drop('iframe','/files/valid.pdf')).rejects.toThrow('UNTRUSTED_QR_SENDER');
+  await expect(handlers.drop('main','relative.pdf')).rejects.toThrow('INVALID_QR_SELECTION');
+  expect(execute).not.toHaveBeenCalled();
+  await expect(handlers.drop('main','/files/valid.pdf')).resolves.toEqual({token:'drop-capability'});
+  expect(execute).toHaveBeenCalledWith('select',{path:'/files/valid.pdf'});
+ });
  it('comparison accepts only a preview capability, never a renderer path, token or arbitrary file ID',async()=>{
   const execute=vi.fn().mockResolvedValue({status:'not-compared'}),handlers=createQrManualHandlers({choosePdf:vi.fn(),execute,openPath:vi.fn(),showItemInFolder:vi.fn()});
   const previewId='b66ac16d-4fd8-4ae6-9c28-974b67179dcb';

@@ -54,8 +54,8 @@ test('V5.2 real indexed tables keep width, alignment, icon actions and frozen co
     })).toBeLessThanOrEqual(2);
     for(const key of columns){
      const header=table.locator(`thead th[data-column-key="${key}"]`);
-     await expect(header).toHaveCSS('text-align','center');
-     await expect(table.locator(`tbody td[data-column-key="${key}"]`).first()).toHaveCSS('text-align','center');
+     await expect(header).toHaveCSS('text-align',label==='PDF 文件中心'?'left':'center');
+     await expect(table.locator(`tbody td[data-column-key="${key}"]`).first()).toHaveCSS('text-align',label==='PDF 文件中心'?'left':'center');
     }
     const geometry=await table.evaluate(element=>{
      const cells=[...element.querySelectorAll('thead th')].map(cell=>cell.getBoundingClientRect().width);

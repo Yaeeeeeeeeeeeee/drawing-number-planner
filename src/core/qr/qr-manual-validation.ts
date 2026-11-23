@@ -1,3 +1,10 @@
+export const QR_MANUAL_PDF_LIMIT_MB = 64;
+export const QR_MANUAL_PDF_LIMIT_BYTES = QR_MANUAL_PDF_LIMIT_MB * 1024 * 1024;
+
+export function canInitializeQrTarget(code: { targetUrl: string | null; files: readonly unknown[]; hasFileHistory?: boolean }): boolean {
+  return !code.targetUrl?.trim() && code.files.length === 0 && !code.hasFileHistory;
+}
+
 export class QrManualError extends Error {
   constructor(public readonly code: string, message: string) { super(message); }
 }

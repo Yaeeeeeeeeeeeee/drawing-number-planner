@@ -46,7 +46,7 @@ async function assertQrModalLayout(modal,label,stage){
  assert.ok(layout.modal.width>0&&layout.modal.height>0&&layout.modal.x>=-tolerance&&layout.modal.y>=-tolerance&&layout.modal.right<=layout.viewport.width+tolerance&&layout.modal.bottom<=layout.viewport.height+tolerance,'QR dialog must fit inside the viewport without scrolling the document to its footer');
  const row={label,stage,...layout};(report.qrModalLayouts??=[]).push(row);fs.writeFileSync(path.join(evidence,'windows-qr-modal-layout.json'),JSON.stringify({revision:report.revision,items:report.qrModalLayouts},null,2));console.log('[native QR modal layout]',JSON.stringify(row));
 }
-async function chooseAndCommitQr(page,file,label){const modal=page.getByRole('dialog',{name:'手动关联二维码PDF'});const picker=nativeDialog('qr',file,label);try{await assertQrModalLayout(modal,label,'before-native-picker');await modal.getByRole('button',{name:'选择本地PDF',exact:true}).click();await picker.done;const selected=modal.getByTitle(file,{exact:true});await selected.waitFor();assert.equal(await selected.locator('small').textContent(),file);assert.ok((await selected.textContent()).startsWith(path.basename(file)));await modal.getByRole('button',{name:'校验文件',exact:true}).click();await modal.getByText('型号、用途、网址尾码与PDF文件校验通过。',{exact:true}).waitFor();await expect(modal.locator('.qr-pixel-comparison [role=status]')).toHaveText(label==='QR首次关联'?'无当前关联文件，未比较首页像素':'首页像素不同');await assertQrModalLayout(modal,label,'validated-before-screenshot');await page.screenshot({path:path.join(evidence,`Windows-原生二维码PDF-${label}-校验.png`)});await modal.getByRole('button',{name:'确认关联',exact:true}).click();await modal.waitFor({state:'hidden'});await page.getByText('文件已关联，业务状态保持不变。',{exact:true}).waitFor();}catch(error){await captureFailure(activeApp,`QR-${label}`,error);throw error;}finally{picker.child.kill();}}
+async function chooseAndCommitQr(page,file,label){const modal=page.getByRole('dialog',{name:'手动关联二维码'});const picker=nativeDialog('qr',file,label);try{await assertQrModalLayout(modal,label,'before-native-picker');await modal.getByRole('button',{name:'选择本地PDF',exact:true}).click();await picker.done;const selected=modal.getByTitle(file,{exact:true});await selected.waitFor();assert.equal(await selected.locator('small').textContent(),file);assert.ok((await selected.textContent()).startsWith(path.basename(file)));await modal.getByRole('button',{name:'校验文件',exact:true}).click();await modal.getByText('型号、用途、网址尾码与PDF文件校验通过。',{exact:true}).waitFor();await expect(modal.locator('.qr-pixel-comparison [role=status]')).toHaveText(label==='QR首次关联'?'无当前关联文件，未比较首页像素':'首页像素不同');await assertQrModalLayout(modal,label,'validated-before-screenshot');await page.screenshot({path:path.join(evidence,`Windows-原生二维码PDF-${label}-校验.png`)});await modal.getByRole('button',{name:'确认关联',exact:true}).click();await modal.waitFor({state:'hidden'});await page.getByText('文件已关联，业务状态保持不变。',{exact:true}).waitFor();}catch(error){await captureFailure(activeApp,`QR-${label}`,error);throw error;}finally{picker.child.kill();}}
 let launchNumber=0,activeApp;
 function fileDiagnostic(file){try{return{file,text:fs.readFileSync(file,'utf8')}}catch(error){return{file,error:error.message}}}
 async function captureFailure(app,label,error){
@@ -131,10 +131,11 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   const productBranch=catalog.locator('.pdf-nav-product').filter({has:page.getByRole('button',{name:'产品 SKU · M1',exact:true})});
   const expandProduct=productBranch.locator('.pdf-nav-expand').first();if(await expandProduct.getAttribute('aria-expanded')==='false')await expandProduct.click();
   const fileFilters=page.getByRole('complementary',{name:'PDF 筛选',exact:true});
-  const setFileFilter=async(field,value)=>{if(!await fileFilters.isVisible())await page.getByRole('button',{name:'筛选',exact:true}).click();const input=fileFilters.getByLabel(field,{exact:true});if(field==='文件关键词')await input.fill(value);else await input.selectOption(value);await fileFilters.getByRole('button',{name:'关闭',exact:true}).click();};
-  await setFileFilter('文件关键词','no-file-matches-this-filter');await page.getByRole('heading',{name:'没有符合条件的 PDF',exact:true}).waitFor();
-  assert.ok(await productBranch.getByRole('button',{name:'批次 首批大货',exact:true}).count(),'A zero count must not move the real batch out of its product');
-  await setFileFilter('文件关键词','');await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
+  const setFileFilter=async(field,value)=>{if(!await fileFilters.isVisible())await page.getByRole('button',{name:'筛选',exact:true}).click();await fileFilters.getByRole('combobox',{name:field,exact:true}).selectOption(value);await fileFilters.getByRole('button',{name:'关闭',exact:true}).click();};
+  const fileSearch=page.getByRole('searchbox',{name:'文件关键词',exact:true});
+  await fileSearch.fill('no-file-matches-this-filter');await page.getByRole('heading',{name:'没有符合条件的 PDF',exact:true}).waitFor();
+  assert.ok(await productBranch.getByRole('button',{name:'批次 首批大货',exact:true}).count(),'Searching the list must keep the real batch under its product');
+  await page.getByRole('button',{name:'清除搜索',exact:true}).click();await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
   const managementActions=[['ignore','排除所选文件'],['restore','恢复所选文件'],['clear','移除文件记录']];
   for(const [action,button]of managementActions){
     await setFileFilter('纳入范围',action==='restore'?'ignored':'included');
@@ -151,7 +152,7 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
   await setFileFilter('纳入范围','included');await require('./verify-scan-ui.cjs')(page);
   await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor({timeout:45000});
   report.pdfManagementButtons={actualRenderer:true,previewApplyIgnoreRestoreClear:true,originalFileHashPreserved:true,clearedIndexRediscovered:true,zeroCountDoesNotReparentBatch:true};
-  await go(page,'图号库');await page.getByRole('button',{name:'自动归类',exact:true}).click();
+  await go(page,'图号库');await page.getByRole('button',{name:'自动归类（全库）',exact:true}).click();
   await page.locator('.drawing-association-result').waitFor({timeout:45000});
   const drawingList=await page.evaluate(async()=>await(await fetch('/api/drawings?productId=5')).json());
   assert.ok(drawingList.items.some(item=>item.fullCode==='02.0209.010.0401002'&&item.productId===5));
@@ -195,8 +196,9 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  let linkedState,replacedState,qrObservationScope;
  app=await launch();try{
   const page=await ready(app);assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);assert.equal(await app.evaluate(({app})=>app.getVersion()),version.applicationVersion);qrObservationScope=await observationScope(page,beforeQr);require('./verify-packaging-restart.cjs')(beforeQr,snapshot(path.join(legacy,'planner.db')),qrObservationScope);report.restartPreservesDatabase=true;
-  await go(page,'二维码管理');await assertQrListLayout(page,'before-native-association');await page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).locator('xpath=ancestor::tr').getByRole('button',{name:'新增用途',exact:true}).click();
-  const modal=page.getByRole('dialog',{name:'手动关联二维码PDF'});await modal.waitFor();
+  await go(page,'二维码管理');await assertQrListLayout(page,'before-native-association');const productRow=page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).locator('xpath=ancestor::tr');
+  const shortcut=productRow.getByRole('button',{name:'售后卡：未配置，关联文件',exact:true});await expect(shortcut).toHaveAttribute('title','售后卡：未配置，关联文件');await shortcut.click();
+  const modal=page.getByRole('dialog',{name:'手动关联二维码'});await modal.waitFor();
   assert.equal(await modal.evaluate(element=>element.contains(document.activeElement)),true);
   const modalCancel=modal.getByRole('button',{name:'取消',exact:true});await modalCancel.focus();await page.keyboard.press('Tab');assert.equal(await modal.evaluate(element=>element.contains(document.activeElement)),true);assert.equal(await modalCancel.evaluate(element=>element===document.activeElement),false);await page.keyboard.press('Shift+Tab');assert.equal(await modalCancel.evaluate(element=>element===document.activeElement),true);
   report.qrModalKeyboardFocus={initialFocus:true,tabLoop:true};
@@ -208,7 +210,11 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  // A fresh real Electron process must reload the new external file and metadata.
  app=await launch();try{
   const page=await ready(app);assert.deepEqual(qrState(path.join(legacy,'planner.db'),qrName),linkedState);await go(page,'二维码管理');
-  await page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).click();await page.getByRole('button',{name:`查看 ${qrName}`,exact:true}).click();await page.getByRole('heading',{name:qrName,exact:true}).waitFor();
+  await page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).click();
+  const qrDetails=page.locator('.qr-manual-subtable').getByRole('table');
+  assert.deepEqual((await qrDetails.getByRole('columnheader').allTextContents()).map(text=>text.trim()),['用途','关联文件','网址','业务状态']);
+  await expect(qrDetails.getByRole('link',{name:'打开网址',exact:true}).filter({has:page.locator('svg')}).first()).toBeVisible();
+  await qrDetails.getByRole('button',{name:`查看 ${qrName}`,exact:true}).click();await page.getByRole('heading',{name:qrName,exact:true}).waitFor();
   await page.getByText(firstPdf,{exact:true}).waitFor();await page.screenshot({path:path.join(evidence,'Windows-原生二维码PDF-关联后重启.png')});
   await page.getByRole('button',{name:'更换文件',exact:true}).click();await chooseAndCommitQr(page,replacementPdf,'QR替换');replacedState=qrState(path.join(legacy,'planner.db'),qrName);assert.deepEqual(replacedState.code,linkedState.code);assert.equal(replacedState.links.length,2);assert.equal(replacedState.files[1].absolute_path,replacementPdf);assert.equal(replacedState.files[1].content_sha256,replacementHash);assert.equal(replacedState.links[1].unlinked_at,null);assert.ok(replacedState.links[0].unlinked_at);assert.deepEqual(replacedState.files[0],linkedState.files[0]);assert.deepEqual(replacedState.audit[0],linkedState.audit[0]);
   await page.waitForFunction(()=>document.querySelector('details.qr-file-section')?.querySelectorAll('p').length===2);

@@ -27,9 +27,20 @@ export function BomEditComparison({ index, original, mainCategories, projects, c
     original.assets.some((asset) => asset.role === 'diagram') ? attachments('diagram') : '未关联位置示意图',
     original.changeDetails, original.notes,
   ] : [];
+  const inputs = Children.toArray(children);
+  const sections = [
+    { name: '核心标识', indexes: [0, 1, 2, 3] },
+    { name: '规格属性', indexes: [4, 5, 7] },
+    { name: '图片与变更信息', indexes: [6, 8, 9, 10] },
+  ];
   return <div className="bom-compact-editor">
     <div className="bom-editor-heading"><strong>本次编辑</strong>{original && <button type="button" className="text-button" onClick={()=>setOpen(true)}>修改前数据</button>}</div>
-    <div className="bom-compact-fields">{Children.toArray(children).map((field, fieldIndex)=><div className={`bom-compact-field bom-edit-field ${fieldIndex===9 && changeDetails?.trim() ? 'bom-change-present' : ''} ${fieldIndex===2 || fieldIndex===9 || fieldIndex===10 ? 'bom-wide-field' : ''}`} key={fields[fieldIndex] ?? fieldIndex}>{field}</div>)}</div>
+    {sections.map(section => <section key={section.name} className="bom-editor-section" aria-label={section.name}>
+      <h4>{section.name}</h4>
+      <div className="bom-compact-fields">{section.indexes.map(fieldIndex => <div
+        className={`bom-compact-field bom-edit-field ${fieldIndex===9 && changeDetails?.trim() ? 'bom-change-present' : ''} ${fieldIndex===2 || fieldIndex===9 || fieldIndex===10 ? 'bom-wide-field' : ''}`}
+        key={fields[fieldIndex]}>{inputs[fieldIndex]}</div>)}</div>
+    </section>)}
     {open && original && <div className="bom-original-overlay" onClick={()=>setOpen(false)}><aside className="bom-original-drawer" role="dialog" aria-modal="true" aria-label={`项目 ${index} 修改前数据`} onClick={event=>event.stopPropagation()}><header><h3>修改前数据</h3><button type="button" className="text-button" autoFocus onClick={()=>setOpen(false)}>关闭</button></header><dl>{fields.map((label,i)=><div key={label} aria-label={`项目 ${index} 修改前数据 · ${label}`} className={i===9 && original.changeDetails?.trim() ? 'bom-change-present' : undefined}><dt>{label}</dt><dd>{values[i] || '—'}</dd></div>)}</dl></aside></div>}
   </div>;
 }

@@ -4,6 +4,11 @@ import { DrawingTasksPage } from '../../src/renderer/pages/DrawingTasksPage';
 import {planningApiFixture} from './planning-workspace-fixture';
 import { PlanningPage } from '../../src/renderer/pages/PlanningPage';
 
+function expandItem(row:HTMLElement){
+  const button=within(row).getByRole('button',{name:/^展开或收起/});
+  if(button.getAttribute('aria-expanded')==='false')fireEvent.click(button);
+}
+
 const product = {id:7,model:'T40',sku:'SKU7',brandId:1,brandName:'品牌',productCategory:'冰柜',status:'active'};
 const item = {id:1,taskId:'task1',drawing:{origin:'planned',id:20},fullCode:'02.0404.010.0401001',projectItemId:3,projectName:'铭牌',color:'白',mode:'manual',parameters:{width:80},state:'awaiting_review',sha256:'hash-current',fileName:'铭牌.pdf'};
 const task = {id:'task1',productId:7,model:'T40',name:'首批',type:'new',state:'active',productDirectory:'冰柜/T40',taskDirectory:'冰柜/T40/00.临时文件/当前任务_task1',createdAt:'2026-10-30',items:[item],pendingFiles:[]};
@@ -26,9 +31,9 @@ function fixture() {
 describe('packaging workflow',()=>{
   it('continues persisted tasks and reviews the exact current hash before archive preview',async()=>{
     const api=fixture();render(<DrawingTasksPage api={api as never}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
+    fireEvent.click(await screen.findByRole('button',{name:/^(继续任务|查看记录)$/}));
     const card=await screen.findByRole('region',{name:'02.0404.010.0401001 铭牌'});
-    fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));
+    expandItem(card);
     fireEvent.click(within(card).getByLabelText('已检查当前 PDF 内容'));
     fireEvent.click(within(card).getByRole('button',{name:'确认当前文件'}));
     await waitFor(()=>expect(api.packaging.reviewItem).toHaveBeenCalledWith('task1',1,'hash-current'));
@@ -49,9 +54,9 @@ describe('packaging workflow',()=>{
     const aitTask={...task,items:[aitItem]};api.packaging.getTask.mockResolvedValue(aitTask);
     const updateItem=vi.fn().mockResolvedValue({...task,items:[{...aitItem,templateId:9,templateName:'标准模板'}]});
     Object.assign(api.packaging,{updateItem});
-    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
+    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:/^(继续任务|查看记录)$/}));
     const card=await screen.findByRole('region',{name:'02.0404.010.0401001 铭牌'});
-    fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));
+    expandItem(card);
     expect(within(card).getByText('有多个匹配模板，请明确选择后保存。')).toBeVisible();
     fireEvent.change(within(card).getByLabelText('本次模板'),{target:{value:'9'}});
     expect(screen.getByRole('button',{name:'批量生成待处理项目'})).toBeDisabled();
@@ -63,7 +68,7 @@ describe('packaging workflow',()=>{
   it('archives only after a ready preview and explicit unified confirmation',async()=>{
     const api=fixture();api.packaging.archivePreview.mockResolvedValue({taskId:'task1',ready:true,blockers:[],files:[{itemId:1,fullCode:item.fullCode,destination:'T40/02.未转曲源文件/铭牌.pdf',replaces:false}]});
     api.packaging.archive.mockResolvedValue({...task,state:'completed'});
-    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
+    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:/^(继续任务|查看记录)$/}));
     fireEvent.click(await screen.findByRole('button',{name:'归档预览'}));const confirm=await screen.findByRole('button',{name:'确认统一归档'});
     expect(confirm).toBeDisabled();expect(api.packaging.archive).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText('已核对全部文件和归档位置，确认统一归档'));fireEvent.click(confirm);
@@ -76,6 +81,7 @@ describe('packaging workflow',()=>{
     api.packaging.createTask.mockResolvedValue(task);
     render(<DrawingTasksPage api={api as never}/>);
     await screen.findByRole('option',{name:'SKU7 · T40 · 品牌'});fireEvent.change(screen.getByRole('combobox',{name:'产品型号'}),{target:{value:'7'}});
+    fireEvent.click(screen.getByRole('button',{name:'发起任务'}));
     fireEvent.change(screen.getByRole('combobox',{name:'任务类型'}),{target:{value:'modify'}});
     fireEvent.click(await screen.findByRole('checkbox',{name:`${item.fullCode} · 铭牌 · 白`}));
     const select=await screen.findByLabelText(`${item.fullCode} 原始源 PDF`);expect(screen.getByRole('button',{name:'创建任务'})).toBeDisabled();
@@ -85,7 +91,7 @@ describe('packaging workflow',()=>{
   it('allows retrying the index stage of an interrupted archive despite pending preview readiness',async()=>{
     const api=fixture();api.packaging.getTask.mockResolvedValue({...task,state:'awaiting_index'});
     api.packaging.archivePreview.mockResolvedValue({taskId:'task1',ready:false,blockers:['等待索引重试'],files:[]});api.packaging.archive.mockResolvedValue({...task,state:'completed'});
-    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));
+    render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:/^(继续任务|查看记录)$/}));
     fireEvent.click(await screen.findByRole('button',{name:'归档预览'}));await screen.findByText('等待索引重试');
     fireEvent.click(screen.getByRole('button',{name:'重试归档索引'}));await waitFor(()=>expect(api.packaging.archive).toHaveBeenCalledWith('task1'));
   });
@@ -102,9 +108,9 @@ it('shows conflict candidates and selected template evidence before generation',
  const api=fixture();const first={id:9,name:'标准模板',status:'active',mainCategoryId:2,projectItemId:3,productIds:[],brandIds:[],fields:[],fileName:'标准.ait',assetRelativePath:'/原始/标准.ait'};const second={...first,id:10,name:'备选模板',fileName:'备选.ait'};
  api.packaging.getCatalog.mockResolvedValue({templates:[first,second],dimensions:[],rules:[{id:1,name:'范围',templateId:9,conditions:[{key:'width',operator:'between',value:50,max:100}],allowLengthWidthSwap:true,status:'active'}],configs:[{projectItemId:3,mode:'ait',parameters:[{key:'width',label:'宽',type:'number',axis:'width',required:true}]}]});
  const aitItem={...item,mode:'ait',state:'pending',templateId:9,templateName:'标准模板',match:{status:'multiple',templateIds:[9,10],missingParameters:[]}};api.packaging.getTask.mockResolvedValue({...task,items:[aitItem]});
- render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));const card=await screen.findByRole('region',{name:`${item.fullCode} 铭牌`});fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));
+ render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:/^(继续任务|查看记录)$/}));const card=await screen.findByRole('region',{name:`${item.fullCode} 铭牌`});expandItem(card);
  const conflicts=within(card).getByRole('region',{name:'匹配冲突列表'});const selected=within(card).getByRole('region',{name:'生成前模板信息'});expect(within(conflicts).getByText('备选模板')).toBeVisible();expect(within(conflicts).getByText(/宽 介于 50 至 100/)).toBeVisible();expect(within(selected).getByText(/原始\/标准.ait/)).toBeVisible();expect(within(conflicts).getAllByText(/匹配原因/)).toHaveLength(2);
 });
 it('shows why a formal PDF cannot be opened for Illustrator editing while keeping preview available',async()=>{
- const api=fixture(),formal={...task,items:[{...item,mode:'existing',state:'completed',relativePath:'冰柜/T40/02.未转曲源文件/铭牌.pdf'}]};api.packaging.getTask.mockResolvedValue(formal);render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:'查看记录'}));const card=await screen.findByRole('region',{name:'02.0404.010.0401001 铭牌'});fireEvent.click(within(card).getByRole('button',{name:'设置 / 检查'}));expect(within(card).getByRole('button',{name:'预览 PDF'})).toBeEnabled();expect(within(card).queryByRole('button',{name:'在 Illustrator 中检查 / 修改'})).not.toBeInTheDocument();expect(within(card).getByText(/修改正式文件.*临时副本/)).toBeVisible();
+ const api=fixture(),formal={...task,items:[{...item,mode:'existing',state:'completed',relativePath:'冰柜/T40/02.未转曲源文件/铭牌.pdf'}]};api.packaging.getTask.mockResolvedValue(formal);render(<DrawingTasksPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:/^(继续任务|查看记录)$/}));const card=await screen.findByRole('region',{name:'02.0404.010.0401001 铭牌'});expandItem(card);expect(within(card).getByRole('button',{name:'预览 PDF'})).toBeEnabled();expect(within(card).queryByRole('button',{name:'在 Illustrator 中检查 / 修改'})).not.toBeInTheDocument();expect(within(card).getByText(/修改正式文件.*临时副本/)).toBeVisible();
 });

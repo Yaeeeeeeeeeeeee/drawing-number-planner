@@ -1,3 +1,4 @@
+import { exportBomPdf } from './bom-pdf-export.js';
 import { createAitChooser } from './ait-chooser.js';
 import { acquireDesktopInstance } from './single-instance.js';
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
@@ -248,6 +249,21 @@ if (primaryInstance) void app.whenReady().then(() => {
     },
     showItemInFolder: (path) => shell.showItemInFolder(path),
   }));
+  ipcMain.handle('planner:bom-export', async (event, id: unknown, revision: unknown) => {
+    const parent = mainWindow;
+    if (!parent || event.sender !== parent.webContents || event.senderFrame !== parent.webContents.mainFrame
+        || typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0
+        || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0) {
+      return { ok: false, error: { code: 'INVALID_BOM_EXPORT', message: 'BOM 导出版本无效' } };
+    }
+    try {
+      if (!localService) throw new Error('本机文件服务尚未启动');
+      const connection = await localService.start();
+      return await exportBomPdf(parent, connection.url, id, revision);
+    } catch (error) {
+      return { ok: false, error: { code: 'BOM_EXPORT_FAILED', message: error instanceof Error ? error.message : 'BOM PDF 导出失败' } };
+    }
+  });
   ipcMain.handle('planner:show-bom-asset-in-folder', createShowBomAssetInFolderHandler({
     resolveBomAssetPath: (id) => {
       if (!localService) throw new Error('本机文件服务尚未启动');
@@ -271,12 +287,15 @@ if (primaryInstance) void app.whenReady().then(() => {
     openPath: path => shell.openPath(path),
     showItemInFolder: path => shell.showItemInFolder(path),
   });
-  ipcMain.handle('planner:select-ait', createAitChooser({
+  const aitChooser = createAitChooser({
     isTrustedEvent: event => {const sender=event as Electron.IpcMainInvokeEvent;return Boolean(mainWindow && sender.sender===mainWindow.webContents && sender.senderFrame===mainWindow.webContents.mainFrame);},
     choose: async () => {const result=await dialog.showOpenDialog(mainWindow!,{title:'选择 AIT 原始文件',properties:['openFile'],filters:[{name:'AIT',extensions:['ait']}]});return result.canceled?null:result.filePaths[0]??null;},
     select: path => {if(!localService)throw new Error('本机文件服务尚未启动');return localService.selectAitTrusted(path);},
-  }));
+  });
+  ipcMain.handle('planner:select-ait', aitChooser);
+  ipcMain.handle('planner:drop-ait', aitChooser.drop);
   ipcMain.handle('planner:qr-manual-select', event => manualQr.select(event));
+  ipcMain.handle('planner:qr-manual-drop', manualQr.drop);
   ipcMain.handle('planner:qr-manual-action', manualQr.action);
   ipcMain.handle('planner:qr-file-action', createQrFileActionHandler({
     resolveQrFilePath: (relativePath) => {

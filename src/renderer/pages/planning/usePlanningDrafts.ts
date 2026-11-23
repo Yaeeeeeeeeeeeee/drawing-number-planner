@@ -8,6 +8,7 @@ export function usePlanningDrafts(api:PlanningWorkspaceApi,mode:PlanningDraftMod
   const [drafts,setDrafts]=useState<Record<PlanningDraftMode,PlanningDraftInput>>({new:emptyPlanningDraft(),batch:emptyPlanningDraft()});
   const [ready,setReady]=useState({new:false,batch:false}),[status,setStatus]=useState<Record<PlanningDraftMode,string>>({new:'',batch:''});
   const [error,setError]=useState<Record<PlanningDraftMode,string>>({new:'',batch:''});
+  const [exists,setExists]=useState({new:false,batch:false});
   const [removing,setRemoving]=useState(false);
   const revision=useRef<Record<PlanningDraftMode,number|undefined>>({new:undefined,batch:undefined}),saved=useRef({new:'',batch:''});
   const pending=useRef<Partial<Record<PlanningDraftMode,PlanningDraftInput>>>({}),running=useRef<Partial<Record<PlanningDraftMode,Promise<void>>>>({});
@@ -17,8 +18,12 @@ export function usePlanningDrafts(api:PlanningWorkspaceApi,mode:PlanningDraftMod
     const request=++requests.current[target];setError(current=>({...current,[target]:''}));
     try{
       const {draft,revision:token}=await api.getPlanningDraft(target);if(!live.current||request!==requests.current[target])return;
-      const input=draft?.input??emptyPlanningDraft();revision.current[target]=token;saved.current[target]=JSON.stringify(input);
-      setDrafts(current=>({...current,[target]:input}));setReady(current=>({...current,[target]:true}));setStatus(current=>({...current,[target]:draft?'草稿已恢复，请重新检查图号及基础资料':''}));
+      const stored=draft?.input??emptyPlanningDraft();
+      const input=target==='batch'&&stored.step===4?{...stored,step:3 as const}:stored;
+      revision.current[target]=token;saved.current[target]=JSON.stringify(input);
+      setDrafts(current=>({...current,[target]:input}));setReady(current=>({...current,[target]:true}));
+      setExists(current=>({...current,[target]:Boolean(draft?.input.groups.length)}));
+      setStatus(current=>({...current,[target]:draft?'草稿已恢复，请重新检查图号及基础资料':''}));
     }catch(reason){if(live.current&&request===requests.current[target])setError(current=>({...current,[target]:message(reason)}));}
   };
   useEffect(()=>{if(!ready[mode])void load(mode);},[api,mode]);
@@ -28,8 +33,8 @@ export function usePlanningDrafts(api:PlanningWorkspaceApi,mode:PlanningDraftMod
       while(pending.current[target]){
         const input=pending.current[target]!;delete pending.current[target];if(JSON.stringify(input)===saved.current[target])continue;
         if(live.current){setStatus(current=>({...current,[target]:'正在保存草稿…'}));setError(current=>({...current,[target]:''}));}
-        try{const {draft}=await api.savePlanningDraft(target,input,revision.current[target]);revision.current[target]=draft.revision;saved.current[target]=JSON.stringify(input);if(live.current)setStatus(current=>({...current,[target]:'草稿已保存'}));}
-        catch(reason){pending.current[target]??=input;if(live.current)setError(current=>({...current,[target]:message(reason)}));break;}
+        try{const {draft}=await api.savePlanningDraft(target,input,revision.current[target]);revision.current[target]=draft.revision;saved.current[target]=JSON.stringify(input);if(live.current){setExists(current=>({...current,[target]:Boolean(input.groups.length)}));setStatus(current=>({...current,[target]:input.groups.length?'草稿已保存':'没有待保存的草稿'}));}}
+        catch(reason){pending.current[target]??=input;if(live.current){setStatus(current=>({...current,[target]:'草稿尚未保存'}));setError(current=>({...current,[target]:message(reason)}));}break;}
       }
     })();running.current[target]=work;void work.finally(()=>{delete running.current[target];});return work;
   };
@@ -40,8 +45,8 @@ export function usePlanningDrafts(api:PlanningWorkspaceApi,mode:PlanningDraftMod
     try{
       await running.current[target];delete pending.current[target];const result=await api.deletePlanningDraft(target,revision.current[target]);
       const input=emptyPlanningDraft();revision.current[target]=result.revision;saved.current[target]=JSON.stringify(input);
-      setDrafts(current=>({...current,[target]:input}));setError(current=>({...current,[target]:''}));setStatus(current=>({...current,[target]:'草稿已删除，正式图号保持不变'}));
+      setDrafts(current=>({...current,[target]:input}));setExists(current=>({...current,[target]:false}));setError(current=>({...current,[target]:''}));setStatus(current=>({...current,[target]:'草稿已删除，正式图号保持不变'}));
     }catch(reason){setError(current=>({...current,[target]:message(reason)}));throw reason;}finally{deleting.current[target]=false;if(live.current)setRemoving(false);}
   };
-  return {draft:drafts[mode],update,removing,ready:ready[mode],status:status[mode],error:error[mode],reload:()=>load(mode),retry:()=>{if(!deleting.current[mode]){pending.current[mode]=drafts[mode];void pump(mode);}},remove};
+  return {draft:drafts[mode],hasDraft:exists[mode]||drafts[mode].groups.length>0,update,removing,ready:ready[mode],status:status[mode],error:error[mode],reload:()=>load(mode),retry:()=>{if(!deleting.current[mode]){pending.current[mode]=drafts[mode];void pump(mode);}},remove};
 }

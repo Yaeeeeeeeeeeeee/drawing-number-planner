@@ -44,6 +44,7 @@ const itemSchema = z.object({
 }).strict().refine((value) => Boolean(value.drawingReference) !== Boolean(value.drawingId));
 const saveFields = z.object({
   appearanceVersionId: z.number().int().positive().optional(), copyFromVersionId: z.number().int().positive().optional(),
+  copyFromVersionRevision: z.number().int().nonnegative().optional(),
   productId: z.number().int().positive(), businessChangeDate: z.string().trim(),
   entryMode: z.enum(['current', 'historical']).default('current'),
   expectedCurrentVersionId: z.number().int().positive().nullable(), notes: z.string().max(1000).optional(),
@@ -115,6 +116,18 @@ export function registerBomRoutes(app: FastifyInstance, service: BomService): vo
     const query = productQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 查询条件无效' } });
     try{return { items: service.listVersions(query.data.productId, query.data.appearanceVersionId) };}catch(error){return sendBomError(reply,error);}
+  });
+  app.get('/api/boms/versions/:id/export-source', async (request, reply) => {
+    const params = versionParams.safeParse(request.params);
+    const query = z.object({ revision: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().nonnegative()) }).strict().safeParse(request.query);
+    if (!params.success || !query.success) return reply.code(400).send({ error: { code: 'INVALID_REQUEST', message: 'BOM 导出版本无效' } });
+    try {
+      const document = service.getExportDocument(params.data.id, query.data.revision);
+      return reply.header('Cache-Control', 'no-store').header('X-Content-Type-Options', 'nosniff')
+        .header('Cross-Origin-Resource-Policy', 'same-origin')
+        .header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'")
+        .type('text/html; charset=utf-8').send(document);
+    } catch (error) { return sendBomError(reply, error); }
   });
   app.get('/api/boms/versions/:id/delete-preview', async (request, reply) => {
     const params = versionParams.safeParse(request.params);

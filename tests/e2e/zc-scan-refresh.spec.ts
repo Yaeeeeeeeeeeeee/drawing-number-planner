@@ -142,7 +142,7 @@ test('actual watcher and archive commits refresh both ZC views without writing p
     const drawingCount = page.getByRole('navigation', { name: '图号导航' }).getByRole('button', { name: '全部图号', exact: true }).locator('.pdf-nav-count');
     await expect(drawingCount).toHaveText(/^\d+$/);
     const countBefore = Number(await drawingCount.textContent());
-    await page.getByRole('button', { name: '诊断图号关联' }).click();
+    await page.getByRole('button', { name: /^诊断图号关联（/ }).click();
     const diagnostic = page.getByRole('region', { name: '关联诊断预览' });
     await expect(diagnostic.getByText(new RegExp(`${pendingCode}.*缺少产品依据`))).toBeVisible();
     await expect(pdfPage.getByText(/夹具1外观1/).first()).toBeVisible();
@@ -234,7 +234,7 @@ test('actual watcher and archive commits refresh both ZC views without writing p
     await expect(page.getByRole('button', { name: newHistoryCode, exact: true })).toBeVisible();
     await expect(diagnostic.getByText(new RegExp(`${pendingCode}.*唯一候选`))).toBeVisible();
     await page.getByRole('checkbox', { name: `选择图号 ${pendingCode}`, exact: true }).check();
-    await page.getByRole('button', { name: '自动归类', exact: true }).click();
+    await page.getByRole('button', { name: '自动归类（已选 1 项）', exact: true }).click();
     await expect(page.getByRole('status').filter({ hasText: /已更新 1 条关联/ })).toBeVisible();
     const auditAfterManual = db.prepare('select * from drawing_association_audit order by id').all();
     expect(auditAfterManual).toHaveLength(initial.protected.drawing_association_audit.length + 1);

@@ -31,7 +31,7 @@ describe('four-step planning workspace',()=>{
   await waitFor(()=>expect(api.savePlanningDraft).toHaveBeenCalledWith('new',expect.anything(),15));
   await waitFor(()=>expect(screen.getByText('草稿已保存')).toBeVisible());
   fireEvent.click(screen.getByRole('button',{name:'删除当前草稿'}));await screen.findByText('草稿已删除，正式图号保持不变');
-  fireEvent.change(screen.getByRole('combobox',{name:/^产品型号$/}),{target:{value:'1'}});
+  fireEvent.click(screen.getByRole('radio',{name:/T40/}));
   await waitFor(()=>expect(api.savePlanningDraft).toHaveBeenLastCalledWith('new',expect.anything(),17));
  });
  it('checks only and writes no reservation until the full confirmation list is acknowledged',async()=>{
@@ -47,10 +47,10 @@ describe('four-step planning workspace',()=>{
  });
  it('keeps model-specific project inputs when switching models in batch mode',async()=>{
   const api=planningApiFixture();render(<PlanningPage api={api as never}/>);fireEvent.click(screen.getByRole('button',{name:'批量规划'}));
-  fireEvent.click(await screen.findByRole('checkbox',{name:/SAMKYO · T40/}));fireEvent.click(screen.getByRole('checkbox',{name:/SAMKYO · T60/}));fireEvent.click(screen.getByRole('button',{name:'下一步'}));
+  fireEvent.click(await screen.findByRole('checkbox',{name:/T40/}));fireEvent.click(screen.getByRole('checkbox',{name:/T60/}));fireEvent.click(screen.getByRole('button',{name:'下一步'}));
   await fillProject();fireEvent.change(screen.getByLabelText('第 1 行备注'),{target:{value:'T40独立输入'}});
-  fireEvent.click(screen.getByRole('tab',{name:'T60'}));expect(screen.getByLabelText('第 1 行备注')).toHaveValue('');
-  fireEvent.change(screen.getByLabelText('第 1 行备注'),{target:{value:'T60独立输入'}});fireEvent.click(screen.getByRole('tab',{name:'T40'}));expect(screen.getByLabelText('第 1 行备注')).toHaveValue('T40独立输入');
+  fireEvent.click(screen.getByRole('tab',{name:/T60.*未配置/}));expect(screen.getByLabelText('第 1 行备注')).toHaveValue('');
+  fireEvent.change(screen.getByLabelText('第 1 行备注'),{target:{value:'T60独立输入'}});fireEvent.click(screen.getByRole('tab',{name:/T40.*已配置 1/}));expect(screen.getByLabelText('第 1 行备注')).toHaveValue('T40独立输入');
   fireEvent.click(screen.getByRole('button',{name:'新建图号'}));await chooseProduct();expect(screen.getByLabelText('第 1 行备注')).toHaveValue('');
  });
  it('restores a persisted draft at its saved step without restoring occupation approval',async()=>{
@@ -60,7 +60,7 @@ describe('four-step planning workspace',()=>{
  });
  it('retains input and shows a retry action when initial metadata fails',async()=>{
   const api=planningApiFixture();api.listProducts.mockRejectedValueOnce(new Error('产品读取失败'));render(<PlanningPage api={api as never}/>);
-  expect(await screen.findByRole('alert')).toHaveTextContent('产品读取失败');fireEvent.click(screen.getByRole('button',{name:'重新加载资料'}));expect(await screen.findByRole('option',{name:/T40/})).toBeVisible();
+  expect(await screen.findByRole('alert')).toHaveTextContent('产品读取失败');fireEvent.click(screen.getByRole('button',{name:'重新加载资料'}));expect(await screen.findByRole('radio',{name:/T40/})).toBeVisible();
  });
  it('does not let a late check for an older mode replace the active draft',async()=>{
   const api=planningApiFixture();let resolve!:(value:unknown)=>void;api.previewBatchPlan.mockImplementationOnce(()=>new Promise(yes=>{resolve=yes;}) as never);
@@ -68,6 +68,45 @@ describe('four-step planning workspace',()=>{
   view.rerender(<PlanningPage api={api as never} active={false}/>);view.rerender(<PlanningPage api={api as never} active/>);
   await act(async()=>{resolve({groups:[{productId:1,model:'T40',rows:[{clientId:'stale',available:true,fullCode:'99.9999.999.9999999'}]}]});});
   await waitFor(()=>expect(screen.queryByText('99.9999.999.9999999')).not.toBeInTheDocument());
+ });
+});
+
+describe('three-step batch planning',()=>{
+ it('reruns checks for an old step four draft, requires fresh confirmation and preserves skipped rows',async()=>{
+  const api=planningApiFixture();
+  api.getPlanningDraft.mockImplementation(async mode=>mode==='batch'?{revision:7,draft:{revision:7,requiresCheck:true,input:{step:4,activeProductId:1,groups:[{productId:1,appearanceId:3,appearanceVersionId:30,rows:[{clientId:'valid',mainCategoryId:5,projectItemId:6,colorId:4},{clientId:'incomplete',mainCategoryId:5,projectItemId:8,notes:'保留未通过备注'}]}]}}}:{revision:0,draft:null});
+  render(<PlanningPage api={api as never}/>);fireEvent.click(screen.getByRole('button',{name:'批量规划'}));
+  const steps=screen.getByRole('navigation',{name:'规划步骤'});
+  expect(within(steps).getAllByRole('button')).toHaveLength(3);
+  expect(screen.queryByRole('button',{name:'上一步'})).not.toBeInTheDocument();
+  await screen.findByText('可占用',{exact:true});
+  expect(within(steps).getByRole('button',{name:'检查与确认占号'})).toHaveAttribute('aria-current','step');
+  expect(api.previewBatchPlan).toHaveBeenCalledWith({groups:[expect.objectContaining({appearanceVersionId:30,rows:[expect.objectContaining({clientId:'valid'}),expect.objectContaining({clientId:'incomplete'})]})]});
+  fireEvent.click(screen.getByRole('checkbox',{name:'仅看未通过'}));
+  expect(screen.queryByText('可占用',{exact:true})).not.toBeInTheDocument();
+  const confirmation=screen.getByRole('button',{name:'确认批量占号'});
+  expect(confirmation).toBeDisabled();
+  fireEvent.click(screen.getByLabelText('已核对本次占号清单'));fireEvent.click(confirmation);
+  await screen.findByRole('heading',{name:'本次占号结果'});
+  expect(api.reserveBatchPlan).toHaveBeenCalledWith({confirmed:true,groups:[expect.objectContaining({rows:[expect.objectContaining({clientId:'valid'})]})]});
+  await waitFor(()=>expect(api.savePlanningDraft).toHaveBeenLastCalledWith('batch',expect.objectContaining({step:3,groups:[expect.objectContaining({appearanceVersionId:30,rows:[expect.objectContaining({clientId:'incomplete',notes:'保留未通过备注'})]})]}),7));
+ });
+
+ it('imports only the selected real template category and project and copies to chosen model IDs',async()=>{
+  const api=planningApiFixture();render(<PlanningPage api={api as never}/>);fireEvent.click(screen.getByRole('button',{name:'批量规划'}));
+  expect(screen.queryByRole('button',{name:'删除当前草稿'})).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('checkbox',{name:/T40/}));fireEvent.click(screen.getByRole('checkbox',{name:/T60/}));
+  fireEvent.change(screen.getByLabelText('统一外观'),{target:{value:'12'}});fireEvent.click(screen.getByRole('button',{name:'应用至已选型号'}));
+  expect(screen.getByLabelText('T40 外观')).toHaveValue('12');expect(screen.getByLabelText('T60 外观')).toHaveValue('12');
+  fireEvent.click(screen.getByRole('button',{name:'下一步'}));
+  fireEvent.click(screen.getByRole('button',{name:'从包材模板导入'}));
+  const template=await screen.findByRole('combobox',{name:'包材模板'});fireEvent.change(template,{target:{value:'51'}});fireEvent.click(screen.getByRole('button',{name:'导入项目'}));
+  expect(api.packaging.getCatalog).toHaveBeenCalledTimes(1);
+  expect(screen.getByLabelText('第 1 行主类别')).toHaveValue('5');expect(screen.getByLabelText('第 1 行项目明细')).toHaveValue('8');expect(screen.getByLabelText('第 1 行颜色')).toHaveValue('');expect(screen.getByLabelText('第 1 行备注')).toHaveValue('');
+  fireEvent.change(screen.getByLabelText('第 1 行颜色'),{target:{value:'4'}});
+  fireEvent.click(screen.getByRole('button',{name:'复制到其他型号'}));fireEvent.click(screen.getByRole('checkbox',{name:'T60'}));fireEvent.click(screen.getByRole('button',{name:'复制项目'}));
+  fireEvent.click(screen.getByRole('tab',{name:/T60.*已配置 1/}));expect(screen.getByLabelText('第 1 行项目明细')).toHaveValue('8');expect(screen.getByLabelText('第 1 行颜色')).toHaveValue('4');
+  expect(api.reserveBatchPlan).not.toHaveBeenCalled();
  });
 });
 

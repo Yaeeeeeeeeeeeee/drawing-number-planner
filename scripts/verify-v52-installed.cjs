@@ -90,7 +90,27 @@ module.exports=async function verifyV52({page,app,source,workspace,evidence,writ
  await request(`/api/products/${product.id}/activate`,{});
  // First-BOM link must load the exact historical record and allow a date correction in place.
  await panel.getByRole('button',{name:`${product.model} · 2026-10-20`,exact:true}).click();await page.getByRole('heading',{name:'BOM 管理',exact:true}).waitFor();
- await page.getByRole('region',{name:'所选 BOM 记录',exact:true}).waitFor();await page.getByRole('button',{name:`编辑 BOM ${first.id}`,exact:true}).click();
+ const selectedRecord=page.getByRole('region',{name:'所选 BOM 记录',exact:true});
+ await selectedRecord.waitFor();
+ if(app){
+  const output=path.resolve(evidence,'V16-隔离BOM打印.pdf');
+  const beforeExport=await get(`/api/boms/versions/${first.id}`);
+  await app.evaluate(({dialog},file)=>{
+   const original=dialog.showSaveDialog;
+   dialog.showSaveDialog=async(...args)=>{
+    if(args.at(-1)?.title!=='导出此 BOM')return original.apply(dialog,args);
+    dialog.showSaveDialog=original;
+    return {canceled:false,filePath:file};
+   };
+  },output);
+  await selectedRecord.getByRole('button',{name:'导出此 BOM',exact:true}).click();
+  await selectedRecord.getByText('BOM PDF 已保存',{exact:true}).waitFor();
+  const exported=fs.readFileSync(output);
+  assert.equal(exported.subarray(0,5).toString(),'%PDF-');
+  assert.match(exported.toString('latin1'),/\/Type\s*\/Page\b/);
+  assert.deepEqual(await get(`/api/boms/versions/${first.id}`),beforeExport);
+ }
+ await page.getByRole('button',{name:`编辑 BOM ${first.id}`,exact:true}).click();
  const date=page.getByLabel('业务变更日期',{exact:true});await expect(date).toHaveValue('2026-10-20');await expect(date).toBeEnabled();assert.equal(await page.getByLabel('录入类型',{exact:true}).count(),0);
  const protectedBefore=snapshot(databaseFile),secondBefore=await get(`/api/boms/versions/${second.id}`);
  await date.fill('2026-10-19');await page.getByRole('button',{name:'保存修改',exact:true}).click();await expect.poll(async()=>(await get(`/api/boms/versions/${first.id}`)).businessChangeDate).toBe('2026-10-19');
@@ -134,7 +154,7 @@ module.exports=async function verifyV52({page,app,source,workspace,evidence,writ
   for(const width of [720,1366,1920,2560,3840]){
    if(app){await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setContentSize(width,900),width);await page.waitForFunction(width=>innerWidth===width,width);}else await page.setViewportSize({width,height:900});
    await expect.poll(()=>section.evaluate(element=>{const workspace=element.closest('.workspace');return workspace.scrollWidth-workspace.clientWidth;})).toBeLessThanOrEqual(2);
-   for(const key of columns){await expect(table.locator(`thead th[data-column-key="${key}"]`)).toHaveCSS('text-align','center');const cell=table.locator(`tbody td[data-column-key="${key}"]`).first();if(await cell.count())await expect(cell).toHaveCSS('text-align','center');}
+   for(const key of columns){await expect(table.locator(`thead th[data-column-key="${key}"]`)).toHaveCSS('text-align',label==='PDF 文件中心'?'left':'center');const cell=table.locator(`tbody td[data-column-key="${key}"]`).first();if(await cell.count())await expect(cell).toHaveCSS('text-align',label==='PDF 文件中心'?'left':'center');}
    const metrics=await table.evaluate(element=>({width:innerWidth,table:element.getBoundingClientRect().width,container:element.closest('.table-wrap').clientWidth,sticky:getComputedStyle(element.closest('.page-surface').querySelector('.page-sticky-controls')).position,headerSticky:[...element.querySelectorAll('thead th')].every(th=>getComputedStyle(th).position==='sticky')}));assert.equal(metrics.sticky,'sticky');assert.equal(metrics.headerSticky,true);if(width>=1920)await expect.poll(()=>table.evaluate(element=>Math.abs(element.getBoundingClientRect().width-element.closest('.table-wrap').clientWidth))).toBeLessThan(2);geometry.push({label,...metrics});
   }
   if(app){await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1920,900));await page.waitForFunction(()=>innerWidth===1920);}else await page.setViewportSize({width:1920,height:900});
@@ -151,7 +171,7 @@ module.exports=async function verifyV52({page,app,source,workspace,evidence,writ
   }
   await page.screenshot({path:path.join(evidence,`V52-${label}-固定操作区与表格.png`)});
  }
- const report={actualHttpAndDom:true,actualInstalledHttpAndDom:Boolean(app),fixtureOnly:true,geometry,layout:{centeredCells:true,rightmostReceivesShrunkWidth:true,stickyControlsAndHeaders:true,pdfSixIconActionsTwoGroups:true},scopedFiles:{indexed:5,excluded:3,sourceOnly02:true,allBatches:4,dateDescending:true,currentAndHistoricalLabels:true,conflictOneRowNoPicker:true,unindexedReadOnly:true,missingVsUnavailable:true,originalPdfHashesPreserved:original.length},bom:{exactFirstRecordJump:true,dateCorrectedInPlace:true,identityCreatedAtLineagePreserved:true,currentPointerAndOtherRecordsPreserved:true,frozenSnapshotsPreserved:true,unifiedEntry:true,queryDropdowns:3,previousAttachmentRoleReuse:true,replacementUploadIndependent:true,originalAssetHashesPreserved:assetHashes.length},mail:{anonymousMatrix:true,sheets:4,recognizedTemplates:25,initial:20,update:5,uniqueContacts:14,roleLinks:135,independentSignatures:1,existingContactPreserved:true,defaultSignaturePreserved:true,sourceCasesPersisted:25,sourceCoordinatesPersisted:true,rawCasesReadOnly:true,manualConfigurationPreservesRawSource:true,signatureOnce:true,reimportSkipped:25,protectedBusinessRowsAndDraftsPreserved:true},scope:'Temporary fixture; no production DB, original workbook, personal contacts or physical DPI tested'};
+ const report={actualHttpAndDom:true,actualInstalledHttpAndDom:Boolean(app),fixtureOnly:true,geometry,layout:{pdfTextAlignedLeft:true,centeredProductAndQrCells:true,rightmostReceivesShrunkWidth:true,stickyControlsAndHeaders:true,pdfSixIconActionsTwoGroups:true},scopedFiles:{indexed:5,excluded:3,sourceOnly02:true,allBatches:4,dateDescending:true,currentAndHistoricalLabels:true,conflictOneRowNoPicker:true,unindexedReadOnly:true,missingVsUnavailable:true,originalPdfHashesPreserved:original.length},bom:{installedA4ExportVerified:Boolean(app),exactFirstRecordJump:true,dateCorrectedInPlace:true,identityCreatedAtLineagePreserved:true,currentPointerAndOtherRecordsPreserved:true,frozenSnapshotsPreserved:true,unifiedEntry:true,queryDropdowns:3,previousAttachmentRoleReuse:true,replacementUploadIndependent:true,originalAssetHashesPreserved:assetHashes.length},mail:{anonymousMatrix:true,sheets:4,recognizedTemplates:25,initial:20,update:5,uniqueContacts:14,roleLinks:135,independentSignatures:1,existingContactPreserved:true,defaultSignaturePreserved:true,sourceCasesPersisted:25,sourceCoordinatesPersisted:true,rawCasesReadOnly:true,manualConfigurationPreservesRawSource:true,signatureOnce:true,reimportSkipped:25,protectedBusinessRowsAndDraftsPreserved:true},scope:'Temporary fixture; no production DB, original workbook, personal contacts or physical DPI tested'};
  await page.evaluate(saved=>{if(saved===null)localStorage.removeItem('table-layout:v1:pdf-files');else localStorage.setItem('table-layout:v1:pdf-files',saved);},originalPdfLayout);
  fs.writeFileSync(path.join(evidence,'v52-acceptance.json'),JSON.stringify(report,null,2));return report;
 };

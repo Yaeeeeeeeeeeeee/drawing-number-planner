@@ -176,7 +176,7 @@ export interface BomDiffView {
   drawingId: number | null; drawingReference: BomDrawingReferenceView | null; fullCode: string | null;
 }
 export interface SaveBomView {
-  appearanceVersionId?: number; copyFromVersionId?: number;
+  appearanceVersionId?: number; copyFromVersionId?: number; copyFromVersionRevision?: number;
   productId: number; entryMode?: BomEntryModeView; businessChangeDate: string; expectedCurrentVersionId: number | null; notes?: string;
   items: Array<{ projectItemId: number; drawingReference: BomDrawingReferenceView; usesWhiteMaterial: boolean; effectiveMaterialBatchId?: number | null;
     material?: string; dimensions?: string; position?: string; notes?: string; changeDetails?: string;
@@ -193,6 +193,7 @@ export interface PdfScanSummaryView {
 }
 /** Inclusive indexed modification dates. These filters apply only to list/count requests. */
 export interface PdfFileFiltersView extends Record<string,string|number|undefined> {
+  keywordIn?: 'file-name-or-code';
   materialBatchId?:number;
   navigationMaterialBatchId?:number;
   modifiedFrom?:string;

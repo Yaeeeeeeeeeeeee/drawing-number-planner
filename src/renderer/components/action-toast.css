@@ -1,0 +1,26 @@
+.action-toast {
+  position: fixed;
+  z-index: 170;
+  inset: auto 20px 20px auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  padding: 9px 12px;
+  border: 1px solid #c9d7ce;
+  border-radius: 8px;
+  background: #f3faf5;
+  color: #244d36;
+  box-shadow: 0 4px 16px #23352a1a;
+}
+.action-toast > span { overflow-wrap: anywhere; }
+.action-toast > button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  min-height: 0;
+  padding: 0;
+}

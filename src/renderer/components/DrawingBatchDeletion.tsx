@@ -62,8 +62,9 @@ export function DrawingBatchDeletion({ ids, api, onComplete }: {
     } catch (error) { setResultIssues([...failures, `刷新失败：${error instanceof Error ? error.message : '请手动刷新'}`]); }
     finally { executing.current = false; setBusy(false); }
   };
+  if (!ids.length && !busy && !report && !resultIssues.length) return null;
   return <section className="drawing-batch-delete" aria-label="批量删除图号">
-    <button type="button" className="text-button danger" disabled={busy || !ids.length} onClick={() => void inspect()}>批量删除（已选 {ids.length} 项）</button>
+    {ids.length > 0 && <button type="button" className="text-button danger" disabled={busy} onClick={() => void inspect()}>批量删除（已选 {ids.length} 项）</button>}
     {busy && executing.current && <button type="button" className="secondary-button" disabled={cancelling} onClick={() => { cancelled.current = true; setCancelling(true); }}>{cancelling ? '等待当前项完成…' : '取消剩余任务'}</button>}
     {previews.length > 0 && <div className="danger-zone">
       <p>可删除 {previews.filter((item) => item.deletable).length} 项 · 当前业务引用阻塞 {previews.filter((item) => !item.deletable).length} 项 · 存在文件 {previews.filter((item) => item.references.presentPdf > 0).length} 项</p>

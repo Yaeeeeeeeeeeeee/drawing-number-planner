@@ -1,3 +1,4 @@
+import { renderBomExportDocument } from './bom-export-document.js';
 import { resolveCanonicalProductId } from '../products/appearance-identity.js';
 import type { PlannerDatabase } from '../../db/database.js';
 import { rmSync } from 'node:fs';
@@ -106,6 +107,20 @@ export class BomService {
     return version;
   }
 
+  getExportDocument(id: number, revision: number): string {
+    return this.db.transaction(() => {
+      const version = this.getVersion(id);
+      if (version.editRevision !== revision) throw new BomError('BOM_STALE', '所选 BOM 已修改，请重新打开记录后导出');
+      const product = this.db.prepare('select product_category as category from products where id = ?')
+        .get(version.productId) as { category: string | null } | undefined;
+      const categories = this.db.prepare(`select project.id, parent.name from bom_items item
+        join dictionary_items project on project.id = item.project_item_id
+        join dictionary_items parent on parent.id = project.parent_id
+        where item.bom_version_id = ? and item.deleted_at is null`).all(id) as { id: number; name: string }[];
+      return renderBomExportDocument(version, product?.category ?? null, new Map(categories.map(row => [row.id, row.name])));
+    })();
+  }
+
   listVersions(productId: number, appearanceVersionId?: number): BomVersionSummary[] { this.validateAppearance(productId, appearanceVersionId); return this.repository.listVersions(productId, appearanceVersionId); }
   queryVersions(filters: BomQueryFilters): BomVersionSummary[] { return this.repository.queryVersions(filters); }
 
@@ -186,6 +201,9 @@ export class BomService {
       const validated = input.items.map((item) => this.validateItem(item, input.productId, projectIds, entryMode));
       const sourceId = input.copyFromVersionId ?? currentId;
       const previous = sourceId === null ? null : this.getVersion(sourceId);
+      if (input.copyFromVersionRevision !== undefined && (input.copyFromVersionId === undefined || previous?.editRevision !== input.copyFromVersionRevision)) {
+        throw new BomError('BOM_STALE', '复制来源已修改，请重新打开来源记录');
+      }
       if (previous && !this.sameProduct(previous.productId, input.productId)) throw new BomError('DRAWING_WRONG_PRODUCT', '不能复制其他产品 BOM');
       const now = new Date().toISOString();
       const versionId = this.repository.insertVersion(input.productId, this.repository.nextVersionNumber(input.productId),

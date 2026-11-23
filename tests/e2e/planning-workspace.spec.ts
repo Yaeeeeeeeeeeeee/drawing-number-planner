@@ -9,6 +9,7 @@ import {DictionaryService} from '../../src/core/dictionaries/dictionary-service'
 import {ProductService} from '../../src/core/products/product-service';
 import {PlanningService} from '../../src/core/planning/planning-service';
 import {PlanningDraftStore} from '../../src/core/planning/planning-draft-store';
+import {PackagingCatalogService} from '../../src/core/packaging/packaging-catalog';
 
 async function fixture() {
   const data=mkdtempSync(join(tmpdir(),'planning-workbench-e2e-')),root=join(data,'library');mkdirSync(root);
@@ -21,7 +22,7 @@ async function fixture() {
   const label=dict.create({type:'project_item',code:'01',name:'铭牌',parentId:main.id}),panel=dict.create({type:'project_item',code:'02',name:'面板',parentId:main.id});
   const products=['T40','T60'].map((model,index)=>{
     const size=dict.create({type:'product_size',code:`010${index+1}`,name:`洗碗机 ${model}`});
-    return new ProductService(db).create({sku:`SKDWT0${index?60:40}JP`,model,brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id,productCategory:'洗碗机'});
+    return new ProductService(db).create({sku:`SKDWT0${index?60:40}JP`,model,brandId:brand.id,productSizeId:size.id,defaultAppearanceId:appearance.id,productCategory:index===0?'洗碗机':'空气炸锅'});
   });
   await vite.listen();
   return {data,db,products,white,black,main,label,panel,close:async()=>{await vite.close();await server.close();db.close();rmSync(data,{recursive:true,force:true});}};
@@ -30,7 +31,7 @@ async function planning(page:Page) {
   await page.goto('http://127.0.0.1:5174/');
   const nav=page.getByRole('navigation',{name:'主导航'});if(!await nav.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();
   await nav.getByRole('button',{name:'图号规划 / 更新包材',exact:true}).click();
-  await expect(page.getByRole('combobox',{name:'产品型号',exact:true})).toBeEnabled();
+  await expect(page.getByRole('radio',{name:/T40/})).toBeEnabled();
 }
 async function fields(page:Page,main:number,project:number,color:number) {
   await page.getByRole('combobox',{name:'第 1 行主类别',exact:true}).selectOption(String(main));
@@ -45,7 +46,7 @@ test('real saved white identity is shared without occupation; explicit confirmat
     const service=new PlanningService(f.db),input={productId:f.products[0].id,rows:[{clientId:'baseline',colorId:f.white.id,mainCategoryId:f.main.id,projectItemId:f.label.id}]};
     const checked=service.preview(input),baseline=service.reserve({...input,rows:[{...input.rows[0],expectedFullCode:checked.rows[0].fullCode}]})[0];
     await page.setViewportSize({width:1920,height:1080});await planning(page);
-    await page.getByRole('combobox',{name:'产品型号',exact:true}).selectOption(String(f.products[0].id));
+    await page.getByRole('radio',{name:/T40/}).check();
     await page.getByRole('button',{name:'下一步',exact:true}).click();await fields(page,f.main.id,f.label.id,f.black.id);
     // Restore a valid older draft without the later optional sharing flag. The
     // checked default in the UI must be sent explicitly to the real service.
@@ -70,28 +71,53 @@ test('real saved white identity is shared without occupation; explicit confirmat
   }finally{await f.close();}
 });
 
-test('batch model selections and independent persisted drafts survive reload, then reserve distinct real drawings',async({page})=>{
+test('batch imports a real template, repairs failed rows and restores a legacy draft before reserving',async({page})=>{
   const f=await fixture();
   try{
+    const template=new PackagingCatalogService(f.db,f.data).uploadTemplate({name:'面板模板',mainCategoryId:f.main.id,projectItemId:f.panel.id,brandIds:[],productIds:[],fields:[{objectName:'图号',sourceKey:'drawingNumber',required:true}],requiredFonts:[],status:'active'},{fileName:'panel.ait',buffer:Buffer.from('Isolated template fixture')});
     await page.setViewportSize({width:1920,height:1080});await planning(page);
-    await page.getByRole('combobox',{name:'产品型号',exact:true}).selectOption(String(f.products[0].id));
+    await page.getByRole('radio',{name:/T40/}).check();
     await page.getByRole('button',{name:'下一步',exact:true}).click();await fields(page,f.main.id,f.label.id,f.white.id);
     await expect(page.getByText('草稿已保存',{exact:true})).toBeVisible();
     await page.getByRole('button',{name:'批量规划',exact:true}).click();
-    await page.getByRole('checkbox',{name:/SAMKYO · T40/}).check();await page.getByRole('checkbox',{name:/SAMKYO · T60/}).check();
+    const chooser=page.getByRole('group',{name:'选择产品型号',exact:true});
+    await chooser.getByRole('group',{name:'洗碗机',exact:true}).getByRole('checkbox',{name:/T40/}).check();
+    await chooser.getByRole('searchbox',{name:'搜索型号'}).fill('T60');
+    await expect(chooser.getByRole('group',{name:'洗碗机',exact:true})).toHaveCount(0);
+    await chooser.getByRole('button',{name:'全选当前结果',exact:true}).click();
+    await expect(chooser.getByRole('status')).toHaveText('已选 2 个型号');
+    await chooser.getByRole('searchbox',{name:'搜索型号'}).clear();
+    await expect(chooser.getByRole('group',{name:'空气炸锅',exact:true}).getByRole('checkbox',{name:/T60/})).toBeChecked();
+    await expect(chooser.getByRole('group',{name:'洗碗机',exact:true}).getByRole('checkbox',{name:/T40/})).toBeChecked();
+    mkdirSync(evidence,{recursive:true});
+    await page.screenshot({path:join(evidence,'p1-batch-product-line-picker-1920.png'),fullPage:true});
     await page.getByRole('button',{name:'下一步',exact:true}).click();await fields(page,f.main.id,f.label.id,f.white.id);
-    await page.getByRole('tab',{name:'T60',exact:true}).click();await fields(page,f.main.id,f.panel.id,f.white.id);
-    await page.getByRole('tab',{name:'T40',exact:true}).click();await expect(page.getByRole('combobox',{name:'第 1 行项目明细',exact:true})).toHaveValue(String(f.label.id));
-    await page.getByRole('button',{name:'下一步',exact:true}).click();await expect(page.getByText('可占用',{exact:true})).toHaveCount(2);
+    await page.getByRole('tab',{name:/T60/}).click();
+    await page.getByRole('button',{name:'从包材模板导入',exact:true}).click();
+    await page.getByRole('combobox',{name:'包材模板',exact:true}).selectOption(String(template.id));
+    await page.getByRole('button',{name:'导入项目',exact:true}).click();
+    await expect(page.getByRole('combobox',{name:'第 1 行项目明细',exact:true})).toHaveValue(String(f.panel.id));
+    await expect(page.getByRole('combobox',{name:'第 1 行颜色',exact:true})).toHaveValue('');
+    await page.getByRole('tab',{name:/T40/}).click();await expect(page.getByRole('combobox',{name:'第 1 行项目明细',exact:true})).toHaveValue(String(f.label.id));
+    await page.getByRole('button',{name:'下一步',exact:true}).click();await expect(page.getByText('可占用',{exact:true})).toHaveCount(1);
+    await page.getByRole('checkbox',{name:'仅看未通过',exact:true}).check();
+    await expect(page.getByText('可占用',{exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'去补充',exact:true}).click();
+    await expect(page.getByRole('tab',{name:/T60/})).toHaveAttribute('aria-selected','true');
+    await expect(page.getByRole('combobox',{name:'第 1 行主类别',exact:true})).toBeFocused();
+    await page.getByRole('combobox',{name:'第 1 行颜色',exact:true}).selectOption(String(f.white.id));
     await page.getByRole('button',{name:'下一步',exact:true}).click();
-    await expect.poll(()=>JSON.parse(readFileSync(join(f.data,'planning-drafts.json'),'utf8')).modes.batch.input.step).toBe(4);
+    await page.getByRole('checkbox',{name:'仅看未通过',exact:true}).uncheck();
+    await expect(page.getByText('可占用',{exact:true})).toHaveCount(2);
+    await expect.poll(()=>JSON.parse(readFileSync(join(f.data,'planning-drafts.json'),'utf8')).modes.batch.input.step).toBe(3);
+    const drafts=new PlanningDraftStore(join(f.data,'planning-drafts.json')),saved=drafts.read('batch')!;
+    drafts.save('batch',{...saved.input,step:4},saved.revision);
     await page.reload();await expect(page.getByRole('button',{name:'新建图号',exact:true})).toHaveAttribute('aria-pressed','true');
     await expect(page.getByRole('combobox',{name:'第 1 行项目明细',exact:true})).toHaveValue(String(f.label.id));
     await page.getByRole('button',{name:'批量规划',exact:true}).click();
-    await expect(page.getByRole('button',{name:'确认占号',exact:true})).toHaveAttribute('aria-current','step');
+    await expect(page.getByRole('button',{name:'检查与确认占号',exact:true})).toHaveAttribute('aria-current','step');
     await expect(page.getByRole('button',{name:'确认批量占号',exact:true})).toBeDisabled();
-    await expect(page.getByRole('cell').getByText('尚未检查',{exact:true})).toHaveCount(2);
-    await page.getByRole('button',{name:'重新检查全部项目'}).click();await expect(page.getByText('可占用',{exact:true})).toHaveCount(2);
+    await expect(page.getByText('可占用',{exact:true})).toHaveCount(2);
     mkdirSync(evidence,{recursive:true});
     for(const width of [1920,2560,3840,1280]){
       await page.setViewportSize({width,height:1080});

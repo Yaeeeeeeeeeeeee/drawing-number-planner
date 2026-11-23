@@ -32,6 +32,7 @@ export interface FileSearchFilters {
   materialSource?: boolean;
   managementState?: 'included' | 'ignored' | 'needs_review' | 'all';
   keyword?: string;
+  keywordIn?: 'file-name-or-code';
   productId?: number;
   appearanceVersionId?: number;
   materialBatchId?: number;

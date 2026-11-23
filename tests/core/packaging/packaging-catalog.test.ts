@@ -22,3 +22,18 @@ it('atomically saves template reference and a chosen rule, rolling back invalid 
  f.service.saveTemplateWithRule(template.id,{...input(f),name:'新名称'},{...range,id:rule.id,conditions:[{key:'width',operator:'between',value:20,max:30}]});expect(f.service.getCatalog().rules.find(r=>r.id===other.id)).toEqual(other);expect(f.service.getCatalog().templates[0].name).toBe('新名称');
  expect(()=>f.service.saveTemplateWithRule(template.id,input(f),range)).toThrow();expect(f.service.getCatalog().rules).toHaveLength(2);
 });
+
+it('rejects assigning the same original AIT to two records without changing either original',()=>{
+ const f=fixture();
+ const firstPath=join(f.dir,'first.ait'),secondPath=join(f.dir,'second.ait');
+ writeFileSync(firstPath,'first');
+ writeFileSync(secondPath,'second');
+ const first=f.service.saveTemplateReference(input(f),firstPath);
+ const second=f.service.saveTemplateReference(input(f),secondPath);
+ expect(()=>f.service.saveTemplateReference({...input(f),name:'Duplicate'},firstPath)).toThrow(/路径.*已/);
+ expect(()=>f.service.saveTemplateReference(input(f),firstPath,second.id)).toThrow(/路径.*已/);
+ expect(f.service.saveTemplateReference({...input(f),name:'Renamed'},firstPath,first.id).id).toBe(first.id);
+ expect(f.service.getCatalog().templates.map(row=>row.assetRelativePath)).toEqual([firstPath,secondPath]);
+ expect(readFileSync(firstPath,'utf8')).toBe('first');
+ expect(readFileSync(secondPath,'utf8')).toBe('second');
+});

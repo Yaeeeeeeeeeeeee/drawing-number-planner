@@ -22,7 +22,7 @@ await nav('编码字典');await page.getByRole('tab',{name:'主类别'}).click()
 await nav('产品档案');await page.getByRole('button',{name:'详情 F60'}).click();await shot('products-detail');
 await page.getByRole('button',{name:'删除档案 F60'}).click();await page.getByRole('heading',{name:'关联检查与退出指引'}).waitFor();await shot('products-preflight');
 await nav('BOM 管理');await page.getByLabel('BOM 产品型号').selectOption('1');await page.getByText('铜版纸',{exact:true}).first().waitFor();await shot('bom-populated');
-await nav('PDF 文件中心');await page.getByText('9 个索引文件',{exact:true}).waitFor();await shot('files-populated');
+await nav('PDF 文件中心');await page.getByText('当前列表：9 条索引',{exact:true}).waitFor();await shot('files-populated');
 await nav('二维码管理');await page.getByText('PREVIEWF60',{exact:false}).first().waitFor();await shot('qr-populated');
 await nav('外发资料');await page.getByLabel('品牌',{exact:true}).selectOption('1');await page.getByLabel('产品',{exact:true}).selectOption('1');await page.getByLabel('资料批次',{exact:true}).selectOption({index:1});await page.getByRole('button',{name:'预览文件',exact:true}).click();await page.getByRole('table',{name:'外发文件预览'}).waitFor();await shot('outbound-populated');
 await page.getByRole('button',{name:'邮件撰写',exact:true}).click();await shot('mail');

@@ -50,7 +50,7 @@ function fixture() {
 }
 
 function expectOldPreserved(old: string) {
-  expect(readFileSync(join(old, 'planner.db'))).toEqual(originalDatabases.get(old));
+  expect(readFileSync(join(old, 'planner.db')).equals(originalDatabases.get(old)!)).toBe(true);
   expect(readFileSync(join(old, 'settings.json'), 'utf8')).toBe('external workspace');
   expect(readFileSync(join(old, 'backups', 'history.db'), 'utf8')).toBe('old backup');
 }
@@ -190,7 +190,7 @@ it.each(['header-only', 'corrupt-contents', 'damaged-data-page'])(
     const directoryBefore = readdirSync(invalid);
     await expect(prepareProductionProfile({ ...input, installationId: 'install-2', chooseDatabase: async () => file })).rejects.toThrow();
     expect(readFileSync(config)).toEqual(previous);
-    expect(readFileSync(file)).toEqual(bytes);
+    expect(readFileSync(file).equals(bytes)).toBe(true);
     expect(readdirSync(invalid)).toEqual(directoryBefore);
     expectOldPreserved(old);
     let prompts = 0;

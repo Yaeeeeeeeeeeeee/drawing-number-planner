@@ -79,8 +79,11 @@ function fileSearchPredicate(filters: FileSearchFilters, db: PlannerDatabase): {
   const where: string[] = [materialScopeSql]; const parameters: Record<string, unknown> = {};
   if (filters.managementState !== 'all') { where.push('file.management_state = @managementState'); parameters.managementState = filters.managementState ?? 'included'; }
   if (filters.keyword?.trim()) {
-    where.push(`(file.relative_path like @keyword escape '\\' or file.file_name like @keyword escape '\\'
-      or drawing.full_code like @keyword escape '\\')`);
+    const identityMatch = `file.file_name like @keyword escape '\\' or drawing.full_code like @keyword escape '\\'`;
+    const extraMatch = filters.keywordIn === 'file-name-or-code'
+      ? `historical.full_code like @keyword escape '\\'`
+      : `file.relative_path like @keyword escape '\\'`;
+    where.push(`(${identityMatch} or ${extraMatch})`);
     parameters.keyword = `%${filters.keyword.trim().replace(/[\\%_]/g, '\\$&')}%`;
   }
   if (filters.materialSource) where.push(sourceScopeSql);

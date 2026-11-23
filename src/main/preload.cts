@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron') as typeof import('electron');
 
 contextBridge.exposeInMainWorld('plannerDesktop', {
   openPdfInDefaultApp(pdfFileId: unknown) { return ipcRenderer.invoke('planner:open-pdf', pdfFileId); },
@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
     }
     return ipcRenderer.invoke('planner:show-file-in-folder', pdfFileId);
   },
+  exportBomPdf(id: unknown, revision: unknown) { return ipcRenderer.invoke('planner:bom-export', id, revision); },
   showBomAssetInFolder(assetId: unknown) {
     if (!Number.isInteger(assetId) || Number(assetId) <= 0) {
       return Promise.resolve({ ok: false, error: { code: 'INVALID_BOM_ASSET_ID', message: 'BOM 附件索引无效' } });
@@ -27,7 +28,17 @@ contextBridge.exposeInMainWorld('plannerDesktop', {
     return ipcRenderer.invoke('planner:qr-file-action', relativePath, action);
   },
   selectAitFile() { return ipcRenderer.invoke('planner:select-ait'); },
+  registerDroppedAit(file: File) {
+    const path = webUtils.getPathForFile(file);
+    if (!path) return Promise.reject(new Error('请选择本机 AIT 原始文件'));
+    return ipcRenderer.invoke('planner:drop-ait', path);
+  },
   qrManualSelectFile() { return ipcRenderer.invoke('planner:qr-manual-select'); },
+  registerDroppedQrPdf(file: File) {
+    const path = webUtils.getPathForFile(file);
+    if (!path) return Promise.reject(new Error('请拖入本地PDF文件'));
+    return ipcRenderer.invoke('planner:qr-manual-drop', path);
+  },
   qrManualAction(action: unknown, input: unknown) {
     if (!['preview','comparison','commit','history','unlink','open','show'].includes(String(action))) return Promise.reject(new Error('INVALID_QR_MANUAL_ACTION'));
     return ipcRenderer.invoke('planner:qr-manual-action', action, input);

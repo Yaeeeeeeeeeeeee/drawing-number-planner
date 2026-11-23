@@ -52,6 +52,8 @@ export class PackagingCatalogService {
     if(!isAbsolute(path)||!/.ait$/iu.test(path))fail('模板文件路径无效');
     let absolutePath:string,buffer:Buffer;
     try{absolutePath=realpathSync.native(path);if(!statSync(absolutePath).isFile())fail('模板文件路径无效');buffer=readFileSync(absolutePath);if(!buffer.length||buffer.length>20*1024*1024)fail('请选择不超过 20 MB 的非空 AIT 模板文件');}catch(error){if(error instanceof PackagingCatalogError)throw error;throw new PackagingCatalogError('PACKAGING_ASSET_UNAVAILABLE','模板文件不存在或无法读取');}
+    const duplicate=this.db.prepare('select id,name from packaging_templates where asset_relative_path=? and id<>?').get(absolutePath,id??0) as {id:number;name:string}|undefined;
+    if(duplicate)fail(`原始 AIT 路径已由模板“${duplicate.name}”引用，请编辑该记录。`);
     const sha256=createHash('sha256').update(buffer).digest('hex'),now=new Date().toISOString();
     const values=[value.name,value.mainCategoryId,value.projectItemId,JSON.stringify(value.brandIds),JSON.stringify(value.productIds),JSON.stringify(value.fields),JSON.stringify(value.requiredFonts),value.status,basename(absolutePath),absolutePath,sha256];
     if(previous)this.db.prepare('update packaging_templates set name=?,main_category_id=?,project_item_id=?,brand_ids_json=?,product_ids_json=?,fields_json=?,required_fonts_json=?,status=?,file_name=?,asset_relative_path=?,sha256=?,revision=revision+1,updated_at=? where id=?').run(...values,now,id!);

@@ -88,7 +88,7 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   const initialCatalog = await showCatalog();
   await page.getByRole('button',{name:'筛选',exact:true}).click();
   const fileFilters = page.getByRole('complementary',{name:'PDF 筛选',exact:true});
-  await fileFilters.getByRole('textbox', { name: '文件关键词', exact: true }).fill('');
+  await page.getByRole('searchbox', { name: '文件关键词', exact: true }).fill('');
   for (const [label, value] of [['匹配状态', ''], ['转曲类型', ''], ['存在状态', 'all'], ['纳入范围', 'included']]) await fileFilters.getByRole('combobox', { name: label, exact: true }).selectOption(value);
   await fileFilters.getByRole('button',{name:'关闭',exact:true}).click();
   await initialCatalog.getByRole('button', { name: '全部文件', exact: true }).click();

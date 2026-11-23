@@ -20,7 +20,7 @@ function fixture(legacy = false) {
 it('rehearses a genuine v15 ledger without changing bytes, then backs up before upgrading', () => {
   const {root, file} = fixture(true), original = readFileSync(file);
   validateProductionDatabase(file);
-  expect(readFileSync(file)).toEqual(original);
+  expect(readFileSync(file).equals(original)).toBe(true);
   expect(readdirSync(root)).toEqual(['planner.db']);
   prepareExistingProductionDatabase(file);
   const backups = readdirSync(join(root, 'backups'));
@@ -43,7 +43,7 @@ it('validates committed WAL pages without touching any source file and backs the
     const files = readdirSync(root), bytes = files.map(name => readFileSync(join(root, name)));
     validateProductionDatabase(file);
     expect(readdirSync(root)).toEqual(files);
-    files.forEach((name, index) => expect(readFileSync(join(root, name))).toEqual(bytes[index]));
+    files.forEach((name, index) => expect(readFileSync(join(root, name)).equals(bytes[index])).toBe(true));
     const backup = new Database(backupProductionDatabase(root), {readonly:true});
     try { expect(backup.prepare('SELECT value FROM wal_evidence').get()).toEqual({value:'committed WAL'}); }
     finally { backup.close(); }
@@ -65,10 +65,10 @@ it.each(['unique', 'partial-predicate', 'foreign-key', 'trigger'])('rejects miss
   } finally { db.close(); }
   const bytes = readFileSync(file);
   expect(() => validateProductionDatabase(file)).toThrow();
-  expect(readFileSync(file)).toEqual(bytes);
+  expect(readFileSync(file).equals(bytes)).toBe(true);
 });
 
 it('accepts schema 26 and rejects a future schema 27 without changing the selected database',()=>{
-  const {file}=fixture(),original=readFileSync(file);validateProductionDatabase(file);expect(readFileSync(file)).toEqual(original);
-  const db=new Database(file);db.prepare('insert into schema_migrations values(27,?)').run('future');db.close();const future=readFileSync(file);expect(()=>validateProductionDatabase(file)).toThrow(/27.*最高26/);expect(readFileSync(file)).toEqual(future);
+  const {file}=fixture(),original=readFileSync(file);validateProductionDatabase(file);expect(readFileSync(file).equals(original)).toBe(true);
+  const db=new Database(file);db.prepare('insert into schema_migrations values(27,?)').run('future');db.close();const future=readFileSync(file);expect(()=>validateProductionDatabase(file)).toThrow(/27.*最高26/);expect(readFileSync(file).equals(future)).toBe(true);
 });

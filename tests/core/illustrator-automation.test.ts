@@ -61,13 +61,13 @@ describe('Windows Illustrator adapter contract (no licensed AI)',()=>{
  it('rejects unavailable platforms honestly',async()=>{const x=setup();const ai=new WindowsIllustratorAutomation({operationRoot:join(x.root,'ops'),platform:'linux'});await expect(ai.inspect({...x,fields})).rejects.toMatchObject({code:'ILLUSTRATOR_UNAVAILABLE'});});
 });
 
-function executeJsx(overrides:Record<string,unknown>={}, input:Record<string,unknown>={}){
+function executeJsx(overrides:Record<string,unknown>={}, input:Record<string,unknown>={}, textFonts?:unknown){
  const writes:Record<string,string>={};const saved:{options:any;path:string}[]=[];let closed=0;let opened=0;
  let content='12.3456.789.1234567';
  const characters=Array.from(content,(_,i)=>({get contents(){return content[i];},set contents(v:string){content=content.slice(0,i)+v+content.slice(i+1);},characterAttributes:{textFont:{name:'ArialMT'}}}));
  const frame:any={name:'DRAWING_NO',typename:'TextFrame',get contents(){return content;},set contents(v:string){content=v;},editable:true,locked:false,hidden:false,parent:{typename:'Layer',locked:false,visible:true},characters};
  const doc:any={textFrames:[frame],pageItems:[frame],placedItems:[],rasterItems:[],saveAs:(file:any,options:any)=>{saved.push({path:file.path,options});},close:()=>{closed++;}};
- const app:any={documents:[],textFonts:{getByName:(name:string)=>{if(name!=='ArialMT')throw Error('missing');return{name};}},userInteractionLevel:'normal',open:()=>{opened++;return doc;}};
+ const app:any={documents:[],textFonts:textFonts??{getByName:(name:string)=>{if(name!=='ArialMT')throw Error('missing');return{name};}},userInteractionLevel:'normal',open:()=>{opened++;return doc;}};
  Object.assign(doc,overrides);
  function File(this:any,path:string){this.path=path;this.exists=true;this.open=()=>true;this.write=(text:string)=>{writes[path]=text;};this.close=()=>true;}
  const payload:any={operationId:'op-1',mode:'generate',templatePath:'copy.ait',outputPath:'candidate.pdf',resultPath:'result.json',fields,values:{DRAWING_NO:'98.7654.321.7654321'},requiredFonts:['ArialMT'],...input};
@@ -83,4 +83,20 @@ describe('generated JSX against a VM Illustrator DOM contract (no real AI)',()=>
  it('preserves quotes, backslashes and line breaks in error evidence',()=>{const x=executeJsx({saveAs:()=>{throw Error('quote " slash \\ and line\nnext');}});expect(x.result.ok).toBe(false);expect(x.result.error.message).toContain('quote " slash \\ and line\nnext');});
  it('reports the original-font substitution limit explicitly',()=>{const x=executeJsx({}, {mode:'inspect'});expect(x.result.inspection.issues).toEqual(expect.arrayContaining([expect.objectContaining({code:'FONT_SUBSTITUTION_NOT_VERIFIED',severity:'warning'})]));});
  it('opens a trusted PDF without closing it or saving an AI file',()=>{const x=executeJsx({}, {mode:'open',pdfPath:'manual-edit.pdf'});expect(x.result.ok).toBe(true);expect(x.opened).toBe(1);expect(x.closed).toBe(0);expect(x.saved).toHaveLength(0);});
+});
+
+it('reports missing fonts only from a readable Illustrator catalogue and still reads template objects',()=>{
+ const registry=Object.assign([{name:'ArialMT'}],{getByName:(name:string)=>{
+   if(name==='ArialMT')return {name};
+   throw Error('font unavailable');
+ }});
+ const x=executeJsx({}, {mode:'inspect',requiredFonts:['ArialMT','UnavailableFont']}, registry);
+ expect(x.opened).toBe(1);
+ expect(x.closed).toBe(1);
+ expect(x.saved).toEqual([]);
+ expect(x.result.inspection.documentRead).toBe(true);
+ expect(x.result.inspection.textObjects).toEqual([expect.objectContaining({objectName:'DRAWING_NO'})]);
+ expect(x.result.inspection.fontStatuses).toEqual([{name:'ArialMT',status:'installed'},{name:'UnavailableFont',status:'missing'}]);
+ const uncertain=executeJsx({}, {mode:'inspect',requiredFonts:['UnavailableFont']});
+ expect(uncertain.result.inspection.fontStatuses).toContainEqual({name:'UnavailableFont',status:'unknown'});
 });

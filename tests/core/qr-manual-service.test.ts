@@ -115,6 +115,29 @@ describe('manual PDF association persistence',()=>{
  expect(()=>manual.commit(p.result.previewId,{confirmed:false,reason:'已核对特殊版本'})).toThrow();expect(count('qr_manual_links')).toBe(0);
  manual.commit(p.result.previewId,{confirmed:true,reason:'已核对特殊版本'});expect(db.prepare('select reason from qr_manual_audit').get()).toEqual({reason:'已核对特殊版本'});
  });
+ it('initializes an unconfigured existing purpose only when its first PDF link is committed',()=>{
+  const qr = new QrService(db);
+  const blank = qr.update(codeId,{name:'Original',targetUrl:null});
+  const path = join(dir,'ZU70SD-User Manual（c2hg2h8）.pdf');
+  writeFileSync(path,PDF);
+  const token = manual.selectTrustedFile(path).token;
+  const input = {token,qrCodeId:codeId,productId,purposeId,name:blank.name,targetUrl:'https://qrs.ly/c2hg2h8'};
+  const checked = manual.preview(input);
+  expect(checked.issues).toEqual([]);
+  expect(qr.get(codeId)).toMatchObject({targetUrl:null,files:[]});
+  expect(manual.commit(checked.previewId)).toMatchObject({id:codeId,name:blank.name,status:blank.status,targetUrl:input.targetUrl,files:[{fileName:'ZU70SD-User Manual（c2hg2h8）.pdf'}]});
+ });
+ it('requires editing metadata separately for a URL-less QR with existing file history',()=>{
+  const linked = preview();
+  manual.commit(linked.result.previewId);
+  manual.unlink(codeId,manual.history(codeId).revision);
+  const blank = new QrService(db).update(codeId,{name:'Original',targetUrl:null});
+  expect(blank.hasFileHistory).toBe(true);
+  const token = manual.selectTrustedFile(linked.path).token;
+  expect(() => manual.preview({token,qrCodeId:codeId,productId,purposeId,name:blank.name,targetUrl:'https://qrs.ly/c2hg2h8'}))
+    .toThrowError(expect.objectContaining({code:'METADATA_CHANGED'}));
+  expect(manual.history(codeId).items).toHaveLength(1);
+ });
  it('does not permit file replacement to edit existing QR name or URL',()=>{
  const p=preview();expect(()=>manual.preview({token:p.selected.token,qrCodeId:codeId,productId,purposeId,name:'Changed',targetUrl:'https://qrs.ly/c2hg2h8'})).toThrowError(expect.objectContaining({code:'METADATA_CHANGED'}));expect(new QrService(db).get(codeId)).toMatchObject({name:'Original',targetUrl:'https://qrs.ly/c2hg2h8',status:'active'});expect(count('qr_manual_links')).toBe(0);
  });

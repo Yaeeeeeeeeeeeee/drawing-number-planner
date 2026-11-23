@@ -36,7 +36,7 @@ export type BomItemInput = BomItemInputFields & (
 
 export interface SaveBomInput {
   appearanceVersionId?: number;
-  copyFromVersionId?: number;
+  copyFromVersionId?: number; copyFromVersionRevision?: number;
   productId: number;
   entryMode?: BomEntryMode;
   businessChangeDate?: string;

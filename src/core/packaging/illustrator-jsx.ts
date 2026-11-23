@@ -25,7 +25,26 @@ var doc = null, ownsDocument = false, previousInteraction;
 function issue(code,message,objectName,severity){var item={code:code,message:message,severity:severity||'error'};if(objectName)item.objectName=objectName;inspection.issues.push(item);}
 function blocking(){for(var i=0;i<inspection.issues.length;i++)if(inspection.issues[i].severity==='error')return true;return false;}
 function fontAvailable(name){try{var font=app.textFonts.getByName(name);return !!font&&font.name===name;}catch(e){return false;}}
-function recordFont(name){for(var i=0;i<inspection.fonts.length;i++)if(inspection.fonts[i]===name)return;inspection.fonts.push(name);if(!fontAvailable(name))issue('MISSING_FONT','Font is unavailable: '+name);}
+function inspectFont(name){
+  var statuses=inspection.fontStatuses;
+  if(!statuses)return;
+  for(var i=0;i<statuses.length;i++)if(statuses[i].name===name)return;
+  var status='unknown';
+  if(fontAvailable(name))status='installed';
+  else try {
+    var registry=app.textFonts;
+    var count=registry.length;
+    if(typeof count==='number'&&count>0){
+      status='missing';
+      for(var f=0;f<count;f++){
+        if(!registry[f]||typeof registry[f].name!=='string'){status='unknown';break;}
+        if(registry[f].name===name){status='installed';break;}
+      }
+    }
+  }catch(e){status='unknown';}
+  statuses.push({name:name,status:status});
+}
+function recordFont(name){for(var i=0;i<inspection.fonts.length;i++)if(inspection.fonts[i]===name)return;inspection.fonts.push(name);inspectFont(name);if(!fontAvailable(name))issue('MISSING_FONT','Font is unavailable: '+name);}
 function editable(frame){try{var current=frame;while(current&&current.typename!=='Document'){if(current.locked===true||current.hidden===true||current.visible===false||current.editable===false)return false;current=current.parent;}return true;}catch(e){return false;}}
 // Snapshot the layout and text attributes that replacement must preserve.
 function properties(object,keys){var result=[],i,v;for(i=0;i<keys.length;i++){try{v=object&&object[keys[i]];if(v===undefined||v===null)result.push('');else if(typeof v==='object'&&typeof v.length==='number')result.push(String(v));else if(typeof v==='object'&&v.typename)result.push(properties(v,['typename','name','red','green','blue','cyan','magenta','yellow','black','gray','tint','mValueA','mValueB','mValueC','mValueD','mValueTX','mValueTY']));else if(typeof v==='object'&&v.name)result.push(String(v.name));else result.push(String(v));}catch(e){result.push('<unavailable>');}}return result.join('|');}
@@ -39,8 +58,12 @@ try {
   } else {
     issue('FONT_SUBSTITUTION_NOT_VERIFIED','仅核对声明及打开后可见的字体；Illustrator 打开时可能替换原字体，请人工核对原稿。',null,'warning');
     var i,j,required=job.requiredFonts||[];
-    for(i=0;i<required.length;i++)if(!fontAvailable(required[i]))issue('MISSING_FONT','Required font is unavailable: '+required[i]);
-    if(!blocking()) {
+    if(job.mode==='inspect'){inspection.documentRead=false;inspection.fontStatuses=[];}
+    for(i=0;i<required.length;i++){
+      inspectFont(required[i]);
+      if(!fontAvailable(required[i]))issue('MISSING_FONT','Required font is unavailable: '+required[i]);
+    }
+    if(job.mode==='inspect'||!blocking()) {
       var existing=[];for(i=0;i<app.documents.length;i++)existing.push(app.documents[i]);
       doc=app.open(new File(job.templatePath));
       ownsDocument=true;
@@ -57,6 +80,7 @@ try {
         var chars=frames[i].characters;
         if(chars)for(j=0;j<chars.length;j++) {try{recordFont(chars[j].characterAttributes.textFont.name);}catch(fontError){issue('FONT_INSPECTION_FAILED','Cannot inspect a text font');}}
       }
+      if(job.mode==='inspect')inspection.documentRead=true;
       for(i=0;i<doc.placedItems.length;i++)resource(doc.placedItems[i]);
       for(i=0;i<doc.rasterItems.length;i++)if(doc.rasterItems[i].embedded!==true)resource(doc.rasterItems[i]);
       var mapping=null, mappings=[], named=[], candidates=[], original=null, targets=[], before=[], layouts=[], parents=[];

@@ -10,6 +10,8 @@ export type { PackagingField } from './packaging-types.js';
 
 export interface IllustratorIssue { code: string; message: string; severity: 'error' | 'warning'; objectName?: string }
 export interface IllustratorInspection {
+  documentRead?: boolean;
+  fontStatuses?: Array<{ name: string; status: 'installed' | 'missing' | 'unknown' }>;
   drawingNumber?: { originalText:string; matches:number; replaced?:number };
   fields: Array<PackagingField & { matches: number; editable: boolean }>;
   textObjects?: Array<{ objectName: string; matches?: number; editable: boolean; sourceText?:string }>;
@@ -63,6 +65,8 @@ function validateInspection(value:unknown):value is IllustratorInspection {
   const x=value as IllustratorInspection;
   return Array.isArray(x.fields)&&x.fields.every(field=>field&&typeof field.objectName==='string'&&typeof field.sourceKey==='string'&&typeof field.required==='boolean'&&Number.isInteger(field.matches)&&field.matches>=0&&typeof field.editable==='boolean')
     &&(x.textObjects===undefined||Array.isArray(x.textObjects)&&x.textObjects.every(item=>item&&typeof item.objectName==='string'&&typeof item.editable==='boolean'&&(item.matches===undefined||Number.isInteger(item.matches)&&item.matches>0)))
+    &&(x.documentRead===undefined||typeof x.documentRead==='boolean')
+    &&(x.fontStatuses===undefined||Array.isArray(x.fontStatuses)&&x.fontStatuses.every(font=>font&&typeof font.name==='string'&&['installed','missing','unknown'].includes(font.status)))
     &&Array.isArray(x.fonts)&&x.fonts.every(font=>typeof font==='string')&&Array.isArray(x.issues)&&x.issues.every(issue=>issue&&typeof issue.code==='string'&&typeof issue.message==='string'&&['error','warning'].includes(issue.severity))&&x.fontValidation==='declared-and-observed-only';
 }
 const powershell = `param([string]$JsxPath,[string]$ResultPath,[string]$CompletedPath,[string]$OperationId)

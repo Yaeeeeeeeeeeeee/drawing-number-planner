@@ -19,6 +19,7 @@ it('isolates BOM preview from every real API, including initial reads', async ()
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
   expect(await screen.findByLabelText('所选 BOM 记录')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '更多 BOM -201' }));
   expect(screen.getByRole('button', { name: '删除 BOM -201' })).toBeDisabled();
   const desktop = vi.fn(); window.plannerDesktop = { showBomAssetInFolder: desktop } as never;
   expect(screen.queryByRole('button', { name: '打开附件位置 说明书-图片.png' })).toBeNull();
@@ -64,7 +65,7 @@ it('retains old-record editing and distinguishes historical drawing references',
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -202' }));
   expect(await screen.findByText('02.0209.010.0501002')).toBeVisible();
-  expect(screen.queryByRole('button', { name: '复制图号 02.0209.010.0501002' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '复制图号 02.0209.010.0501002' })).toBeVisible();
   expect(screen.queryByText('历史图号 · 已停用')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '编辑 BOM -202' }));
   expect(await screen.findByLabelText('第 2 行图号')).toHaveValue('historical:-602');
@@ -76,8 +77,9 @@ it('shows field-specific blockers without requiring optional material or batch f
   render(<BomPage api={{} as never} />);
   await screen.findByLabelText('第 1 行图号');
   fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
-  expect(screen.getByText('暂不能保存')).toBeInTheDocument();
-  expect(screen.getAllByText('项目 9 · 图号：请选择')).toHaveLength(2);
+  expect(screen.queryByText('请选择主类别')).not.toBeInTheDocument();
+  fireEvent.blur(screen.getByLabelText('第 9 行主类别'));
+  expect(screen.getByLabelText('第 9 行主类别')).toHaveAttribute('aria-invalid','true');
   fireEvent.change(screen.getByLabelText('第 9 行主类别'), { target: { value: '-10' } });
   fireEvent.change(screen.getByLabelText('第 9 行项目明细'), { target: { value: '-28' } });
   expect(await screen.findByText('没有符合条件的图号。')).toBeInTheDocument();

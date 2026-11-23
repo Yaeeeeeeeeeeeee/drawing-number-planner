@@ -66,11 +66,12 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  const originalAit=path.join(path.dirname(databaseFile),'ait-original-reference.ait');fs.writeFileSync(originalAit,aitBytes);
  const picker=app?nativeDialog('ait',originalAit,'ait-original-reference'):null;
  try{await editor.getByRole('button',{name:'选择 AIT 原始文件',exact:true}).click();if(picker)await picker.done;await editor.getByText(originalAit,{exact:true}).waitFor();}finally{picker?.child.kill();}
- await editor.getByRole('button',{name:'添加图号映射',exact:true}).click();
+ // The upload-only fixture cannot supply editable Illustrator objects.
  await expect(editor.getByRole('button',{name:'保存模板',exact:true})).toBeEnabled();
- await editor.getByLabel('AIT 对象名称 1',{exact:true}).fill('DRAWING_NO');await expect(editor.getByLabel('填入内容 1',{exact:true})).toHaveValue('DRAWING_NO');assert.deepEqual(await editor.getByLabel('填入内容 1',{exact:true}).locator('option').allTextContents(),['完整图号']);assert.equal(await editor.getByRole('textbox',{name:'数据字段',exact:true}).count(),0);
+ await expect(editor.getByRole('button',{name:'添加图号映射',exact:true})).toBeDisabled();
+ await expect(editor.getByRole('combobox',{name:'AIT 对象名称 1',exact:true})).toHaveCount(0);
  await editor.getByRole('button',{name:'保存模板',exact:true}).click();await editor.waitFor({state:'detached'});
- let catalog=await request('/api/packaging/catalog');const template=catalog.templates.find(item=>item.name==='AIT上传验收');assert.ok(template);assert.deepEqual(template.fields,[{objectName:'DRAWING_NO',sourceKey:'DRAWING_NO',required:true}]);
+ let catalog=await request('/api/packaging/catalog');const template=catalog.templates.find(item=>item.name==='AIT上传验收');assert.ok(template);assert.deepEqual(template.fields,[]);
  const asset=path.isAbsolute(template.assetRelativePath)?template.assetRelativePath:path.join(path.dirname(databaseFile),template.assetRelativePath),aitHash=createHash('sha256').update(aitBytes).digest('hex');assert.equal(hash(asset),aitHash);
  if(!app){await page.getByRole('button',{name:'本机检查',exact:true}).click();await page.getByRole('alert').filter({hasText:/Illustrator|Windows/u}).waitFor();}
  await page.getByRole('tab',{name:'模板匹配规则',exact:true}).click();await page.getByRole('button',{name:'新增匹配规则',exact:true}).click();
@@ -81,7 +82,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  await rule.getByLabel('允许长宽互换（高度不参与）',{exact:true}).check();await rule.getByRole('button',{name:'保存匹配规则',exact:true}).click();await rule.waitFor({state:'detached'});
  await capture('AIT-模板尺寸规则真实保存',{responsive:true});
  await navigation.getByRole('button',{name:'图号规划 / 更新包材',exact:true}).click();await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor();
- await page.getByRole('combobox',{name:'产品类别',exact:true}).selectOption(product.productCategory);await page.getByRole('combobox',{name:'产品型号',exact:true}).selectOption(String(product.id));
+ await page.getByRole('combobox',{name:'产品类别',exact:true}).selectOption(product.productCategory);await page.getByRole('radio',{name:new RegExp(product.model)}).check();
  await page.getByRole('button',{name:'下一步',exact:true}).click();
  await page.getByRole('combobox',{name:'第 1 行主类别',exact:true}).selectOption(String(main.id));await page.getByRole('combobox',{name:'第 1 行项目明细',exact:true}).selectOption(String(templateProject.id));await page.getByRole('combobox',{name:'第 1 行颜色',exact:true}).selectOption(String(color.id));
  // This fixture color is named 验收白色, not a real white dictionary entry.
@@ -104,10 +105,10 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  assert.equal(await page.getByRole('textbox',{name:'任务名称',exact:true}).count(),0);assert.equal(await page.getByRole('combobox',{name:'实际产品目录',exact:true}).count(),0);assert.equal(await page.getByRole('group',{name:'本次已占号图号',exact:true}).getByRole('checkbox').count(),0);
  await page.getByRole('group',{name:'本次已占号图号',exact:true}).getByText(drawing.fullCode,{exact:true}).waitFor();await page.getByRole('button',{name:'创建任务',exact:true}).click();
  const detail=page.getByRole('region',{name:'当前制图任务',exact:true});await detail.waitFor();let task=(await request(`/api/packaging/tasks?productId=${product.id}`)).items.find(item=>item.state==='active');assert.ok(task);assert.equal(task.items[0].drawing.id,drawing.id);assert.equal(task.taskDirectory.replaceAll('\\','/'),`${task.productDirectory.replaceAll('\\','/')}/00.临时文件`);
- await assert.rejects(()=>request('/api/packaging/tasks',{productId:product.id,type:'new',drawings:[{origin:'planned',id:Math.abs(drawing.id)}]}),/已有未完成制图任务/u);await detail.getByRole('button',{name:'返回任务记录',exact:true}).click();await page.getByText(`${product.model} 已有未完成制图任务`,{exact:true}).waitFor();await page.getByRole('button',{name:'继续任务',exact:true}).click();await detail.waitFor();assert.equal((await request(`/api/packaging/tasks?productId=${product.id}`)).items.filter(item=>item.state!=='completed').length,1);
+ await assert.rejects(()=>request('/api/packaging/tasks',{productId:product.id,type:'new',drawings:[{origin:'planned',id:Math.abs(drawing.id)}]}),/已有未完成制图任务/u);await detail.getByRole('button',{name:'返回制图任务',exact:true}).click();await page.getByText(`${product.model} 已有未完成任务，可在任务历史中继续。`,{exact:true}).waitFor();await page.getByRole('button',{name:'继续任务',exact:true}).click();await detail.waitFor();assert.equal((await request(`/api/packaging/tasks?productId=${product.id}`)).items.filter(item=>item.state!=='completed').length,1);
  const temporary=path.join(workspace,task.taskDirectory);assert.equal(fs.readdirSync(temporary).filter(name=>fs.statSync(path.join(temporary,name)).isDirectory()).length,0);
  await capture('UI15-制图任务紧凑列表',{rows:true,responsive:true});
- const row=detail.getByRole('region',{name:`${drawing.fullCode} ${templateProject.name}`,exact:true});await row.getByRole('button',{name:'设置 / 检查',exact:true}).click();
+ const row=detail.getByRole('region',{name:`${drawing.fullCode} ${templateProject.name}`,exact:true});await expect(row.getByRole('button',{name:`展开或收起 ${drawing.fullCode}`,exact:true})).toHaveAttribute('aria-expanded','true');
  await row.getByLabel('长 (mm)',{exact:true}).fill('90');await row.getByLabel('宽 (mm)',{exact:true}).fill('50');await row.getByRole('button',{name:'保存本次设置',exact:true}).click();await detail.getByText('本次参数已保存',{exact:true}).waitFor();
  task=await request(`/api/packaging/tasks/${task.id}`);assert.equal(task.items[0].parameters.length,90);assert.equal(task.items[0].parameters.width,50);assert.equal(task.items[0].templateId,template.id);
  await capture('UI15-任务尺寸匹配与设置');
@@ -145,27 +146,37 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
   }
   await expect.poll(async()=>(await request(`/api/packaging/tasks/${id}`)).state,{timeout:20000}).toMatch(/completed|awaiting_index/u);
   let current=await request(`/api/packaging/tasks/${id}`);if(current.state==='awaiting_index'){await detail.getByRole('button',{name:'重试归档索引',exact:true}).click();}
-  await expect.poll(async()=>(await request(`/api/packaging/tasks/${id}`)).state).toBe('completed');await detail.locator('.pkg-task-counters').getByText('已完成',{exact:true}).waitFor();return request(`/api/packaging/tasks/${id}`);
+  await expect.poll(async()=>(await request(`/api/packaging/tasks/${id}`)).state).toBe('completed');await detail.locator('.pkg-task-actions').getByText('已完成',{exact:true}).waitFor();return request(`/api/packaging/tasks/${id}`);
  };
  await review(row);task=await archive(task.id);
  const indexed=(await request(`/api/files?productId=${product.id}&presence=all`)).items;assert.equal(indexed.length,1);assert.equal(indexed[0].drawingId,drawing.id);assert.ok(indexed[0].relativePath.includes('02.未转曲源文件'));const formal=path.join(workspace,indexed[0].relativePath);assert.equal(hash(formal),originalHash);assert.equal(fs.existsSync(associated),false);assert.ok(fs.existsSync(temporary));assert.equal(fs.readFileSync(unrelated,'utf8'),'unrelated file must remain');
  await capture('AIT-规划后人工文件归档与索引');
  // A manual navigation clears the planning handoff so a formal modification can be selected normally.
- await go(page,'制图任务');await detail.getByRole('button',{name:'返回任务记录',exact:true}).click();await page.getByRole('combobox',{name:'任务类型',exact:true}).selectOption('modify');
+ await go(page,'制图任务');await detail.getByRole('button',{name:'返回制图任务',exact:true}).click();await page.getByRole('button',{name:'发起任务',exact:true}).click();await page.getByRole('combobox',{name:'任务类型',exact:true}).selectOption('modify');
  await page.getByRole('checkbox',{name:`${drawing.fullCode} · ${templateProject.name} · ${color.name}`,exact:true}).check();await page.getByRole('button',{name:'创建任务',exact:true}).click();await detail.waitFor();let modification=(await request(`/api/packaging/tasks?productId=${product.id}`)).items.find(item=>item.state==='active');assert.equal(hash(formal),originalHash);assert.equal(modification.taskDirectory.replaceAll('\\','/'),task.taskDirectory.replaceAll('\\','/'));
- const modifyRow=detail.getByRole('region',{name:`${drawing.fullCode} ${templateProject.name}`,exact:true});await modifyRow.getByRole('button',{name:'设置 / 检查',exact:true}).click();
+ const modifyRow=detail.getByRole('region',{name:`${drawing.fullCode} ${templateProject.name}`,exact:true});await expect(modifyRow.getByRole('button',{name:`展开或收起 ${drawing.fullCode}`,exact:true})).toHaveAttribute('aria-expanded','true');
  const copy=path.join(workspace,modification.items[0].relativePath);writePdf(copy,'Real edited working copy; keep the original until archive');const editedHash=hash(copy);assert.notEqual(editedHash,originalHash);assert.equal(hash(formal),originalHash);
  await expect.poll(async()=>(await request(`/api/packaging/tasks/${modification.id}`)).items[0].sha256).toBe(editedHash);await detail.getByRole('button',{name:'刷新当前任务',exact:true}).click();await detail.getByText('任务已刷新',{exact:true}).waitFor();await expect(modifyRow.getByRole('button',{name:'确认当前文件',exact:true})).toBeDisabled();
  await review(modifyRow);modification=await archive(modification.id);assert.equal(hash(formal),editedHash);assert.equal(hash(path.join(path.dirname(databaseFile),modification.items[0].backupRelativePath)),originalHash);assert.equal(hash(asset),aitHash);
  const backup=await page.evaluate(async({id,itemId})=>{const response=await fetch(`/api/packaging/tasks/${id}/items/${itemId}/backup`);return{status:response.status,bytes:[...new Uint8Array(await response.arrayBuffer())]};},{id:modification.id,itemId:modification.items[0].id});assert.equal(backup.status,200);assert.equal(createHash('sha256').update(Buffer.from(backup.bytes)).digest('hex'),originalHash);
  await capture('AIT-正式文件修改备份与历史');
- await detail.getByRole('button',{name:'返回任务记录',exact:true}).click();
+ await detail.getByRole('button',{name:'返回制图任务',exact:true}).click();
+ const refreshTaskHistory=async()=>{
+  const settings=page.locator('details.pkg-task-settings');
+  if(await settings.getAttribute('open')===null)await settings.locator('summary').click();
+  await settings.getByRole('button',{name:'刷新任务记录',exact:true}).click();
+ };
  const deleteRecord=async(taskId,unfinished=false)=>{
-  const modelRow=page.locator('.pkg-tasks table tbody tr').filter({has:page.getByRole('button',{name:'删除',exact:true})});
+  const modelRow=page.locator('.pkg-tasks table tbody tr').filter({has:page.getByRole('cell',{name:product.model,exact:true})});
+  const openDelete=async(index)=>{
+   const row=modelRow.nth(index),menu=row.locator('details.pkg-task-row-menu');
+   if(await menu.getAttribute('open')===null)await menu.getByText('更多操作',{exact:true}).click();
+   await menu.getByRole('button',{name:'删除任务记录',exact:true}).click();
+  };
   // Match the row by its creation timestamp and state through the list order returned by the same real API.
   const list=(await request(`/api/packaging/tasks?productId=${product.id}`)).items,index=list.findIndex(task=>task.id===taskId);assert.ok(index>=0);
   await expect.poll(async()=>(await request(`/api/packaging/tasks/${taskId}/deletion-preview`)).canDelete,{timeout:20000}).toBe(true);
-  await modelRow.nth(index).getByRole('button',{name:'删除',exact:true}).click();const dialog=page.getByRole('dialog',{name:'删除制图任务记录',exact:true});await dialog.waitFor();await expect(dialog).toContainText('实际 PDF、原始 AIT、正式文件均保留');
+  await openDelete(index);const dialog=page.getByRole('dialog',{name:'删除制图任务记录',exact:true});await dialog.waitFor();await expect(dialog).toContainText('实际 PDF、原始 AIT、正式文件均保留');
   if(unfinished){assert.equal(await dialog.getByRole('button',{name:'确认删除记录',exact:true}).isDisabled(),true);await dialog.getByRole('checkbox').check();}else assert.equal(await dialog.getByRole('checkbox').count(),0);
   for(let attempt=0;;attempt++){
    if(unfinished)await dialog.getByRole('checkbox').check();
@@ -177,7 +188,7 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
    if(attempt<3&&body.error?.code==='TASK_DELETE_BLOCKED'&&body.error.message==='任务正在处理文件，请完成后再删除'){
     await expect.poll(async()=>(await request(`/api/packaging/tasks/${taskId}/deletion-preview`)).canDelete,{timeout:20000}).toBe(true);
     await dialog.getByRole('button',{name:'取消',exact:true}).click();
-    await modelRow.nth(index).getByRole('button',{name:'删除',exact:true}).click();await dialog.waitFor();
+    await openDelete(index);await dialog.waitFor();
     continue;
    }
    assert.ok(attempt<3&&body.error?.code==='TASK_DELETE_CHANGED',`Unexpected deletion rejection: ${JSON.stringify(body)}`);
@@ -192,10 +203,10 @@ module.exports=async function verify({page,app,source,workspace,evidence,databas
  assert.deepEqual(indexFacts(await request(`/api/files?productId=${product.id}&presence=all`),unchangedIndexIds),indexFacts(indicesBeforeDelete,unchangedIndexIds));
  // An unfinished formal-copy task retains its file when deleted. Its successor must not adopt that owned file.
  const discarded=await request('/api/packaging/tasks',{productId:product.id,type:'modify',drawings:[{origin:'planned',id:Math.abs(drawing.id)}]});const retained=path.join(workspace,discarded.items[0].relativePath),retainedHash=hash(retained);
- await page.getByRole('button',{name:'刷新任务记录',exact:true}).click();await deleteRecord(discarded.id,true);assert.equal(hash(retained),retainedHash);assert.equal(hash(formal),editedHash);
+ await refreshTaskHistory();await deleteRecord(discarded.id,true);assert.equal(hash(retained),retainedHash);assert.equal(hash(formal),editedHash);
  const unfinished=await request('/api/packaging/tasks',{productId:product.id,name:'重启恢复验收',type:'new',drawings:[{origin:'planned',id:Math.abs(drawing.id)}]});
  const discovered=await request(`/api/packaging/tasks/${unfinished.id}/discover`,{});assert.equal(discovered.items[0].relativePath,undefined);assert.equal(discovered.pendingFiles.some(file=>file.relativePath===discarded.items[0].relativePath),false);assert.equal(hash(retained),retainedHash);
- await page.getByRole('button',{name:'刷新任务记录',exact:true}).click();await capture('UI15-任务历史删除与文件保留',{responsive:true});
+ await refreshTaskHistory();await capture('UI15-任务历史删除与文件保留',{responsive:true});
  const after=snapshot(databaseFile);for(const[table,rows]of Object.entries(before)){if(table==='schema_migrations')continue;const original=observations.businessRows(before,table,rows,scope),current=observations.businessRows(before,table,after[table],scope);assert.deepEqual(observations.existingRows(original,current),original,`Original ${table} row changed`);}
  fs.writeFileSync(path.join(evidence,'UI15-layout-geometry.json'),JSON.stringify(geometry,null,2));
  return{actualHttpAndDom:true,actualInstalledHttpAndDom:Boolean(app),menuOrder:true,independentTaskMenu:true,numberOnlyMappingUi:true,planningNoDimensions:true,exactDrawingFocus:true,flatTemporaryDirectory:true,completedDeletionPreservesFiles:true,unfinishedDeletionReleasesLock:true,catalogSavedThroughUi:true,matchingBasisChoicesThroughUi:true,rangeRuleAndSwapSaved:true,reservationToTask:true,singleProductTask:true,watcherDetectedWithoutClick:true,manualAssociation:true,reviewHash:true,newArchiveAndScopedIndex:true,formalEditCopyOnly:true,formalBackupHashPreserved:true,backupReadableThroughRegisteredId:true,taskCleanupOnly:true,taskHistoryRetained:true,originalAitHashPreserved:true,protectedBusinessRowsPreserved:true,unfinishedTaskId:unfinished.id,unfinishedTaskMode:unfinished.items[0].mode,unfinishedTaskParameters:unfinished.items[0].parameters,pdfIndexIds:indexed.map(file=>file.id),productDirectory:task.productDirectory,productId:product.id,realIllustratorGeneration:false,editablePdfReopenVerified:false,aitFixtureReferenceOnly:true,limitations:'No licensed Illustrator or real AIT was provided; actual Adobe generation/editability/font/layout acceptance remains local.'};

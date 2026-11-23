@@ -44,6 +44,7 @@ it('compares the explicit predecessor and clears it when selecting the first rec
   await preview();
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
+  fireEvent.click(await screen.findByRole('button',{name:'版本对比'}));
   await screen.findAllByRole('button',{name:'全部字段'});
   const project = screen.getByRole('button', { name: /项目 2 · 包装箱/ }).closest('article')!;
   fireEvent.click(within(project).getByRole('button', { name: '全部字段' }));
@@ -51,7 +52,7 @@ it('compares the explicit predecessor and clears it when selecting the first rec
   expect(drawing.cells[2]).toHaveTextContent('02.0209.010.0501002');
   expect(drawing.cells[1]).not.toHaveTextContent('历史图号 · 已停用');
   fireEvent.click(screen.getByRole('button', { name: '查看 BOM -202' }));
-  expect((await screen.findAllByRole('button',{name:/首次记录/})).length).toBeGreaterThan(0);
+  await waitFor(() => expect(screen.queryByRole('button',{name:'版本对比'})).not.toBeInTheDocument());
   expect(screen.queryByText(/对照上一条记录/)).not.toBeInTheDocument();
   expect(screen.queryByRole('columnheader', { name: '上一条记录' })).not.toBeInTheDocument();
 });
@@ -59,6 +60,7 @@ it('retains complete query fields and independent attachment roles in all-fields
   await preview();
   fireEvent.click(screen.getByRole('button', { name: '查询 BOM' }));
   fireEvent.click(await screen.findByRole('button', { name: '查看 BOM -201' }));
+  fireEvent.click(await screen.findByRole('button',{name:'版本对比'}));
   await screen.findAllByRole('button',{name:'全部字段'});
   const project = screen.getByRole('button', { name: /项目 1 · 说明书/ }).closest('article')!;
   fireEvent.click(within(project).getByRole('button', { name: '全部字段' }));
@@ -105,7 +107,7 @@ async function preview(scenario = 'normal') {
 it('keeps code primary and shows qualification once outside the select', async () => {
   await preview();
   const row = within(screen.getByRole('article', { name: 'BOM 项目 1' }));
-  expect(row.getByRole('option', { name: '02.0209.010.0501001' })).toBeInTheDocument();
+  expect(row.getByRole('option', { name: /02\.0209\.010\.0501001 · 说明书$/ })).toBeInTheDocument();
   expect(row.getByText('正式规划 · 正式使用')).toBeVisible();
 });
 it('groups upload and reuse with each independent attachment role', async () => {
@@ -143,5 +145,5 @@ it('locates drawing exceptions at the field without a repeated project footer', 
   const description = drawing.getAttribute('aria-describedby')!.split(' ').map((id) => document.getElementById(id)?.textContent).join(' ');
   expect(description).toContain('请选择可用图号替换后再保存');
   expect(within(record).queryByText('项目 1 · 图号：原引用已作废，请选择可用图号')).not.toBeInTheDocument();
-  expect(screen.getAllByRole('status').some(e=>e.textContent?.includes('项目 1 · 图号：原引用已作废，请选择可用图号'))).toBe(true);
+  expect(screen.getByRole('button',{name:'保存当前 BOM'})).toBeDisabled();
 });

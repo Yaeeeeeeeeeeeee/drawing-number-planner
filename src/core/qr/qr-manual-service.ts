@@ -4,7 +4,7 @@ import { basename, extname } from 'node:path';
 import type { PlannerDatabase } from '../../db/database.js';
 import { QrService } from './qr-service.js';
 import { QrRepository } from './qr-repository.js';
-import { QrManualError, validateQrManualFilename, qrUrlTail } from './qr-manual-validation.js';
+import { QR_MANUAL_PDF_LIMIT_BYTES, QR_MANUAL_PDF_LIMIT_MB, QrManualError, canInitializeQrTarget, validateQrManualFilename, qrUrlTail } from './qr-manual-validation.js';
 export interface QrManualSelection { token: string; fileName: string; path: string }
 export interface QrManualInput { token: string; qrCodeId?: number; productId: number; purposeId: number; name: string; targetUrl: string; appearanceVersionId?: number | null }
 export interface QrManualPreview { previewId: string; fileName: string; path: string; tail: string; issues: string[]; revision: string }
@@ -20,7 +20,7 @@ function readPdf(path: string): {file:Fingerprint;bytes:Buffer} {
   const fd = openSync(canonical, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.size > 64 * 1024 * 1024) throw new QrManualError('INVALID_PDF', '请选择64MB以内的PDF文件');
+    if (!stat.isFile() || stat.size > QR_MANUAL_PDF_LIMIT_BYTES) throw new QrManualError('INVALID_PDF', `请选择${QR_MANUAL_PDF_LIMIT_MB}MB以内的PDF文件`);
     const check = statSync(canonical);
     if (realpathSync(canonical)!==canonical || check.ino!==stat.ino || check.dev!==stat.dev) throw new QrManualError('FILE_CHANGED','文件路径在读取期间改变');
     const bytes = readFileSync(fd);
@@ -74,7 +74,7 @@ export class QrManualService {
     if (input.appearanceVersionId!=null) new QrService(this.db).list({productId:input.productId,appearanceVersionId:input.appearanceVersionId});
     if (input.qrCodeId) {
       const code=this.repository.get(input.qrCodeId);
-      if (!code || input.name!==code.name || input.targetUrl!==code.targetUrl || (input.appearanceVersionId??null)!==(code.appearanceVersionId??null)) throw new QrManualError('METADATA_CHANGED','更换文件仅修改文件关联；请先在详情中保存二维码名称或网址');
+      if (!code || input.name!==code.name || (input.targetUrl!==code.targetUrl && !canInitializeQrTarget(code)) || (input.appearanceVersionId??null)!==(code.appearanceVersionId??null)) throw new QrManualError('METADATA_CHANGED','更换文件仅修改文件关联；请先在详情中保存二维码名称或网址');
     }
     const current = fingerprint(selection.file.path);
     if (JSON.stringify(current) !== JSON.stringify(selection.file)) throw new QrManualError('FILE_CHANGED', '文件已改变，请重新选择');
@@ -117,9 +117,11 @@ export class QrManualService {
     const result = this.db.transaction(() => {
       if (this.revision(prepared.input) !== prepared.revision) throw new QrManualError('RECORD_CHANGED', '二维码记录在预检后改变，请重新校验');
       const input = prepared.input; const now = new Date().toISOString();
-      let code = input.qrCodeId ? this.repository.get(input.qrCodeId)! : new QrService(this.db).create({ productId: input.productId, purposeId: input.purposeId, name: input.name.trim(), targetUrl: input.targetUrl.trim(), status: 'inactive', ...(input.appearanceVersionId ? { appearanceVersionId: input.appearanceVersionId } : {}) });
-      // Existing QR identity, name, URL, state and all historical references remain unchanged.
-      if (!input.qrCodeId) code = this.repository.get(code.id)!;
+      const qrService = new QrService(this.db);
+      const code = input.qrCodeId ? qrService.get(input.qrCodeId) : qrService.create({ productId: input.productId, purposeId: input.purposeId, name: input.name.trim(), targetUrl: input.targetUrl.trim(), status: 'inactive', ...(input.appearanceVersionId ? { appearanceVersionId: input.appearanceVersionId } : {}) });
+      if (input.qrCodeId && canInitializeQrTarget(code)) {
+        this.repository.update(code.id, { name: code.name, targetUrl: new URL(input.targetUrl).toString() });
+      }
       const fileId = randomUUID();
       this.db.prepare('insert into qr_manual_files(id,absolute_path,file_name,size_bytes,modified_ms,content_sha256,created_at) values(?,?,?,?,?,?,?)').run(fileId,file.path,file.fileName,file.size,file.modified,file.hash,now);
       this.db.prepare('update qr_manual_links set unlinked_at=? where qr_code_id=? and unlinked_at is null').run(now, code.id);

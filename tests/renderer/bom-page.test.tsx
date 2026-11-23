@@ -117,7 +117,7 @@ describe('BomPage product-level BOM', () => {
   it('shows query details as separate business fields and keeps model-wide deletion collapsed', async () => {
     const api = apiFixture();
     const record = { ...activeCurrent, editRevision: 1, updatedAt: '2026-09-03T10:00:00Z', items: [{
-      ...activeCurrent.items[0], material: 'PET', dimensions: '20×10', position: '正面', changeDetails: '改为哑光', effectiveBatchName: '20260928', effectiveBatchRelativePath: 'batch-path-should-not-be-displayed',
+      ...activeCurrent.items[0], material: 'PET', dimensions: '20×10', position: '正面', changeDetails: '改为哑光', effectiveBatchName: '01.20260928', effectiveBatchRelativePath: 'batch-path-should-not-be-displayed',
     }] };
     api.queryBomVersions.mockResolvedValue([record]); api.getBomVersion.mockResolvedValue(record);
     render(<BomPage api={api as never} />);
@@ -125,12 +125,15 @@ describe('BomPage product-level BOM', () => {
     fireEvent.click(await screen.findByRole('button', { name: '查看 BOM 20' }));
     expect(await screen.findByText('改为哑光')).toBeVisible();
     expect(screen.getByText('PET')).toBeVisible();
-    expect(screen.getByRole('rowheader',{name:'生效批次'}).closest('tr')).toHaveTextContent('20260928');
-    const drawingField = screen.getByRole('rowheader', { name: '图号' }).closest('tr')!.querySelector('td')!;
+    const basic = within(screen.getByRole('region', { name: '基本信息' }));
+    const batchValue = basic.getByText('生产批次').nextElementSibling;
+    expect(batchValue).toHaveTextContent(/^20260928$/);
+    const drawingField = basic.getByText('图号').nextElementSibling;
+    expect(basic.getByRole('button', { name: `复制图号 ${candidate.fullCode}` })).toBeVisible();
     expect(drawingField).toHaveTextContent(candidate.fullCode);
     expect(drawingField).not.toHaveTextContent('正式图号');
     expect(drawingField).not.toHaveTextContent('使用中');
-    expect(screen.getByText('batch-path-should-not-be-displayed')).not.toBeVisible();
+    expect(screen.queryByText('batch-path-should-not-be-displayed')).not.toBeInTheDocument();
     expect(screen.getByText('20×10')).toBeVisible();
     expect(screen.getByText('正面')).toBeVisible();
     expect(screen.queryByRole('columnheader', { name: '版本' })).not.toBeInTheDocument();
@@ -171,7 +174,11 @@ describe('BomPage product-level BOM', () => {
     expect(screen.getByLabelText('第 1 行项目明细')).toBeDisabled();
     fireEvent.change(screen.getByLabelText('第 1 行主类别'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('第 1 行项目明细'), { target: { value: '7' } });
-    expect(await screen.findByRole('option', { name: /历史已用.*已停用/ })).toBeVisible();
+    const drawing = screen.getByLabelText('第 1 行图号');
+    const option = await within(drawing).findByRole('option', { name: /02\.0404\.010\.0401008.*LOGO.*历史已用.*已停用/ });
+    expect(option).toBeVisible();
+    fireEvent.change(drawing, { target: { value: 'historical:19' } });
+    expect(screen.getByText('历史已用 · 已停用')).toBeVisible();
     expect(api.listBomCandidates).toHaveBeenLastCalledWith({ productId: 1, projectItemId: 7,
       usesWhiteMaterial: false, entryMode: 'historical' });
   });
@@ -252,7 +259,7 @@ describe('BomPage product-level BOM', () => {
     ]);
   });
 
-  it('separates add and query, exposes product/date/batch/project/drawing filters and renders legacy dates safely', async () => {
+  it('exposes product/date/project/drawing filters and renders a missing legacy date as a dash', async () => {
     const api = apiFixture(); api.queryBomVersions.mockResolvedValue([{ id: 20, productId: 1, model: 'ZC100', versionNumber: 1,
       previousVersionId: null, businessChangeDate: null, businessChangeDateLabel: '未补录', notes: null, createdAt: '2026-09-02T00:00:00Z' }]);
     render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
@@ -266,8 +273,9 @@ describe('BomPage product-level BOM', () => {
     fireEvent.change(screen.getByLabelText('查询 BOM 图号'), { target: { value: '0401001' } });
     await waitFor(() => expect(screen.getByRole('button', { name: '查询' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
-    expect(await screen.findByText('业务日期未补录')).toBeVisible();
-    const table=screen.getByText('业务日期未补录').closest('table')!;
+    const table = (await screen.findByRole('button', { name: '查看 BOM 20' })).closest('table')!;
+    const recordRow = within(table).getByRole('button', { name: '查看 BOM 20' }).closest('tr')!;
+    expect(recordRow.querySelector('td[data-column-key="businessDate"]')).toHaveTextContent(/^—$/);
     const modelPosition=Array.from(table.querySelectorAll('thead th')).findIndex(cell=>cell.getAttribute('data-column-key')==='model');
     fireEvent.keyDown(within(table).getByRole('columnheader',{name:'型号'}),{altKey:true,key:'ArrowLeft'});
     expect(table.querySelectorAll('thead th')[modelPosition-1]).toHaveAttribute('data-column-key','model');
@@ -280,7 +288,7 @@ describe('BomPage product-level BOM', () => {
   it('keeps voided drawings visible for replacement without exposing historical QR editing', async () => {
     const api = apiFixture(); api.getCurrentBom.mockResolvedValue(currentWithReferences); api.listBomCandidates.mockResolvedValue([]);
     render(<BomPage api={api as never} />); await selectProduct(false);
-    expect(await screen.findByRole('option', { name: candidate.fullCode })).toBeDisabled();
+    expect(await screen.findByRole('option', { name: /02\.0404\.010\.0401001.*LOGO.*作废/ })).toBeDisabled();
     expect(screen.getByText('正式规划 · 作废，需替换')).toBeVisible();
     expect(screen.getByText('当前引用图号已作废，请选择可用图号替换后再保存。')).toBeVisible();
     expect(screen.getByRole('button', { name: '保存当前 BOM' })).toBeDisabled();
@@ -294,10 +302,10 @@ describe('BomPage product-level BOM', () => {
     expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
     const replacement = new File(['new'], '新版图片.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('第 1 行图片'), { target: { files: [replacement] } });
-    await waitFor(() => expect(api.uploadBomAsset).toHaveBeenCalledWith(1, replacement));
-    expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).not.toBeChecked();
+    await waitFor(() => expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).not.toBeChecked());
+    expect(api.uploadBomAsset).toHaveBeenCalledWith(1, replacement);
     fireEvent.click(screen.getByRole('button', { name: '添加 BOM 项目' }));
-    expect(within(screen.getByRole('group',{name:'第 2 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).toBeDisabled();
+    expect(within(screen.getByRole('group',{name:'第 2 行图片附件'})).queryByRole('radio',{name:'使用上一版图片'})).not.toBeInTheDocument();
   });
 
   it('loads fresh eligible candidates for a new blank item after saving', async () => {
@@ -321,11 +329,14 @@ describe('BomPage product-level BOM', () => {
     api.getCurrentBom.mockResolvedValue({ ...activeCurrent, items: [{ ...activeCurrent.items[0], qrCodes: [{ id: 9, name: '说明书二维码', purposeDisplayName: '说明书', status: 'active' as const }] }] });
     render(<BomPage api={api as never} />); await selectProduct(false);
     await within(await screen.findByRole('group',{name:'第 1 行图片附件'})).findByRole('radio',{name:'使用上一版图片'});
+    const drawingSearch = screen.getByRole('searchbox', { name: '第 1 行查找图号或项目' });
+    fireEvent.change(drawingSearch, { target: { value: '0401001' } });
     fireEvent.change(screen.getByLabelText('第 1 行项目明细'), { target: { value: '8' } });
+    expect(screen.getByRole('searchbox', { name: '第 1 行查找图号或项目' })).toHaveValue('');
     await waitFor(() => expect(api.listBomCandidates).toHaveBeenLastCalledWith({ productId: 1, projectItemId: 8, usesWhiteMaterial: false, entryMode: 'historical' }));
     expect(screen.getByLabelText('第 1 行图号')).toHaveValue('');
     expect(within(screen.getByRole('group', { name: '第 1 行图片附件' })).queryByText('客户示意图.png')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).toBeDisabled();
+    expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).queryByRole('radio',{name:'使用上一版图片'})).not.toBeInTheDocument();
     expect(screen.queryByLabelText('第 1 行二维码 9')).not.toBeInTheDocument();
   });
 
@@ -349,7 +360,10 @@ describe('BomPage product-level BOM', () => {
       isCurrent: true, fallbackVersionId: 19, fallbackVersionNumber: 3 });
     const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<BomPage api={api as never} />); fireEvent.click(await screen.findByRole('button', { name: '查询 BOM' }));
-    fireEvent.click(await screen.findByRole('button', { name: '删除 BOM 20' }));
+    const more = await screen.findByRole('button', { name: '更多 BOM 20' });
+    expect(screen.queryByRole('button', { name: '删除 BOM 20' })).not.toBeInTheDocument();
+    fireEvent.click(more);
+    fireEvent.click(screen.getByRole('button', { name: '删除 BOM 20' }));
     await waitFor(() => expect(confirmation).toHaveBeenCalledWith(expect.stringMatching(/当前 BOM.*上一条.*记录 19/)));
     expect(confirmation.mock.calls[0][0]).not.toMatch(/V\d/);
     expect(api.deleteBomVersion).toHaveBeenCalledWith(20, true);
@@ -477,7 +491,7 @@ it('restores the real source asset when replacing then choosing reuse, independe
  expect(within(image).getByRole('radio',{name:'更换图片'})).toBeChecked();
  fireEvent.click(within(image).getByRole('radio',{name:'使用上一版图片'}));
  expect(within(image).getByRole('img',{name:asset.originalFileName})).toHaveAttribute('src','/api/boms/assets/31/preview');
- const diagram=screen.getByRole('group',{name:'第 1 行位置示意图附件'});expect(within(diagram).getByRole('radio',{name:'使用上一版位置示意图'})).toBeDisabled();
+ const diagram=screen.getByRole('group',{name:'第 1 行位置示意图附件'});expect(within(diagram).queryByRole('radio',{name:'使用上一版位置示意图'})).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'保存当前 BOM'}));
  await waitFor(()=>expect(api.saveBomVersion).toHaveBeenCalled());expect(api.saveBomVersion.mock.calls[0][0].items[0].assets).toEqual([{role:'image',reusePrevious:true}]);
 });
@@ -491,7 +505,7 @@ it('clears a successful new draft including uploaded roles and reuse state while
  await waitFor(()=>expect(screen.getByRole('button',{name:'保存当前 BOM'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'保存当前 BOM'}));
  expect(await screen.findByText('当前 BOM 已保存')).toBeVisible();expect(screen.queryByLabelText('第 1 行图片')).toBeNull();expect(screen.queryByText('本次变更')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'添加 BOM 项目'}));expect(screen.getByLabelText('第 1 行材质')).toHaveValue('');expect(screen.getByLabelText('第 1 行图片')).toHaveValue('');
- expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).getByRole('radio',{name:'使用上一版图片'})).not.toBeChecked();
+ expect(within(screen.getByRole('group',{name:'第 1 行图片附件'})).queryByRole('radio',{name:'使用上一版图片'})).not.toBeInTheDocument();
  fireEvent.change(screen.getByLabelText('第 1 行主类别'),{target:{value:'6'}});fireEvent.change(screen.getByLabelText('第 1 行项目明细'),{target:{value:'7'}});
  await waitFor(()=>expect(screen.getByLabelText('第 1 行图号').querySelector('option[value="planned:10"]')).toBeTruthy());fireEvent.change(screen.getByLabelText('第 1 行图号'),{target:{value:'planned:10'}});
  fireEvent.click(screen.getByRole('button',{name:'保存当前 BOM'}));await waitFor(()=>expect(api.saveBomVersion).toHaveBeenCalledTimes(2));expect(api.saveBomVersion.mock.calls[1][0]).toMatchObject({expectedCurrentVersionId:21,items:[{assets:[]}]});
@@ -507,11 +521,49 @@ it('offers the actual predecessor image only on explicit edit reuse and keeps se
  fireEvent.click(reuse);expect(within(image).getByRole('img',{name:'prior.png'})).toHaveAttribute('src','/api/boms/assets/28/preview');
  fireEvent.click(screen.getByRole('button',{name:'保存修改'}));await waitFor(()=>expect(api.updateBomVersion).toHaveBeenCalledWith(20,expect.objectContaining({items:[expect.objectContaining({assets:[{role:'image',reusePrevious:true}]})]}),1));
 });
-it('keeps the current source after cancelled or failed replacement and disables reuse after an actual preview failure',async()=>{
+it('keeps the current source after cancelled or failed replacement and hides reuse after an actual preview failure',async()=>{
  const api=apiFixture();api.getCurrentBom.mockResolvedValue(activeCurrent);api.uploadBomAsset.mockRejectedValue(Error('上传失败'));
  render(<BomPage api={api as never}/>);await selectProduct(false);const image=await screen.findByRole('group',{name:'第 1 行图片附件'});
  fireEvent.change(within(image).getByLabelText('第 1 行图片'),{target:{files:[]}});expect(within(image).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
  fireEvent.change(within(image).getByLabelText('第 1 行图片'),{target:{files:[new File(['bad'],'bad.png',{type:'image/png'})]}});
  expect(await screen.findByRole('alert')).toHaveTextContent('上传失败');expect(within(image).getByRole('radio',{name:'使用上一版图片'})).toBeChecked();
- fireEvent.error(within(image).getByRole('img',{name:asset.originalFileName}));expect(within(image).getByRole('radio',{name:'使用上一版图片'})).toBeDisabled();
+ fireEvent.error(within(image).getByRole('img',{name:asset.originalFileName}));expect(within(image).queryByRole('radio',{name:'使用上一版图片'})).not.toBeInTheDocument();
+});
+
+it('exports only the selected record revision and opens predecessor comparison on request', async () => {
+  const selected = { ...activeCurrent, editRevision: 3, previousVersionId: 19 };
+  const api = apiFixture();
+  api.getBomVersion.mockImplementation(async (id: number) => id === 20 ? selected : { ...selected, id: 19, previousVersionId: null });
+  const exportBomPdf = vi.fn().mockResolvedValue({ ok: false, error: { message: '图片附件已缺失' } });
+  const originalDesktop = window.plannerDesktop;
+  window.plannerDesktop = { showFileInFolder: vi.fn(), exportBomPdf };
+  try {
+    render(<BomPage api={api as never} target={{ productId:1, bomVersionId:20 }} />);
+    const detail = await screen.findByRole('region', { name:'所选 BOM 记录' });
+    expect(api.getBomVersion).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(detail).getByRole('button', { name:'导出此 BOM' }));
+    await waitFor(() => expect(exportBomPdf).toHaveBeenCalledWith(20, 3));
+    expect(await screen.findByRole('alert')).toHaveTextContent('图片附件已缺失');
+    fireEvent.click(within(detail).getByRole('button', { name:'版本对比' }));
+    await waitFor(() => expect(api.getBomVersion).toHaveBeenCalledWith(19));
+    expect(api.saveBomVersion).not.toHaveBeenCalled();
+  } finally { window.plannerDesktop = originalDesktop; }
+});
+
+it('starts a new draft from the selected historical BOM while protecting the actual current version', async () => {
+  const current = { ...activeCurrent, id:21, editRevision:0 };
+  const selected = { ...activeCurrent, editRevision:3, notes:'原记录备注',
+    items:[{ ...activeCurrent.items[0], material:'保留原材质' }] };
+  const api = apiFixture();
+  api.getCurrentBom.mockResolvedValue(current);
+  api.getBomVersion.mockResolvedValue(selected);
+  render(<BomPage api={api as never} target={{ productId:1, bomVersionId:20 }} />);
+  fireEvent.click(await screen.findByRole('button', { name:'基于此版新建' }));
+  expect(await screen.findByLabelText('第 1 行材质')).toHaveValue('保留原材质');
+  fireEvent.click(screen.getByRole('button', { name:'保存当前 BOM' }));
+  await waitFor(() => expect(api.saveBomVersion).toHaveBeenCalledWith(expect.objectContaining({
+    productId:1, copyFromVersionId:20, copyFromVersionRevision:3, notes:'原记录备注',
+    expectedCurrentVersionId:21,
+    items:[expect.objectContaining({ material:'保留原材质', assets:[{ role:'image', reusePrevious:true }] })],
+  })));
 });

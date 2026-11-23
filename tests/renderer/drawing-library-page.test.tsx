@@ -29,7 +29,7 @@ describe('DrawingLibraryPage', () => {
     const product={id:9,sku:'SKU-ZU70SD',model:'ZU70SD',productCategory:'冰柜',status:'active'};
     const api={searchDrawings:vi.fn().mockResolvedValue({items:[],total:733}),listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValueOnce([]).mockResolvedValue([product]),getDrawingNavigationCounts:vi.fn().mockResolvedValue({total:733,unassociated:0,recycle:0,categories:[{name:'冰柜',count:733}],products:[{productId:9,count:733}],batches:[]}),classifyDrawingAssociations:vi.fn().mockResolvedValue({updated:0,before:{historicalAssociated:733,historicalTotal:757,plannedAssociated:0,plannedTotal:0},after:{historicalAssociated:733,historicalTotal:757,plannedAssociated:0,plannedTotal:0},issues:[]})};
     render(<DrawingLibraryPage api={api as never}/>);await waitFor(()=>expect(api.listProducts).toHaveBeenCalledOnce());
-    fireEvent.click(screen.getByRole('button',{name:'自动归类'}));
+    fireEvent.click(screen.getByRole('button',{name:/^自动归类（/}));
     await screen.findByRole('button',{name:'产品 ZU70SD'});expect(api.listProducts.mock.calls.length).toBeGreaterThan(1);
   });
   it('does not discard loaded products when an unrelated dictionary request fails',async()=>{
@@ -374,8 +374,8 @@ describe('DrawingLibraryPage', () => {
 
     render(<DrawingLibraryPage api={api as never} />);
 
-    expect(await screen.findByText(/历史扫描/)).toBeVisible();
-    expect(screen.getByText(/字典待映射/)).toBeVisible();
+    expect(await screen.findByText('字典待映射')).toBeVisible();
+    expect(screen.queryByRole('columnheader',{name:'来源'})).not.toBeInTheDocument();
   });
 
   it('separates business status, file completeness, and current BOM usage in planned maintenance detail', async () => {
@@ -811,7 +811,7 @@ it('retains the table and draft while reactivating the applied query without pag
  const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1})};
  const rendered=render(<DrawingLibraryPage api={api as never}/>);
  await screen.findByRole('button',{name:'STABLE-CODE'});const table=screen.getByRole('table');
- expect(within(table).getAllByRole('columnheader')).toHaveLength(8);
+ expect(within(table).getAllByRole('columnheader')).toHaveLength(7);
  fireEvent.change(screen.getByLabelText('关键词'),{target:{value:'未提交'}});
  rendered.rerender(<DrawingLibraryPage api={api as never} active={false}/>);rendered.rerender(<DrawingLibraryPage api={api as never} active/>);
  await waitFor(()=>expect(screen.getByRole('table')).toBe(table));
@@ -853,7 +853,7 @@ it('displays confirmed before/after counts from a real association response and 
   const after={...before,historicalAssociated:3,ready:0};
   const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[],total:0}),previewDrawingAssociations:vi.fn().mockResolvedValue({fingerprint:'snapshot',summary:before,records:[{signedId:-2,fullCode:'02.0209.010.0501002',state:'ready',evidence:['人工核验产品'],targets:[{signedId:-2,productId:3,appearanceVersionId:null}]}]}),confirmDrawingAssociations:vi.fn().mockResolvedValue({updated:1,before,after})};
   render(<DrawingLibraryPage api={api as never}/>);
-  fireEvent.click(screen.getByRole('button',{name:'诊断图号关联'}));
+  fireEvent.click(screen.getByRole('button',{name:/^诊断图号关联（/}));
   await screen.findByText(/历史图号已关联 2 \/ 8/);
   fireEvent.click(screen.getByRole('button',{name:'人工确认候选关联'}));
   await waitFor(()=>expect(api.confirmDrawingAssociations).toHaveBeenCalledWith(expect.objectContaining({fingerprint:'snapshot',targets:[{signedId:-2,productId:3,appearanceVersionId:null}]})));
@@ -864,7 +864,7 @@ it('displays confirmed before/after counts from a real association response and 
 it('offers direct classification without a second preview confirmation and reports failures visibly',async()=>{
  const api={listDictionaries:vi.fn().mockResolvedValue([]),searchDrawings:vi.fn().mockResolvedValue({items:[],total:0}),classifyDrawingAssociations:vi.fn().mockRejectedValue(new Error('备份目录不可写，未保存归类'))};
  render(<DrawingLibraryPage api={api as never}/>);
- fireEvent.click(screen.getByRole('button',{name:'自动归类'}));
+ fireEvent.click(screen.getByRole('button',{name:/^自动归类（/}));
  expect(await screen.findByRole('alert')).toHaveTextContent('备份目录不可写，未保存归类');
  expect(api.classifyDrawingAssociations).toHaveBeenCalledWith({});
 });
@@ -875,7 +875,7 @@ it('updates an already-open drawing detail after direct classification',async()=
  render(<DrawingLibraryPage api={api as never}/>);
  fireEvent.click(await screen.findByRole('button',{name:record.fullCode}));
  const panel=await screen.findByRole('complementary',{name:'图号详情'});
- fireEvent.click(screen.getByRole('button',{name:'自动归类'}));
+ fireEvent.click(screen.getByRole('button',{name:/^自动归类（/}));
  await waitFor(()=>expect(within(panel).getByText('CLASSIFIED-T40')).toBeInTheDocument());
 });
 
@@ -949,7 +949,7 @@ it('refreshes saved classification counts even when the open detail reload fails
  const api={listDictionaries:vi.fn().mockResolvedValue([]),listProducts:vi.fn().mockResolvedValue([{id:3,sku:'SKU',model:'T40',productCategory:'冰柜'}]),searchDrawings:vi.fn().mockResolvedValue({items:[row],total:1}),getDrawingNavigationCounts:vi.fn().mockImplementation(()=>Promise.resolve({total:1,products:[{productId:3,count:changed?1:0}],categories:[],batches:[],unassociated:changed?0:1})),getDrawing:vi.fn().mockResolvedValueOnce(row).mockRejectedValue(new Error('详情刷新失败')),classifyDrawingAssociations:vi.fn().mockImplementation(()=>{changed=true;return Promise.resolve({updated:1});})};
  render(<DrawingLibraryPage api={api as never}/>);fireEvent.click(await screen.findByRole('button',{name:row.fullCode}));
  await screen.findByRole('complementary',{name:'图号详情'});
- fireEvent.click(screen.getByRole('button',{name:'自动归类'}));
+ fireEvent.click(screen.getByRole('button',{name:/^自动归类（/}));
  await waitFor(()=>expect(within(screen.getByRole('button',{name:'产品 T40'})).getByLabelText('1 个图号')).toBeInTheDocument());
  expect(screen.getByRole('status')).toHaveTextContent('已更新 1 条关联');
  expect(await screen.findByText('详情刷新失败')).toBeInTheDocument();
@@ -1038,7 +1038,7 @@ it('refreshes the open diagnosis using its original selection and rejects older 
   const row = screen.getByRole('button', { name: record.fullCode }).closest('tr')!;
   const selected = within(row).getByRole('checkbox');
   fireEvent.click(selected);
-  fireEvent.click(screen.getByRole('button', { name: '诊断图号关联' }));
+  fireEvent.click(screen.getByRole('button', { name: /^诊断图号关联（/ }));
   await screen.findByText(/初始诊断/);
   const scan = (id: number) => ({ id, completedAt: '2026-11-20', currentTotal: 1, added: 0, missing: 0, moved: 0, changed: 0, unchanged: 1 });
   act(() => publishSuccessfulFileScan(api, scan(8)));

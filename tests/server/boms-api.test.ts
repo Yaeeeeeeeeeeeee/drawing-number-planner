@@ -1,6 +1,6 @@
 // @vitest-environment node
 import type { BomVersionDetail as BomVersion } from '../../src/core/bom/bom-types';
-import Fastify from 'fastify'; import { afterEach, beforeEach, describe, expect, it } from 'vitest'; import { existsSync, mkdtempSync, rmSync } from 'node:fs'; import { tmpdir } from 'node:os'; import { join } from 'node:path';
+import Fastify from 'fastify'; import { afterEach, beforeEach, describe, expect, it } from 'vitest'; import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'; import { tmpdir } from 'node:os'; import { join } from 'node:path';
 import { BomService } from '../../src/core/bom/bom-service'; import { DictionaryService } from '../../src/core/dictionaries/dictionary-service'; import { PlanningService } from '../../src/core/planning/planning-service'; import { ProductService } from '../../src/core/products/product-service'; import { openDatabase, type PlannerDatabase } from '../../src/db/database'; import { migrateDatabase } from '../../src/db/migrations'; import { registerBomRoutes } from '../../src/server/routes/boms'; import { registerImportRoutes } from '../../src/server/routes/import';
 let db: PlannerDatabase; let app: ReturnType<typeof Fastify>; let refs: { product: { id:number }; logo:{id:number}; drawing:{id:number; fullCode:string} };
 function multipartAsset(productId: number, filename: string, content: Buffer, boundary = 'BOM-BOUNDARY') {
@@ -170,4 +170,46 @@ it('combines category, real product identity, main/project, inclusive business-d
  const query=async()=>app.inject({method:'GET',url:`/api/boms/query?${params}`});
  expect((await query()).statusCode).toBe(200);expect((await query()).json().items.map((v:{id:number})=>v.id)).toEqual([saved.id]);
  for(const [key,value] of [['productCategory','其他'],['productId','99999'],['mainCategoryId','99999'],['businessDateFrom','2026-10-21'],['businessDateTo','2026-10-19']] as const){const old=params.get(key)!;params.set(key,value);expect((await query()).json().items).toEqual([]);params.set(key,old);}
+});
+
+it('prepares the selected BOM version for A4 export without changing history or omitting attachment roles', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'bom-export-'));
+  const service = new BomService(db, () => workspace);
+  const exportApp = Fastify();
+  registerBomRoutes(exportApp, service);
+  try {
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jxt8AAAAASUVORK5CYII=';
+    const assetPath = join(workspace, '测试.png');
+    writeFileSync(assetPath, Buffer.from(png, 'base64'));
+    const asset = service.importAsset(refs.product.id, assetPath);
+    const input = { productId: refs.product.id, expectedCurrentVersionId: null,
+      businessChangeDate: '2026-10-20', notes:'版本级备注',
+      items: [{ projectItemId: refs.logo.id, drawingId: refs.drawing.id, usesWhiteMaterial: true,
+        material: '白色不锈钢', dimensions: '宽 10 mm', position: '前面板', changeDetails: '旧版本修改', notes: '条目 <备注>',
+        assets: [{ role: 'image' as const, assetId: asset.id }, { role: 'diagram' as const, assetId: asset.id }] }] };
+    const first = service.saveVersion(input).version;
+    const second = service.saveVersion({ ...input, businessChangeDate:'2026-10-21',
+      expectedCurrentVersionId: first.id, items: [{ ...input.items[0], changeDetails: '新版独有内容', assets: [] }] }).version;
+    const response = await exportApp.inject(`/api/boms/versions/${first.id}/export-source?revision=${first.editRevision}`);
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('text/html');
+    for (const label of ['A4','产品类别','冰柜','产品型号','业务变更日期','2026-10-20','主类别','项目明细',
+      refs.drawing.fullCode,'生产批次','白色不锈钢','宽 10 mm','前面板','旧版本修改','条目 &lt;备注&gt;',
+      '版本级备注','提交时间','最后修改时间','图片','位置示意图']) expect(response.body).toContain(label);
+    expect(response.body).not.toContain('新版独有内容');
+    for (const link of first.items[0].assets) expect(response.body).toContain(`/api/boms/assets/${link.assetId}/preview`);
+    const other = await exportApp.inject(`/api/boms/versions/${second.id}/export-source?revision=0`);
+    expect(other.body).toContain('未提供');
+    expect(other.body).toContain('新版独有内容');
+    expect((await exportApp.inject(`/api/boms/versions/${first.id}/export-source?revision=1`)).statusCode).toBe(409);
+    rmSync(join(workspace, first.items[0].assets[0].relativePath));
+    const invalid = await exportApp.inject(`/api/boms/assets/${first.items[0].assets[0].assetId}/preview`);
+    expect(invalid.statusCode).toBe(404);
+    expect(invalid.json().error.message).toContain('缺失');
+    expect(service.getVersion(first.id)).toEqual(first);
+    expect(service.getVersion(second.id)).toEqual(second);
+  } finally {
+    await exportApp.close();
+    rmSync(workspace, { recursive: true, force: true });
+  }
 });

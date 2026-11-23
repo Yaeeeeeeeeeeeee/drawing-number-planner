@@ -51,3 +51,25 @@
 /* Keep the narrow navigation filter readable and inside its scrolling region. */
 .files-page .pdf-nav-filters .files-filter > button.primary-button {color:#fff;background:#365da8;min-height:36px;flex:none;align-self:stretch;width:100%;margin:2px 0 8px;white-space:nowrap;}
 .files-page .pdf-nav-filters .files-filter > button.primary-button:disabled {color:#fff;background:#727e94;opacity:1;cursor:wait;}
+
+.file-workspace .pdf-product-navigation button[data-navigation-select] {
+  height: auto;
+  min-height: 36px;
+}
+.file-workspace .pdf-nav-label {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.file-workspace .pdf-nav-state {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  font-size: 0;
+  background: #8a949c;
+}
+.file-workspace .pdf-nav-state.current { background: #4d8662; }
+.file-workspace .module-navigation.module-drawer { width: min(340px, calc(100vw - 32px)); }
