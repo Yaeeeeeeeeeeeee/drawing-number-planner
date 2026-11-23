@@ -97,6 +97,14 @@ test('V5.2 real indexed tables keep width, alignment, icon actions and frozen co
     const rects=await buttons.evaluateAll(nodes=>nodes.map(node=>({y:node.getBoundingClientRect().y,h:node.getBoundingClientRect().height,icon:!!node.querySelector('svg'),text:node.textContent})));
     expect(Math.max(...rects.map(r=>r.y))-Math.min(...rects.map(r=>r.y))).toBeLessThan(2);
     expect(rects.every(r=>r.icon&&r.text==='')).toBe(true);
+    for(const width of [1920,720]){
+     await page.setViewportSize({width,height:900});
+     await expect(toolbar).toHaveCSS('overflow-x','auto');
+     const geometry=await buttons.evaluateAll(nodes=>nodes.map(node=>({height:node.getBoundingClientRect().height,y:node.getBoundingClientRect().y,wrap:getComputedStyle(node).whiteSpace})));
+     expect(geometry.every(button=>button.height>=32&&button.height<=36&&button.wrap==='nowrap')).toBe(true);
+     expect(Math.max(...geometry.map(button=>button.y))-Math.min(...geometry.map(button=>button.y))).toBeLessThan(2);
+    }
+    await page.setViewportSize({width:1920,height:900});
     const scroll=table.locator('xpath=..');await scroll.evaluate(element=>{element.scrollTop=500;});
     await expect(section.getByRole('button',{name:'扫描资料库',exact:true})).toBeVisible();
     await expect(toolbar).toBeVisible();
