@@ -120,3 +120,9 @@
 .files-page .files-management-toolbar .files-remove-record:disabled {color:#8a7474;border-color:#dce0e4;}
 .files-page .files-management-toolbar .files-management-icon {display:inline-flex;align-items:center;justify-content:center;width:34px;min-width:34px;padding:7px;}
 .files-page .files-management-toolbar .files-management-icon svg {flex:none;}
+
+.files-page tr[aria-selected=true]{background:#e2edf6}
+.files-page .files-filter-overlay {position:fixed;z-index:100;right:0;top:0;bottom:0;width:min(380px,90vw);overflow:auto;background:var(--ws-surface,#fff);box-shadow:-6px 0 24px #0003;padding:20px;}
+.files-page .files-filter-overlay>div {display:flex;justify-content:space-between;align-items:center;}
+.files-page .files-filter-overlay .files-filter {display:flex;flex-direction:column;align-items:stretch;}
+.files-page .files-filter-overlay .files-filter label {display:flex;flex-direction:column;gap:4px;}
