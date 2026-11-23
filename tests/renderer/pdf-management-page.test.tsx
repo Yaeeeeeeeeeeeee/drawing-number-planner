@@ -108,6 +108,19 @@ it('confirms batch deletion and returns selected batch to its parent while prese
  await waitFor(()=>{const last=api.searchPdfFiles.mock.calls.at(-1)![0];expect(last).toMatchObject({productId:1,keyword:'keep-filter',managementState:'included'});expect(last).not.toHaveProperty('materialBatchId');});
  expect(screen.queryByRole('button',{name:'批次 首批'})).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'产品 SKU · T40'})).toHaveAttribute('aria-current','page');
 });
+it('rechecks a stale batch in the open dialog and requires a second explicit confirmation',async()=>{
+ const {api}=batchFixture();
+ api.deleteMaterialBatch.mockRejectedValueOnce(Object.assign(new Error('批次或引用已变化'),{code:'PDF_PREVIEW_STALE'}));
+ render(<FilesPage api={api as never} initialTarget={{productId:1,materialBatchId:7}}/>);
+ fireEvent.contextMenu(await screen.findByRole('button',{name:'批次 首批'}));fireEvent.click(screen.getByRole('menuitem',{name:'删除批次'}));
+ const dialog=await screen.findByRole('dialog',{name:'删除批次'});
+ api.previewMaterialBatchDeletion.mockResolvedValue({...await api.previewMaterialBatchDeletion(),fingerprint:'b'.repeat(64)});
+ const confirm=within(dialog).getByRole('button',{name:'确认删除批次'});
+ fireEvent.click(confirm);await within(dialog).findByText('批次已变化，已重新检查。请核对后再次确认。');
+ expect(api.deleteMaterialBatch).toHaveBeenCalledTimes(1);
+ fireEvent.click(confirm);await screen.findByText('已删除批次记录');
+ expect(api.deleteMaterialBatch).toHaveBeenLastCalledWith(7,{fingerprint:'b'.repeat(64),confirmation:'删除批次'});
+});
 it('shows the actual batch reference reason and prevents confirmation when preflight is blocked',async()=>{
  const {api}=batchFixture(false);render(<FilesPage api={api as never} initialTarget={{productId:1,materialBatchId:7}}/>);
  fireEvent.contextMenu(await screen.findByRole('button',{name:'批次 首批'}));fireEvent.click(screen.getByRole('menuitem',{name:'删除批次'}));

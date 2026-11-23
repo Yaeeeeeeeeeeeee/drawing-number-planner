@@ -175,7 +175,19 @@ module.exports = async function verifyV41V42({ page, app, legacy, evidence, writ
   await menu.getByRole('menuitem', { name: '删除批次', exact: true }).click();
   deletion = page.getByRole('dialog', { name: '删除批次', exact: true }); await deletion.waitFor();
   assert.equal(await deletion.getByRole('button', { name: '确认删除批次', exact: true }).isEnabled(), true);
-  await deletion.getByRole('button', { name: '确认删除批次', exact: true }).click();
+  const confirmDeletion = async () => {
+    const response = page.waitForResponse(r => r.request().method() === 'DELETE' && new URL(r.url()).pathname === '/api/material-batches/' + emptyBatch.id);
+    await deletion.getByRole('button', { name: '确认删除批次', exact: true }).click();
+    const received = await response;
+    return {status:received.status(),body:await received.json()};
+  };
+  let outcome = await confirmDeletion();
+  if(outcome.status === 409 && outcome.body.error?.code === 'PDF_PREVIEW_STALE'){
+    await deletion.getByText('批次已变化，已重新检查。请核对后再次确认。',{exact:true}).waitFor();
+    outcome = await confirmDeletion();
+  }
+  assert.equal(outcome.status,200,JSON.stringify(outcome.body));
+  assert.equal(outcome.body.deleted,emptyBatch.id);
   await deletion.waitFor({ state: 'detached' });
   await page.getByText('已删除批次记录', { exact: true }).waitFor();
   assert.equal(items(await get('/api/material-batches')).some(batch => batch.id === emptyBatch.id), false);

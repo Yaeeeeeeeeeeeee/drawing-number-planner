@@ -94,6 +94,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const presenceRequest=useRef(0),scanInFlight=useRef(false);
   const [managementPhrase, setManagementPhrase] = useState('');
   const [managementBusy, setManagementBusy] = useState(false);
+  const [batchDeletionError,setBatchDeletionError]=useState('');
   const [batchDeletion, setBatchDeletion] = useState<MaterialBatchDeletionPreview | null>(null);
   const [renameBatch, setRenameBatch] = useState<MaterialBatchView | null>(null);
   const [batchName, setBatchName] = useState('');
@@ -297,7 +298,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const previewBatchDeletion = async (batch:MaterialBatchView) => {
     if (!api.previewMaterialBatchDeletion) return;
     setManagementBusy(true);setError('');setMessage('');
-    try {setBatchDeletion(await api.previewMaterialBatchDeletion(batch.id));}
+    try {setBatchDeletionError('');setBatchDeletion(await api.previewMaterialBatchDeletion(batch.id));}
     catch(reason){setError(reason instanceof Error?reason.message:'批次预检失败');}
     finally{setManagementBusy(false);}
   };
@@ -317,7 +318,16 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       setMessage('已删除批次记录');
       setBatches(await api.listMaterialBatches({}));
       await search(nextValues,nextScope===current.scope?current.page:1,nextScope);await refreshNavigation(nextValues);
-    } catch(reason){setError(reason instanceof Error?reason.message:'删除批次失败');}
+    } catch(reason){
+      setBatchDeletionError(reason instanceof Error?reason.message:'删除批次失败');
+      if(reason && typeof reason==='object' && 'code' in reason && reason.code==='PDF_PREVIEW_STALE' && api.previewMaterialBatchDeletion){
+        setBatchDeletion({...batchDeletion,allowed:false});
+        try {
+          setBatchDeletion(await api.previewMaterialBatchDeletion(batchDeletion.id));
+          setBatchDeletionError('批次已变化，已重新检查。请核对后再次确认。');
+        } catch(previewError){setBatchDeletionError(previewError instanceof Error?previewError.message:'重新检查批次失败');}
+      }
+    }
     finally{setManagementBusy(false);}
   };
   const saveBatchName = async () => {
@@ -654,6 +664,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     {batchDeletion && <section className="file-cleanup-confirmation" role="dialog" aria-label="删除批次">
       <strong>删除批次“{batchDeletion.name}”</strong>
       <p>仅删除内部批次记录。磁盘文件和文件夹保持保留；目录内 PDF 再次被扫描时，会重新建立批次记录。</p>
+      {batchDeletionError && <p role="alert">{batchDeletionError}</p>}
       {batchDeletion.reason && <p role="alert">{batchDeletion.reason}</p>}
       <button className="secondary-button" disabled={managementBusy} onClick={()=>setBatchDeletion(null)}>取消</button>
       <button className="secondary-button danger" disabled={managementBusy||!batchDeletion.allowed} onClick={()=>void confirmBatchDeletion()}>确认删除批次</button>
