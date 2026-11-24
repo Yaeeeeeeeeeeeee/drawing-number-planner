@@ -138,12 +138,13 @@ function installRecoveryControls(): void {
   });
   Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: '应用', submenu: [
     { label: '安全恢复', submenu: [
+      { label: '界面与服务维护', enabled: false },
       { label: '终止当前任务', click: () => invoke('terminateTask') },
       { label: '重新加载界面', click: () => invoke('reloadRenderer') },
       { label: '重启本地服务', click: () => invoke('restartService') },
       { type: 'separator' },
+      { label: '数据与数据库恢复', enabled: false },
       { label: '完整恢复应用', click: () => invoke('relaunchApp') },
-      { type: 'separator' },
       { label: '重新选择数据库', click: () => invoke('reselectDatabase') },
     ] },
   ] }]));

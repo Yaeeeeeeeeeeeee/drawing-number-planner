@@ -32,3 +32,15 @@
 
 /* All indexed candidates remain available in one scrollable list. */
 .outbound-full-file-list { max-height: 60vh; overflow: auto; }
+
+.approved-outbound .outbound-workflow .ob-step-pending,
+.approved-outbound .outbound-workflow .ob-mail-step:has(details:not([open])) {
+  margin-bottom: 6px;
+  padding-block: 10px;
+}
+.approved-outbound .outbound-workflow .ob-step-pending h2 { margin: 0; color: var(--ws-muted); }
+.approved-outbound .ob-workbench-mail > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.approved-outbound .ob-workbench-mail > summary h2 { font-size: 17px; margin: 0; }
+.approved-outbound .ob-workbench-mail > summary h2 span { font: 12px Consolas, monospace; margin-right: 8px; color: var(--ws-muted); }
+.approved-outbound .outbound-preview-action { justify-content: flex-start; margin-top: 16px; }
+.approved-outbound .outbound-preview-action button { min-height: 40px; padding-inline: 24px; }

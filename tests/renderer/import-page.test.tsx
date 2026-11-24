@@ -20,7 +20,7 @@ describe('ImportPage', () => {
     render(<ImportPage api={api as never} />);
 
     const file = new File(['xlsx'], '图号规划.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('选择图号字典 Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
 
     expect(await screen.findByText('发现 1 个问题')).toBeVisible();
@@ -49,7 +49,7 @@ describe('ImportPage', () => {
     render(<ImportPage api={api as never} />);
 
     const file = new File(['xlsx'], '图号规划.xlsx');
-    fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('选择图号字典 Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
 
     expect(await screen.findByText('可导入 2 条')).toBeVisible();
@@ -84,7 +84,7 @@ describe('ImportPage', () => {
     render(<ImportPage api={api as never} />);
 
     const file = new File(['xlsx'], '图号规划.xlsx');
-    fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('选择图号字典 Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
     expect(await screen.findByText('可导入 2 条')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
@@ -116,7 +116,7 @@ describe('ImportPage', () => {
     render(<ImportPage api={api as never} />);
 
     const file = new File(['xlsx'], '图号规划.xlsx');
-    fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('选择图号字典 Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
     expect(await screen.findByText('可导入 1 条')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));
@@ -144,7 +144,7 @@ describe('ImportPage', () => {
     render(<ImportPage api={api as never} />);
 
     const file = new File(['xlsx'], '图号规划.xlsx');
-    fireEvent.change(screen.getByLabelText('选择 Excel 文件'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('选择图号字典 Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '开始检查' }));
     expect(await screen.findByText('可导入 2 条')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /导入候选/ }));

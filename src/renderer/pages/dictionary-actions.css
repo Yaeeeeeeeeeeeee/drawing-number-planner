@@ -1,0 +1,14 @@
+.dm-actions .dictionary-more-actions,
+.dictionary-more-actions > [role="group"] {
+  display: grid;
+  gap: 4px;
+}
+
+.dm-actions:has(.dictionary-more-actions) {
+  align-items: start;
+}
+
+.dictionaries-real-page .dictionary-more-actions button {
+  width: 76px;
+  min-height: 32px;
+}

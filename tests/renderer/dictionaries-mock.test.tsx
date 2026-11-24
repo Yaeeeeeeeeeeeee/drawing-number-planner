@@ -16,7 +16,7 @@ describe('dictionary mock isolation',()=>{
   fireEvent.click(screen.getByRole('button',{name:/03.*主类别丙/}));expect(screen.getByRole('button',{name:'新增项目明细'})).toBeDisabled();
  });
  it('checks impact and uses second confirmation for referenced deletion',async()=>{
-  render(<DictionariesMockPage/>);fireEvent.click(screen.getAllByRole('button',{name:'删除'})[0]);
+  render(<DictionariesMockPage/>);fireEvent.click(screen.getByRole('button',{name:'更多 品牌甲'}));fireEvent.click(screen.getByRole('button',{name:'删除'}));
   await screen.findByRole('button',{name:'继续确认'});expect(screen.getByText(/已引用：标记删除/)).toBeVisible();
   expect(screen.queryByRole('button',{name:'确认删除'})).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'继续确认'}));fireEvent.click(screen.getByRole('button',{name:'确认删除'}));
@@ -25,7 +25,7 @@ describe('dictionary mock isolation',()=>{
  });
  it('fails closed on uncertain references and distinguishes empty from failed load',async()=>{
   render(<DictionariesMockPage/>);fireEvent.change(screen.getByLabelText('Mock 场景'),{target:{value:'checkFailure'}});
-  fireEvent.click(screen.getAllByRole('button',{name:'删除'})[0]);await screen.findByText(/引用检查失败/);
+  fireEvent.click(screen.getByRole('button',{name:'更多 品牌甲'}));fireEvent.click(screen.getByRole('button',{name:'删除'}));await screen.findByText(/引用检查失败/);
   expect(screen.queryByRole('button',{name:'继续确认'})).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'取消'}));
   fireEvent.change(screen.getByLabelText('Mock 场景'),{target:{value:'loadFailure'}});expect(screen.getByRole('alert')).toHaveTextContent('字典加载失败');
   expect(screen.queryByText('当前分类还没有字典记录')).not.toBeInTheDocument();

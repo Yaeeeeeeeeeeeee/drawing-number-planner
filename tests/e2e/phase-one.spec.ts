@@ -33,7 +33,9 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
   await page.getByLabel('品类尺寸').selectOption({ label: 'ZC220冰柜' });
   await page.getByLabel('默认外观').selectOption({ label: '1号外观' });
   await page.getByRole('button', { name: '保存产品' }).click();
-  await expect(page.getByText('SAMKYO · ZC220', { exact: true })).toBeVisible();
+  const productRow = page.getByRole('row').filter({ hasText: 'PHASE1-ZC220' });
+  await expect(productRow.locator('[data-column-key=model]')).toHaveText('ZC220');
+  await expect(productRow.locator('[data-column-key=brand]')).toHaveText('SAMKYO');
 
   const rows = Array.from({ length: 23 }, () => Array<string | null>(14).fill(null));
   rows[20] = ['品类尺寸', null, null, null, null, '品牌字典', null, null, null, null, null, null, null, null];
@@ -42,7 +44,7 @@ test('Phase 1 browser workflow uses the real local database', async ({ page, req
   const workbook = await writeXlsxFile([{ sheet: '新版图号', data: rows }]).toBuffer();
 
   await page.getByRole('button', { name: /迁移检查/ }).click();
-  await page.getByLabel('选择 Excel 文件').setInputFiles({
+  await page.getByLabel('选择图号字典 Excel').setInputFiles({
     name: '图号规划.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook,
   });
   await page.getByRole('button', { name: '开始检查' }).click();

@@ -188,7 +188,8 @@ it('orders reference refreshes and retains last good options when a newer refres
 it('opens the correct unconfigured purpose from its parent status and validates a dropped PDF with its selection token', async () => {
  const bridge=desktop();const api=apiFor();render(<QrCodesPage api={api as never}/>);
  const status=await screen.findByRole('button',{name:'售后卡：未配置，关联文件'});
- expect(status).toHaveAttribute('title','售后卡：未配置，关联文件');
+ expect(status).toHaveTextContent('未配置');
+ expect(screen.getByRole('img',{name:'菜谱：不适用'})).toHaveTextContent('不适用');
  fireEvent.click(status);
  const dialog=screen.getByRole('dialog',{name:'手动关联二维码'});
  expect(dialog).toHaveTextContent('SKU-Q1');

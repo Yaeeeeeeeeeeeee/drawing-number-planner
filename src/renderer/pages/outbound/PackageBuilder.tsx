@@ -39,11 +39,10 @@ interface PackageBuilderProps {
   api: PlannerApi;
   target?:{productId:number;appearanceVersionId?:number};
   onPackage(value: CreatedOutboundPackageView, context: OutboundMailContext): void;
-  showResult?: boolean;
-  onResultChange?: (value:CreatedOutboundPackageView|null)=>void;
+  renderMailAction?(value: CreatedOutboundPackageView): React.ReactNode;
 }
 
-export function PackageBuilder({ api, onPackage, showResult=true, onResultChange, target }: PackageBuilderProps) {
+export function PackageBuilder({ api, onPackage, renderMailAction, target }: PackageBuilderProps) {
   const previewRequest=useRef(0);
   const preflightRequest=useRef(0);
   const generationRequest=useRef(0);
@@ -62,7 +61,6 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
   const [independentOnly, setIndependentOnly] = useState<OutboundPackagePreviewItemView[]>([]);
   const [created, setCreated] = useState<CreatedOutboundPackageView | null>(null);
   useEffect(()=>{if(target){setProductId(String(target.productId));const product=products.find(item=>item.id===target.productId);if(product){setBrandId(String(product.brandId));setCategoryId(String(product.productSizeId));}}},[target?.productId,target?.appearanceVersionId,products]);
-  useEffect(()=>{onResultChange?.(created);},[created,onResultChange]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [bomSelections, setBomSelections] = useState<Record<string, number>>({});
@@ -207,7 +205,6 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
 
   return (
     <section className="outbound-panel package-builder">
-      {independentOnly.length > 0 && <section aria-label="独立传输结果" className="info-banner"><h3>没有生成 ZIP</h3><p>所选原始 PDF 均超过 50MB，请独立传输：</p>{independentOnly.map(item => <p key={item.pdfFileId}>{item.fileName} · {item.sizeBytes} 字节 · 超过 50MB，需独立传输 · {item.contentSha256}</p>)}{preview?.items.filter(item => item.pdfFileId === null || !selected.includes(item.pdfFileId)).map((item,index) => <p key={index}>{item.fileName ?? '未命名'} · 未纳入：{item.selectable ? '未选择' : (item.detail ?? '不可选择')}</p>)}</section>}
       <section className="ob-step" aria-label="选择外发范围"><h2><span aria-hidden="true">01</span> 选择外发范围</h2>
       <div className="outbound-selection-grid">
         <label>
@@ -234,11 +231,10 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
       </div>
 
 
-      <div className="ob-section-head outbound-preview-action"><span>核对所选产品及资料批次后预览文件。</span><button className="primary-button" type="button" disabled={busy || !productId || !batchId} onClick={() => void loadPreview()}>预览文件</button></div>
+      <div className="ob-section-head outbound-preview-action"><button className="primary-button" type="button" disabled={busy || !productId || !batchId} onClick={() => void loadPreview()}>预览文件</button></div>
       {error && <p className="error-banner">{error}</p>}
       </section>
-      <section className="ob-step" aria-label="外发文件清单"><h2><span aria-hidden="true">02</span> 外发文件清单</h2>
-      {!preview&&<p className="muted-text">预览后显示所选批次的实际文件；不会自动补入其他批次资料。</p>}
+      <section className={preview ? "ob-step" : "ob-step ob-step-pending"} aria-label="外发文件清单"><h2><span aria-hidden="true">02</span> 外发文件清单</h2>
       {preview && (
         <>
           <div className="outbound-preview-head">
@@ -256,7 +252,11 @@ export function PackageBuilder({ api, onPackage, showResult=true, onResultChange
       </section>
       {detail&&createPortal(<aside className="outbound-file-drawer" role="dialog" aria-modal="true" aria-label="外发文件详情"><header><h2>文件详情</h2><button onClick={()=>setDetail(null)}>关闭</button></header><dl>{[['文件名',detail.fileName],['完整图号',detail.fullCode],['产品型号',chosenProduct?.model],['资料批次',detail.sourceBatchName],['实际路径',detail.relativePath],['文件大小',detail.sizeBytes==null?'未记录':`${detail.sizeBytes} 字节`],['内容哈希',detail.contentSha256],['核对说明',detail.detail??'正常'],['BOM 核对',detail.bomContext?.status==='matched'?'已关联 BOM':'未关联 BOM'],['修改明细',detail.bomContext?.changeDetails??'待人工补充'],['人工确认',detail.confirmationReason],['转曲状态',detail.conversionType==='outlined'?'转曲后':'转曲前或未记录'],['文件存在',detail.presenceStatus==='index-stale'?'文件存在，索引待更新':detail.presenceStatus==='path-invalid'?'路径失效':detail.presenceStatus==='read-failed'?'文件读取失败':detail.presenceStatus==='index-missing'?'索引未命中':detail.status==='missing'?'磁盘文件不存在':'已读取并核对'],['对比结果',detail.change==='copied'?'图号和内容相同':detail.change==='same_code_changed'?'同图号内容不同':detail.change==='replaced'?'已修改':detail.change==='removed'?'已移除':detail.change==='new'?'新增':'待确认'],['当前选择',detail.pdfFileId&&selected.includes(detail.pdfFileId)?'已选择':'未选择']].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value||'未记录'}</dd></div>)}</dl>{detail.comparison&&<section><h3>与上一批次对比</h3><p>{detail.comparison.batchName}</p>{detail.comparison.files.length===0?<p>基准批次没有对应项目。</p>:detail.comparison.files.map(file=><dl key={file.pdfFileId}><dt>基准文件</dt><dd>{file.fileName}</dd><dt>完整图号</dt><dd>{file.fullCode??'待确认'}</dd><dt>实际路径</dt><dd>{file.relativePath}</dd><dt>内容哈希</dt><dd>{file.contentSha256??'无法读取'}</dd><dt>内容比较</dt><dd>{!file.contentSha256?'无法确定':file.contentSha256===detail.contentSha256?'内容相同':'内容不同'}</dd></dl>)}</section>}{detail.pdfFileId&&<button className="text-button" onClick={async()=>{const result=await openIndexedPdfLocation(detail.pdfFileId!);if(!result.ok)setError(result.error?.message??'打开位置失败');}}>打开文件位置</button>}{detail.pdfFileId&&detail.status!=='missing'&&!!detail.contentSha256&&<><label>人工确认依据<textarea value={confirmationReason} onChange={event=>setConfirmationReason(event.target.value)}/></label><button disabled={confirmationReason.trim().length<5} onClick={()=>{setConfirmations(value=>({...value,[detail.pdfFileId!]:{reason:confirmationReason.trim(),contentSha256:detail.contentSha256??undefined}}));setPreviewDirty(true);setSelected([]);setDetail(null);}}>记录确认并重新预览</button></>}</aside>,document.body)}
       {preflight&&preview&&createPortal(<div className="outbound-overlay"><section role="dialog" aria-modal="true" aria-label="外发预检" className="outbound-confirm-dialog"><h2>外发预检</h2><p>产品：{chosenProduct?.model}</p><p>批次：{batches.find(item=>item.id===Number(batchId))?.name}</p><p>{materialType==='initial'?'初次资料':'更新资料'} · {mode==='current_complete'?'当前完整包材资料':'本次变更资料'}</p><p>已选 {preflight.selectedCount} 个文件 · 有效文件 {preflight.normalCount} 个 · 警告 {preflight.warningCount} 项 · 阻断错误 {preflight.blockingErrors.length} 项</p>{preflight.warnings.map((warning,index)=><p className="info-banner" key={index}>{warning}</p>)}{preflight.blockingErrors.map((error,index)=><p className="error-banner" key={index}>{error.message}</p>)}<button disabled={busy} onClick={()=>setPreflight(null)}>返回检查</button><button disabled={busy||preflight.blockingErrors.length>0||!preflight.selectedCount} onClick={()=>{setPreflight(null);void generate();}}>确认生成</button></section></div>,document.body)}
-      {created && showResult && <PackageResult key={created.id} value={created}/>}
+      <section className={created || independentOnly.length ? 'ob-step' : 'ob-step ob-step-pending'} aria-label="外发生成结果">
+        <h2><span aria-hidden="true">03</span> 生成外发结果</h2>
+      {independentOnly.length > 0 && <section aria-label="独立传输结果" className="info-banner"><h3>没有生成 ZIP</h3><p>所选原始 PDF 均超过 50MB，请独立传输：</p>{independentOnly.map(item => <p key={item.pdfFileId}>{item.fileName} · {item.sizeBytes} 字节 · 超过 50MB，需独立传输 · {item.contentSha256}</p>)}{preview?.items.filter(item => item.pdfFileId === null || !selected.includes(item.pdfFileId)).map((item,index) => <p key={index}>{item.fileName ?? '未命名'} · 未纳入：{item.selectable ? '未选择' : (item.detail ?? '不可选择')}</p>)}</section>}
+        {created && <><PackageResult key={created.id} value={created}/>{renderMailAction?.(created)}</>}
+      </section>
     </section>
   );
 }

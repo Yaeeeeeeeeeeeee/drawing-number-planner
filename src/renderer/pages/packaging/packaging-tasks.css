@@ -93,3 +93,7 @@
   .pkg-task-expansion { grid-template-columns: 1fr; }
   .pkg-task-verification { border-left: 0; border-top: 1px solid var(--pkg-line); padding: 12px 0 0; }
 }
+
+.drawing-tasks-page > .standard-page-header {justify-content:flex-start;gap:12px;}
+.drawing-tasks-page > .standard-page-header .page-heading-copy {flex:0 1 auto;}
+.pkg-illustrator-status {font-size:12px;color:var(--ws-muted);}

@@ -29,7 +29,7 @@ await page.getByRole('button',{name:'邮件撰写',exact:true}).click();await sh
 await nav('迁移检查');
 const rows=Array.from({length:23},()=>Array(14).fill(null));rows[20]=['品类尺寸',null,null,null,null,'品牌字典',null,null,null,null,null,null,null,null];rows[21]=['0209','ZC200冰柜',null,null,'01','品牌甲',null,null,null,null,null,null,null,null];rows[22]=['0209','ZC220冰柜',null,null,'03','品牌乙',null,null,null,null,null,null,null,null];
 const buffer=await writeXlsxFile([{sheet:'新版图号',data:rows}]).toBuffer();
-await page.getByLabel('选择 Excel 文件').setInputFiles({name:'隔离检查.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
+await page.getByLabel('选择图号字典 Excel').setInputFiles({name:'隔离检查.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
 await page.getByRole('button',{name:'开始检查'}).click();await page.getByRole('button',{name:/异常明细/}).waitFor();await shot('migration-report');
 await nav('图号规划 / 更新包材');await page.getByLabel('产品型号',{exact:true}).selectOption('1');await page.getByLabel('第 1 行主类别').selectOption('5');await page.getByLabel('第 1 行项目明细').selectOption('6');await page.getByLabel('第 1 行颜色').selectOption('4');await page.getByRole('button',{name:'查重并预览',exact:true}).click();await page.getByRole('button',{name:'确认批量占号'}).waitFor();await shot('planning-real-preview');
 await page.getByRole('button',{name:'确认批量占号'}).click();await page.getByText('已成功占用 1 个图号 · 正式保存').waitFor();await shot('planning-real-saved');

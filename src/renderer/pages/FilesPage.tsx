@@ -99,7 +99,13 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const [renameBatch, setRenameBatch] = useState<MaterialBatchView | null>(null);
   const [batchName, setBatchName] = useState('');
   const [classifying, setClassifying] = useState(false);
-  const [showScanDetails, setShowScanDetails] = useState(false);
+  const [detailsMode, setDetailsMode] = useState<'closed' | 'details' | 'root-setup'>('closed');
+  const showScanDetails = detailsMode !== 'closed';
+  const rootInputRef = useRef<HTMLInputElement>(null);
+  const keywordRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (detailsMode === 'root-setup') rootInputRef.current?.focus();
+  }, [detailsMode]);
   const [readerFile,setReaderFile]=useState<PdfFileView|null>(null);
   const [selectedRowId,setSelectedRowId]=useState<number|null>(null);
   const [expandedPathId, setExpandedPathId] = useState<number | null>(null);
@@ -343,8 +349,12 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const saveRoot = async () => {
     if (!rootInput.trim()) return; setSaving(true); setError(''); setMessage('');
     try { const saved = await api.updateWorkspaceSettings(rootInput.trim()); setSettings(saved); setRootInput(saved.workspaceRoot ?? rootInput);
-      setMessage('资料根目录已保存'); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '资料根目录保存失败'); }
+      setMessage('资料根目录已保存');
+      if (detailsMode === 'root-setup') {
+        setDetailsMode('closed');
+        keywordRef.current?.focus();
+      }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '资料根目录保存失败'); }
     finally { setSaving(false); }
   };
   const scan = async (productId?:number,category?:string) => {
@@ -547,7 +557,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       <span className="files-root-path" title={settings.workspaceRoot ?? ''}>{settings.workspaceRoot ?? '尚未设置资料根目录'}</span>
       <span title="按目录筛选条件统计">目录索引 {navigationCounts?.total ?? '—'}</span>
       <span title="按目录筛选条件统计">目录未匹配 {unmatchedCount ?? '—'}</span>
-      <button className="text-button" type="button" aria-expanded={showScanDetails} onClick={() => setShowScanDetails(!showScanDetails)}>详细信息</button>
+      <button className="text-button" type="button" aria-expanded={showScanDetails} onClick={() => setDetailsMode(showScanDetails ? 'closed' : 'details')}>详细信息</button>
       <button className="text-button" type="button" onClick={() => {resetTableLayouts('pdf-files'); resetTableLayouts('pdf-files-model'); window.dispatchEvent(new Event('module-workspace:reset-layout'));}}>恢复默认表格布局</button>
       <div className="files-scan-actions" role="group" aria-label="扫描范围">
         {hasProductScan && <button className={navigationScope.productId ? 'primary-button' : 'secondary-button'} type="button" disabled={scanUnavailable || !navigationScope.productId} title={products.find(product => product.id === navigationScope.productId)?.model} onClick={() => void scan(navigationScope.productId)}>{requestedScan === 'product' ? '正在扫描所选型号…' : '扫描当前型号'}</button>}
@@ -557,7 +567,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     </div></div>
     <details className="files-scan-details" open={showScanDetails}>
     <section className="workspace-strip" aria-label="资料根目录设置">
-      <label><span>资料根目录</span><input aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
+      <label><span>资料根目录</span><input ref={rootInputRef} aria-label="资料根目录" value={rootInput} disabled={saving || scanning}
         placeholder="请输入本机资料库目录" onChange={(event) => { setRootInput(event.target.value); setMessage(''); setError(''); }} /></label>
       <button className="secondary-button" type="button" disabled={saving || scanning || !rootInput.trim()} onClick={() => void saveRoot()}>{saving ? '保存中…' : '保存根目录'}</button>
     </section>
@@ -613,7 +623,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     <ModuleWorkspace fileWorkspace resizable hideLayoutReset navigation={navigation} detailLabel="" onCloseDetail={() => {}}>
     <div className="files-filter-controls">
       <div className="files-list-search" role="search" aria-label="搜索当前 PDF 列表">
-        <input type="search" aria-label="文件关键词" placeholder="搜索文件名 / 图号" maxLength={500} value={filters.keyword} onChange={event => setFilter('keyword', event.target.value)} />
+        <input ref={keywordRef} type="search" aria-label="文件关键词" placeholder="搜索文件名 / 图号" maxLength={500} value={filters.keyword} onChange={event => setFilter('keyword', event.target.value)} />
         {filters.keyword && <button type="button" className="text-button" onClick={() => setFilter('keyword', '')}>清除搜索</button>}
       </div>
       <button className="secondary-button" type="button" aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}>筛选</button>
@@ -707,7 +717,12 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
           onClick={() => void confirmIndexClear()}>{clearingIndex ? '清空中…' : '确认清空资料库索引'}</button></div>
     </section>}
     {!loading && !error && !metadataLoading && !Object.keys(metadataErrors).length && settingsLoaded && files.length === 0 && <EmptyState symbol="P" title={settings.configured ? navigationScope.kind!=='all'||Object.keys(initialFilters).some(key=>latestSearch.current.values[key as keyof typeof initialFilters]!==initialFilters[key as keyof typeof initialFilters])?'没有符合条件的 PDF':'暂无 PDF 文件索引' : '请先设置资料根目录'}
-      description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'} />}
+      description={settings.configured ? '调整筛选条件，或重新扫描资料库。' : '设置后扫描，PDF 索引将显示在这里。'}>
+      {!settings.configured && <button className="primary-button" type="button" onClick={() => {
+        setDetailsMode('root-setup');
+        if (detailsMode === 'root-setup') rootInputRef.current?.focus();
+      }}>设置资料根目录</button>}
+    </EmptyState>}
     {(files.length > 0 || loading) &&
       <DataTable key={tableId} tableId={tableId} showLayoutTools={false} virtualize virtualKey={queryKey('pdf:scope',{cacheScope,values:latestSearch.current.values,scope:latestSearch.current.scope})} onEndReached={() => {if(loading)return false;void loadMore();return true;}} items={listRows} onRowClick={item=>{if(!item.group)setSelectedRowId(item.id);}} onRowDoubleClick={item=>{if(!item.group)openPreview(item);}} selectedRowId={selectedRowId??undefined}
         renderGroupRow={item => {

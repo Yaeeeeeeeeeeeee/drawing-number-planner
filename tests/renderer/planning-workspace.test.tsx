@@ -125,3 +125,19 @@ it('shows dictionary names and both used and recommended sequences in the right 
  expect(within(panel).getByText('最后使用流水号').nextElementSibling).toHaveTextContent('004');
  expect(within(panel).getByText('推荐流水号').nextElementSibling).toHaveTextContent('005');
 });
+
+it('releases the preview column without candidates and restores the adjusted width',async()=>{
+ const api=planningApiFixture();render(<PlanningPage api={api as never}/>);
+ expect(screen.getByText('图号预览：暂无候选图号')).toBeVisible();
+ expect(screen.queryByRole('separator',{name:'调整图号预览宽度'})).not.toBeInTheDocument();
+ await chooseProduct();fillProject();await checkPlanning();
+ const handle=screen.getByRole('separator',{name:'调整图号预览宽度'});
+ fireEvent.keyDown(handle,{key:'ArrowLeft'});
+ const width=handle.getAttribute('aria-valuenow');
+ expect(width).toBe('376');
+ fireEvent.click(screen.getByRole('button',{name:'选择项目'}));
+ fireEvent.change(screen.getByLabelText('第 1 行颜色'),{target:{value:'7'}});
+ expect(screen.getByText('图号预览：暂无候选图号')).toBeVisible();
+ await checkPlanning();
+ expect(screen.getByRole('separator',{name:'调整图号预览宽度'})).toHaveAttribute('aria-valuenow',width);
+});

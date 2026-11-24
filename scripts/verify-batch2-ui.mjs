@@ -47,6 +47,7 @@ await page.getByRole('button',{name:'取消新增'}).click();
 await page.getByRole('button',{name:'修改 样例品牌'}).click();
 await capture('dictionary-edit');
 await page.getByRole('button',{name:'取消',exact:true}).click();
+await page.getByRole('button',{name:'更多 样例品牌'}).click();
 await page.getByRole('button',{name:'删除 样例品牌'}).click();
 await capture('dictionary-delete');
 await page.getByRole('button',{name:'取消',exact:true}).click();

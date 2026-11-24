@@ -1,3 +1,7 @@
+# 当前工作 · V1.6.2 界面整改
+
+独立分支 codex/unslop-ui-v162 建立于 56fb2ef。四种窗口实测及本轮回归详见交付报告。旧 PDF 上传、网格视图、迁移文件管理器直接切换仍待现场核验。
+
 # 当前：V1.6本轮44项修正交付（2026-11-17）
 
 - 来源 `docs/requirements/v16-corrections-20261111.md`，44项矩阵、分阶段记录和FINAL_REPORT位于 `docs/v16-corrections/`，旧30项完成率仅历史。

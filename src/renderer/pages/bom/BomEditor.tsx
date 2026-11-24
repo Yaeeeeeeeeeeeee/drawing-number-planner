@@ -57,7 +57,7 @@ export function BomEditor({ base, reuseSource = base, rows, mainCategories, proj
 
   return <section aria-label="添加 BOM">
     <div className="batch-toolbar"><div><h2>{editing ? '编辑所选 BOM' : '当前 BOM'}</h2><small>{rows.length} 个项目</small></div></div>
-    {!base && rows.length === 0 && <div className="bom-empty"><strong>尚未建立 BOM</strong><span>添加至少一个项目后保存。</span></div>}
+    {!base && rows.length === 0 && <div className="bom-empty"><strong>尚无当前 BOM</strong><span>添加至少一个项目后保存。</span></div>}
     <div className="bom-work-list">{rows.map((row, index) => {
       const selected = row.candidates.find((item) => candidateKey(item) === row.drawingId);
       const fieldErrors = blockers.filter((text) => text.startsWith(`项目 ${index + 1} ·`));

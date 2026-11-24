@@ -283,6 +283,35 @@ it('shows Illustrator as undetected when Windows availability is only inferred',
   const api=fixture();
   Object.assign(api.packaging,{getAutomation:vi.fn().mockResolvedValue({platform:'win32',available:true,message:'将在本机调用 Illustrator'})});
   render(<DrawingTasksPage api={api as never}/>);
-  expect(await screen.findByText('将在本机调用 Illustrator')).toBeVisible();
-  expect(screen.getByText('Illustrator：未检测')).toBeVisible();
+  const openTask=await screen.findByRole('button',{name:'继续任务'});
+  expect(screen.getByRole('heading',{name:'制图任务'}).closest('header')).toContainElement(screen.getByText('Illustrator：未检测'));
+  expect(screen.queryByText('将在本机调用 Illustrator')).not.toBeInTheDocument();
+  fireEvent.click(openTask);
+  const row=await screen.findByRole('region',{name:`${item.fullCode} 铭牌`});
+  expect(within(row).getByText('将在本机调用 Illustrator')).toBeVisible();
+  expect(within(row).getByText(/生成前请确认本机 Illustrator 可启动/)).toBeVisible();
+  for(const name of ['人工制作','使用现成文件']){
+    fireEvent.click(within(row).getByRole('button',{name}));
+    expect(screen.queryByText('将在本机调用 Illustrator')).not.toBeInTheDocument();
+  }
+  fireEvent.click(within(row).getByRole('button',{name:'AIT 自动生成'}));
+  expect(within(row).getByText('将在本机调用 Illustrator')).toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:'返回制图任务'}));
+  expect(screen.queryByText('将在本机调用 Illustrator')).not.toBeInTheDocument();
+});
+
+it('reconciles an unsettled Illustrator operation from the selected AIT item',async()=>{
+  const api=fixture();
+  const reconcile=vi.fn().mockResolvedValue({platform:'win32',available:true,message:'将在本机调用 Illustrator'});
+  Object.assign(api.packaging,{
+    getAutomation:vi.fn().mockResolvedValue({platform:'win32',available:false,blocked:true,message:'上次 Illustrator 操作尚未核实结束'}),
+    reconcileAutomation:reconcile,
+  });
+  const row=await open(api);
+  expect(screen.getByText('Illustrator：待核对')).toBeVisible();
+  expect(within(row).getByText(/请保存文档并退出 Illustrator/)).toBeVisible();
+  fireEvent.click(within(row).getByRole('button',{name:'检查上次本机操作是否已结束'}));
+  expect(await screen.findByText('Illustrator：未检测')).toBeVisible();
+  expect(reconcile).toHaveBeenCalledTimes(1);
+  expect(within(row).queryByText(/上次 Illustrator 操作尚未核实结束/)).not.toBeInTheDocument();
 });

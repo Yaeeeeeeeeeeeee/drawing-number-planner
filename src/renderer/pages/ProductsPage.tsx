@@ -4,6 +4,8 @@ import type { ProductVersionTarget } from './products/ProductAppearancePanel';
 import type { AppearanceApi } from '../data/appearance-client';
 import './products/product-appearance.css';
 import { productQrPurposes, type ProductQrTarget } from './products/product-qr-navigation';
+import { createPortal } from 'react-dom';
+import { useModalFocus } from '../components/useModalFocus';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
@@ -38,6 +40,12 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
   const [allProducts, setAllProducts] = useState<ProductView[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<number>();
+  const drawer = useRef<HTMLElement>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const closeEditor = () => { setEditorOpen(false); setCleanupId(null); };
+  useModalFocus({ panel: drawer, open: editorOpen && active, onClose: closeEditor,
+    returnFocus: () => opener.current?.isConnected ? opener.current : root.current?.querySelector('button.product-create') ?? null });
   const [brands, setBrands] = useState<DictionaryItemView[]>([]);
   const [sizes, setSizes] = useState<DictionaryItemView[]>([]);
   const [appearances, setAppearances] = useState<DictionaryItemView[]>([]);
@@ -129,8 +137,9 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
   };
 
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const openCreate = () => { setEditingId(null); setForm(blank); setEditorOpen(true); void refreshDictionaries(); };
-  const openEdit = (item: ProductView) => {
+  const openCreate = (button: HTMLButtonElement) => { opener.current = button; setError(''); setEditingId(null); setForm(blank); setEditorOpen(true); void refreshDictionaries(); };
+  const openEdit = (item: ProductView, button: HTMLButtonElement) => {
+    opener.current = button; setSelectedId(item.id); setError('');
     setCleanupId(null);
     setEditingId(item.id);
     setForm({ sku: item.sku ?? '', model: item.model, productCategory: item.productCategory, brandId: String(item.brandId),
@@ -210,7 +219,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
   const historicalOption = (options: DictionaryItemView[], id: number | null | undefined, name: string | null | undefined) =>
     id && !options.some(item => item.id === id) ? <option value={id} disabled>{name ?? `字典项 ${id}`}（已停用或删除）</option> : null;
   const dictionaryFeedback = dictionaryError && <div className="error-banner" role="alert">{dictionaryError} <button className="text-button" type="button" onClick={() => void refreshDictionaries()}>重试加载字典</button></div>;
-  const productEditor = <form className="editor-strip panel-enter" onSubmit={save}><div className="form-grid">
+  const productEditor = <form id="product-editor-form" onSubmit={save}><div className="form-grid">
     <label><span>SKU</span><input aria-label="SKU" value={form.sku} onChange={(event) => set('sku', event.target.value)} required /></label>
     <label><span>型号</span><input aria-label="型号" value={form.model} onChange={(event) => set('model', event.target.value)} required /></label>
     <label><span>产品类别</span><input aria-label="产品类别" value={form.productCategory} onChange={(event) => set('productCategory', event.target.value)} required /></label>
@@ -218,25 +227,34 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
     <label><span>品类尺寸</span><select aria-label="品类尺寸" value={form.productSizeId} onChange={(event) => set('productSizeId', event.target.value)} required><option value="">请选择</option>{historicalOption(sizes, editingProduct?.productSizeId, editingProduct?.productSizeName)}{sizes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
     <label><span>默认外观</span><select aria-label="默认外观" value={form.defaultAppearanceId} onChange={(event) => set('defaultAppearanceId', event.target.value)}><option value="">不指定</option>{historicalOption(appearances, editingProduct?.defaultAppearanceId, editingProduct?.defaultAppearanceName)}{appearances.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
     <label><span>参考来源型号</span><select aria-label="参考来源型号" value={form.referenceProductId} onChange={(event) => set('referenceProductId', event.target.value)}><option value="">不指定</option>{allProducts.filter((item) => item.id !== editingId && item.status === 'active').map((item) => <option value={item.id} key={item.id}>{item.brandName} · {item.model}</option>)}</select></label>
-  </div><div className="form-actions"><button className="text-button" onClick={() => setEditorOpen(false)} type="button">取消</button><button className="primary-button" type="submit" disabled={Boolean(dictionaryError)}>{editingId ? '保存修改' : '保存产品'}</button></div></form>;
+  </div></form>;
 
-  if (editorOpen) return <section className="page-surface products-integrated products-compact product-editor-page">
-    <PageHeader title={editingProduct ? `编辑产品 · ${editingProduct.model}` : '新建产品'} description="维护产品基础信息与业务状态，历史身份和关联资料保持原有规则。">
-      <button className="secondary-button" type="button" onClick={() => { setEditorOpen(false); setCleanupId(null); }}>返回产品档案</button>
-    </PageHeader>
-    {error && <p className="error-banner">{error}</p>}
-    {dictionaryFeedback}
-    {productEditor}
+  const editorDrawer = editorOpen && active && createPortal(<div className="product-editor-backdrop" onClick={event => {
+    if (event.target === event.currentTarget) closeEditor();
+  }}>
+    <aside className="product-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="product-editor-title" tabIndex={-1} ref={drawer}>
+      <header><h2 id="product-editor-title">{editingProduct ? `编辑产品 · ${editingProduct.model}` : '新建产品'}</h2>
+        <button type="button" className="text-button" onClick={closeEditor}>关闭</button></header>
+      <div className="product-editor-body">
+        {error && <p className="error-banner" role="alert">{error}</p>}
+        {dictionaryFeedback}
+        {productEditor}
     {editingProduct && <section className="product-maintenance" aria-label="产品状态与删除管理"><h2>产品管理</h2>
       <p>当前状态：{editingProduct.status === 'active' ? '启用中' : '已停用'}；删除前可分别选择占号及业务历史的处理方式，不删除实际文件。</p>
       <div className="row-actions"><button className="secondary-button" type="button" aria-label={`${editingProduct.status === 'active' ? '停用' : '启用'} ${editingProduct.model}`} onClick={() => void (editingProduct.status === 'active' ? deactivate(editingProduct) : activate(editingProduct))}>{editingProduct.status === 'active' ? '停用产品' : '重新启用产品'}</button>
       <button className="text-button danger" type="button" aria-label={`删除档案 ${editingProduct.model}`} onClick={() => setCleanupId(editingProduct.id)}>删除档案</button></div>
       {cleanupId === editingProduct.id && <ProductCleanupPanel key={editingProduct.id} api={api} productId={editingProduct.id} confirmLabel="确认删除档案" onCancel={() => setCleanupId(null)} onComplete={() => { cleanupComplete(editingProduct.id); setEditorOpen(false); }}/>}</section>}
-  </section>;
+      </div>
+      <footer className="product-editor-footer">
+        <button className="secondary-button" type="button" onClick={closeEditor}>取消</button>
+        <button className="primary-button" form="product-editor-form" type="submit" disabled={Boolean(dictionaryError)}>{editingId ? '保存修改' : '保存产品'}</button>
+      </footer>
+    </aside>
+  </div>, document.body);
   return <section ref={root} className="page-surface page-enter products-integrated products-compact">
     <div className="page-sticky-controls">
     <PageHeader title="产品档案" description="产品档案是图号、BOM 与 PDF 记录共用的产品身份来源。">
-      <div className="header-actions"><button className="secondary-button" onClick={() => void openHistoricalCandidates()} type="button">识别历史产品</button><button className="primary-button" onClick={openCreate} type="button">新建产品</button></div>
+      <div className="header-actions"><button className="secondary-button" onClick={() => void openHistoricalCandidates()} type="button">识别历史产品</button><button className="primary-button product-create" onClick={event => openCreate(event.currentTarget)} type="button">新建产品</button></div>
     </PageHeader>
     <form className="filter-bar" onSubmit={(event) => { event.preventDefault(); scroll.current = { table: 0, left: 0, workspace: 0 }; void load({ search, status, ...(brandFilter ? { brandId: Number(brandFilter) } : {}), ...(categoryFilter ? { productCategory: categoryFilter } : {}) }); }}>
       <label><span>SKU / 型号</span><input aria-label="搜索产品" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
@@ -247,7 +265,7 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
     </form>
     <div className="page-query-feedback"><QueryFeedback state={queryState} error={queryError} onRetry={() => initialLoaded ? void load(queriedFilters) : loadInitial()}/></div>
     </div>
-    {dictionaryFeedback}
+    {!editorOpen && dictionaryFeedback}
     {historicalOpen && <section className="historical-product-panel panel-enter" aria-label="历史产品候选">
       <div className="historical-product-heading"><div><p className="eyebrow">LIBRARY CANDIDATES</p><h2>从资料库识别历史产品</h2><p>这里只列出目录信息完整的候选。系统不会自动建档，确认前请核对 SKU、型号和产品类别。</p></div><button className="text-button" onClick={() => { setHistoricalOpen(false); setSelectedCandidate(null); }} type="button">关闭</button></div>
       {historicalLoading ? <p className="muted-text">正在读取候选…</p> : historicalCandidates.length === 0
@@ -266,11 +284,11 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
         </article>)}</div>}
       {historicalMessage && <p className="success-banner">{historicalMessage}</p>}
     </section>}
-    {error && <p className="error-banner">{error}</p>}
+    {!editorOpen && error && <p className="error-banner">{error}</p>}
     {items.length === 0 ? queryState !== 'ready' ? null : <EmptyState title={Object.entries(queriedFilters).some(([key,value]) => key === 'status' ? value !== 'all' : Boolean(value)) ? '没有符合筛选条件的产品' : '还没有产品档案'} description="先完成编码字典，再创建首个产品型号。" symbol="品" /> :
-      <><DataTable tableId="products.archive" fillViewport virtualize virtualKey={JSON.stringify(queriedFilters)} items={items} columns={[
+      <><DataTable tableId="products.archive" selectedRowId={selectedId} onRowClick={item => setSelectedId(item.id)} fillViewport virtualize virtualKey={JSON.stringify(queriedFilters)} items={items} columns={[
         { key: 'sku', label: 'SKU', width:210, minWidth:130, align:'center', render: item => <strong title={item.sku ?? undefined}>{item.sku ?? '待补录'}</strong> },
-        { key: 'model', label: '型号', width:170, minWidth:130, align:'center', render: item => <span title={`${item.brandName} · ${item.model}`}>{item.brandName} · {item.model}</span> },
+        { key: 'model', label: '型号', width:170, minWidth:130, align:'center', render: item => <span className="product-model" title={item.model}><span>{item.model.slice(0, -6)}</span><span>{item.model.slice(-6)}</span></span> },
         { key: 'brand', label: '品牌', width:130, minWidth:130, align:'center', render: item => item.brandName },
         { key: 'category', label: '产品类别', width:150, minWidth:130, align:'center', render: item => item.productCategory },
         { key: 'status', label: '状态', width:120, minWidth:120, align:'center', render: item => <span className={`status-text ${item.status}`}>{item.status === 'active' ? '启用中' : '已停用'}</span> },
@@ -284,7 +302,8 @@ function ProductsWorkspace({ api, onOpenQr, active = true }: { api: PlannerApi &
           const label = state === 'unconfigured' ? '未配置' : state === 'active' ? '已启用' : '已停用';
           return <button className={`text-button product-purpose-link product-purpose-${state}`} type="button" aria-label={`${purpose.label} · ${label}`} title={records.length > 1 ? `${records.length} 条记录，点击查看全部；${records.filter(code => code.status === 'active').length} 条已启用` : `管理 ${item.model} 的${purpose.label}`} onClick={() => openQr(item, purpose)} disabled={!onOpenQr}>{label}{records.length > 1 && <small> · {records.length} 条</small>}</button>;
         }})),
-        { key: 'actions', label: '操作', width:100, minWidth:100, align:'center', locked:'end', render: item => <button className="text-button" aria-label={`编辑 ${item.model}`} onClick={() => openEdit(item)} type="button">编辑</button> },
+        { key: 'actions', label: '操作', width:100, minWidth:100, align:'center', locked:'end', render: item => <button className="text-button" aria-label={`编辑 ${item.model}`} onClick={event => openEdit(item, event.currentTarget)} type="button">编辑</button> },
       ]} /></>}
+    {editorDrawer}
   </section>;
 }

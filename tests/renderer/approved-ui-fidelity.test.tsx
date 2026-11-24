@@ -14,11 +14,11 @@ it('keeps dictionary editing on the approved branch with a locked code and equal
   expect(screen.getByRole('button',{name:/^保存$/})).toBeVisible();
 });
 
-it('places the approved four-step preview in a resizable right panel without granting occupancy', async () => {
+it('collapses the four-step preview before candidates exist without granting occupancy', async () => {
   const api=planningApiFixture();const {container}=render(<PlanningPage api={api as never}/>);
   expect(screen.getByRole('navigation',{name:'规划步骤'})).toBeVisible();
-  expect(screen.getByRole('complementary',{name:'完整图号与编码拆解'})).toBeVisible();
-  expect(screen.getByRole('separator',{name:'调整图号预览宽度'})).toBeInTheDocument();
+  expect(screen.getByText('图号预览：暂无候选图号')).toBeVisible();
+  expect(screen.queryByRole('separator',{name:'调整图号预览宽度'})).not.toBeInTheDocument();
   expect(container.querySelector('.planning-workbench-layout')).not.toBeNull();
   expect(screen.queryByRole('button',{name:'确认批量占号'})).not.toBeInTheDocument();
   expect(api.reserveBatchPlan).not.toHaveBeenCalled();
@@ -27,7 +27,7 @@ it('places the approved four-step preview in a resizable right panel without gra
 it('shows real migration issues in the approved worksheet and expands actual reasons only', async () => {
   const api={auditWorkbook:vi.fn().mockResolvedValue({auditId:'a',report:{candidates:[],issues:[{code:'DUPLICATE_CODE',dictionaryType:'brand',sourceCell:'E22',value:'01',message:'真实检查原因'}]}}),confirmImport:vi.fn()};
   render(<ImportPage api={api as never}/>);
-  fireEvent.change(screen.getByLabelText('选择 Excel 文件'),{target:{files:[new File(['sample'],'sample.xlsx')]}});
+  fireEvent.change(screen.getByLabelText('选择图号字典 Excel'),{target:{files:[new File(['sample'],'sample.xlsx')]}});
   fireEvent.click(screen.getByRole('button',{name:'开始检查'}));
   expect(await screen.findByRole('table',{name:'迁移问题工作表'})).toBeVisible();
   fireEvent.click(screen.getByRole('button',{name:'查看原因'}));
@@ -38,7 +38,7 @@ it('shows real migration issues in the approved worksheet and expands actual rea
 it('discloses the original all-report selection scope when migration rows are filtered', async () => {
  const api={auditWorkbook:vi.fn().mockResolvedValue({auditId:'a',report:{issues:[],candidates:[{id:'b',type:'brand',code:'01',name:'品牌甲',sourceCell:'E22'},{id:'c',type:'color',code:'0',name:'白色',sourceCell:'C22'}]}}),confirmImport:vi.fn().mockResolvedValue({imported:2,skipped:0})};
  render(<ImportPage api={api as never}/>);
- fireEvent.change(screen.getByLabelText('选择 Excel 文件'),{target:{files:[new File(['sample'],'sample.xlsx')]}});
+ fireEvent.change(screen.getByLabelText('选择图号字典 Excel'),{target:{files:[new File(['sample'],'sample.xlsx')]}});
  fireEvent.click(screen.getByRole('button',{name:'开始检查'}));
  fireEvent.click(await screen.findByRole('button',{name:/导入候选/}));
  fireEvent.change(screen.getByLabelText('筛选异常'),{target:{value:'品牌甲'}});

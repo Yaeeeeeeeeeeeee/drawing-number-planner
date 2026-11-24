@@ -85,6 +85,7 @@ try {
     if (await toggleForDictionary.isVisible()) await toggleForDictionary.click();
     await page.getByRole('navigation', {name:'主导航'}).getByRole('button', {name:'编码字典',exact:true}).click();
     await page.getByRole('checkbox', {name:'显示已删除',exact:true}).check();
+    await page.getByRole('button', {name:'更多 验收样例',exact:true}).click();
     await page.getByRole('button', {name:'永久删除 验收样例',exact:true}).click();
     await page.getByText('历史图号编码仍有引用', {exact:true}).waitFor();
     assert.equal(await page.getByRole('button', {name:'确认永久删除',exact:true}).isDisabled(),true);
@@ -93,9 +94,9 @@ try {
     await page.getByRole('button', {name:'取消永久删除',exact:true}).click();
     await page.getByRole('button', {name:'恢复 验收样例',exact:true}).click();
     await page.getByRole('button', {name:'确认恢复',exact:true}).click();
-    await page.getByRole('button', {name:'停用 验收样例',exact:true}).waitFor();
-    const actionSizes = await page.locator('.dm-actions > button').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
-    assert.equal(actionSizes.length,3);assert.ok(actionSizes.every(r=>r.width===76&&r.height===32));
+    await page.getByRole('button', {name:'恢复 验收样例',exact:true}).waitFor({state:'detached'});
+    const actionSizes = await page.locator('.dm-actions > button, .dictionary-more-actions > button').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
+    assert.equal(actionSizes.length,2);assert.ok(actionSizes.every(r=>r.width===76&&r.height===32));
     await page.getByRole('button', {name:'修改 验收样例',exact:true}).click();
     const nameInput = page.getByLabel('修改名称', {exact:true});
     await nameInput.click();await page.keyboard.press('Control+A');await page.keyboard.type('ABC');
@@ -117,8 +118,8 @@ try {
       if(tab==='主类别')await page.getByRole('button',{name:`查看 ${name} 的项目明细`,exact:true}).click();
       await page.getByRole('button',{name:`修改 ${name}`,exact:true}).waitFor();
       if(tab==='主类别')await page.getByRole('button',{name:'修改 项目样例',exact:true}).waitFor();
-      const sizes=await page.locator('.dm-actions > button').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
-      assert.equal(sizes.length,tab==='主类别'?6:3);assert.ok(sizes.every(r=>r.width===76&&r.height===32));
+      const sizes=await page.locator('.dm-actions > button, .dictionary-more-actions > button').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
+      assert.equal(sizes.length,tab==='主类别'?4:2);assert.ok(sizes.every(r=>r.width===76&&r.height===32));
       dictionaryTabs.push({tab,sizes});
       if(width===1920&&tab==='主类别')await page.screenshot({path:`${output}/dictionary-parent-project-actions-${width}.png`});
     }
@@ -126,7 +127,7 @@ try {
     if(await productToggle.isVisible())await productToggle.click();
     await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'产品档案',exact:true}).click();
     await page.getByRole('button',{name:'编辑 F60',exact:true}).click();
-    await page.getByLabel('品牌',{exact:true}).getByRole('option',{name:'Restored-Edited',exact:true}).waitFor({state:'attached'});
+    await page.getByRole('dialog').getByLabel('品牌',{exact:true}).getByRole('option',{name:'Restored-Edited',exact:true}).waitFor({state:'attached'});
     await page.getByRole('button',{name:'删除档案 F60',exact:true}).click();
     const cleanup=page.getByRole('region',{name:'产品删除检查与清理'});
     await cleanup.getByLabel('输入型号确认').fill('F60');
@@ -141,6 +142,7 @@ try {
     await cleanup.getByRole('region',{name:'最后确认处理范围'}).scrollIntoViewIfNeeded();
     await page.screenshot({path:`${output}/product-cleanup-review-${width}.png`});
     await cleanup.getByRole('button',{name:'取消',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'关闭',exact:true}).click();
     if(await productToggle.isVisible())await productToggle.click();
     await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'图号库',exact:true}).click();
     await page.getByRole('columnheader',{name:'来源',exact:true}).waitFor();

@@ -85,7 +85,7 @@ it('shows field-specific blockers without requiring optional material or batch f
   expect(await screen.findByText('没有符合条件的图号。')).toBeInTheDocument();
 });
 it.each([
-  ['unselected', '请选择产品型号，查看或维护 BOM。'], ['empty', '尚未建立 BOM'], ['error', 'Mock：BOM 加载失败，可切换场景重试。'], ['loading', '正在加载 BOM…'],
+  ['unselected', '请选择产品型号'], ['empty', '尚无当前 BOM'], ['error', 'Mock：BOM 加载失败，可切换场景重试。'], ['loading', '正在加载 BOM…'],
 ])('renders %s safely', async (scenario, text) => {
   window.history.replaceState(null, '', `/?mock=bom&bom-scenario=${scenario}`);
   render(<BomPage api={{} as never} />);

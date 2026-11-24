@@ -1,8 +1,7 @@
 import './outbound/outbound-v2.css';
 import { PageHeader } from '../components/PageHeader';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CreatedOutboundPackageView, PlannerApi } from '../data/client';
-import { PackageResult } from './outbound/PackageResult';
+import type { PlannerApi } from '../data/client';
 import { MailConfiguration } from './outbound/MailConfiguration';
 import type { LeaveGuard, RegisterLeaveGuard } from './outbound/useConfigurationEditor';
 import './outbound/outbound-configuration.css';
@@ -26,7 +25,6 @@ function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard, target
   const registerDraftGuard = useCallback((guard: LeaveGuard | null) => { draftGuard.current = guard; }, []);
   useEffect(()=>{registerOuterGuard?.(()=> (activeSettings.current?leaveGuard.current:draftGuard.current)?.() ?? true);return()=>registerOuterGuard?.(null);},[registerOuterGuard]);
   const [refreshRevision, setRefreshRevision] = useState(0);
-  const [createdPackage,setCreatedPackage] = useState<CreatedOutboundPackageView|null>(null);
 
   return (
     <section className="page-surface page-enter outbound-page outbound-integrated outbound-mock-page approved-outbound">
@@ -44,17 +42,16 @@ function OutboundWorkspace({ api, registerLeaveGuard: registerOuterGuard, target
         <PackageBuilder
           api={api}
           target={target}
-          showResult={false}
-          onResultChange={setCreatedPackage}
+          renderMailAction={result => <button type="button" className="primary-button"
+            disabled={!completedContext || completedContext.packageId !== result.id}
+            onClick={() => { if (completedContext) setMailContext({ ...completedContext }); }}>生成邮件草稿</button>}
           onPackage={(_value, context) => setCompletedContext(context)}
         />
-      <section className="ob-step" aria-label="外发生成结果">
-          <h2><span aria-hidden="true">03</span> 生成外发结果</h2>{createdPackage ? <><PackageResult key={createdPackage.id} value={createdPackage}/><button type="button" className="primary-button" disabled={!completedContext || completedContext.packageId !== createdPackage.id} onClick={() => { if (completedContext) setMailContext({ ...completedContext }); }}>生成邮件草稿</button></> : <p className="muted-text">完成预览并打包后，在此核对真实生成结果。</p>}
-      </section>
-      <section className="ob-step" aria-label="邮件编辑步骤"><h2><span aria-hidden="true">04</span> 邮件草稿</h2>
-          {!mailContext && <p className="muted-text">ZIP 成功生成后，点击“生成邮件草稿”带入本次外发资料。</p>}
+        <section className="ob-step ob-mail-step" aria-label="邮件编辑步骤">
           <details className="ob-workbench-mail" open={mailContext !== null}>
-            <summary onClick={event => { if ((event.currentTarget.parentElement as HTMLDetailsElement).open && draftGuard.current && !draftGuard.current()) event.preventDefault(); }}>编辑邮件草稿</summary>
+            <summary onClick={event => { if ((event.currentTarget.parentElement as HTMLDetailsElement).open && draftGuard.current && !draftGuard.current()) event.preventDefault(); }}>
+              <h2><span aria-hidden="true">04</span> 邮件草稿</h2><span>编辑邮件草稿</span>
+            </summary>
             <EmailComposer api={api} mailContext={mailContext} refreshRevision={refreshRevision} registerLeaveGuard={registerDraftGuard} />
           </details>
       </section>

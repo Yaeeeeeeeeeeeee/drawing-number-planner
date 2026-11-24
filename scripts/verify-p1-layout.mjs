@@ -115,6 +115,7 @@ try {
    if(name==='编码字典') {
     const b=page.getByRole('button',{name:/修改 /}).first();
     if(await b.count()) {await b.click();await check('dictionary-edit');await page.getByRole('button',{name:'取消',exact:true}).click();}
+    await page.getByRole('button',{name:'更多 验收样例'}).click();
     await page.getByRole('button',{name:'删除 验收样例'}).click();
     const confirmation=page.getByRole('button',{name:'确认删除',exact:true});
     const danger=await confirmation.evaluate(el=>getComputedStyle(el).backgroundColor);

@@ -3,7 +3,7 @@ import { LayoutTable } from '../components/LayoutTable';
 import './v4-page-tables.css';
 import './qr-manual.css';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleMinus, Copy, Link2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleCheck, CircleMinus, Copy, Link2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import type { PlannerApi, ProductQrCodeView, ProductView, QrFileView, QrPurposeView } from '../data/client';
 import type { ProductQrTarget } from './products/product-qr-navigation';
@@ -122,15 +122,17 @@ export function QrCodesPage({api: originalApi, initialQrCodeId,onOpened,productT
     const code = codes.length === 1 ? codes[0] : undefined;
     const unconfigured = !codes.length || Boolean(code && canInitializeQrTarget(code));
     if (!codes.length && (!applicable || filterExcludesMissing)) {
-      const label = `${name}：${filterExcludesMissing ? '筛选范围外' : referencesReady.purposes ? '不适用' : '用途资料不可用'}`;
+      const state = filterExcludesMissing ? '筛选范围外' : referencesReady.purposes ? '不适用' : '用途资料不可用';
+      const label = `${name}：${state}`;
       return <span role="img" aria-label={label} title={label} className="qr-status-icon">
-        <CircleMinus size={17} aria-hidden="true" />
+        {state}
       </span>;
     }
     if (purpose && applicable && (unconfigured || (code && !code.files.length && code.targetUrl))) {
-      const label = `${name}：${unconfigured ? '未配置' : '未关联文件'}，关联文件`;
+      const state = unconfigured ? '未配置' : '未关联文件';
+      const label = `${name}：${state}，关联文件`;
       return <button className="text-button qr-status-icon" type="button" aria-label={label} title={label} onClick={() => start(group, purpose, code)}>
-        <CircleDashed size={17} aria-hidden="true" />
+        {state}
       </button>;
     }
     const states = [...new Set(codes.map(item => item.status === 'active' ? '启用中' : '已停用'))];

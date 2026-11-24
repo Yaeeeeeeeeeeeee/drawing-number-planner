@@ -1,3 +1,4 @@
+import { DictionaryMoreActions } from './DictionaryMoreActions';
 import { ViewportRegion } from '../components/ViewportRegion';
 import { PageHeader } from '../components/PageHeader';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -149,10 +150,12 @@ function DictionariesWorkspace({ api }: { api: PlannerApi }) {
   };
   const itemActions = (item: DictionaryItemView) => <div className="row-actions dm-actions">
     <button className="text-button" disabled={pendingId === item.id} aria-label={`修改 ${item.name}`} onClick={() => { setConfirmRestoreId(null); setPermanentDeleteId(null); setEditing(item); setEditingName(item.name); setConfirmDeleteId(null); setRowFeedback(null); }} type="button">修改</button>
-    {item.status === 'active' && <button className="text-button dictionary-stop amber" disabled={pendingId === item.id} aria-label={`停用 ${item.name}`} onClick={() => {setPermanentDeleteId(null);void deactivate(item.id);}} type="button">停用</button>}
     {item.status === 'inactive' && <button className="text-button green" disabled={pendingId === item.id} aria-label={`${item.deletedAt ? '恢复' : '启用'} ${item.name}`} onClick={() => { setPermanentDeleteId(null); setEditing(null); setConfirmDeleteId(null); setRowFeedback(null); if (item.deletedAt) setConfirmRestoreId(item.id); else void activate(item.id); }} type="button">{item.deletedAt ? '恢复记录' : '启用'}</button>}
-    {!item.deletedAt && <button className="text-button danger" disabled={pendingId === item.id} aria-label={`删除 ${item.name}`} onClick={() => { setConfirmRestoreId(null); setConfirmDeleteId(item.id); setEditing(null); setRowFeedback(null); }} type="button">删除</button>}
-    {item.deletedAt && <button className="text-button danger" disabled={pendingId !== null} aria-label={`永久删除 ${item.name}`} onClick={() => {setConfirmRestoreId(null);setPermanentDeleteId(item.id);setEditing(null);setConfirmDeleteId(null);setRowFeedback(null);}} type="button">永久删除</button>}
+    <DictionaryMoreActions key={item.id} name={item.name}>
+      {item.status === 'active' && <button className="text-button dictionary-stop amber" disabled={pendingId === item.id} aria-label={`停用 ${item.name}`} onClick={() => {setPermanentDeleteId(null);void deactivate(item.id);}} type="button">停用</button>}
+      {!item.deletedAt && <button className="text-button danger" disabled={pendingId === item.id} aria-label={`删除 ${item.name}`} onClick={() => { setConfirmRestoreId(null); setConfirmDeleteId(item.id); setEditing(null); setRowFeedback(null); }} type="button">删除</button>}
+      {item.deletedAt && <button className="text-button danger" disabled={pendingId !== null} aria-label={`永久删除 ${item.name}`} onClick={() => {setConfirmRestoreId(null);setPermanentDeleteId(item.id);setEditing(null);setConfirmDeleteId(null);setRowFeedback(null);}} type="button">永久删除</button>}
+    </DictionaryMoreActions>
   </div>;
   const dictionaryEditor = (item: DictionaryItemView) => editing?.id === item.id || confirmDeleteId === item.id || confirmRestoreId === item.id || permanentDeleteId === item.id || rowFeedback?.id === item.id ? <div className="dm-edit-branch">
     {confirmRestoreId === item.id && <div className="inline-confirm dictionary-restore-confirm" role="alert"><p>确认恢复“{item.code} {item.name}”？将重新启用此字典记录，历史引用保持不变。</p><div className="form-actions"><button type="button" disabled={pendingId === item.id} onClick={()=>setConfirmRestoreId(null)}>取消恢复</button><button className="primary-button" type="button" disabled={pendingId === item.id} onClick={()=>void activate(item.id)}>{pendingId === item.id?'恢复中…':'确认恢复'}</button></div></div>}

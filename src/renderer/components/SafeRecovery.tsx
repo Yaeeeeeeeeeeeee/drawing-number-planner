@@ -116,12 +116,18 @@ export function SafeRecovery({ api }: { api: PlannerApi }) {
     {open && <section className="safe-recovery-panel" aria-label="安全恢复面板">
       <div className="integrated-recovery-heading"><strong>安全恢复</strong><button type="button" disabled={Boolean(busy)} onClick={() => setOpen(false)}>关闭</button></div>
       {!desktop && <p className="desktop-only-note">安全恢复仅在 Windows 桌面版可用</p>}
-      <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('terminateTask')}>终止当前任务</button>
-      <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('reloadRenderer')}>重新加载界面</button>
-      <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('restartService')}>重启本地服务</button>
-      {busy === 'restartService' && status.service === 'stopping' && <p role="status">旧服务仍在停止，退出后将重新启动。</p>}
-      <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('relaunchApp')}>完整恢复应用</button>
-      <button type="button" disabled={!desktop?.reselectDatabase || Boolean(busy)} onClick={() => void run('reselectDatabase')}>重新选择数据库</button>
+      <section className="recovery-action-group" aria-label="界面与服务维护">
+        <h3>界面与服务维护</h3>
+        <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('terminateTask')}>终止当前任务</button>
+        <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('reloadRenderer')}>重新加载界面</button>
+        <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('restartService')}>重启本地服务</button>
+        {busy === 'restartService' && status.service === 'stopping' && <p role="status">旧服务仍在停止，退出后将重新启动。</p>}
+      </section>
+      <section className="recovery-action-group" aria-label="数据与数据库恢复">
+        <h3>数据与数据库恢复</h3>
+        <button type="button" disabled={!desktop || Boolean(busy)} onClick={() => void run('relaunchApp')}>完整恢复应用</button>
+        <button type="button" disabled={!desktop?.reselectDatabase || Boolean(busy)} onClick={() => void run('reselectDatabase')}>重新选择数据库</button>
+      </section>
       {message && <p className="recovery-message">{message}</p>}
       {slowTask && !busy && <div className="slow-recovery-warning" role="alert">
         <strong>当前操作响应较慢</strong><p>后台任务长时间没有进展。不会自动终止任务，请选择下一步。</p>

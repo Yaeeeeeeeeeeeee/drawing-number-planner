@@ -16,7 +16,7 @@ const makeApi = () => ({ listProducts: vi.fn().mockResolvedValue([]),
 });
 const expectChoices = async () => {
   for (const [label, name] of [['品牌', '新增品牌'], ['品类尺寸', '新增尺寸'], ['默认外观', '新增外观']]) {
-    await waitFor(() => expect(within(screen.getByRole('combobox', { name: label })).getByRole('option', { name })).toBeEnabled());
+    await waitFor(() => expect(within(within(screen.getByRole('dialog')).getByRole('combobox', { name: label })).getByRole('option', { name })).toBeEnabled());
   }
 };
 
@@ -70,7 +70,7 @@ describe('product dictionary refresh', () => {
     const resolveOlder: Array<(items: typeof dictionaries.brand) => void> = [];
     api.listDictionaries.mockImplementation(() => new Promise(resolve => { resolveOlder.push(resolve); }));
     fireEvent.click(screen.getByRole('button', { name: '新建产品' }));
-    fireEvent.click(screen.getByRole('button', { name: '返回产品档案' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     api.listDictionaries.mockImplementation(type => Promise.resolve(dictionaries[type]));
     fireEvent.click(screen.getByRole('button', { name: '新建产品' }));
     await expectChoices();
@@ -84,15 +84,15 @@ describe('product dictionary refresh', () => {
     render(<ProductsPage api={api as never} />);
     fireEvent.click(await screen.findByRole('button', { name: '编辑 M1' }));
     for (const [label, id, name] of [['品牌', '41', '旧品牌'], ['品类尺寸', '42', '旧尺寸'], ['默认外观', '43', '旧外观']]) {
-      const select = screen.getByRole('combobox', { name: label });
+      const select = within(screen.getByRole('dialog')).getByRole('combobox', { name: label });
       expect(select).toHaveValue(id);
       expect(within(select).getByRole('option', { name: new RegExp(name) })).toBeDisabled();
     }
     await expectChoices();
-    fireEvent.click(screen.getByRole('button', { name: '返回产品档案' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     fireEvent.click(screen.getByRole('button', { name: '新建产品' }));
     for (const label of ['品牌', '品类尺寸', '默认外观']) {
-      expect(within(screen.getByRole('combobox', { name: label })).queryByRole('option', { name: /旧品牌|旧尺寸|旧外观/ })).not.toBeInTheDocument();
+      expect(within(within(screen.getByRole('dialog')).getByRole('combobox', { name: label })).queryByRole('option', { name: /旧品牌|旧尺寸|旧外观/ })).not.toBeInTheDocument();
     }
   });
 });

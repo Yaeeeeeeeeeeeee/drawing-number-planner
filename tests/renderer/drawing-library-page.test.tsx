@@ -317,8 +317,11 @@ describe('DrawingLibraryPage', () => {
         .mockResolvedValueOnce({ items: [drawing], total: 1, page: 1, pageSize: 20 }),
       getDrawing: vi.fn().mockResolvedValue(drawing),
     };
-    render(<DrawingLibraryPage api={api as never} />);
+    const navigatePlanning = vi.fn();
+    render(<DrawingLibraryPage api={api as never} onNavigatePlanning={navigatePlanning} />);
     await screen.findByText('图号库尚无记录');
+    fireEvent.click(screen.getByRole('button', {name:'前往图号规划'}));
+    expect(navigatePlanning).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole('button', {name:'更多筛选'}));
     fireEvent.change(screen.getByLabelText('完整图号'), { target: { value: '02.0209' } });
@@ -736,6 +739,7 @@ it('clears manual drawing filters while retaining the selected category and refr
   fireEvent.click(screen.getByRole('button',{name:'查询'}));
   await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({navigationProductCategory:'冰柜',keyword:'BOX'})));
   await waitFor(()=>expect(api.getDrawingNavigationCounts).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'BOX'})));
+  expect(await screen.findByText('没有符合查询条件的图号')).toBeVisible();
   fireEvent.click(screen.getByRole('button',{name:'清除筛选'}));
   await waitFor(()=>expect(api.searchDrawings).toHaveBeenLastCalledWith(expect.objectContaining({navigationProductCategory:'冰柜',keyword:''})));
   expect(screen.getByRole('button',{name:'分类 冰柜'})).toHaveAttribute('aria-current','page');

@@ -135,6 +135,7 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
     主类别:dictionaryCode(references.main_category,projectFocus?.mainCategoryId)??'??',
     项目明细:dictionaryCode(references.project_item,projectFocus?.projectItemId)??'??',
   };
+  const hasPreview = batch && draft.step <= 2 ? Boolean(selectedGroup) : visibleRows.some(row => row.fullCode);
   return <section className={`page-surface page-enter planning-page planning-workbench${batch?' planning-batch-workbench':''}`}>
     <PageHeader title="图号规划" description=""/>
     <div className="planning-workbench-toolbar"><div role="group" aria-label="规划模式">{(['new','batch'] as const).map(value=><button type="button" key={value} aria-pressed={mode===value} disabled={busy} onClick={()=>setMode(value)}>{value==='new'?'新建图号':'批量规划'}</button>)}</div><div className="row-actions">{results[mode]&&<button type="button" onClick={()=>setShowResults(true)}>查看本次结果</button>}{saved.hasDraft&&<button type="button" disabled={!saved.ready||busy} onClick={()=>void saved.remove().then(()=>{setChecks(null);checkedInputs.current.clear();setConfirmed(false);}).catch(()=>{})}>删除当前草稿</button>}</div></div>
@@ -142,7 +143,7 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
     {saved.error&&<div role="alert" className="error-banner">{saved.error}<button type="button" onClick={()=>saved.ready?saved.retry():void saved.reload()}>{saved.ready?'重试保存草稿':'重新读取草稿'}</button></div>}{saved.status&&<p className="planning-draft-status" role="status">{saved.status}</p>}{error&&<p role="alert" className="error-banner">{error}</p>}
     {showResults&&results[mode]?<PlanningResults result={results[mode]!} products={references.products} onBack={()=>setShowResults(false)} onOpenLibrary={onOpenDrawingLibrary} onGenerate={onGenerateFiles}/>:<>
     <nav className="planning-steps" aria-label="规划步骤">{steps.map((label,index)=><button type="button" aria-label={label} aria-current={draft.step===index+1?'step':undefined} key={label} disabled={!ready||busy||(index>0&&!draft.groups.length)||(batch&&draft.step<index+1&&(!canProducts||index===2&&!canCheck))} onClick={()=>{if(draft.step!==index+1){setEditRow(undefined);update({...draft,step:(index+1) as PlanningDraftInput['step']});}}}><span>{index+1}</span>{label}</button>)}</nav>
-    <div ref={root} className={`planning-workbench-layout${width<900?' compact':''}`} style={{'--planning-preview-width':`${Math.min(preferredWidth,Math.max(280,width*.45))}px`} as CSSProperties}>
+    <div ref={root} className={`planning-workbench-layout${width<900?' compact':''}${hasPreview?'':' preview-empty'}`} style={{'--planning-preview-width':`${Math.min(preferredWidth,Math.max(280,width*.45))}px`} as CSSProperties}>
       <div className="planning-step-content" aria-busy={busy||!ready}>
         {draft.step===1&&<PlanningProducts key={mode} mode={mode} draft={draft} products={references.products} appearances={references.appearance} disabled={!ready||busy} onChange={update}/>}
         {draft.step===2&&<PlanningProjects key={mode} mode={mode} group={selectedGroup} groups={draft.groups} products={references.products} mains={references.main_category} projects={references.project_item} colors={references.color} packaging={api.packaging} disabled={!ready||busy} editRow={editRow} onGroups={groups=>update({...draft,groups})} onSelect={id=>{setEditRow(undefined);update({...draft,activeProductId:id});}} onFocus={row=>{if(selectedGroup)setFocused(planningRowKey(selectedGroup.productId,row.clientId));}} whiteBases={whiteBases} whiteError={whiteErrors} onLoadWhite={row=>void white(row)}/>}
@@ -154,7 +155,7 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
           <PlanningChecks preview={effective} projects={references.project_item} colors={references.color} busy={busy} failedOnly={batch&&failedOnly} onFocus={row=>setFocused(planningRowKey(row.productId,row.clientId))} onRecheck={row=>void check(row)} onEdit={batch?openProject:undefined} onRemove={batch?removeProject:undefined}/>
         </>}
       </div>
-      <PanelResizeHandle label="调整图号预览宽度" value={Math.min(preferredWidth,Math.max(280,width*.45))} min={280} max={Math.max(280,width*.45)} reversed onChange={setPreferredWidth}/>
+      {hasPreview?<><PanelResizeHandle label="调整图号预览宽度" value={Math.min(preferredWidth,Math.max(280,width*.45))} min={280} max={Math.max(280,width*.45)} reversed onChange={setPreferredWidth}/>
       <aside className="planning-preview-panel" aria-label={batch&&draft.step===1?'已选产品清单':batch&&draft.step===2?'图号结构预览':'完整图号与编码拆解'}>
         {batch&&draft.step===1?<><h2>已选产品清单</h2>{draft.groups.length?<ul className="planning-selected-list">{draft.groups.map(group=>{
           const product=references.products.find(item=>item.id===group.productId);
@@ -168,7 +169,7 @@ function PlanningWorkspace({api,active=true,onOpenDrawingLibrary,onGenerateFiles
           {batch&&<p>待新占号 {eligible.filter(row=>!row.shared).length} 项 · 共用 {eligible.filter(row=>row.shared).length} 项 · 跳过 {rows.length-eligible.length} 项</p>}
           {focus?.fullCode?<><strong className="planning-code planning-preview-code">{focus.fullCode}</strong><p className={focus.available?'planning-pass':'error-banner'}>{focus.available?focus.shared?'共用已有图号，不重复占号':'检查通过，尚未正式占号':focus.error?.message}</p>{parts&&<dl>{Object.entries({品牌:describeCode(references.brand,parts.brandCode),品类尺寸:describeCode(references.product_size,parts.productSizeCode),外观:describeCode(references.appearance,parts.appearanceCode),颜色:describeCode(references.color,parts.colorCode),主类别:describeCode(references.main_category,parts.mainCategoryCode),项目明细:describeCode(references.project_item.filter(project=>references.main_category.some(main=>main.code===parts.mainCategoryCode&&main.id===project.parentId)),parts.projectItemCode),最后使用流水号:focus.lastUsedSequence===undefined?'未读取':focus.lastUsedSequence?String(focus.lastUsedSequence).padStart(3,'0'):'暂无',推荐流水号:focus.sequence?String(focus.sequence).padStart(3,'0'):'—'}).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}</>:<p>{focus?.error?.message??'选择产品和项目后进行图号检查'}</p>}
         </>}
-      </aside>
+      </aside></>:<p className="planning-empty-preview">{batch&&draft.step===1?'已选产品清单：请选择产品型号':'图号预览：暂无候选图号'}</p>}
     </div>
     <footer className="planning-step-actions">
       {(draft.step>1||!batch)&&<button type="button" disabled={!ready||busy||draft.step===1} onClick={()=>{setEditRow(undefined);update({...draft,step:(draft.step-1) as PlanningDraftInput['step']});}}>上一步</button>}

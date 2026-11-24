@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../../src/renderer/App';
@@ -57,7 +57,8 @@ describe('safe recovery surface', () => {
     expect(screen.getByRole('button', { name: '终止当前任务' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '重新加载界面' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '重启本地服务' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: '完整恢复应用' })).toBeEnabled();
+    expect(within(screen.getByRole('region',{name:'数据与数据库恢复'})).getByRole('button', { name: '完整恢复应用' })).toBeEnabled();
+    expect(within(screen.getByRole('region',{name:'界面与服务维护'})).getByRole('button',{name:'重启本地服务'})).toBeEnabled();
   });
 
   it('warns when an active business task makes no progress without automatically terminating it', async () => {

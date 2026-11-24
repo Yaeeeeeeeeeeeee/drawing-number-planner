@@ -34,12 +34,14 @@ export function DrawingTasksPage({api,target,active=true}:{api:PlannerApi;target
       .catch(reason=>{if(current)setAutomation({failed:true,message:reason instanceof Error?reason.message:'本机自动化状态读取失败'});});
     return()=>{current=false;};
   },[active,packaging]);
-  const illustratorState=automation?.failed||(automation?.platform&&automation.platform!=='win32')?'无法检测':'未检测';
-  return <section className="page-surface page-enter packaging-page drawing-tasks-page"><PageHeader title="制图任务" description="从已占号图号制作文件、检查并统一归档"/>
+  const illustratorState=automation?.blocked?'待核对':automation?.failed||(automation?.platform&&automation.platform!=='win32')?'无法检测':'未检测';
+  const automationNotice=automation&&<div className="pkg-automation">
+    <span>{automation.message}</span>
+    <small>{automation.failed?'请检查本地服务连接后重新进入制图任务。':automation.blocked?'请保存文档并退出 Illustrator，再核对上次操作状态。':automation.platform!=='win32'?'请在已安装 Illustrator 的 Windows 电脑上生成，或选择人工制作。':'生成前请确认本机 Illustrator 可启动，且已安装模板所需字体。'}</small>
+    {automation.blocked&&packaging&&<button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{setAutomation(await packaging.reconcileAutomation());}catch(reason){setAutomation({...automation,message:reason instanceof Error?reason.message:'检查失败'});}finally{setBusy(false);}}}>检查上次本机操作是否已结束</button>}
+  </div>;
+  return <section className="page-surface page-enter packaging-page drawing-tasks-page"><PageHeader title="制图任务" description=""><small className="pkg-illustrator-status">Illustrator：{illustratorState}</small></PageHeader>
     {loading&&<p role="status">加载任务资料…</p>}{error&&<div className="pkg-error" role="alert">{error}<button type="button" onClick={()=>void load()}>重新加载</button></div>}
-    {data&&packaging&&<>
-      <div className="pkg-automation"><span>Illustrator：{illustratorState}</span>{automation?.message&&<small>{automation.message}</small>}{automation?.blocked&&<button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{setAutomation(await packaging.reconcileAutomation());}catch(reason){setAutomation({...automation,message:reason instanceof Error?reason.message:'检查失败'});}finally{setBusy(false);}}}>检查上次本机操作是否已结束</button>}</div>
-      <PackagingTasks active={active} api={api} catalog={data.catalog} lookups={data.lookups} target={target}/>
-    </>}
+    {data&&packaging&&<PackagingTasks active={active} api={api} catalog={data.catalog} lookups={data.lookups} target={target} automationNotice={automationNotice}/>}
   </section>;
 }

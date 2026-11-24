@@ -24,3 +24,42 @@
 .products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(5) {width:8%;min-width:80px;}
 .products-integrated.products-compact > .table-wrap > table > :is(thead,tbody) > tr > :is(th,td):nth-child(n+6) {width:10%;min-width:80px;}
 .products-integrated.products-compact > .table-wrap > table > tbody > .expanded-table-row > td {position:static;white-space:normal;width:auto;box-shadow:none;}
+
+.products-integrated [data-column-key='model'] > .product-model {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.products-compact tr[aria-selected='true'] > td { background: #e2edf6; }
+.product-model > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.product-model > :last-child { flex: none; }
+.product-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(20 30 40 / 18%);
+}
+.product-editor-drawer {
+  width: min(560px, 100%);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--ws-surface, white);
+  border-left: 1px solid var(--ws-line, #ccc);
+  box-shadow: -4px 0 16px #0001;
+}
+.product-editor-drawer > header, .product-editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+}
+.product-editor-drawer > header { justify-content: space-between; border-bottom: 1px solid var(--ws-line, #ccc); }
+.product-editor-drawer h2 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.product-editor-body { overflow: auto; overscroll-behavior: contain; padding: 16px 20px; }
+.product-editor-body .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px; }
+.product-editor-body .form-grid label { min-width: 0; }
+.product-editor-body .form-grid :is(input,select) { width: 100%; min-width: 0; }
+.product-editor-body .product-maintenance { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ws-line, #ccc); }
+.product-editor-footer { justify-content: flex-end; border-top: 1px solid var(--ws-line, #ccc); }

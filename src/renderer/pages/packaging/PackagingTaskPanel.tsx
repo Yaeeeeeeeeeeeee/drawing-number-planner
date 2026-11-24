@@ -1,7 +1,7 @@
 import { scanExecutionLabel, scanExecutionProgress, useOwnedScanProgress } from '../useScanProgress';
 import { templateRanges } from './packaging-dimensions';
 import { isMaterialDirectory } from '../../../core/files/material-directory-policy';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawingView, PlannerApi } from '../../data/client';
 import type { PackagingApi } from '../../data/packaging-client';
 import type { PackagingArchivePreview, PackagingCatalog, PackagingDrawingRef, PackagingMode, PackagingParameter, PackagingProductDirectory, PackagingTask, PackagingTaskItem, PackagingTaskItemInput } from '../../../core/packaging/packaging-types';
@@ -13,6 +13,8 @@ import { ChevronRight } from 'lucide-react';
 import { ActionToast } from '../../components/ActionToast';
 import { CopyButton } from '../../components/CopyButton';
 import { useModalFocus } from '../../components/useModalFocus';
+
+const AutomationNoticeContext = createContext<ReactNode>(null);
 
 export interface PackagingNavigationTarget { productId:number; drawings:PackagingDrawingRef[]; revision?:number; itemSettings?:Array<{origin:PackagingDrawingRef['origin'];id:number;input:PackagingTaskItemInput}> }
 const isOpenTask=(task:PackagingTask)=>!task.endedAt&&task.state!=='completed';
@@ -30,7 +32,7 @@ async function productDrawings(api:PlannerApi,productId:number):Promise<DrawingV
 }
 const errorText=(reason:unknown)=>reason instanceof Error?reason.message:'操作失败，请重试';
 
-export function PackagingTasks({api,catalog,lookups,target,active=true}:{active?:boolean;api:PlannerApi;catalog:PackagingCatalog;lookups:PackagingLookups;target?:PackagingNavigationTarget|null}) {
+export function PackagingTasks({api,catalog,lookups,target,active=true,automationNotice}:{active?:boolean;automationNotice?:ReactNode;api:PlannerApi;catalog:PackagingCatalog;lookups:PackagingLookups;target?:PackagingNavigationTarget|null}) {
   const packaging=api.packaging!;
   const [tasks,setTasks]=useState<PackagingTask[]>([]);const [selected,setSelected]=useState<PackagingTask|null>(null);
   const [detailVisible,setDetailVisible]=useState(false);
@@ -111,7 +113,7 @@ export function PackagingTasks({api,catalog,lookups,target,active=true}:{active?
     catch(reason){setError(errorText(reason));}finally{setBusy(false);}
   };
   return <section className="pkg-tasks" aria-label="制图任务管理">
-    {selected&&<div hidden={!detailVisible}><TaskDetail readScanStatus={api.getPdfScanStatus} active={active} visible={detailVisible} refreshTask={refreshTask} runTask={runTask} key={selected.id} packaging={packaging} task={selected} catalog={catalog} brands={lookups.brands} productId={selected.productId} productTitle={[lookups.products.find(p=>p.id===selected.productId)?.brandName,selected.model].filter(Boolean).join(' · ')} onBack={()=>{detailRequest.current++;setDetailVisible(false);void refresh().catch(e=>setError(errorText(e)));}}/></div>}
+    {selected&&<div hidden={!detailVisible}><AutomationNoticeContext.Provider value={detailVisible?automationNotice:null}><TaskDetail readScanStatus={api.getPdfScanStatus} active={active} visible={detailVisible} refreshTask={refreshTask} runTask={runTask} key={selected.id} packaging={packaging} task={selected} catalog={catalog} brands={lookups.brands} productId={selected.productId} productTitle={[lookups.products.find(p=>p.id===selected.productId)?.brandName,selected.model].filter(Boolean).join(' · ')} onBack={()=>{detailRequest.current++;setDetailVisible(false);void refresh().catch(e=>setError(errorText(e)));}}/></AutomationNoticeContext.Provider></div>}
     <div hidden={detailVisible}>
       <div className="pkg-editor pkg-task-create">
         <div className="pkg-task-launch">
@@ -270,6 +272,7 @@ function TaskItem({packaging,task,item,catalog,brands,productId,disabled,onActio
   onAction(operation:()=>Promise<PackagingTask>,success?:string):Promise<void>;onDirty(id:number,dirty:boolean):void;onPreview():void;onDiscover():Promise<void>;onReview():Promise<void>;
   expanded:boolean;onToggle():void;controlRef(element:HTMLButtonElement|null):void;
 }) {
+  const automationNotice=useContext(AutomationNoticeContext);
   const initial:PackagingTaskItemInput={mode:item.mode,parameters:item.parameters,templateId:item.templateId,dimensionProfileId:item.dimensionProfileId,ratioLocked:item.ratioLocked};
   const [explicitTemplate,setExplicitTemplate]=useState(Boolean(item.templateId&&(item.match?.status!=='unique'||item.match.templateIds[0]!==item.templateId)));
   const [draft,setDraft]=useState(initial);const [reviewed,setReviewed]=useState(false);const [regenerate,setRegenerate]=useState(false);const [message,setMessage]=useState('');const [localBusy,setLocalBusy]=useState(false);
@@ -298,6 +301,7 @@ function TaskItem({packaging,task,item,catalog,brands,productId,disabled,onActio
     <form onSubmit={event=>{event.preventDefault();void onAction(async()=>{const next=await packaging.updateItem(task.id,item.id,draft);const saved=next.items.find(i=>i.id===item.id)!;setDraft({mode:saved.mode,parameters:saved.parameters,templateId:saved.templateId,dimensionProfileId:saved.dimensionProfileId,ratioLocked:saved.ratioLocked});return next;},'本次参数已保存');}}>
     <fieldset disabled={!editable}>
       <div className="pkg-source-modes pkg-view-switch" role="group" aria-label="本次生成方式">{sourceModes.map(mode=><button key={mode} type="button" aria-pressed={draft.mode===mode} onClick={()=>setDraft({...draft,mode})}>{modeLabels[mode]}</button>)}</div>
+      {expanded&&draft.mode==='ait'&&automationNotice}
       {draft.mode==='none'&&<p className="pkg-muted">{modeLabels.none}</p>}
       <div className="pkg-fields">{draft.mode==='ait'&&<>{profiles.length>0&&<label>已保存尺寸<select value={draft.dimensionProfileId??''} onChange={event=>{const selected=profiles.find(p=>p.id===Number(event.target.value));setDraft({...draft,dimensionProfileId:selected?.id,parameters:selected?{...selected.parameters}:{...draft.parameters},ratioLocked:Boolean(selected?.ratioKeys),...(!explicitTemplate?{templateId:undefined}:{})});}}><option value="">本次临时参数</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.name} · {p.scope==='specific'?'指定':'通用'}{(p.defaultProductIds?.includes(productId)??p.isDefault)?' · 默认':''}</option>)}</select></label>}<label>本次模板<select value={draft.templateId??''} onChange={event=>{setExplicitTemplate(Boolean(event.target.value));setDraft({...draft,templateId:Number(event.target.value)||undefined});}}><option value="">保存参数后自动匹配</option>{catalog.templates.filter(t=>t.status==='active'&&t.projectItemId===item.projectItemId&&(t.productIds.length===0||t.productIds.includes(productId))).map(t=><option key={t.id} value={t.id}>{t.name}{match?.templateIds.includes(t.id)?' · 匹配':''}</option>)}</select></label></>}</div>
     {draft.mode==='ait'&&<><ParameterValues definitions={dimensionDefinitions} value={draft.parameters??{}} onChange={changeDimensions} ratioKeys={draft.ratioLocked?profile?.ratioKeys:undefined} ratio={profile?.ratio}/><p className="pkg-muted">临时参数只作用于本次任务。</p>{profile?.ratioKeys&&<label className="pkg-check"><input type="checkbox" checked={Boolean(draft.ratioLocked)} onChange={event=>setDraft({...draft,ratioLocked:event.target.checked})}/>沿用已保存尺寸比例</label>}{match&&!dirty&&<p className={match.status==='unique'?'pkg-muted':'pkg-notice'}>{match.status==='multiple'?'有多个匹配模板，请明确选择后保存。':match.status==='none'?'没有匹配模板，请维护模板 / 规则或人工选择。':match.status==='missing_dimensions'?`请填写：${match.missingParameters.map(key=>definitions.find(p=>p.key===key)?.label??'必要尺寸').join('、')}`:'已找到唯一匹配模板。'}</p>}</>}

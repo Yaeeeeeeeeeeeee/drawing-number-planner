@@ -152,4 +152,4 @@
 /* Recovery actions remain unchanged; bound the popover rather than the viewport. */
 .safe-recovery.integrated-recovery .safe-recovery-panel {position:fixed;left:16px;bottom:16px;width:min(360px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto;padding:16px;}
 .safe-recovery.integrated-recovery .integrated-recovery-heading > strong {font-size:18px;line-height:1.4;}
-.safe-recovery.integrated-recovery .safe-recovery-panel > button {min-height:34px;padding:6px 10px;}
+.safe-recovery.integrated-recovery .safe-recovery-panel .recovery-action-group > button {min-height:34px;padding:6px 10px;}

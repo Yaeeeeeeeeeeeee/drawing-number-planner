@@ -285,8 +285,9 @@ describe('DictionariesPage', () => {
     expect(await screen.findByText('新 LOGO')).toBeVisible();
     expect(api.updateDictionaryName).toHaveBeenCalledWith(20, '新 LOGO');
 
+    fireEvent.click(screen.getByRole('button', { name: '更多 新 LOGO' }));
     fireEvent.click(screen.getByRole('button', { name: '停用 新 LOGO' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: '停用 新 LOGO' })).toBeNull());
+    await waitFor(() => expect(screen.getByRole('button', { name: '启用 新 LOGO' })).toBeVisible());
     expect(api.deactivateDictionary).toHaveBeenCalledWith(20);
   });
 
@@ -301,6 +302,7 @@ describe('DictionariesPage', () => {
     render(<DictionariesPage api={api as never} />);
 
     await screen.findByText('SAMKYO');
+    fireEvent.click(screen.getByRole('button', { name: '更多 SAMKYO' }));
     fireEvent.click(screen.getByRole('button', { name: '停用 SAMKYO' }));
     expect(await screen.findByText('已停用')).toBeVisible();
     expect(api.deactivateDictionary).toHaveBeenCalledWith(3);
@@ -350,6 +352,7 @@ describe('DictionariesPage', () => {
     render(<DictionariesPage api={api as never} />);
     await screen.findByText('临时品牌');
 
+    fireEvent.click(screen.getByRole('button', { name: '更多 临时品牌' }));
     fireEvent.click(screen.getByRole('button', { name: '删除 临时品牌' }));
     expect(screen.getByText(/09 临时品牌/).closest('.expanded-table-row')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }));

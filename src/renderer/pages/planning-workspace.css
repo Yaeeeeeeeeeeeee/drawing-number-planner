@@ -153,3 +153,7 @@
 .planning-workbench-layout.compact .planning-step-content {padding-right:0;}
 .planning-workbench-layout.compact .planning-preview-panel {position:static;}
 @media(max-width:760px){.planning-workbench-layout{grid-template-columns:minmax(0,1fr);gap:18px}.planning-workbench-layout>.panel-resize-handle{display:none}.planning-step-content{padding-right:0}.planning-preview-panel{position:static}.planning-fields{grid-template-columns:minmax(0,1fr)}.planning-section-title{flex-wrap:wrap}.planning-result-group li{flex-wrap:wrap}.planning-result-group .planning-code{white-space:normal;overflow-wrap:anywhere}}
+
+.planning-workbench-layout.preview-empty {display:flex;flex-direction:column;gap:8px;}
+.planning-workbench-layout.preview-empty .planning-step-content {padding-right:0;}
+.planning-empty-preview {margin:0;padding:6px 0;color:var(--ws-muted);font-size:12px;}

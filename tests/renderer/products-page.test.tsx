@@ -25,7 +25,7 @@ describe('ProductsPage', () => {
     expect(headers).not.toContain('关联资料');
     expect(headers.slice(5, 8)).toEqual(['说明书', '售后卡', '菜谱']);
     const normalCells = within(screen.getByRole('button', {name:'编辑 N100'}).closest('tr')!).getAllByRole('cell');
-    expect(normalCells[1]).toHaveTextContent('SAMKYO · N100');
+    expect(normalCells[1]).toHaveTextContent(/^N100$/);
     expect(within(normalCells[5]).getByRole('button', { name: '说明书 · 已启用' })).toBeVisible();
     expect(within(normalCells[5]).getByRole('button', {name:'说明书 · 已启用'})).toHaveClass('product-purpose-active');
     expect(within(normalCells[6]).getByRole('button', {name:'售后卡 · 已停用'})).toHaveClass('product-purpose-inactive');
@@ -71,8 +71,8 @@ describe('ProductsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '新建产品' }));
     fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 'SKDZC220JP' } });
-    fireEvent.change(screen.getByLabelText('型号'), { target: { value: 'ZC220' } });
-    fireEvent.change(screen.getByLabelText('产品类别'), { target: { value: '冰柜' } });
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('型号'), { target: { value: 'ZC220' } });
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('产品类别'), { target: { value: '冰柜' } });
     fireEvent.change(screen.getByRole('combobox', { name: /^品牌$/ }), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('品类尺寸'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('默认外观'), { target: { value: '3' } });
@@ -113,7 +113,7 @@ describe('ProductsPage', () => {
     await waitFor(() => expect(screen.queryByText('ZC200', { exact: true })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: '编辑 ZC220' }));
-    fireEvent.change(screen.getByLabelText('型号'), { target: { value: 'ZC220A' } });
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('型号'), { target: { value: 'ZC220A' } });
     fireEvent.change(screen.getByLabelText('参考来源型号'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
     expect(api.updateProduct).toHaveBeenCalledWith(2, expect.objectContaining({ model: 'ZC220A', referenceProductId: 1 }));
@@ -269,4 +269,35 @@ it('keeps the table mounted while a new product query is pending',async()=>{
  fireEvent.change(screen.getByLabelText('搜索产品'),{target:{value:'M'}});fireEvent.click(screen.getByRole('button',{name:'筛选'}));
  expect(container.querySelector('table')).toBe(table);expect(screen.getByRole('button',{name:'编辑 M'})).toBeVisible();
  finish([product]);await waitFor(()=>expect(screen.queryByText('正在加载，请稍候…')).not.toBeInTheDocument());expect(container.querySelector('table')).toBe(table);
+});
+
+
+it('preserves the archive and returns focus to the opener for both drawer entries', async () => {
+  const product = { id: 9, model: 'ZC220-LONG-MODEL-JP', sku: 'SKU-JP', brandName: 'SAMKYO', productCategory: '冰柜', status: 'active' };
+  const api = { listProducts: vi.fn().mockResolvedValue([product]), listDictionaries: vi.fn().mockResolvedValue([]) };
+  const { container } = render(<ProductsPage api={api as never} />);
+  const edit = await screen.findByRole('button', { name: `编辑 ${product.model}` });
+  const create = screen.getByRole('button', { name: '新建产品' });
+  const row = edit.closest('tr')!;
+  const archive = container.querySelector('.table-wrap')!;
+  const model = within(row).getByTitle(product.model);
+  expect(model.textContent).toBe(product.model);
+  expect(model.lastElementChild).toHaveTextContent('-JP');
+  expect(within(row).getByRole('cell', { name: 'SAMKYO' })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('搜索产品'), { target: { value: 'LONG' } });
+  fireEvent.click(row);
+  archive.scrollTop = 64;
+  archive.scrollLeft = 32;
+  for (const [opener, name] of [[edit, `编辑产品 · ${product.model}`], [create, '新建产品']] as const) {
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('dialog', { name });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    expect(container.querySelector('.table-wrap')).toBe(archive);
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(opener).toHaveFocus();
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('搜索产品')).toHaveValue('LONG');
+    expect([archive.scrollTop, archive.scrollLeft]).toEqual([64, 32]);
+  }
 });

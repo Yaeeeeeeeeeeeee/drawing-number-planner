@@ -509,6 +509,29 @@ it('renders one empty PDF list region without a second empty table',async()=>{
  expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
 
+it('opens root settings from the empty list and returns to the scoped search after saving', async () => {
+  const api = apiFixture();
+  api.searchPdfFiles.mockResolvedValue({items: [], total: 0, page: 1, pageSize: 100});
+  api.updateWorkspaceSettings.mockRejectedValueOnce(new Error('目录无效'));
+  render(<FilesPage api={api as never} initialTarget={{productId: 9, fullCode: 'LOGO'}} />);
+  const setup = await screen.findByRole('button', {name: '设置资料根目录'});
+  expect(setup.closest('.empty-state')).toBeTruthy();
+  fireEvent.click(setup);
+  const root = screen.getByLabelText('资料根目录');
+  expect(root).toHaveFocus();
+  fireEvent.change(root, {target: {value: 'X:\\Library'}});
+  fireEvent.click(screen.getByRole('button', {name: '保存根目录'}));
+  expect(await screen.findByText('目录无效')).toBeVisible();
+  expect(root).toBeVisible();
+  fireEvent.click(screen.getByRole('button', {name: '保存根目录'}));
+  expect(await screen.findByRole('heading', {name: '没有符合条件的 PDF'})).toBeVisible();
+  expect(root.closest('details')).not.toHaveAttribute('open');
+  expect(screen.getByLabelText('文件关键词')).toHaveFocus();
+  expect(screen.getByLabelText('文件关键词')).toHaveValue('LOGO');
+  expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({productId: 9, keyword: 'LOGO'}));
+  expect(screen.queryByRole('button', {name: '设置资料根目录'})).toBeNull();
+});
+
 it('places source-folder membership in the batch column and leaves business batch status empty',async()=>{
  const api=apiFixture(true);
  const source={...file,relativePath:'冰柜\\SKDZU070JP-ZU70SD\\02.未转曲源文件\\铭牌.pdf',fileName:'铭牌.pdf',materialBatchId:null,materialBatchName:null};

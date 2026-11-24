@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { BomPage, localBusinessDateToday } from '../../src/renderer/pages/BomPage';
@@ -49,10 +49,33 @@ function apiFixture() {
 
 async function selectProduct(expectEmpty = true) {
   fireEvent.change(await screen.findByLabelText('BOM 产品型号'), { target: { value: '1' } });
-  if (expectEmpty) await screen.findByText('尚未建立 BOM');
+  if (expectEmpty) await screen.findByText('尚无当前 BOM');
 }
 
 describe('BomPage product-level BOM', () => {
+  it('shows an empty BOM only after a successful load for the selected product', async () => {
+    const api = apiFixture();
+    let finishOld!: (value: null) => void;
+    const old = new Promise<null>(resolve => { finishOld = resolve; });
+    api.getCurrentBom.mockImplementation((id: number) => id === 1 ? old
+      : id === 2 ? Promise.reject(new Error('所选型号读取失败')) : Promise.resolve(null));
+    const view = render(<BomPage api={api as never} />);
+    await screen.findByRole('option', { name: /ZC100/ });
+    expect(screen.getByText('请选择产品型号')).toBeVisible();
+    expect(screen.queryByText('尚无当前 BOM')).toBeNull();
+
+    view.rerender(<BomPage api={api as never} target={{productId: 1}} />);
+    expect(await screen.findByText('正在加载 BOM…')).toBeVisible();
+    expect(screen.queryByText('尚无当前 BOM')).toBeNull();
+    view.rerender(<BomPage api={api as never} target={{productId: 2}} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('所选型号读取失败');
+    await act(async () => { finishOld(null); await old; });
+    expect(screen.queryByText('尚无当前 BOM')).toBeNull();
+    view.rerender(<BomPage api={api as never} target={{productId: 3}} />);
+    expect(await screen.findByText('尚无当前 BOM')).toBeVisible();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('opens the exact requested history as a read-only detail and keeps the latest navigation target', async () => {
     let finishOld!: (value: unknown) => void;
     const old = new Promise(resolve => { finishOld = resolve; });
@@ -472,7 +495,7 @@ it('keeps entry category before model and uses only three query dropdowns with r
  const model=screen.getByLabelText('BOM 产品型号');expect(category.compareDocumentPosition(model)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
  expect(within(model).getAllByRole('option',{name:'SAMKYO · ZC100'})).toHaveLength(2);
  fireEvent.change(category,{target:{value:'冰柜'}});expect(model.querySelectorAll('option')).toHaveLength(2);
- fireEvent.change(model,{target:{value:'1'}});await screen.findByText('尚未建立 BOM');
+ fireEvent.change(model,{target:{value:'1'}});await screen.findByText('尚无当前 BOM');
  fireEvent.change(category,{target:{value:'冰箱'}});expect(model).toHaveValue('');
  fireEvent.click(screen.getByRole('button',{name:'查询 BOM'}));await screen.findByText('LOGO、说明书');
  expect(screen.queryByLabelText('查询 BOM 产品类别')).toBeNull();expect(screen.getAllByRole('combobox')).toHaveLength(3);

@@ -44,7 +44,7 @@ try{
  rows[21]=['0209','ZC200冰柜',null,null,'01','品牌甲',null,null,null,null,null,null,null,null];
  rows[22]=['0209','ZC220冰柜',null,null,'03','品牌乙',null,null,null,null,null,null,null,null];
  const buffer=await writeXlsxFile([{sheet:'新版图号',data:rows}]).toBuffer();
- await page.getByLabel('选择 Excel 文件').setInputFiles({name:'隔离检查.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
+ await page.getByLabel('选择图号字典 Excel').setInputFiles({name:'隔离检查.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
  await page.getByRole('button',{name:'开始检查'}).click();await page.getByRole('table',{name:'迁移问题工作表'}).waitFor();await shot('migration');
  await page.getByRole('button',{name:'查看原因'}).first().click();await shot('migration-detail');
  await page.getByRole('button',{name:'安全恢复',exact:true}).click();await shot('recovery');

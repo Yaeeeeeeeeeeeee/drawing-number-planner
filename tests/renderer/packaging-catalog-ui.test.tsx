@@ -22,6 +22,15 @@ describe('packaging catalog simplification',()=>{
     expect(screen.queryByRole('button',{name:'制图任务'})).not.toBeInTheDocument();
     expect(screen.queryByText('尺寸档案')).not.toBeInTheDocument();
     expect(screen.queryByText('批量创建临时文件夹')).not.toBeInTheDocument();
+    expect(screen.getByText('共 1 个模板')).toBeVisible();
+    expect(screen.queryByRole('heading',{name:'AIT 模板管理'})).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('按名称搜索'),{target:{value:'无匹配'}});
+    expect(screen.getByText('共 0 个模板')).toBeVisible();
+    fireEvent.click(screen.getByRole('tab',{name:'模板匹配规则'}));
+    expect(screen.getByText('共 0 条规则')).toBeVisible();
+    expect(screen.getByRole('button',{name:'新增匹配规则'})).toBeVisible();
+    fireEvent.click(screen.getByRole('tab',{name:'项目生成设置'}));
+    expect(screen.getByText('已配置 1 个项目')).toBeVisible();
     expect(packaging.saveConfig).not.toHaveBeenCalled();expect(listTasks).not.toHaveBeenCalled();
   });
   it('edits only drawing number mappings with Chinese content choices and preserves other stored mappings',async()=>{
