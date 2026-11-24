@@ -46,13 +46,13 @@
 | BOM-FILE-UI / §9 | 搜索图号、白色引用标签及附件并排/拖放/正确沿用 | 已实现 | BomDrawingField.tsx、BomAttachmentControl.tsx、bom-page.test.tsx。选择项目清除搜索，保留历史候选身份与按用途独立沿用。 |
 | BOM-IMPORT / §9 | 安全地从图号库批量导入与复制所选旧版 | 已实现 | BomDrawingImport.tsx / BomPage.tsx。历史版本复制回归及补充 UI 验证通过，验证同项目双选阻止、按图号 ID 导入和手动保存。 |
 | BOM-QUERY-UI / §10 | 属性网格、日期区分、图片对比、列表选择、搜索和工具收纳 | 已实现 | BomQuery.tsx 及 bom-worksheet.test.tsx；按需比较与同链版本、普通详情、批次标签、图号复制和历史异常均有专项。 |
-| BOM-EXPORT / §10、D-03 | 从所选保存历史版本生成 A4 PDF，完整业务字段与两类图片 | 待验证 | bom-export-document.ts、bom-pdf-export.ts、boms-api.test.ts；可打印 A4 文档已在 Chromium 输出，Electron 保存对话框需安装版验证。 |
+| BOM-EXPORT / §10、D-03 | 从所选保存历史版本生成 A4 PDF，完整业务字段与两类图片 | 已实现 | bom-export-document.ts、bom-pdf-export.ts、boms-api.test.ts；Windows 安装版验证 v52.bom.installedA4ExportVerified 通过，真实生成 PDF。测试指定保存目标，人工选择保存路径和物理打印待现场核验。 |
 | AIT-UI-FILE / §11 | 文件置顶、选择/拖放、成功/失败真反馈、路径唯一 | 已实现 | PackagingEditors.tsx 和 packaging-catalog-ui.test.tsx 覆盖选择、拖入受信文件、同路径重复检查；原始文件始终按路径引用。 |
 | AIT-UI-SCOPE / §11、D-02 | 品牌与指定型号保留并存，品牌过滤、分组胶囊 | 已实现 | PackagingEditors.tsx、ProductLinePicker.tsx，品牌范围及指定型号可并存，沿用 D-02。 |
 | AIT-OBJECT-FONT / §11、T-04 | 对象下拉、重新读取保手动映射、真实字体检测结果 | 已实现 | PackagingEditors.tsx 与 Illustrator 探测脚本区分成功、缺失、未知；组件/驱动测试验证保留已有手动映射。真实字体库及设计文件待现场核验。 |
 | AIT-UI-FORM / §11 | 表单分块、保存吸底、未保存保护、筛选/Tab、关联项目设置跳转 | 已实现 | PackagingEditors.tsx、PackagingTemplatesPage.tsx，提交/关闭保护、筛选和项目设置联动。 |
 | GENERATION-SUMMARY / §12 | 项目设置下只读摘要，已保存配置和未保存状态 | 已实现 | 包材项目设置页内只读摘要区分已保存配置与表单变更；包材专项目录通过。 |
-| UI-SHARED / §13 | 状态、抽屉操作、危险确认、瞬时反馈与窄屏尺寸 | 部分实现 | 已有布局与工具组件。随本轮页面更新核对真实交互。 |
+| UI-SHARED / §13 | 状态、抽屉操作、危险确认、瞬时反馈与窄屏尺寸 | 部分实现 | 已验证分组选择器、操作反馈、抽屉、危险操作确认和宽窄视口几何；全部页面在用户实际 Windows 缩放比例下的视觉一致性待现场核验。 |
 
 ## P2 与现场证据
 
