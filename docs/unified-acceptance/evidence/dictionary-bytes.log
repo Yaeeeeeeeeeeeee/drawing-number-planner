@@ -1,0 +1,15 @@
+npm warn Unknown project config "confirmModulesPurge". This will stop working in the next major version of npm.
+
+ RUN  v4.1.11 /tmp/planner-unified-final
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  18:55:56
+   Duration  3.60s (transform 211ms, setup 317ms, import 233ms, tests 2.56s, environment 0ms)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice

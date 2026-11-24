@@ -1,24 +1,24 @@
-name: Publish verified stable Windows release
+name: Publish verified unified Windows acceptance installer
 # Publish the fixed source and explicitly tracked verification evidence.
 on:
   push:
-    branches: [codex/v16-corrections-20261111]
+    branches: [codex/v16-unified-delivery-20261124]
     paths: ['.github/workflows/publish-stable-release.yml']
   workflow_dispatch:
 permissions:
   contents: write
   actions: read
 concurrency:
-  group: publish-stable-1.6.2
+  group: publish-unified-acceptance-1.6.2
   cancel-in-progress: false
 env:
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
-  SOURCE_SHA: 0610c06e8d73c2e616b5b2c0b0364ecb55aba784
-  VERIFIED_RUN: '44011078119'
-  SETUP_DIGEST: 'sha256:67385aca333ab628aee030a7933794a90903c2c839acfa0b81ed8ea580d0bcae'
-  REPORT_DIGEST: 'sha256:632f53e9e2bea9e70bb42b9918c1fa9a71a68382c006e0e6e6c9018173fbecd8'
-  RELEASE_TAG: v1.6.2
+  SOURCE_SHA: 56fb2efc6c6d3313c6823fd6b8f210d309325506
+  VERIFIED_RUN: '45244286272'
+  SETUP_DIGEST: 'sha256:5dee85dc504ad1410912a9a0a21e10ae9e3ceb247e78f3158952aff2663ffda7'
+  REPORT_DIGEST: 'sha256:9aadbfe345f1ae5427369709178e86594e0f86ad939f79165bdfbbeeb2dfab5a'
+  RELEASE_TAG: v1.6.2-unified-acceptance
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -63,8 +63,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir release-assets
+          gh api "repos/$GH_REPO/actions/runs/$VERIFIED_RUN/logs" > release-assets/Windows-build-logs.zip
           python3 - <<'PY'
-          import pathlib,hashlib,shutil,json,os,zipfile,re
+          import pathlib,hashlib,shutil,json,os,zipfile
           report=pathlib.Path('verified-report')
           native=json.loads((report/'windows-comprehensive-verification.json').read_text(encoding='utf-8-sig'))
           assert native['revision']==os.environ['SOURCE_SHA']
@@ -95,8 +96,9 @@ jobs:
           assert mail['reasonSynchronizes'] and mail['directBodyEditPreserved'] and mail['signatureOnce'] and mail['actualClipboardCopy']
           assert mail['originalPdfHashesPreserved']==4 and mail['protectedRowsUnchanged'] and mail['zipAndSnapshotsUnchangedByDraft']
           v52=native['v52']
+          assert v52['bom']['installedA4ExportVerified']
           assert v52['actualInstalledHttpAndDom'] and v52['fixtureOnly']
-          assert all(v52['layout'][key] for key in ['centeredCells','rightmostReceivesShrunkWidth','stickyControlsAndHeaders','pdfSixIconActionsTwoGroups'])
+          assert all(v52['layout'][key] for key in ['pdfTextAlignedLeft','centeredProductAndQrCells','rightmostReceivesShrunkWidth','stickyControlsAndHeaders','pdfSixIconActionsTwoGroups'])
           files=v52['scopedFiles']
           assert (files['indexed'],files['excluded'],files['allBatches'],files['originalPdfHashesPreserved'])==(5,3,4,9)
           assert all(files[key] for key in ['sourceOnly02','dateDescending','currentAndHistoricalLabels','conflictOneRowNoPicker','unindexedReadOnly','missingVsUnavailable'])
@@ -112,7 +114,7 @@ jobs:
           ait=native['aitPackaging']
           assert all(ait[key] for key in ['actualInstalledHttpAndDom','catalogSavedThroughUi','matchingBasisChoicesThroughUi','rangeRuleAndSwapSaved','menuOrder','independentTaskMenu','numberOnlyMappingUi','planningNoDimensions','exactDrawingFocus','flatTemporaryDirectory','completedDeletionPreservesFiles','unfinishedDeletionReleasesLock','reservationToTask','watcherDetectedWithoutClick','manualAssociation','reviewHash','newArchiveAndScopedIndex','formalEditCopyOnly','formalBackupHashPreserved','backupReadableThroughRegisteredId','taskCleanupOnly','taskHistoryRetained','originalAitHashPreserved','protectedBusinessRowsPreserved','realProcessRestartPreservesTask'])
           confirmed=native['confirmedRequirements']
-          assert all(confirmed[key] for key in ['actualInstalledHttpAndDom','fourStepBatch','modelSpecificSelections','distinctCompleteCodes','persistedDraftRequiresFreshCheck','explicitConfirmation','exactLibraryNavigation','deletedDrawingTaskSafelyEnded','detachedPdfNotReclaimed','formalFileHashPreserved','endedNotArchived','taskLockReleased'])
+          assert all(confirmed[key] for key in ['actualInstalledHttpAndDom','threeStepBatch','modelSpecificSelections','distinctCompleteCodes','persistedDraftRequiresFreshCheck','explicitConfirmation','exactLibraryNavigation','deletedDrawingTaskSafelyEnded','detachedPdfNotReclaimed','formalFileHashPreserved','endedNotArchived','taskLockReleased'])
           assert not confirmed['productionDatabaseOperated']
           reselection=native['databaseReselection']
           assert all(reselection[key] for key in ['actualNativePicker','rendererCancelPreservesProfile','nativeMenuSwitch','selectedOtherExistingDirectory','returnedOriginalDirectory','protectedBusinessRowsPreserved','backupsRequiredAndVerified'])
@@ -134,42 +136,34 @@ jobs:
           assert not any(row['event']=='timeout' for row in large['records'])
           source=pathlib.Path('verified-installer/图号规划器-Windows-x64-安装包.exe')
           assert source.is_file() and source.read_bytes()[:2]==b'MZ'
-          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.6.2-Windows-x64-Setup.exe')
+          target=pathlib.Path('release-assets/DrawingNumberPlanner-1.6.2-Unified-Windows-x64-Setup.exe')
           shutil.copyfile(source,target)
           assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest()
           shutil.copyfile('docs/install-and-upgrade.md','release-assets/INSTALL-UPGRADE.md')
-          notes=pathlib.Path('docs/release-1.6.2.md').read_text()
-          prefix=f"https://github.com/{os.environ['GH_REPO']}/blob/{os.environ['GITHUB_SHA']}/docs/"
-          notes=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+m.group(1)+')',notes)
-          test_report=pathlib.Path('docs/v16-corrections/FINAL_REPORT.md').read_text()
-          test_report=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m:']('+prefix+'v16-corrections/'+m.group(1)+')',test_report)
-          pathlib.Path('release-assets/TEST-REPORT-1.6.2.md').write_text(test_report)
-          notes+=f"\n\n正式源码：`{os.environ['SOURCE_SHA']}`，Tag `v1.6.2`。\n\n完整自动化 **241文件、2101项通过；Chromium 26项通过**，随后目录分组专项及邮件抄送恢复专项各1项通过；类型和源码构建通过。Windows实际安装与业务验证：[运行 {os.environ['VERIFIED_RUN']}](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['VERIFIED_RUN']})。本轮待用户重新验收，真实Adobe及物理DPI不在自动化通过范围。\n"
-          pathlib.Path('release-assets/README-Windows-1.6.2.md').write_text(notes)
+          notes=pathlib.Path('docs/unified-acceptance/RELEASE-NOTES.md')
+          shutil.copyfile(notes,'release-assets/RELEASE-NOTES.md')
+          shutil.copyfile('docs/unified-acceptance/TEST-REPORT.md','release-assets/TEST-REPORT.md')
+          with zipfile.ZipFile('release-assets/Windows-build-logs.zip') as log:
+              assert log.namelist() and log.testzip() is None
+          installer_checksum = hashlib.sha256(target.read_bytes()).hexdigest()
+          print('WINDOWS_INSTALLER_SHA256='+installer_checksum)
           with zipfile.ZipFile('release-assets/Verification-Windows-1.6.2-Verified.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(report.rglob('*')):
                   if file.is_file(): archive.write(file,file.relative_to(report))
-          proof=pathlib.Path('docs/v16-corrections/evidence')
-          for entry in json.loads((proof/'MANIFEST.json').read_text())['files']:
-              item=proof/entry['path']
-              assert item.is_file() and item.stat().st_size==entry['bytes']
-              assert hashlib.sha256(item.read_bytes()).hexdigest()==entry['sha256']
-          shutil.copytree(proof,'release-assets/automated-evidence')
-          with zipfile.ZipFile('release-assets/Verification-Automated-1.6.2.zip','w',zipfile.ZIP_DEFLATED) as archive:
-              for file in sorted(pathlib.Path('release-assets/automated-evidence').rglob('*')):
-                  if file.is_file(): archive.write(file,file.relative_to('release-assets/automated-evidence'))
-          shutil.rmtree('release-assets/automated-evidence')
+          with zipfile.ZipFile('release-assets/Regression-1.6.2.zip','w',zipfile.ZIP_DEFLATED) as archive:
+              for file in sorted(pathlib.Path('docs/unified-acceptance').rglob('*')):
+                  if file.is_file(): archive.write(file,file.relative_to('docs/unified-acceptance'))
           files=sorted(pathlib.Path('release-assets').iterdir())
           pathlib.Path('release-assets/SHA256SUMS.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files))
           PY
-      - name: Publish stable tag and permanent download
+      - name: Publish a separate acceptance download
         shell: bash
         run: |
           set -euo pipefail
           existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
           test "$existing" = "$SOURCE_SHA" || { echo 'Refuse to replace another source tag'; exit 1; }
           if ! gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 v1.6.2 · Windows 正式版' --notes-file release-assets/README-Windows-1.6.2.md --draft
+            gh release create "$RELEASE_TAG" --verify-tag --title '图号规划器 1.6.2 · 全范围验收版' --notes-file release-assets/RELEASE-NOTES.md --draft --prerelease --latest=false
           fi
-          gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --notes-file release-assets/README-Windows-1.6.2.md --draft=false --prerelease=false --latest
+          gh release upload "$RELEASE_TAG" release-assets/*
+          gh release edit "$RELEASE_TAG" --notes-file release-assets/RELEASE-NOTES.md --draft=false --prerelease --latest=false

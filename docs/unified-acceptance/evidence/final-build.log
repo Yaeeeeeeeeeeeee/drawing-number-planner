@@ -1,0 +1,31 @@
+npm warn Unknown project config "confirmModulesPurge". This will stop working in the next major version of npm.
+
+> drawing-number-planner@1.6.2 build
+> vite build && tsc -p tsconfig.main.json
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 2072 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/renderer/index.html                                   0.63 kB │ gzip:   0.40 kB
+dist/renderer/assets/pdf.worker.min-wgc6bjNh.mjs       1,078.61 kB
+dist/renderer/assets/PdfReader-sH0uLncl.css                2.38 kB │ gzip:   0.83 kB
+dist/renderer/assets/index-Dem1VA0A.css                  316.03 kB │ gzip:  50.49 kB
+dist/renderer/assets/pdf.worker.min-tZCqKnqW.js            0.05 kB │ gzip:   0.07 kB
+dist/renderer/assets/qr-first-page-pixels-BCBL06Kg.js      1.84 kB │ gzip:   1.03 kB
+dist/renderer/assets/PdfReader-PtBAnF53.js                 7.32 kB │ gzip:   2.82 kB
+dist/renderer/assets/pdf-DgBa19X4.js                     397.01 kB │ gzip: 117.42 kB
+dist/renderer/assets/index-z0Qr6-Vt.js                   837.84 kB │ gzip: 239.81 kB
+
+✓ built in 1.21s
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice

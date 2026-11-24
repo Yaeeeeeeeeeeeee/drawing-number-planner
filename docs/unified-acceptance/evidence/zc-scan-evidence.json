@@ -1,0 +1,2334 @@
+{
+  "schemaVersion": 26,
+  "fixture": [
+    {
+      "model": "ZC100",
+      "sku": "FIXZC1",
+      "variants": [
+        {
+          "productId": 1,
+          "versionId": 1,
+          "versionNumber": 1,
+          "appearanceId": 3,
+          "drawingId": 1,
+          "fullCode": "02.0401.010.0401001"
+        },
+        {
+          "productId": 1,
+          "versionId": 2,
+          "versionNumber": 2,
+          "appearanceId": 4,
+          "drawingId": 2,
+          "fullCode": "02.0401.020.0401001"
+        }
+      ]
+    },
+    {
+      "model": "ZC100（WB55）",
+      "sku": "FIXZC2",
+      "variants": [
+        {
+          "productId": 2,
+          "versionId": 3,
+          "versionNumber": 1,
+          "appearanceId": 3,
+          "drawingId": 3,
+          "fullCode": "02.0402.010.0401001"
+        },
+        {
+          "productId": 2,
+          "versionId": 4,
+          "versionNumber": 2,
+          "appearanceId": 4,
+          "drawingId": 4,
+          "fullCode": "02.0402.020.0401001"
+        }
+      ]
+    },
+    {
+      "model": "ZC200",
+      "sku": "FIXZC3",
+      "variants": [
+        {
+          "productId": 3,
+          "versionId": 5,
+          "versionNumber": 1,
+          "appearanceId": 3,
+          "drawingId": 5,
+          "fullCode": "02.0403.010.0401001"
+        },
+        {
+          "productId": 3,
+          "versionId": 6,
+          "versionNumber": 2,
+          "appearanceId": 4,
+          "drawingId": 6,
+          "fullCode": "02.0403.020.0401001"
+        }
+      ]
+    },
+    {
+      "model": "ZC200（WB55）",
+      "sku": "FIXZC4",
+      "variants": [
+        {
+          "productId": 4,
+          "versionId": 7,
+          "versionNumber": 1,
+          "appearanceId": 3,
+          "drawingId": 7,
+          "fullCode": "02.0404.010.0401001"
+        },
+        {
+          "productId": 4,
+          "versionId": 8,
+          "versionNumber": 2,
+          "appearanceId": 4,
+          "drawingId": 8,
+          "fullCode": "02.0404.020.0401001"
+        }
+      ]
+    }
+  ],
+  "scanBefore": {
+    "scope": {
+      "kind": "workspace",
+      "productDirectories": []
+    },
+    "id": 1,
+    "completedAt": "2026-11-23T08:09:39.022Z",
+    "currentTotal": 7,
+    "added": 7,
+    "missing": 0,
+    "moved": 0,
+    "changed": 0,
+    "unchanged": 0
+  },
+  "watcherScan": {
+    "scope": {
+      "kind": "products",
+      "productDirectories": [
+        "冰柜/FIXZC4-ZC200（WB55）"
+      ]
+    },
+    "id": 9,
+    "completedAt": "2026-11-23T08:09:46.220Z",
+    "currentTotal": 3,
+    "added": 2,
+    "missing": 0,
+    "moved": 0,
+    "changed": 0,
+    "unchanged": 1
+  },
+  "archiveScan": {
+    "scope": {
+      "kind": "products",
+      "productDirectories": [
+        "冰柜/FIXZC4-ZC200（WB55）"
+      ]
+    },
+    "id": 13,
+    "completedAt": "2026-11-23T08:09:50.287Z",
+    "currentTotal": 4,
+    "added": 1,
+    "missing": 0,
+    "moved": 0,
+    "changed": 0,
+    "unchanged": 3
+  },
+  "manualScan": {
+    "scope": {
+      "kind": "workspace",
+      "productDirectories": []
+    },
+    "id": 14,
+    "completedAt": "2026-11-23T08:09:51.561Z",
+    "currentTotal": 16,
+    "added": 0,
+    "missing": 0,
+    "moved": 0,
+    "changed": 0,
+    "unchanged": 16
+  },
+  "pdfBefore": [
+    {
+      "id": 3,
+      "fileName": "02.0401.010.0401001-02.0402.010.0401001-两个图号.pdf",
+      "drawingId": null,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "pending",
+      "classificationWarning": "ambiguous"
+    },
+    {
+      "id": 1,
+      "fileName": "02.0401.010.0401001-夹具1外观1.pdf",
+      "drawingId": 1,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 2,
+      "fileName": "02.0401.020.0402001-强制脱钩.pdf",
+      "drawingId": null,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "pending",
+      "classificationWarning": "drawing-force-released"
+    },
+    {
+      "id": 4,
+      "fileName": "02.0402.010.0401001-夹具2外观1.pdf",
+      "drawingId": 3,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 5,
+      "fileName": "02.0402.020.0401722-人工绑定（转曲）.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 3,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 6,
+      "fileName": "02.0403.010.0401001-夹具3外观1.pdf",
+      "drawingId": 5,
+      "historicalDrawingId": null,
+      "productId": 3,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 7,
+      "fileName": "02.0404.010.0401001-夹具4外观1.pdf",
+      "drawingId": 7,
+      "historicalDrawingId": null,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    }
+  ],
+  "pdfAfterWatcher": [
+    {
+      "id": 3,
+      "fileName": "02.0401.010.0401001-02.0402.010.0401001-两个图号.pdf",
+      "drawingId": null,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "pending",
+      "classificationWarning": "ambiguous"
+    },
+    {
+      "id": 1,
+      "fileName": "02.0401.010.0401001-夹具1外观1.pdf",
+      "drawingId": 1,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 16,
+      "fileName": "02.0401.020.0401001-夹具1外观2.pdf",
+      "drawingId": 2,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 17,
+      "fileName": "02.0401.020.0401721-候选A.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 2,
+      "productId": 1,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 20,
+      "fileName": "02.0401.020.0401721-候选B.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 2,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 2,
+      "fileName": "02.0401.020.0402001-强制脱钩.pdf",
+      "drawingId": null,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "pending",
+      "classificationWarning": "drawing-force-released"
+    },
+    {
+      "id": 4,
+      "fileName": "02.0402.010.0401001-夹具2外观1.pdf",
+      "drawingId": 3,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 22,
+      "fileName": "02.0402.020.0401001-夹具2外观2.pdf",
+      "drawingId": 4,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 5,
+      "fileName": "02.0402.020.0401722-人工绑定（转曲）.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 3,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 6,
+      "fileName": "02.0403.010.0401001-夹具3外观1.pdf",
+      "drawingId": 5,
+      "historicalDrawingId": null,
+      "productId": 3,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 25,
+      "fileName": "02.0403.020.0401001-夹具3外观2.pdf",
+      "drawingId": 6,
+      "historicalDrawingId": null,
+      "productId": 3,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 26,
+      "fileName": "02.0403.020.0401720-新增候选.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 1,
+      "productId": 3,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 7,
+      "fileName": "02.0404.010.0401001-夹具4外观1.pdf",
+      "drawingId": 7,
+      "historicalDrawingId": null,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 28,
+      "fileName": "02.0404.020.0401001-夹具4外观2.pdf",
+      "drawingId": 8,
+      "historicalDrawingId": null,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 29,
+      "fileName": "02.0404.020.0401723-新增历史图号.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 10,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    }
+  ],
+  "pdfAfterArchive": [
+    {
+      "id": 3,
+      "fileName": "02.0401.010.0401001-02.0402.010.0401001-两个图号.pdf",
+      "drawingId": null,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "pending",
+      "classificationWarning": "ambiguous"
+    },
+    {
+      "id": 1,
+      "fileName": "02.0401.010.0401001-夹具1外观1.pdf",
+      "drawingId": 1,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 16,
+      "fileName": "02.0401.020.0401001-夹具1外观2.pdf",
+      "drawingId": 2,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 17,
+      "fileName": "02.0401.020.0401721-候选A.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 2,
+      "productId": 1,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 20,
+      "fileName": "02.0401.020.0401721-候选B.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 2,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 2,
+      "fileName": "02.0401.020.0402001-强制脱钩.pdf",
+      "drawingId": null,
+      "historicalDrawingId": null,
+      "productId": 1,
+      "matchStatus": "pending",
+      "classificationWarning": "drawing-force-released"
+    },
+    {
+      "id": 4,
+      "fileName": "02.0402.010.0401001-夹具2外观1.pdf",
+      "drawingId": 3,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 22,
+      "fileName": "02.0402.020.0401001-夹具2外观2.pdf",
+      "drawingId": 4,
+      "historicalDrawingId": null,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 5,
+      "fileName": "02.0402.020.0401722-人工绑定（转曲）.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 3,
+      "productId": 2,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 6,
+      "fileName": "02.0403.010.0401001-夹具3外观1.pdf",
+      "drawingId": 5,
+      "historicalDrawingId": null,
+      "productId": 3,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 25,
+      "fileName": "02.0403.020.0401001-夹具3外观2.pdf",
+      "drawingId": 6,
+      "historicalDrawingId": null,
+      "productId": 3,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 26,
+      "fileName": "02.0403.020.0401720-新增候选.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 1,
+      "productId": 3,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 7,
+      "fileName": "02.0404.010.0401001-夹具4外观1.pdf",
+      "drawingId": 7,
+      "historicalDrawingId": null,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 28,
+      "fileName": "02.0404.020.0401001-夹具4外观2.pdf",
+      "drawingId": 8,
+      "historicalDrawingId": null,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 29,
+      "fileName": "02.0404.020.0401723-新增历史图号.pdf",
+      "drawingId": null,
+      "historicalDrawingId": 10,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    },
+    {
+      "id": 44,
+      "fileName": "02.0404.020.0402001-ZC 隔离测试品牌-ZC200(WB55)白色-归档项目.pdf",
+      "drawingId": 9,
+      "historicalDrawingId": null,
+      "productId": 4,
+      "matchStatus": "matched",
+      "classificationWarning": null
+    }
+  ],
+  "diagnosisBefore": [
+    {
+      "signedId": -1,
+      "fullCode": "02.0403.020.0401720",
+      "state": "missing-product",
+      "evidence": [
+        "扫描信息为归类候选；唯一产品可直接归类，多产品歧义保留待处理"
+      ],
+      "targets": [],
+      "untouched": true,
+      "automaticEligible": false
+    },
+    {
+      "signedId": -2,
+      "fullCode": "02.0401.020.0401721",
+      "state": "missing-product",
+      "evidence": [
+        "扫描信息为归类候选；唯一产品可直接归类，多产品歧义保留待处理"
+      ],
+      "targets": [],
+      "untouched": true,
+      "automaticEligible": false
+    },
+    {
+      "signedId": -3,
+      "fullCode": "02.0402.020.0401722",
+      "state": "associated",
+      "evidence": [
+        "confirmed-pdf: 产品 ID 2",
+        "confirmed: 产品 ID 2，原外观版本 ID 4"
+      ],
+      "targets": [
+        {
+          "signedId": -3,
+          "productId": 2,
+          "appearanceVersionId": 4
+        }
+      ],
+      "untouched": false,
+      "automaticEligible": false
+    }
+  ],
+  "diagnosisAfterWatcher": [
+    {
+      "signedId": -1,
+      "fullCode": "02.0403.020.0401720",
+      "state": "ready",
+      "evidence": [
+        "原扫描产品 ID 3 及相同 SKU / 型号档案仅为候选",
+        "目录 SKU FIXZC3 / 型号 ZC200 精确候选，尚未归类",
+        "关联 PDF 的完整 SKU-型号目录对应全部产品档案候选",
+        "扫描信息为归类候选；唯一产品可直接归类，多产品歧义保留待处理"
+      ],
+      "targets": [
+        {
+          "signedId": -1,
+          "productId": 3,
+          "appearanceVersionId": null
+        }
+      ],
+      "untouched": true,
+      "automaticEligible": false
+    },
+    {
+      "signedId": -2,
+      "fullCode": "02.0401.020.0401721",
+      "state": "ambiguous",
+      "evidence": [
+        "原扫描产品 ID 2 及相同 SKU / 型号档案仅为候选",
+        "目录 SKU FIXZC2 / 型号 ZC100（WB55） 精确候选，尚未归类",
+        "关联 PDF 的完整 SKU-型号目录对应全部产品档案候选",
+        "扫描信息为归类候选；唯一产品可直接归类，多产品歧义保留待处理"
+      ],
+      "targets": [
+        {
+          "signedId": -2,
+          "productId": 2,
+          "appearanceVersionId": null
+        },
+        {
+          "signedId": -2,
+          "productId": 1,
+          "appearanceVersionId": null
+        }
+      ],
+      "untouched": true,
+      "automaticEligible": false
+    },
+    {
+      "signedId": -3,
+      "fullCode": "02.0402.020.0401722",
+      "state": "associated",
+      "evidence": [
+        "confirmed-pdf: 产品 ID 2",
+        "confirmed: 产品 ID 2，原外观版本 ID 4"
+      ],
+      "targets": [
+        {
+          "signedId": -3,
+          "productId": 2,
+          "appearanceVersionId": 4
+        }
+      ],
+      "untouched": false,
+      "automaticEligible": false
+    }
+  ],
+  "protectedBefore": {
+    "products": [
+      {
+        "id": 1,
+        "brand_id": 1,
+        "product_size_id": 8,
+        "default_appearance_id": 3,
+        "model": "ZC100",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.973Z",
+        "deactivated_at": null,
+        "sku": "FIXZC1",
+        "deleted_at": null,
+        "deletion_reason": null
+      },
+      {
+        "id": 2,
+        "brand_id": 1,
+        "product_size_id": 9,
+        "default_appearance_id": 3,
+        "model": "ZC100（WB55）",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.978Z",
+        "deactivated_at": null,
+        "sku": "FIXZC2",
+        "deleted_at": null,
+        "deletion_reason": null
+      },
+      {
+        "id": 3,
+        "brand_id": 1,
+        "product_size_id": 10,
+        "default_appearance_id": 3,
+        "model": "ZC200",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.982Z",
+        "deactivated_at": null,
+        "sku": "FIXZC3",
+        "deleted_at": null,
+        "deletion_reason": null
+      },
+      {
+        "id": 4,
+        "brand_id": 1,
+        "product_size_id": 11,
+        "default_appearance_id": 3,
+        "model": "ZC200（WB55）",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.986Z",
+        "deactivated_at": null,
+        "sku": "FIXZC4",
+        "deleted_at": null,
+        "deletion_reason": null
+      }
+    ],
+    "product_appearance_versions": [
+      {
+        "id": 1,
+        "product_id": 1,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.973Z",
+        "activated_at": "2026-11-23T08:09:38.975Z"
+      },
+      {
+        "id": 2,
+        "product_id": 1,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.976Z",
+        "activated_at": "2026-11-23T08:09:38.977Z"
+      },
+      {
+        "id": 3,
+        "product_id": 2,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.979Z",
+        "activated_at": "2026-11-23T08:09:38.979Z"
+      },
+      {
+        "id": 4,
+        "product_id": 2,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.980Z",
+        "activated_at": "2026-11-23T08:09:38.981Z"
+      },
+      {
+        "id": 5,
+        "product_id": 3,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.982Z",
+        "activated_at": "2026-11-23T08:09:38.983Z"
+      },
+      {
+        "id": 6,
+        "product_id": 3,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.984Z",
+        "activated_at": "2026-11-23T08:09:38.985Z"
+      },
+      {
+        "id": 7,
+        "product_id": 4,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.986Z",
+        "activated_at": "2026-11-23T08:09:38.987Z"
+      },
+      {
+        "id": 8,
+        "product_id": 4,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.988Z",
+        "activated_at": "2026-11-23T08:09:38.989Z"
+      }
+    ],
+    "product_identity_members": [
+      {
+        "raw_product_id": 1,
+        "canonical_product_id": 1,
+        "merged_at": null
+      },
+      {
+        "raw_product_id": 2,
+        "canonical_product_id": 2,
+        "merged_at": null
+      },
+      {
+        "raw_product_id": 3,
+        "canonical_product_id": 3,
+        "merged_at": null
+      },
+      {
+        "raw_product_id": 4,
+        "canonical_product_id": 4,
+        "merged_at": null
+      }
+    ],
+    "drawing_numbers": [
+      {
+        "id": 1,
+        "full_code": "02.0401.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-铭牌",
+        "product_id": 1,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.976Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 2,
+        "full_code": "02.0401.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-铭牌",
+        "product_id": 1,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.978Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 3,
+        "full_code": "02.0402.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100（WB55）白色-铭牌",
+        "product_id": 2,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0402",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.980Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 4,
+        "full_code": "02.0402.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100（WB55）白色-铭牌",
+        "product_id": 2,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0402",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.982Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 5,
+        "full_code": "02.0403.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200白色-铭牌",
+        "product_id": 3,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0403",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.984Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 6,
+        "full_code": "02.0403.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200白色-铭牌",
+        "product_id": 3,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0403",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.986Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 7,
+        "full_code": "02.0404.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200（WB55）白色-铭牌",
+        "product_id": 4,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0404",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.988Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 8,
+        "full_code": "02.0404.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200（WB55）白色-铭牌",
+        "product_id": 4,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0404",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.990Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 9,
+        "full_code": "02.0404.020.0402001",
+        "display_name": "ZC 隔离测试品牌-ZC200（WB55）白色-归档项目",
+        "product_id": 4,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 7,
+        "brand_code": "02",
+        "product_size_code": "0404",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "02",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.991Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 10,
+        "full_code": "__force_released__:planned:10:1",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-归档项目",
+        "product_id": 1,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 7,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "02",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.992Z",
+        "deleted_at": "2026-11-23T08:09:39.072Z",
+        "deletion_mode": "release",
+        "deleted_full_code": "02.0401.020.0402001",
+        "deleted_previous_status": "reserved",
+        "deleted_reason": null,
+        "scan_resolution": "ignore"
+      },
+      {
+        "id": 11,
+        "full_code": "02.0401.020.0402001",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-归档项目",
+        "product_id": 1,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 7,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "02",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:39.074Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      }
+    ],
+    "drawing_appearance_bindings": [
+      {
+        "origin": "planned",
+        "record_id": 1,
+        "product_id": 1,
+        "appearance_version_id": 1,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.976Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 2,
+        "product_id": 1,
+        "appearance_version_id": 2,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.978Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 3,
+        "product_id": 2,
+        "appearance_version_id": 3,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.980Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 4,
+        "product_id": 2,
+        "appearance_version_id": 4,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.982Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 5,
+        "product_id": 3,
+        "appearance_version_id": 5,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.984Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 6,
+        "product_id": 3,
+        "appearance_version_id": 6,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.986Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 7,
+        "product_id": 4,
+        "appearance_version_id": 7,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.988Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 8,
+        "product_id": 4,
+        "appearance_version_id": 8,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.990Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 9,
+        "product_id": 4,
+        "appearance_version_id": 8,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.991Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 10,
+        "product_id": 1,
+        "appearance_version_id": 2,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.992Z"
+      },
+      {
+        "origin": "historical",
+        "record_id": 3,
+        "product_id": 2,
+        "appearance_version_id": 4,
+        "source": "confirmed",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:39.066Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 11,
+        "product_id": 1,
+        "appearance_version_id": 2,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:39.074Z"
+      }
+    ],
+    "drawing_appearance_usages": [],
+    "drawing_association_audit": [
+      {
+        "id": 1,
+        "origin": "historical",
+        "record_id": 3,
+        "previous_product_id": 2,
+        "previous_appearance_version_id": null,
+        "product_id": 2,
+        "appearance_version_id": 4,
+        "evidence_json": "[\"用户人工明确确认产品归属\"]",
+        "reason": "台架人工绑定",
+        "created_at": "2026-11-23T08:09:39.066Z"
+      }
+    ],
+    "drawing_force_releases": [
+      {
+        "id": 1,
+        "origin": "planned",
+        "record_id": 10,
+        "full_code": "02.0401.020.0402001",
+        "fingerprint": "92d1de7483dd5f403b67332aa1f29c974b6afe97791112e2ab10110d3fc007b0",
+        "snapshot_json": "{\"drawing\":{\"id\":10,\"full_code\":\"02.0401.020.0402001\",\"display_name\":\"ZC 隔离测试品牌-ZC100白色-归档项目\",\"product_id\":1,\"appearance_id\":4,\"color_id\":2,\"main_category_id\":5,\"project_item_id\":7,\"brand_code\":\"02\",\"product_size_code\":\"0401\",\"appearance_code\":\"02\",\"color_code\":\"0\",\"main_category_code\":\"04\",\"project_item_code\":\"02\",\"sequence\":1,\"status\":\"reserved\",\"previous_drawing_id\":null,\"change_reason\":null,\"source_product_id\":null,\"source_drawing_id\":null,\"notes\":null,\"created_at\":\"2026-11-23T08:09:38.992Z\",\"deleted_at\":null,\"deletion_mode\":null,\"deleted_full_code\":null,\"deleted_previous_status\":null,\"deleted_reason\":null,\"scan_resolution\":null},\"pdf\":[{\"id\":2,\"relative_path\":\"冰柜/FIXZC1-ZC100/02.未转曲源文件/02.0401.020.0402001-强制脱钩.pdf\",\"file_name\":\"02.0401.020.0402001-强制脱钩.pdf\",\"drawing_id\":10,\"historical_drawing_id\":null,\"match_status\":\"matched\",\"detected_codes_json\":\"[\\\"02.0401.020.0402001\\\"]\",\"conversion_type\":\"source\",\"classification_warning\":null,\"size_bytes\":46,\"modified_at\":\"2026-11-23T08:09:38.988Z\",\"scanned_at\":\"2026-11-23T08:09:39.022Z\",\"is_present\":1,\"path_key\":\"冰柜\\\\fixzc1-zc100\\\\02.未转曲源文件\\\\02.0401.020.0402001-强制脱钩.pdf\",\"material_batch_id\":null,\"content_sha256\":\"b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f\",\"last_seen_scan_run_id\":1,\"management_state\":\"included\"}],\"bom\":[],\"bomSnapshots\":[],\"outbound\":[],\"outboundSnapshots\":[],\"email\":[],\"usages\":[],\"bindings\":[{\"origin\":\"planned\",\"record_id\":10,\"product_id\":1,\"appearance_version_id\":2,\"source\":\"planning\",\"revision\":1,\"updated_at\":\"2026-11-23T08:09:38.992Z\"}],\"lineage\":[],\"audits\":{\"association\":[],\"usage\":[],\"deletion\":[],\"merge\":[]},\"snapshotOwners\":[],\"archivedPaths\":[]}",
+        "references_json": "{\"drawingRecords\":1,\"pdf\":1,\"presentPdf\":1,\"missingPdf\":0,\"currentBom\":0,\"historicalBom\":0,\"deletedBom\":0,\"bomSnapshots\":0,\"outboundItems\":0,\"outboundSnapshots\":0,\"emailDrafts\":0,\"appearanceUsages\":0,\"bindings\":1,\"lineage\":0,\"audits\":0,\"products\":1}",
+        "reason": null,
+        "created_at": "2026-11-23T08:09:39.072Z"
+      }
+    ],
+    "drawing_force_release_files": [
+      {
+        "release_id": 1,
+        "relative_path": "冰柜/FIXZC1-ZC100/02.未转曲源文件/02.0401.020.0402001-强制脱钩.pdf",
+        "path_key": "冰柜\\fixzc1-zc100\\02.未转曲源文件\\02.0401.020.0402001-强制脱钩.pdf",
+        "full_code": "02.0401.020.0402001"
+      }
+    ],
+    "pdf_product_assignments": [
+      {
+        "pdf_file_id": 5,
+        "product_id": 2,
+        "material_batch_id": 1,
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:39.049Z"
+      }
+    ],
+    "pdf_product_assignment_audit": [
+      {
+        "id": 1,
+        "pdf_file_id": 5,
+        "previous_json": "{\"productId\":2,\"materialBatchId\":1,\"assignment\":null}",
+        "target_json": "{\"productId\":2,\"materialBatchId\":1,\"conflict\":null}",
+        "reason": "台架人工 PDF 归纳",
+        "created_at": "2026-11-23T08:09:39.049Z"
+      }
+    ],
+    "schema_migrations": [
+      {
+        "version": 1,
+        "applied_at": "2026-11-23T08:09:38.669Z"
+      },
+      {
+        "version": 2,
+        "applied_at": "2026-11-23T08:09:38.678Z"
+      },
+      {
+        "version": 3,
+        "applied_at": "2026-11-23T08:09:38.679Z"
+      },
+      {
+        "version": 4,
+        "applied_at": "2026-11-23T08:09:38.679Z"
+      },
+      {
+        "version": 5,
+        "applied_at": "2026-11-23T08:09:38.683Z"
+      },
+      {
+        "version": 6,
+        "applied_at": "2026-11-23T08:09:38.687Z"
+      },
+      {
+        "version": 7,
+        "applied_at": "2026-11-23T08:09:38.689Z"
+      },
+      {
+        "version": 8,
+        "applied_at": "2026-11-23T08:09:38.691Z"
+      },
+      {
+        "version": 9,
+        "applied_at": "2026-11-23T08:09:38.707Z"
+      },
+      {
+        "version": 10,
+        "applied_at": "2026-11-23T08:09:38.758Z"
+      },
+      {
+        "version": 11,
+        "applied_at": "2026-11-23T08:09:38.766Z"
+      },
+      {
+        "version": 12,
+        "applied_at": "2026-11-23T08:09:38.805Z"
+      },
+      {
+        "version": 13,
+        "applied_at": "2026-11-23T08:09:38.862Z"
+      },
+      {
+        "version": 14,
+        "applied_at": "2026-11-23T08:09:38.881Z"
+      },
+      {
+        "version": 15,
+        "applied_at": "2026-11-23T08:09:38.882Z"
+      },
+      {
+        "version": 16,
+        "applied_at": "2026-11-23T08:09:38.897Z"
+      },
+      {
+        "version": 17,
+        "applied_at": "2026-11-23T08:09:38.905Z"
+      },
+      {
+        "version": 18,
+        "applied_at": "2026-11-23T08:09:38.907Z"
+      },
+      {
+        "version": 19,
+        "applied_at": "2026-11-23T08:09:38.909Z"
+      },
+      {
+        "version": 20,
+        "applied_at": "2026-11-23T08:09:38.910Z"
+      },
+      {
+        "version": 21,
+        "applied_at": "2026-11-23T08:09:38.914Z"
+      },
+      {
+        "version": 22,
+        "applied_at": "2026-11-23T08:09:38.942Z"
+      },
+      {
+        "version": 23,
+        "applied_at": "2026-11-23T08:09:38.950Z"
+      },
+      {
+        "version": 24,
+        "applied_at": "2026-11-23T08:09:38.956Z"
+      },
+      {
+        "version": 25,
+        "applied_at": "2026-11-23T08:09:38.965Z"
+      },
+      {
+        "version": 26,
+        "applied_at": "2026-11-23T08:09:38.969Z"
+      }
+    ],
+    "bom_versions": [],
+    "bom_items": []
+  },
+  "protectedAfter": {
+    "products": [
+      {
+        "id": 1,
+        "brand_id": 1,
+        "product_size_id": 8,
+        "default_appearance_id": 3,
+        "model": "ZC100",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.973Z",
+        "deactivated_at": null,
+        "sku": "FIXZC1",
+        "deleted_at": null,
+        "deletion_reason": null
+      },
+      {
+        "id": 2,
+        "brand_id": 1,
+        "product_size_id": 9,
+        "default_appearance_id": 3,
+        "model": "ZC100（WB55）",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.978Z",
+        "deactivated_at": null,
+        "sku": "FIXZC2",
+        "deleted_at": null,
+        "deletion_reason": null
+      },
+      {
+        "id": 3,
+        "brand_id": 1,
+        "product_size_id": 10,
+        "default_appearance_id": 3,
+        "model": "ZC200",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.982Z",
+        "deactivated_at": null,
+        "sku": "FIXZC3",
+        "deleted_at": null,
+        "deletion_reason": null
+      },
+      {
+        "id": 4,
+        "brand_id": 1,
+        "product_size_id": 11,
+        "default_appearance_id": 3,
+        "model": "ZC200（WB55）",
+        "product_category": "冰柜",
+        "reference_product_id": null,
+        "status": "active",
+        "created_at": "2026-11-23T08:09:38.986Z",
+        "deactivated_at": null,
+        "sku": "FIXZC4",
+        "deleted_at": null,
+        "deletion_reason": null
+      }
+    ],
+    "product_appearance_versions": [
+      {
+        "id": 1,
+        "product_id": 1,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.973Z",
+        "activated_at": "2026-11-23T08:09:38.975Z"
+      },
+      {
+        "id": 2,
+        "product_id": 1,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.976Z",
+        "activated_at": "2026-11-23T08:09:38.977Z"
+      },
+      {
+        "id": 3,
+        "product_id": 2,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.979Z",
+        "activated_at": "2026-11-23T08:09:38.979Z"
+      },
+      {
+        "id": 4,
+        "product_id": 2,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.980Z",
+        "activated_at": "2026-11-23T08:09:38.981Z"
+      },
+      {
+        "id": 5,
+        "product_id": 3,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.982Z",
+        "activated_at": "2026-11-23T08:09:38.983Z"
+      },
+      {
+        "id": 6,
+        "product_id": 3,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.984Z",
+        "activated_at": "2026-11-23T08:09:38.985Z"
+      },
+      {
+        "id": 7,
+        "product_id": 4,
+        "version_number": 1,
+        "appearance_id": 3,
+        "label": "1号外观",
+        "status": "historical",
+        "predecessor_id": null,
+        "revision": 2,
+        "created_at": "2026-11-23T08:09:38.986Z",
+        "activated_at": "2026-11-23T08:09:38.987Z"
+      },
+      {
+        "id": 8,
+        "product_id": 4,
+        "version_number": 2,
+        "appearance_id": 4,
+        "label": "2号外观",
+        "status": "current",
+        "predecessor_id": null,
+        "revision": 1,
+        "created_at": "2026-11-23T08:09:38.988Z",
+        "activated_at": "2026-11-23T08:09:38.989Z"
+      }
+    ],
+    "product_identity_members": [
+      {
+        "raw_product_id": 1,
+        "canonical_product_id": 1,
+        "merged_at": null
+      },
+      {
+        "raw_product_id": 2,
+        "canonical_product_id": 2,
+        "merged_at": null
+      },
+      {
+        "raw_product_id": 3,
+        "canonical_product_id": 3,
+        "merged_at": null
+      },
+      {
+        "raw_product_id": 4,
+        "canonical_product_id": 4,
+        "merged_at": null
+      }
+    ],
+    "drawing_numbers": [
+      {
+        "id": 1,
+        "full_code": "02.0401.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-铭牌",
+        "product_id": 1,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.976Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 2,
+        "full_code": "02.0401.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-铭牌",
+        "product_id": 1,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.978Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 3,
+        "full_code": "02.0402.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100（WB55）白色-铭牌",
+        "product_id": 2,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0402",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.980Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 4,
+        "full_code": "02.0402.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC100（WB55）白色-铭牌",
+        "product_id": 2,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0402",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.982Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 5,
+        "full_code": "02.0403.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200白色-铭牌",
+        "product_id": 3,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0403",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.984Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 6,
+        "full_code": "02.0403.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200白色-铭牌",
+        "product_id": 3,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0403",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.986Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 7,
+        "full_code": "02.0404.010.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200（WB55）白色-铭牌",
+        "product_id": 4,
+        "appearance_id": 3,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0404",
+        "appearance_code": "01",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.988Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 8,
+        "full_code": "02.0404.020.0401001",
+        "display_name": "ZC 隔离测试品牌-ZC200（WB55）白色-铭牌",
+        "product_id": 4,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 6,
+        "brand_code": "02",
+        "product_size_code": "0404",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "01",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.990Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 9,
+        "full_code": "02.0404.020.0402001",
+        "display_name": "ZC 隔离测试品牌-ZC200（WB55）白色-归档项目",
+        "product_id": 4,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 7,
+        "brand_code": "02",
+        "product_size_code": "0404",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "02",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.991Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      },
+      {
+        "id": 10,
+        "full_code": "__force_released__:planned:10:1",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-归档项目",
+        "product_id": 1,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 7,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "02",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:38.992Z",
+        "deleted_at": "2026-11-23T08:09:39.072Z",
+        "deletion_mode": "release",
+        "deleted_full_code": "02.0401.020.0402001",
+        "deleted_previous_status": "reserved",
+        "deleted_reason": null,
+        "scan_resolution": "ignore"
+      },
+      {
+        "id": 11,
+        "full_code": "02.0401.020.0402001",
+        "display_name": "ZC 隔离测试品牌-ZC100白色-归档项目",
+        "product_id": 1,
+        "appearance_id": 4,
+        "color_id": 2,
+        "main_category_id": 5,
+        "project_item_id": 7,
+        "brand_code": "02",
+        "product_size_code": "0401",
+        "appearance_code": "02",
+        "color_code": "0",
+        "main_category_code": "04",
+        "project_item_code": "02",
+        "sequence": 1,
+        "status": "reserved",
+        "previous_drawing_id": null,
+        "change_reason": null,
+        "source_product_id": null,
+        "source_drawing_id": null,
+        "notes": null,
+        "created_at": "2026-11-23T08:09:39.074Z",
+        "deleted_at": null,
+        "deletion_mode": null,
+        "deleted_full_code": null,
+        "deleted_previous_status": null,
+        "deleted_reason": null,
+        "scan_resolution": null
+      }
+    ],
+    "drawing_appearance_bindings": [
+      {
+        "origin": "planned",
+        "record_id": 1,
+        "product_id": 1,
+        "appearance_version_id": 1,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.976Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 2,
+        "product_id": 1,
+        "appearance_version_id": 2,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.978Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 3,
+        "product_id": 2,
+        "appearance_version_id": 3,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.980Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 4,
+        "product_id": 2,
+        "appearance_version_id": 4,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.982Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 5,
+        "product_id": 3,
+        "appearance_version_id": 5,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.984Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 6,
+        "product_id": 3,
+        "appearance_version_id": 6,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.986Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 7,
+        "product_id": 4,
+        "appearance_version_id": 7,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.988Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 8,
+        "product_id": 4,
+        "appearance_version_id": 8,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.990Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 9,
+        "product_id": 4,
+        "appearance_version_id": 8,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.991Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 10,
+        "product_id": 1,
+        "appearance_version_id": 2,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:38.992Z"
+      },
+      {
+        "origin": "historical",
+        "record_id": 3,
+        "product_id": 2,
+        "appearance_version_id": 4,
+        "source": "confirmed",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:39.066Z"
+      },
+      {
+        "origin": "planned",
+        "record_id": 11,
+        "product_id": 1,
+        "appearance_version_id": 2,
+        "source": "planning",
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:39.074Z"
+      }
+    ],
+    "drawing_appearance_usages": [],
+    "drawing_association_audit": [
+      {
+        "id": 1,
+        "origin": "historical",
+        "record_id": 3,
+        "previous_product_id": 2,
+        "previous_appearance_version_id": null,
+        "product_id": 2,
+        "appearance_version_id": 4,
+        "evidence_json": "[\"用户人工明确确认产品归属\"]",
+        "reason": "台架人工绑定",
+        "created_at": "2026-11-23T08:09:39.066Z"
+      }
+    ],
+    "drawing_force_releases": [
+      {
+        "id": 1,
+        "origin": "planned",
+        "record_id": 10,
+        "full_code": "02.0401.020.0402001",
+        "fingerprint": "92d1de7483dd5f403b67332aa1f29c974b6afe97791112e2ab10110d3fc007b0",
+        "snapshot_json": "{\"drawing\":{\"id\":10,\"full_code\":\"02.0401.020.0402001\",\"display_name\":\"ZC 隔离测试品牌-ZC100白色-归档项目\",\"product_id\":1,\"appearance_id\":4,\"color_id\":2,\"main_category_id\":5,\"project_item_id\":7,\"brand_code\":\"02\",\"product_size_code\":\"0401\",\"appearance_code\":\"02\",\"color_code\":\"0\",\"main_category_code\":\"04\",\"project_item_code\":\"02\",\"sequence\":1,\"status\":\"reserved\",\"previous_drawing_id\":null,\"change_reason\":null,\"source_product_id\":null,\"source_drawing_id\":null,\"notes\":null,\"created_at\":\"2026-11-23T08:09:38.992Z\",\"deleted_at\":null,\"deletion_mode\":null,\"deleted_full_code\":null,\"deleted_previous_status\":null,\"deleted_reason\":null,\"scan_resolution\":null},\"pdf\":[{\"id\":2,\"relative_path\":\"冰柜/FIXZC1-ZC100/02.未转曲源文件/02.0401.020.0402001-强制脱钩.pdf\",\"file_name\":\"02.0401.020.0402001-强制脱钩.pdf\",\"drawing_id\":10,\"historical_drawing_id\":null,\"match_status\":\"matched\",\"detected_codes_json\":\"[\\\"02.0401.020.0402001\\\"]\",\"conversion_type\":\"source\",\"classification_warning\":null,\"size_bytes\":46,\"modified_at\":\"2026-11-23T08:09:38.988Z\",\"scanned_at\":\"2026-11-23T08:09:39.022Z\",\"is_present\":1,\"path_key\":\"冰柜\\\\fixzc1-zc100\\\\02.未转曲源文件\\\\02.0401.020.0402001-强制脱钩.pdf\",\"material_batch_id\":null,\"content_sha256\":\"b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f\",\"last_seen_scan_run_id\":1,\"management_state\":\"included\"}],\"bom\":[],\"bomSnapshots\":[],\"outbound\":[],\"outboundSnapshots\":[],\"email\":[],\"usages\":[],\"bindings\":[{\"origin\":\"planned\",\"record_id\":10,\"product_id\":1,\"appearance_version_id\":2,\"source\":\"planning\",\"revision\":1,\"updated_at\":\"2026-11-23T08:09:38.992Z\"}],\"lineage\":[],\"audits\":{\"association\":[],\"usage\":[],\"deletion\":[],\"merge\":[]},\"snapshotOwners\":[],\"archivedPaths\":[]}",
+        "references_json": "{\"drawingRecords\":1,\"pdf\":1,\"presentPdf\":1,\"missingPdf\":0,\"currentBom\":0,\"historicalBom\":0,\"deletedBom\":0,\"bomSnapshots\":0,\"outboundItems\":0,\"outboundSnapshots\":0,\"emailDrafts\":0,\"appearanceUsages\":0,\"bindings\":1,\"lineage\":0,\"audits\":0,\"products\":1}",
+        "reason": null,
+        "created_at": "2026-11-23T08:09:39.072Z"
+      }
+    ],
+    "drawing_force_release_files": [
+      {
+        "release_id": 1,
+        "relative_path": "冰柜/FIXZC1-ZC100/02.未转曲源文件/02.0401.020.0402001-强制脱钩.pdf",
+        "path_key": "冰柜\\fixzc1-zc100\\02.未转曲源文件\\02.0401.020.0402001-强制脱钩.pdf",
+        "full_code": "02.0401.020.0402001"
+      }
+    ],
+    "pdf_product_assignments": [
+      {
+        "pdf_file_id": 5,
+        "product_id": 2,
+        "material_batch_id": 1,
+        "revision": 1,
+        "updated_at": "2026-11-23T08:09:39.049Z"
+      }
+    ],
+    "pdf_product_assignment_audit": [
+      {
+        "id": 1,
+        "pdf_file_id": 5,
+        "previous_json": "{\"productId\":2,\"materialBatchId\":1,\"assignment\":null}",
+        "target_json": "{\"productId\":2,\"materialBatchId\":1,\"conflict\":null}",
+        "reason": "台架人工 PDF 归纳",
+        "created_at": "2026-11-23T08:09:39.049Z"
+      }
+    ],
+    "schema_migrations": [
+      {
+        "version": 1,
+        "applied_at": "2026-11-23T08:09:38.669Z"
+      },
+      {
+        "version": 2,
+        "applied_at": "2026-11-23T08:09:38.678Z"
+      },
+      {
+        "version": 3,
+        "applied_at": "2026-11-23T08:09:38.679Z"
+      },
+      {
+        "version": 4,
+        "applied_at": "2026-11-23T08:09:38.679Z"
+      },
+      {
+        "version": 5,
+        "applied_at": "2026-11-23T08:09:38.683Z"
+      },
+      {
+        "version": 6,
+        "applied_at": "2026-11-23T08:09:38.687Z"
+      },
+      {
+        "version": 7,
+        "applied_at": "2026-11-23T08:09:38.689Z"
+      },
+      {
+        "version": 8,
+        "applied_at": "2026-11-23T08:09:38.691Z"
+      },
+      {
+        "version": 9,
+        "applied_at": "2026-11-23T08:09:38.707Z"
+      },
+      {
+        "version": 10,
+        "applied_at": "2026-11-23T08:09:38.758Z"
+      },
+      {
+        "version": 11,
+        "applied_at": "2026-11-23T08:09:38.766Z"
+      },
+      {
+        "version": 12,
+        "applied_at": "2026-11-23T08:09:38.805Z"
+      },
+      {
+        "version": 13,
+        "applied_at": "2026-11-23T08:09:38.862Z"
+      },
+      {
+        "version": 14,
+        "applied_at": "2026-11-23T08:09:38.881Z"
+      },
+      {
+        "version": 15,
+        "applied_at": "2026-11-23T08:09:38.882Z"
+      },
+      {
+        "version": 16,
+        "applied_at": "2026-11-23T08:09:38.897Z"
+      },
+      {
+        "version": 17,
+        "applied_at": "2026-11-23T08:09:38.905Z"
+      },
+      {
+        "version": 18,
+        "applied_at": "2026-11-23T08:09:38.907Z"
+      },
+      {
+        "version": 19,
+        "applied_at": "2026-11-23T08:09:38.909Z"
+      },
+      {
+        "version": 20,
+        "applied_at": "2026-11-23T08:09:38.910Z"
+      },
+      {
+        "version": 21,
+        "applied_at": "2026-11-23T08:09:38.914Z"
+      },
+      {
+        "version": 22,
+        "applied_at": "2026-11-23T08:09:38.942Z"
+      },
+      {
+        "version": 23,
+        "applied_at": "2026-11-23T08:09:38.950Z"
+      },
+      {
+        "version": 24,
+        "applied_at": "2026-11-23T08:09:38.956Z"
+      },
+      {
+        "version": 25,
+        "applied_at": "2026-11-23T08:09:38.965Z"
+      },
+      {
+        "version": 26,
+        "applied_at": "2026-11-23T08:09:38.969Z"
+      }
+    ],
+    "bom_versions": [],
+    "bom_items": []
+  },
+  "schemaUnchanged": true,
+  "schemaSha256": "c65ba3601a8793c42b8f78ff87c66b153b60c22269e25c74692c95b5a3b41300",
+  "filesBefore": [
+    {
+      "name": "02.0401.010.0401001-夹具1外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0402.010.0401001-夹具2外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0403.010.0401001-夹具3外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0404.010.0401001-夹具4外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0401.020.0402001-强制脱钩.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0401.010.0401001-02.0402.010.0401001-两个图号.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0402.020.0401722-人工绑定（转曲）.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    }
+  ],
+  "filesAfter": [
+    {
+      "name": "02.0401.010.0401001-夹具1外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0402.010.0401001-夹具2外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0403.010.0401001-夹具3外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0404.010.0401001-夹具4外观1.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0401.020.0402001-强制脱钩.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0401.010.0401001-02.0402.010.0401001-两个图号.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    },
+    {
+      "name": "02.0402.020.0401722-人工绑定（转曲）.pdf",
+      "sha256": "b8274cd2f933ba897ac5a626e96063aa6ed45d4389b105279661a55aedd2bc6f"
+    }
+  ],
+  "historicBefore": [
+    {
+      "id": 1,
+      "full_code": "02.0403.020.0401720",
+      "sequence": 720,
+      "appearance_code": "02",
+      "status": "active",
+      "first_seen_at": "2026-11-19",
+      "deleted_at": null
+    },
+    {
+      "id": 2,
+      "full_code": "02.0401.020.0401721",
+      "sequence": 721,
+      "appearance_code": "02",
+      "status": "active",
+      "first_seen_at": "2026-11-19",
+      "deleted_at": null
+    },
+    {
+      "id": 3,
+      "full_code": "02.0402.020.0401722",
+      "sequence": 722,
+      "appearance_code": "02",
+      "status": "active",
+      "first_seen_at": "2026-11-19",
+      "deleted_at": null
+    }
+  ],
+  "historicAfter": [
+    {
+      "id": 1,
+      "full_code": "02.0403.020.0401720",
+      "sequence": 720,
+      "appearance_code": "02",
+      "status": "active",
+      "first_seen_at": "2026-11-19",
+      "deleted_at": null
+    },
+    {
+      "id": 2,
+      "full_code": "02.0401.020.0401721",
+      "sequence": 721,
+      "appearance_code": "02",
+      "status": "active",
+      "first_seen_at": "2026-11-19",
+      "deleted_at": null
+    },
+    {
+      "id": 3,
+      "full_code": "02.0402.020.0401722",
+      "sequence": 722,
+      "appearance_code": "02",
+      "status": "active",
+      "first_seen_at": "2026-11-19",
+      "deleted_at": null
+    }
+  ],
+  "integrity": "ok",
+  "foreignKeys": [],
+  "auditAfterManual": [
+    {
+      "id": 1,
+      "origin": "historical",
+      "record_id": 3,
+      "previous_product_id": 2,
+      "previous_appearance_version_id": null,
+      "product_id": 2,
+      "appearance_version_id": 4,
+      "evidence_json": "[\"用户人工明确确认产品归属\"]",
+      "reason": "台架人工绑定",
+      "created_at": "2026-11-23T08:09:39.066Z"
+    },
+    {
+      "id": 2,
+      "origin": "historical",
+      "record_id": 1,
+      "previous_product_id": 3,
+      "previous_appearance_version_id": null,
+      "product_id": 3,
+      "appearance_version_id": null,
+      "evidence_json": "[\"原扫描产品 ID 3 及相同 SKU / 型号档案仅为候选\",\"目录 SKU FIXZC3 / 型号 ZC200 精确候选，尚未归类\",\"关联 PDF 的完整 SKU-型号目录对应全部产品档案候选\",\"扫描信息为归类候选；唯一产品可直接归类，多产品歧义保留待处理\"]",
+      "reason": "用户一键归类：唯一产品候选",
+      "created_at": "2026-11-23T08:10:01.219Z"
+    }
+  ]
+}

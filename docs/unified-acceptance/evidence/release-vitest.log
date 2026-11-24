@@ -1,0 +1,476 @@
+npm warn Unknown project config "confirmModulesPurge". This will stop working in the next major version of npm.
+
+> drawing-number-planner@1.6.2 test
+> vitest run --maxWorkers=1 --reporter=default
+
+
+ RUN  v4.1.11 /tmp/planner-unified-final
+
+ ✓ tests/core/dictionary-permanent-deletion.test.ts (9 tests) 1128ms
+ ✓ tests/core/outbound-package-service.test.ts (87 tests) 18060ms
+     ✓ never records half a multipart publication as completed after abrupt process exit  642ms
+     ✓ decodes every real multipart ZIP to the exact original bytes without changing the sources  990ms
+     ✓ loads exact BOM changes into preview, rejects a changed preview and freezes completed changes  371ms
+     ✓ rejects creation as stale when the physical file disappears after preview  409ms
+     ✓ rejects unsafe Windows package-name component SAMKYO / T40 / CON  431ms
+     ✓ consumes a preview token after successful generation  307ms
+     ✓ includes a real 50MB PDF byte-for-byte with accurate part counts  1801ms
+     ✓ reports an existing incompressible PDF exceeding the actual ZIP cap without publishing or changing it  466ms
+     ✓ freezes included, independent and unselected dispositions in V2 history  502ms
+     ✓ validates two independent ZIPs and exactly fourteen real source files with accurate per-part manifests  1401ms
+ ✓ tests/core/packaging-task-service.test.ts (56 tests) 19514ms
+   ✓ ends a settled active task without finishing archive, indexing or changing its files  311ms
+   ✓ preserves an interrupted task and its lock when its Illustrator operation has not safely settled  477ms
+   ✓ tracks an in-flight Illustrator open so ending cannot release the task lock mid-operation  349ms
+   ✓ discovers one stable full-code manual PDF, requires exact review, archives/indexes only its product and keeps history  543ms
+   ✓ keeps temporary files when indexing fails and resumes archive without overwriting the published PDF  658ms
+   ✓ does not reuse reviewed hashes after external PDF edits  302ms
+   ✓ copies formal PDFs for editing, keeps the original until review and retains a verified backup after replacement  981ms
+   ✓ blocks replacement when someone changes the formal original after a modify task starts  363ms
+   ✓ isolates per-item generation failures and retries without reserving again or overwriting a successful/edited PDF  625ms
+   ✓ serializes PDF review against configuration changes so old bytes cannot approve new settings  301ms
+   ✓ resumes an indexed archive after an interruption during cleanup has already removed the task source  502ms
+   ✓ backs up and finishes unchanged files included in a formal modification task  767ms
+   ✓ retries an interrupted initial formal-file copy using its persisted original hash  359ms
+   ✓ shows a newly replaced PDF at a previously linked input filename as pending  501ms
+   ✓ prevents changing the workspace setting during a tracked file review  313ms
+   ✓ creates an automatically named task directly in root00 and retains all original source files until reviewed archive  647ms
+   ✓ retains a confirmed deleted task and physical files while releasing only its unfinished-product lock  345ms
+   ✓ continues legacy nested task paths without moving files and keeps the legacy directory after archive  554ms
+   ✓ discovery refreshes the exact root00 working file hash and invalidates a previous content review  385ms
+   ✓ keeps a completed but uncommitted original copy assigned to its deleted task instead of auto-adopting it into a new task  358ms
+   ✓ does not complete from ambiguous, changed, or temporary indexed files  327ms
+   ✓ prefers the unique reliable 02 source over several 03 files for a new manual task without rewriting files or history  413ms
+   ✓ prefers the unique reliable 02 source over several 03 files for a new existing task without rewriting files or history  388ms
+   ✓ excludes an unreliable 02 source (wrong drawing) before applying unique-source priority  305ms
+   ✓ opens the temporary copy of a modify task in Illustrator  403ms
+ ✓ tests/renderer/outbound-page.test.tsx (50 tests) 9149ms
+     ✓ omits historical packages from the normal outbound workspace  368ms
+     ✓ warns about missing BOM change details before packaging  361ms
+     ✓ warns about matched BOM change details before packaging  379ms
+     ✓ shows every generated ZIP and opens the selected part instead of inventing a single ZIP name  306ms
+     ✓ requires a hash-bound manual file confirmation and fresh preview without a BOM gate  312ms
+     ✓ completes the desktop package flow for 首批资料  309ms
+     ✓ completes the desktop package flow for 更新资料  373ms
+     ✓ passes editable update description and selected preview files into the update template  403ms
+     ✓ keeps the email package name, product and files atomic after previewing a different package  422ms
+ ✓ tests/renderer/files-page.test.tsx (40 tests) 7316ms
+     ✓ keeps selection through group folding and clears it when a filter changes  554ms
+     ✓ keeps manual file filters when all files clears only navigation scope  423ms
+     ✓ separates current library state from this scan changes and expands grouped details in place  336ms
+     ✓ clears a selected deleted batch filter so the next scan shows rebuilt batches and files  370ms
+     ✓ keeps retry disabled until the stopped scan releases ownership, then retries the same product  314ms
+     ✓ clears a detailed batch filter after the batch index was explicitly cleared  395ms
+ ✓ tests/renderer/drawing-library-page.test.tsx (67 tests) 10148ms
+     ✓ opens details outside the table without selecting batch checkboxes  341ms
+     ✓ keeps detail attributes, state actions and file maintenance grouped without losing information  403ms
+     ✓ keeps all Mock maintenance and disk buttons disabled even with colliding real IDs  738ms
+     ✓ associates a searched current PDF and refreshes detail and row while surfacing failures  301ms
+   ✓ ignores scope and record changes during a save, then allows navigation after the save completes  398ms
+   ✓ refreshes filtered records and navigation counts after planned status changes while preserving scope and scroll  326ms
+   ✓ refreshes filtered records and navigation counts after historical status changes while preserving scope and scroll  320ms
+   ✓ refreshes source-presence results and counts after saving PDF associations  323ms
+ ✓ tests/main/database-selection.test.ts (19 tests) 6483ms
+   ✓ rejects future without modifying target or saved profile  398ms
+   ✓ rejects unrecognized without modifying target or saved profile  309ms
+   ✓ rejects incompatible without modifying target or saved profile  302ms
+   ✓ rejects corrupt without modifying target or saved profile  501ms
+   ✓ verifies a current independent backup and starts target before saving the new profile  342ms
+   ✓ preserves saved profile on startup failure and permits retry  372ms
+   ✓ preserves saved profile on migration failure and permits retry  343ms
+   ✓ preserves saved profile on write failure and permits retry  397ms
+   ✓ refuses existing switching if the current database cannot have a verified backup  400ms
+   ✓ refuses switching if the saved current database is missing  308ms
+   ✓ rejects a selected filename that would resolve to a different runtime database  326ms
+   ✓ does not substitute a different case-sensitive file merely because the platform is Windows  309ms
+   ✓ shows the checked path and schema before quiescing and honors cancellation  307ms
+   ✓ restores exact profile bytes after renderer activation fails following commit and restarts on the old database  460ms
+ ✓ tests/core/dictionary-service.test.ts (13 tests) 6854ms
+     ✓ rejects new children under an inactive parent without altering existing identities  2056ms
+     ✓ rejects new children under an deleted parent without altering existing identities  1776ms
+     ✓ rejects new children under an deleted-active parent without altering existing identities  1850ms
+ ✓ tests/renderer/files-mock.test.tsx (12 tests) 7792ms
+     ✓ keeps explicit batch absence separate from file presence and drawing matching  529ms
+     ✓ shows and copies the complete indexed path without file or network access  600ms
+     ✓ opens files directly without recovery, business API, or desktop calls  1897ms
+     ✓ fails closed for unknown methods and isolates cancellation and cleanup  606ms
+     ✓ isolates missing cleanup and cancellation through actual UI controls  2259ms
+     ✓ exposes only completed scans as the latest in-memory scan  1281ms
+     ✓ preserves memory indices when a simulated scan fails  607ms
+ ✓ tests/main/production-profile.test.ts (23 tests) 6851ms
+   ✓ portable launches reuse the explicitly selected folder without a repeated prompt  361ms
+   ✓ asks once after each installation including a same-version reinstall and remembers only the completed choice  596ms
+   ✓ creates independent empty databases after reinstall without changing any old default database or settings  545ms
+   ✓ preserves the previous profile marker and database on cancel after reinstall, and asks again next time  397ms
+   ✓ preserves the previous profile marker and database on initialization-failure after reinstall, and asks again next time  305ms
+   ✓ preserves the previous profile marker and database on profile-write-failure after reinstall, and asks again next time  306ms
+   ✓ rejects a database with valid SQLite magic but header-only before saving the installation choice  628ms
+   ✓ rejects a database with valid SQLite magic but corrupt-contents before saving the installation choice  434ms
+   ✓ rejects a database with valid SQLite magic but damaged-data-page before saving the installation choice  425ms
+   ✓ reports the attempted database in a failed reinstall verification without committing another profile  332ms
+ ✓ tests/server/dictionaries-api.test.ts (9 tests) 5924ms
+     ✓ rejects direct project creation under an inactive parent and allows explicit restoration  1890ms
+     ✓ rejects direct project creation under an deleted parent and allows explicit restoration  1784ms
+     ✓ rejects direct project creation under an deleted-active parent and allows explicit restoration  1609ms
+ ✓ tests/core/bom-service.test.ts (35 tests) 4971ms
+ ✓ tests/core/drawing-query.test.ts (34 tests) 5799ms
+     ✓ aggregates every batch file instance by canonical full code  320ms
+     ✓ uses completed outbound selected batches rather than file-source batches or drawing-code snapshots  412ms
+ ✓ tests/renderer/bom-page.test.tsx (40 tests) 4158ms
+     ✓ opens the exact requested history as a read-only detail and keeps the latest navigation target  311ms
+     ✓ overrides the global table nowrap rule for long BOM attachment paths  384ms
+ ✓ tests/core/file-repository.test.ts (35 tests) 5211ms
+ ✓ tests/core/material-batch-deletion.test.ts (27 tests) 4064ms
+   ✓ blocks every PDF index including missing or ignored records  331ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ tests/renderer/product-bom-roundtrip.test.tsx (6 tests) 6469ms
+     ✓ restores source filter and forces fresh check  1095ms
+     ✓ protects unsaved changes on tab switch and return  1150ms
+     ✓ does not assume cancelled processing succeeded  961ms
+     ✓ uses completed memory result but still checks other blockers  2264ms
+     ✓ fails closed after product disappears  992ms
+ ✓ tests/core/packaging/packaging-monitor.test.ts (15 tests) 4160ms
+   ✓ real watcher events index only the affected formal product and discover00 without indexing it  611ms
+   ✓ does not scan an unavailable root and safely recreates watching after settings change  316ms
+   ✓ skips queued formal events already covered by an archive or manual product scan  611ms
+ ✓ tests/db/migrations.test.ts (59 tests) 3991ms
+ ✓ tests/renderer/bom-worksheet.test.tsx (13 tests) 4470ms
+   ✓ emphasizes change details only where content exists, independently of reference data  508ms
+   ✓ preserves editable values and their baseline without inferred change markers  347ms
+   ✓ compares the explicit predecessor and clears it when selecting the first record  1179ms
+   ✓ retains complete query fields and independent attachment roles in all-fields mode  676ms
+   ✓ keeps loaded baseline unchanged when editing a field or changing project identity  352ms
+   ✓ summarizes known exceptions but does not classify legal empty attachments as errors  324ms
+ ✓ tests/core/file-navigation.test.ts (11 tests) 2728ms
+     ✓ aggregates beyond the list page limit without parsing filenames or fetching list pages  1279ms
+ ✓ tests/core/product-cleanup.test.ts (28 tests) 4412ms
+   ✓ invalidates impact confirmation when another indexed file becomes associated after preview  309ms
+ ✓ tests/core/file-service.test.ts (24 tests) 3483ms
+     ✓ keeps a timed-out scan in stopping until the current I/O resolves and allows the original scope to retry  354ms
+ ✓ tests/renderer/qr-codes-page.test.tsx (29 tests) 3510ms
+     ✓ shows first-page equality as advice and never skips confirmation or enables the record  485ms
+     ✓ windows the scrollable product list without rendering thousands of rows or a pager  445ms
+ ✓ tests/renderer/v5-outbound-builder.test.tsx (4 tests) 3296ms
+   ✓ filters brand/category/model by real IDs and renders every file without redundant controls/history  3129ms
+ ✓ tests/renderer/pdf-management-page.test.tsx (12 tests) 2916ms
+   ✓ loads the next 100-file chunk without replacing rows or losing selection  979ms
+   ✓ discards an old incremental response after changing the navigation scope  389ms
+ ✓ tests/core/qr-manual-service.test.ts (28 tests) 4234ms
+     ✓ requires editing metadata separately for a URL-less QR with existing file history  422ms
+ ✓ tests/renderer/drawing-tasks-page.test.tsx (19 tests) 3114ms
+     ✓ automatically rematches changed dimensions while retaining an explicit template choice  311ms
+   ✓ uses only a matching archive execution as the task’s indexing progress  307ms
+ ✓ tests/server/dictionary-permanent-deletion-api.test.ts (1 test) 3945ms
+   ✓ requires exact confirmation metadata and returns 204 only after physical deletion  3944ms
+ ✓ tests/core/v3-drawing-product-association.test.ts (16 tests) 3280ms
+   ✓ classifies 697 candidates atomically and returns matching persisted navigation counts  808ms
+ ✓ tests/renderer/scan-progress.test.tsx (4 tests) 3512ms
+   ✓ recovers the latest active scan and stops polling at completion  1318ms
+   ✓ clears an outdated owner on a read error and finds the new owner on automatic retry  2025ms
+ ✓ tests/renderer/packaging-workflow.test.tsx (9 tests) 1553ms
+     ✓ continues persisted tasks and reviews the exact current hash before archive preview  606ms
+ ✓ tests/renderer/bom-mock.test.tsx (22 tests) 2848ms
+   ✓ isolates BOM preview from every real API, including initial reads  966ms
+   ✓ uses the existing conflict feedback without calling the real save API  376ms
+   ✓ retains old-record editing and distinguishes historical drawing references  614ms
+   ✓ shows field-specific blockers without requiring optional material or batch fields  564ms
+ ✓ tests/server/application-api.test.ts (7 tests) 1224ms
+     ✓ resolves an unindexed drawing file through the installed-service bridge without index writes  461ms
+ ✓ tests/renderer/pdf-classification-page.test.tsx (6 tests) 3151ms
+   ✓ refreshes saved rows even when catalog metadata reload fails and exposes a visible retryable error  1010ms
+   ✓ confirms only PDF ownership while visibly retaining conflicting drawing ownership  416ms
+   ✓ classifies twelve concrete instances in one confirmed call and refreshes list, catalog and counts  517ms
+   ✓ shows conflict reasons and prevents writes; cancelling preserves all selected files  528ms
+   ✓ retains target choices, reason and preview after a failed save and allows retry  405ms
+ ✓ tests/main/qr-manual-integration.test.ts (2 tests) 2265ms
+     ✓ registers, compares and persists native-selected PDF through in-process without an HTTP byte route  426ms
+     ✓ registers, compares and persists native-selected PDF through child IPC without an HTTP byte route  1835ms
+ ✓ tests/renderer/packaging-page-freshness.test.tsx (14 tests) 1945ms
+     ✓ refreshes catalog lookups once per activation without unmounting the template draft  417ms
+ ✓ tests/server/drawings-api.test.ts (18 tests) 2649ms
+ ✓ tests/renderer/packaging-catalog-ui.test.tsx (34 tests) 2496ms
+ ✓ tests/core/file-scan-coverage.test.ts (16 tests) 2526ms
+   ✓ preserves all rows when a previously indexed source becomes an unobserved link  343ms
+   ✓ keeps a 200MiB PDF present and uses source/filename roles across every production batch  336ms
+ ✓ tests/core/planning-service.test.ts (14 tests) 1905ms
+ ✓ tests/core/product-service.test.ts (20 tests) 2566ms
+ ✓ tests/server/boms-api.test.ts (15 tests) 2214ms
+ ✓ tests/read-only-workspace.test.ts (1 test) 2107ms
+   ✓ serves existing data read-only, rejects writes before handlers, and preserves database bytes and rows  2106ms
+ ✓ tests/core/drawing-deletion-service.test.ts (18 tests) 2746ms
+ ✓ tests/renderer/outbound-mock.test.tsx (4 tests) 2543ms
+     ✓ routes exclusively to Mock and performs package, mail, copy, history and maintenance without real calls  2265ms
+ ✓ tests/core/planning-batch.test.ts (18 tests) 2493ms
+ ✓ tests/renderer/recovery-mock.test.tsx (4 tests) 2298ms
+     ✓ distinguishes cancel request from confirmed cancellation and locks repeats  1348ms
+     ✓ reload confirmation does not pretend recovery success  719ms
+ ✓ tests/renderer/dictionaries-page.test.tsx (20 tests) 1679ms
+     ✓ reveals archived dictionary identities with a restore action  341ms
+ ✓ tests/core/product-scoped-scan.test.ts (16 tests) 2102ms
+ ✓ tests/server/database-switch.test.ts (8 tests) 2203ms
+   ✓ refuses a target removed after validation and restores the old service/profile without creating an empty replacement  595ms
+   ✓ reads candidate core APIs and rolls back a post-commit renderer failure to the old service  707ms
+ ✓ tests/core/outbound-reference-service.test.ts (9 tests) 991ms
+ ✓ tests/core/pdf-management.test.ts (13 tests) 1998ms
+ ✓ tests/core/packaging/packaging-catalog.test.ts (7 tests) 893ms
+ ✓ tests/core/v5-force-release.test.ts (12 tests) 1645ms
+ ✓ tests/renderer/planning-page.test.tsx (12 tests) 1965ms
+ ✓ tests/renderer/planning-workspace.test.tsx (13 tests) 1935ms
+ ✓ tests/renderer/planning-mock.test.tsx (4 tests) 1839ms
+     ✓ keeps full appearance code and invalidates upstream changes  475ms
+     ✓ accounts for explicitly simulated historical occupancy  404ms
+     ✓ fails saving without granting occupation or reusing preview  807ms
+ ✓ tests/renderer/safe-recovery.test.tsx (8 tests) 854ms
+ ✓ tests/db/migrations-v5.test.ts (4 tests) 1531ms
+   ✓ backs up a real v20 disk database on first startup and reopens v23 with unchanged original rows  1067ms
+ ✓ tests/renderer/migration-mock.test.tsx (3 tests) 1904ms
+     ✓ includes incomplete rows without candidates and disables conflicts  625ms
+     ✓ consumes only the simulated selected import and invalidates on new source  1132ms
+ ✓ tests/renderer/import-page.test.tsx (5 tests) 983ms
+     ✓ shows workbook conflicts before import confirmation  313ms
+ ✓ tests/server/packaging/packaging-workflow.test.ts (1 test) 1677ms
+   ✓ runs the real local HTTP manual-file task through review/archive/index and rejects unsafe requests  1675ms
+ ✓ tests/core/email-template-matrix.test.ts (4 tests) 882ms
+   ✓ imports reviewed matrix as 14 shared contacts and 135 ordered role links with a separate nondefault signature  368ms
+ ✓ tests/core/bom-asset-archive.test.ts (10 tests) 1300ms
+ ✓ tests/db/migrations-v26.test.ts (4 tests) 1841ms
+   ✓ upgrades a BLOB-bearing v25 database under a bounded Node heap without serializing the whole database  1312ms
+ ✓ tests/renderer/products-page.test.tsx (9 tests) 1486ms
+     ✓ summarizes only existing applicable QR records and opens the selected QR detail  349ms
+ ✓ tests/core/current-material-set.test.ts (15 tests) 1847ms
+ ✓ tests/renderer/table-layout.test.tsx (21 tests) 780ms
+ ✓ tests/server/outbound-packages-api.test.ts (8 tests) 1747ms
+     ✓ previews a 69MB PDF and reports independent transfer without creating a ZIP  855ms
+ ✓ tests/core/appearance-service.test.ts (12 tests) 1549ms
+ ✓ tests/server/products-api.test.ts (10 tests) 1365ms
+     ✓ previews central cleanup and requires explicit model confirmation before exiting the product  315ms
+ ✓ tests/renderer/v51-mail-composer.test.tsx (16 tests) 1424ms
+     ✓ keeps manually selected recipient text until adopting a different package is confirmed  328ms
+ ✓ tests/renderer/query-cache.test.ts (6 tests) 1519ms
+   ✓ observes committed scans once across subscribers and ignores a late older response  1507ms
+ ✓ tests/renderer/product-cleanup-options.test.tsx (3 tests) 781ms
+   ✓ confirms a whole product once without requiring every drawing or a second typed phrase  402ms
+ ✓ tests/renderer/drawing-v41-page.test.tsx (4 tests) 948ms
+   ✓ replaces the placeholder version with dictionary color and keeps category/project together with stable tones  325ms
+   ✓ switches planned business state both ways without a history-version option  309ms
+ ✓ tests/renderer/bom-history-comparison.test.tsx (9 tests) 874ms
+     ✓ computes union counts; changes open, unchanged closed; filters fields and expands all  438ms
+ ✓ tests/core/drawing-association.test.ts (9 tests) 1010ms
+ ✓ tests/core/qr-service.test.ts (10 tests) 1207ms
+ ✓ tests/server/pdf-management-client-contract.test.ts (3 tests) 1139ms
+   ✓ executes all three PDF actions for 23 selected records through the real client and HTTP parser without touching PDFs  837ms
+ ✓ tests/renderer/dictionaries-mock.test.tsx (4 tests) 1443ms
+     ✓ checks impact and uses second confirmation for referenced deletion  977ms
+ ✓ tests/renderer/drawing-bom-navigation.test.tsx (4 tests) 1503ms
+   ✓ opens the first BOM exact record and original owner through the shell without requesting current BOM  635ms
+   ✓ reports an invalid first BOM target (mismatch) without selecting another record or entering add mode  343ms
+ ✓ tests/server/files-api.test.ts (7 tests) 1904ms
+     ✓ exposes scan and index-clear work through cancellable task endpoints  396ms
+     ✓ returns current scan counts and grouped changes without treating old missing rows as newly deleted  320ms
+     ✓ protects and persists workspace settings, scans real PDFs, and filters indexed results  399ms
+ ✓ tests/renderer/workspace-shell.test.tsx (16 tests) 1362ms
+ ✓ tests/renderer/pdf-classification-batches.test.tsx (1 test) 658ms
+   ✓ classifies more than500 selected files with independent server previews and retries only the failed part  657ms
+ ✓ tests/core/indexed-pdf-resolver.test.ts (10 tests) 1177ms
+ ✓ tests/core/packaging/packaging-workspace.test.ts (5 tests) 857ms
+ ✓ tests/server/files-filters-scope.test.ts (5 tests) 769ms
+ ✓ tests/db/migrations-v14.test.ts (5 tests) 468ms
+ ✓ tests/db/migrations-v20.test.ts (3 tests) 525ms
+ ✓ tests/server/material-batches-api.test.ts (5 tests) 686ms
+ ✓ tests/renderer/products-mock.test.tsx (4 tests) 967ms
+     ✓ supports filters, details and state changes without real calls  901ms
+ ✓ tests/main/database-validation.test.ts (7 tests) 1468ms
+   ✓ rehearses a genuine v15 ledger without changing bytes, then backs up before upgrading  458ms
+   ✓ rejects missing or changed trigger safety constraints even with an intact ledger  342ms
+ ✓ tests/renderer/v4-drawing-scroll.test.tsx (1 test) 566ms
+   ✓ loads drawing chunks without paging and keeps selected IDs during append  565ms
+ ✓ tests/server/planning-api.test.ts (6 tests) 897ms
+ ✓ tests/core/v4-multi-appearance.test.ts (7 tests) 903ms
+ ✓ tests/renderer/drawing-library-origin-column.test.tsx (5 tests) 1317ms
+     ✓ separates actual origin from full code in the default list  588ms
+ ✓ tests/server/qr-codes-api.test.ts (6 tests) 864ms
+ ✓ tests/renderer/products-dictionaries.test.tsx (5 tests) 796ms
+ ✓ tests/core/material-batch-service.test.ts (10 tests) 1611ms
+ ✓ tests/renderer/v52-template-contacts.test.tsx (5 tests) 700ms
+ ✓ tests/renderer/bom-v5-controls.test.tsx (4 tests) 801ms
+   ✓ query reset clears hidden appearance scope  475ms
+ ✓ tests/renderer/module-workspace.test.tsx (11 tests) 612ms
+ ✓ tests/core/planning-reservation.test.ts (5 tests) 865ms
+ ✓ tests/db/migrations-v24.test.ts (4 tests) 819ms
+ ✓ tests/renderer/approved-ui-fidelity.test.tsx (4 tests) 677ms
+ ✓ tests/server/packaging/packaging-scan-scope.test.ts (4 tests) 1194ms
+   ✓ scans only enabled canonical products in the exact category and preserves all other indices  527ms
+ ✓ tests/core/pdf-classification.test.ts (6 tests) 1352ms
+     ✓ uses real HTTP JSON preview/apply transport  367ms
+ ✓ tests/server/outbound-reference-api.test.ts (6 tests) 926ms
+ ✓ tests/db/migrations-v25.test.ts (4 tests) 748ms
+ ✓ tests/core/packaging/packaging-file-operations.test.ts (10 tests) 1102ms
+   ✓ cleans only unchanged owned task PDFs, retaining edited and unknown children and root00  317ms
+ ✓ tests/core/email-template-import.test.ts (7 tests) 889ms
+ ✓ tests/core/excel-import.test.ts (5 tests) 615ms
+ ✓ tests/server/startup-progress.test.ts (2 tests) 718ms
+   ✓ reports protected database initialization and loopback health before becoming ready  451ms
+ ✓ tests/db/migrations-v23.test.ts (4 tests) 962ms
+ ✓ tests/core/email-template-provenance.test.ts (4 tests) 917ms
+   ✓ retains the original historical case and precise source after confirm/reopen, ignoring edited client source fields  334ms
+ ✓ tests/server/import-api.test.ts (6 tests) 955ms
+ ✓ tests/core/v51-mail-configuration.test.ts (5 tests) 816ms
+     ✓ saves without internal key, signature or runtime values and preserves the key while editing  316ms
+ ✓ tests/renderer/pdf-product-navigation.test.tsx (9 tests) 443ms
+ ✓ tests/renderer/product-appearance.test.tsx (3 tests) 489ms
+ ✓ tests/renderer/data-table-virtual.test.tsx (6 tests) 535ms
+     ✓ renders a bounded window and retains user expansion when returning to a row  331ms
+ ✓ tests/main/comprehensive-delivery.test.ts (4 tests) 1098ms
+   ✓ real SQLite profile and delivery helper preserve old v15 rows, WAL backups, rollback and upgraded restart  941ms
+ ✓ tests/server/file-navigation-api.test.ts (3 tests) 523ms
+ ✓ tests/renderer/dictionary-restore-edit.test.tsx (1 test) 456ms
+   ✓ restores an archived identity, edits its name and keeps draft input if saving fails  455ms
+ ✓ tests/server/email-template-import-api.test.ts (2 tests) 677ms
+   ✓ carries reviewed shared-contact reuse and independent signature choices without stripping fingerprint fields  452ms
+ ✓ tests/core/bom-asset-service.test.ts (6 tests) 675ms
+ ✓ tests/smoke/app-shell.test.tsx (1 test) 349ms
+     ✓ shows the product name and primary navigation  348ms
+ ✓ tests/renderer/dictionary-permanent-delete.test.tsx (4 tests) 690ms
+ ✓ tests/renderer/qr-mock.test.tsx (2 tests) 451ms
+     ✓ removes pending flow and blocks every real API, fetch and desktop bridge during file/detail/manual operations  446ms
+ ✓ tests/renderer/pdf-bulk-management.test.tsx (1 test) 417ms
+   ✓ previews 501 selected records in bounded requests, confirms once and retries only a failed batch  415ms
+ ✓ tests/server/packaging/packaging-catalog.test.ts (3 tests) 566ms
+   ✓ requires a native selection capability for original references  318ms
+ ✓ tests/renderer/email-template-import.test.tsx (3 tests) 444ms
+ ✓ tests/core/occupied-number-repository.test.ts (4 tests) 388ms
+ ✓ tests/renderer/product-exit-mock-panel.test.tsx (3 tests) 355ms
+ ✓ tests/db/migrations-v19.test.ts (3 tests) 527ms
+ ✓ tests/core/v5-mail-reference.test.ts (4 tests) 436ms
+ ✓ tests/renderer/client-cache-invalidation.test.ts (5 tests) 530ms
+   ✓ continues to read the same scan task after a lost connection without starting another scan  506ms
+ ✓ tests/core/planning-repository.test.ts (5 tests) 527ms
+ ✓ tests/db/backup.test.ts (7 tests) 444ms
+ ✓ tests/renderer/pdf-batch-context-menu.test.tsx (5 tests) 366ms
+ ✓ tests/main/comprehensive-qr-fixture.test.ts (1 test) 250ms
+ ✓ tests/db/migrations-v18.test.ts (2 tests) 477ms
+   ✓ upgrades v17 product-only compatibility after backup without changing any old binding, audit or schema guards  327ms
+ ✓ tests/renderer/pdf-scan-presence.test.tsx (2 tests) 815ms
+   ✓ scans the explicitly selected category rather than the model or entire library  440ms
+   ✓ shows last-scan presence in the list and checks only the expanded file in real time  372ms
+ ✓ tests/renderer/api-client.test.ts (28 tests) 420ms
+     ✓ sends product cleanup as JSON over real HTTP and retires only the confirmed product  353ms
+ ✓ tests/server/v51-mail-configuration.test.ts (3 tests) 565ms
+ ✓ tests/core/excel-audit.test.ts (7 tests) 386ms
+ ✓ tests/renderer/product-exit-worksheet.test.tsx (2 tests) 350ms
+     ✓ does not turn owned BOM counts into blockers or offer historical deletion  300ms
+ ✓ tests/renderer/qr-pixel-comparison.test.tsx (4 tests) 418ms
+   ✓ displays equal first-page pixels without any association/status action  313ms
+ ✓ tests/renderer/email-template-provenance.test.tsx (1 test) 189ms
+ ✓ tests/server/pdf-reader-stream.test.ts (1 test) 537ms
+   ✓ streams only an indexed PDF and reports a missing file without changing the index  536ms
+ ✓ tests/db/migrations-v16.test.ts (5 tests) 408ms
+ ✓ tests/renderer/product-line-picker.test.tsx (2 tests) 311ms
+ ✓ tests/renderer/catalog-appearance-navigation.test.tsx (2 tests) 379ms
+ ✓ tests/renderer/v51-mail-configuration.test.tsx (1 test) 337ms
+   ✓ keeps internal codes and variable choices out of daily editing until insertion is requested  334ms
+ ✓ tests/core/v52-template-contacts.test.ts (3 tests) 610ms
+   ✓ supports caller transaction rollback and exposes linked template count before deleting a contact  361ms
+ ✓ tests/renderer/drawing-alignment-feedback.test.tsx (3 tests) 329ms
+ ✓ tests/main/empty-acceptance-delivery.test.ts (6 tests) 373ms
+ ✓ tests/db/migrations-v17.test.ts (5 tests) 582ms
+ ✓ tests/renderer/dictionaries-density.test.tsx (2 tests) 261ms
+ ✓ tests/core/outbound-bom-context.test.ts (3 tests) 371ms
+ ✓ tests/db/schema.test.ts (5 tests) 410ms
+ ✓ tests/renderer/bom-history-asset.test.tsx (9 tests) 323ms
+ ✓ tests/renderer/outbound-shell-guard.test.tsx (1 test) 277ms
+ ✓ tests/server/packaging/packaging-template-inspection.test.ts (3 tests) 411ms
+ ✓ tests/main/pdf-open-default.test.ts (1 test) 5ms
+ ✓ tests/renderer/drawing-batch-deletion.test.tsx (3 tests) 200ms
+ ✓ tests/renderer/data-table.test.tsx (1 test) 185ms
+ ✓ tests/server/pdf-management-api.test.ts (1 test) 270ms
+ ✓ tests/renderer/recovery-feedback.test.tsx (5 tests) 237ms
+ ✓ tests/renderer/v5-mail-template.test.tsx (1 test) 241ms
+ ✓ tests/server/qr-manual-api.test.ts (1 test) 202ms
+ ✓ tests/server/appearance-client-contract.test.ts (1 test) 241ms
+ ✓ tests/renderer/image-preview-dialog.test.tsx (2 tests) 244ms
+ ✓ tests/renderer/v5-force-release.test.tsx (2 tests) 200ms
+ ✓ tests/server/appearances-api.test.ts (1 test) 216ms
+ ✓ tests/core/daily-backup.test.ts (8 tests) 378ms
+ ✓ tests/db/migrations-v15.test.ts (2 tests) 159ms
+ ✓ tests/renderer/drawing-reuse-panel.test.tsx (1 test) 163ms
+ ✓ tests/renderer/bom-archive-panel.test.tsx (1 test) 163ms
+ ✓ tests/renderer/bom-asset-preview.test.tsx (2 tests) 157ms
+ ✓ tests/renderer/material-batch-navigation.test.tsx (2 tests) 138ms
+ ✓ tests/renderer/query-feedback.test.tsx (3 tests) 105ms
+ ✓ tests/renderer/action-toast.test.tsx (1 test) 141ms
+ ✓ tests/core/bom-concurrency.test.ts (1 test) 136ms
+ ✓ tests/server/local-access.test.ts (4 tests) 68ms
+ ✓ tests/renderer/copy-button.test.tsx (3 tests) 304ms
+ ✓ tests/renderer/workspace-extent.test.tsx (1 test) 104ms
+ ✓ tests/server/tasks-api.test.ts (2 tests) 68ms
+ ✓ tests/server/planning-drafts-api.test.ts (1 test) 74ms
+ ✓ tests/core/illustrator-automation.test.ts (31 tests) 81ms
+ ✓ tests/core/file-scan-stability.test.ts (2 tests) 61ms
+ ✓ tests/main/delivery-source-guard.test.ts (4 tests) 209ms
+ ✓ tests/core/file-fingerprint.test.ts (5 tests) 12ms
+ ✓ tests/core/illustrator-jsx-fullcode.test.ts (11 tests) 29ms
+ ✓ tests/renderer/bom-history-diff.test.ts (15 tests) 10ms
+ ✓ tests/core/v5-pdf-scope.test.ts (4 tests) 35ms
+ ✓ tests/renderer/pdf-batches.test.ts (4 tests) 7ms
+ ✓ tests/core/drawing-file-observation.test.ts (8 tests) 30ms
+ ✓ tests/main/recovery-controller.test.ts (16 tests) 15ms
+ ✓ tests/main/packaging-restart-verification.test.ts (14 tests) 32ms
+ ✓ tests/main/local-service-controller.test.ts (22 tests) 144ms
+ ✓ tests/core/qr-file-scanner.test.ts (1 test) 12ms
+ ✓ tests/core/directory-policy.test.ts (4 tests) 5ms
+ ✓ tests/core/pdf-scanner.test.ts (2 tests) 27ms
+ ✓ tests/main/outbound-file-actions.test.ts (4 tests) 7ms
+ ✓ tests/core/planning-draft-store.test.ts (5 tests) 16ms
+ ✓ tests/main/qr-manual-actions.test.ts (5 tests) 10ms
+ ✓ tests/renderer/drawing-library-mock.test.ts (5 tests) 20ms
+ ✓ tests/core/task-registry.test.ts (9 tests) 19ms
+ ✓ tests/renderer/desktop-files.test.ts (3 tests) 6ms
+ ✓ tests/main/database-reselection.test.ts (5 tests) 7ms
+ ✓ tests/core/file-scan-diff.test.ts (7 tests) 15ms
+ ✓ tests/main/open-file-location.test.ts (22 tests) 16ms
+ ✓ tests/core/v5-mail-schema.test.ts (1 test) 12ms
+ ✓ tests/core/drawing-code.test.ts (20 tests) 8ms
+ ✓ tests/core/workspace-paths.test.ts (10 tests) 14ms
+ ✓ tests/renderer/drawing-file-selection.test.ts (8 tests) 11ms
+ ✓ tests/core/qr-manual-validation.test.ts (10 tests) 7ms
+ ✓ tests/core/packaging/ait-chooser.test.ts (2 tests) 7ms
+ ✓ tests/core/packaging/packaging-matcher.test.ts (11 tests) 6ms
+ ✓ tests/core/outbound-artifact-ownership.test.ts (13 tests) 10ms
+ ✓ tests/core/code-generator.test.ts (5 tests) 6ms
+ ✓ tests/core/material-batch-parser.test.ts (6 tests) 8ms
+ ✓ tests/core/material-batch-label.test.ts (30 tests) 8ms
+ ✓ tests/main/open-qr-file.test.ts (3 tests) 7ms
+ ✓ tests/core/pdf-matcher.test.ts (5 tests) 6ms
+ ✓ tests/core/workspace-settings.test.ts (5 tests) 10ms
+ ✓ tests/core/historical-file-classifier.test.ts (8 tests) 10ms
+ ✓ tests/progress.test.ts (3 tests) 6ms
+ ✓ tests/core/qr-file-classifier.test.ts (8 tests) 7ms
+ ✓ tests/core/pdf-presence.test.ts (1 test) 6ms
+ ✓ tests/main/isolated-trial.test.ts (2 tests) 6ms
+ ✓ tests/main/desktop-startup.test.ts (2 tests) 6ms
+ ✓ tests/renderer/packaging-client.test.ts (3 tests) 5ms
+ ✓ tests/core/packaging/ait-selection.test.ts (1 test) 5ms
+ ✓ tests/core/outbound-partition.test.ts (4 tests) 5ms
+ ✓ tests/renderer/pdf-list-groups.test.ts (3 tests) 4ms
+ ✓ tests/main/single-instance.test.ts (2 tests) 5ms
+ ✓ tests/main/installer-data-policy.test.ts (2 tests) 4ms
+ ✓ tests/core/batch-business-order.test.ts (1 test) 4ms
+ ✓ tests/core/app-paths.test.ts (1 test) 3ms
+ ✓ tests/main/window-layout.test.ts (3 tests) 3ms
+ ✓ tests/core/package-naming.test.ts (2 tests) 3ms
+
+ Test Files  243 passed (243)
+      Tests  2166 passed (2166)
+   Start at  18:58:46
+   Duration  547.15s (transform 7.14s, setup 36.13s, import 26.14s, tests 329.38s, environment 119.80s)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice

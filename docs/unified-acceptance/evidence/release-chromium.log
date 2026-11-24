@@ -1,0 +1,136 @@
+npm warn Unknown project config "confirmModulesPurge". This will stop working in the next major version of npm.
+
+> drawing-number-planner@1.6.2 test:e2e
+> playwright test --config=/tmp/planner-unified-acceptance/playwright-final.config.cjs
+
+
+Running 30 tests using 1 worker
+
+(node:136092) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/30] tests/e2e/ait-packaging.spec.ts:10:1 › AIT catalog and durable manual drawing tasks use real UI, watcher, files, archive, original backups and scoped index
+[2/30] tests/e2e/bom-pixels.spec.ts:24:1 › compares real decoded PNG pixels through saved BOM history without altering source images or history
+[3/30] tests/e2e/confirmed-installed-contract.spec.ts:10:1 › confirmed installed contract checks multi-model planning, restored drafts and force-detached safe task ending
+[4/30] tests/e2e/drawing-status.spec.ts:19:1 › new reservations display as pending across app reopen and change only on explicit activation and deactivation
+tests/e2e/drawing-status.spec.ts:19:1 › new reservations display as pending across app reopen and change only on explicit activation and deactivation
+(node:136560) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:136588) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[5/30] tests/e2e/mail-import-feedback.spec.ts:7:1 › single reviewed supplier template imports shared CC and keeps failure/success feedback visible at the submit button
+[6/30] tests/e2e/outbound-draft-recovery.spec.ts:10:1 › restores and saves a real SQLite draft through the browser after reload
+[7/30] tests/e2e/outbound.spec.ts:3:1 › browser preview opens outbound workspace while keeping desktop file actions unavailable
+[8/30] tests/e2e/pdf-scan-ownership.spec.ts:21:1 › shows the real watcher owner while rejecting concurrent scans without changing Schema26 or protected data
+[9/30] tests/e2e/pdf-scan-recovery.spec.ts:19:1 › drains a blocked file read before retry and starts the replacement child only after the old one exits
+tests/e2e/pdf-scan-recovery.spec.ts:19:1 › drains a blocked file read before retry and starts the replacement child only after the old one exits
+(node:136875) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:136946) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:136993) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[10/30] tests/e2e/phase-one.spec.ts:6:1 › Phase 1 browser workflow uses the real local database
+[11/30] tests/e2e/phase-real-usage-outbound.spec.ts:56:1 › real-usage acceptance covers lifecycle, QR, historical BOM, outbound packages, mail and recovery boundary
+tests/e2e/phase-real-usage-outbound.spec.ts:56:1 › real-usage acceptance covers lifecycle, QR, historical BOM, outbound packages, mail and recovery boundary
+
+
+[12/30] tests/e2e/phase-three.spec.ts:18:1 › Phase 3 creates and queries a product-level BOM with a business date
+[13/30] tests/e2e/phase-two.spec.ts:14:1 › Phase 2 previews and atomically reserves a real batch
+[14/30] tests/e2e/phase-z-four.spec.ts:21:1 › Phase 4 scans a local PDF workspace and persists relative paths only
+[15/30] tests/e2e/phase-zz-compatibility.spec.ts:20:1 › compatibility correction scans history, preserves occupancy, and reports completeness
+[16/30] tests/e2e/planning-workspace.spec.ts:43:1 › real saved white identity is shared without occupation; explicit confirmation preserves library navigation
+[17/30] tests/e2e/planning-workspace.spec.ts:74:1 › batch imports a real template, repairs failed rows and restores a legacy draft before reserving
+[18/30] tests/e2e/second-acceptance-layout.spec.ts:3:1 › selection controls remain compact beside their labels in a desktop-sized window
+[19/30] tests/e2e/task-termination.spec.ts:13:1 › ends a force-detached T40 task through the real UI, preserving the PDF and index
+[20/30] tests/e2e/v16-workspace.spec.ts:10:1 › preserves module drafts and opens a real AIT drawer without resizing the table
+[21/30] tests/e2e/v51-mail.spec.ts:7:1 › V5.1 real XLSX import -> exact changed PDF ZIP -> editable mail draft preserves business history
+[22/30] tests/e2e/v52-layout.spec.ts:19:1 › V5.2 real indexed tables keep width, alignment, icon actions and frozen controls across window sizes
+[23/30] tests/e2e/v52-mail.spec.ts:7:1 › V5.2 scoped files, exact BOM correction and anonymous matrix import preserve original data
+[24/30] tests/e2e/zc-scan-refresh.spec.ts:27:1 › actual watcher and archive commits refresh both ZC views without writing product ownership
+tests/e2e/zc-scan-refresh.spec.ts:27:1 › actual watcher and archive commits refresh both ZC views without writing product ownership
+(node:138188) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:138455) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[25/30] tests/e2e/pdf-batch-workflow.spec.ts:12:1 › real category scan and501-file selection use two guarded batches without touching files or occupation
+(node:138713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[26/30] tests/e2e/pdf-list-groups.spec.ts:12:1 › groups actual scanned files and retains checked files through folding
+(node:138897) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[27/30] tests/e2e/pdf-reader.spec.ts:13:1 › opens a real PDF and controls pages, zoom, rotation, thumbnails and search without changing bytes
+tests/e2e/pdf-reader.spec.ts:13:1 › opens a real PDF and controls pages, zoom, rotation, thumbnails and search without changing bytes
+6:58:12 PM [vite] (client) [console.warn] Warning: Indexing all PDF objects
+
+6:58:12 PM [vite] (client) [console.warn] Warning: Indexing all PDF objects
+
+[28/30] tests/e2e/pdf-reader.spec.ts:22:1 › preserves intrinsic page rotation in reading, fitting, thumbnails and printing
+[29/30] tests/e2e/pdf-reader.spec.ts:42:1 › built renderer serves PDF.js resources and renders a PDF with its bundled standard font
+tests/e2e/pdf-reader.spec.ts:42:1 › built renderer serves PDF.js resources and renders a PDF with its bundled standard font
+vite v8.2.2 building client environment for production...
+
+transforming...
+
+
+✓ 2072 modules transformed.
+
+
+rendering chunks...
+
+
+computing gzip size...
+
+
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/index.html                                   0.63 kB │ gzip:   0.40 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/pdf.worker.min-wgc6bjNh.mjs       1,078.61 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/PdfReader-sH0uLncl.css                2.38 kB │ gzip:   0.83 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/index-Dem1VA0A.css                  316.03 kB │ gzip:  50.49 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/pdf.worker.min-tZCqKnqW.js            0.05 kB │ gzip:   0.07 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/qr-first-page-pixels-Cv2InRHW.js      1.84 kB │ gzip:   1.03 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/PdfReader-B5BOg0ZY.js                 9.89 kB │ gzip:   3.12 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/pdf-Bpuj9olT.js                     397.01 kB │ gzip: 117.42 kB
+../planner-unified-acceptance/chromium-tmp/pdf-reader-built-WaCjlo/renderer/assets/index-QDnmKKut.js                 1,286.92 kB │ gzip: 328.76 kB
+
+
+✓ built in 1.24s
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+(node:139238) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[30/30] tests/e2e/qr-first-page-pixels.spec.ts:15:1 › compares real decoded first-page RGBA, excluding metadata and all later pages
+tests/e2e/qr-first-page-pixels.spec.ts:15:1 › compares real decoded first-page RGBA, excluding metadata and all later pages
+6:58:31 PM [vite] (client) [console.warn] Warning: Indexing all PDF objects
+
+  30 passed (4.6m)
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice

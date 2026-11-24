@@ -1,0 +1,23 @@
+{
+  "monitorProductDirectories": [
+    "连续实施验收/CONFIRMED-1-CONF-A",
+    "连续实施验收/CONFIRMED-2-CONF-B"
+  ],
+  "monitorPdfIndexIds": [
+    1
+  ],
+  "actualInstalledHttpAndDom": false,
+  "threeStepBatch": true,
+  "modelSpecificSelections": true,
+  "distinctCompleteCodes": true,
+  "persistedDraftRequiresFreshCheck": true,
+  "explicitConfirmation": true,
+  "exactLibraryNavigation": true,
+  "deletedDrawingTaskSafelyEnded": true,
+  "detachedPdfNotReclaimed": true,
+  "formalFileHashPreserved": true,
+  "endedNotArchived": true,
+  "taskLockReleased": true,
+  "originalHash": "209b14f83e3cdfe61ce12da302a5ecd00bec6b4df9a537dc98a9be9866edd3a7",
+  "productionDatabaseOperated": false
+}

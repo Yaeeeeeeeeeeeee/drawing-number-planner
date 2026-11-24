@@ -1,0 +1,22 @@
+1 success Set up job
+2 success Run actions/checkout@v4
+3 success Run actions/checkout@v4
+4 success Run actions/setup-node@v4
+5 success Recover only the hash-pinned published stable runtime
+6 success Build the exact clean application source
+7 success Verify every original runtime hash and bundle current Main/service/preload/renderer
+8 success Build Chinese installer with custom directory page
+9 success Refuse sample-bearing target without deleting its files
+10 success Install to a Chinese custom path and compare every installed file hash
+11 success Verify Desktop root and Chinese Desktop folder installation
+12 success Bundle verification fixture only into runner temporary storage
+13 success Verify large existing database startup and restart with installed Electron
+14 success Run installed Electron; native profile selection, v15 upgrade, backup, WAL, rollback, restart, V5.2 scoped files/BOM/matrix mail and screenshots
+15 success Run actions/upload-artifact@v4
+16 success Run actions/upload-artifact@v4
+17 success Run actions/upload-artifact@v4
+32 success Post Run actions/setup-node@v4
+33 success Post Run actions/checkout@v4
+34 success Post Run actions/checkout@v4
+35 success Complete job
+job ['completed']
