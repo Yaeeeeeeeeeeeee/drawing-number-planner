@@ -1,7 +1,7 @@
-name: Stable Windows build and installed verification
+name: Unslop Windows preview 8671e8e
 on:
   push:
-    branches: [codex/v3-business-ui-20261022, codex/v16-corrections-20261111]
+    branches: [codex/unslop-windows-preview-8671e8e]
     paths:
       - 'src/**'
       - 'tests/**'
@@ -13,13 +13,13 @@ on:
       - '.github/workflows/comprehensive-windows-delivery.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   actions: read
 concurrency:
   group: comprehensive-windows-${{ github.ref }}
   cancel-in-progress: true
 env:
-  PLANNER_ACCEPTANCE_REVISION: ${{ github.sha }}
+  PLANNER_ACCEPTANCE_REVISION: 8671e8e56e3e7c1cf2b5e3ca89caffc791afd35f
 jobs:
   package-and-verify:
     runs-on: windows-latest
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.PLANNER_ACCEPTANCE_REVISION }}
           path: app-source
           fetch-depth: 0
       - uses: actions/setup-node@v4
@@ -156,3 +156,20 @@ jobs:
           path: installer/图号规划器-Windows-x64-安装包.exe
           if-no-files-found: error
           retention-days: 14
+
+      - name: Deliver isolated preview without changing latest or stable releases
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $proof = Get-Content installer/unslop-installed.json -Raw | ConvertFrom-Json
+          if (!$proof.success -or $proof.version.revision -ne $env:PLANNER_ACCEPTANCE_REVISION) { throw 'Missing installed preview evidence' }
+          $tag = 'v1.6.2-unslop-preview-8671e8e'
+          $exe = 'DrawingNumberPlanner-1.6.2-Unslop-Preview-Windows-x64-Setup.exe'
+          Copy-Item 'installer/图号规划器-Windows-x64-安装包.exe' $exe
+          $digest = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLowerInvariant()
+          "$digest  $exe" | Set-Content SHA256SUMS.txt -Encoding ascii
+          Compress-Archive -Path installer/*.json,installer/*.png -DestinationPath Unslop-Windows-Verification.zip
+          gh release create $tag $exe SHA256SUMS.txt Unslop-Windows-Verification.zip --target $env:PLANNER_ACCEPTANCE_REVISION --prerelease --latest=false --title '图号规划器 1.6.2 · Unslop 体验版' --notes "源码 $env:PLANNER_ACCEPTANCE_REVISION · Schema26。已验证安装和启动，附 Windows 安装体验截图。安装包 SHA256 $digest"
+          if ($LASTEXITCODE -ne 0) { throw 'Preview delivery failed' }

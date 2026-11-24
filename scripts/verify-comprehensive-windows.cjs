@@ -66,225 +66,62 @@ async function launch(){
 }
 async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow(app,dialog);await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});return page;}catch(error){await captureFailure(app,app.__verificationLabel,error);throw error;}}
 (async()=>{
- fs.mkdirSync(evidence,{recursive:true});assert.equal(fs.existsSync(profileHome),false,'Refuse to touch any pre-existing runner/user production profile');
- const version=JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));assert.equal(version.revision,report.revision);assert.equal(version.schemaVersion,require(path.join(appRoot,'initialize-empty-acceptance.cjs')).CURRENT_SCHEMA_VERSION);assert.equal(version.applicationVersion,JSON.parse(fs.readFileSync(path.join(source,'package.json'),'utf8')).version);assert.equal(JSON.parse(fs.readFileSync(path.join(appRoot,'package.json'),'utf8')).version,version.applicationVersion);assert.equal(version.bundledSample,false);assert.equal(fs.existsSync(path.join(appRoot,'acceptance-seed')),false);
- const legacy=path.join(temporary,'旧版原始数据目录');database('prepare',legacy);database('rollback-and-wal',legacy);const settingsBefore=fs.readFileSync(path.join(legacy,'settings.json'));
- const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));let app;
- try{app=await launch();const page=await ready(app,dialog);
-  assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);assert.equal(await app.evaluate(({app})=>app.getVersion()),version.applicationVersion);assert.equal(JSON.parse(fs.readFileSync(config,'utf8')).dataDir,legacy);
-  assert.deepEqual(fs.readFileSync(path.join(legacy,'settings.json')),settingsBefore);
-  const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  const native=await app.evaluate(({BrowserWindow,Menu})=>{const w=BrowserWindow.getAllWindows()[0];return{isolated:w.webContents.getLastWebPreferences().contextIsolation,sandbox:w.webContents.getLastWebPreferences().sandbox,nodeIntegration:w.webContents.getLastWebPreferences().nodeIntegration,recovery:Menu.getApplicationMenu().items[0].submenu.items.some(i=>i.label==='安全恢复')};});assert.deepEqual(native,{isolated:true,sandbox:true,nodeIntegration:false,recovery:true});report.native=native;
-  for(const [width,height]of [[3840,2160],[2560,1440],[1920,1080],[1366,768],[720,600]]){
-   await app.evaluate(({BrowserWindow},size)=>BrowserWindow.getAllWindows()[0].setContentSize(...size),[width,height]);
-   await page.waitForTimeout(200);
-   const viewport=await page.evaluate(()=>({width:innerWidth,height:innerHeight,devicePixelRatio,screenWidth:screen.width,screenHeight:screen.height}));
-   assert.equal(viewport.width,width);assert.equal(viewport.height,height);report.viewports.push({requested:{width,height},actual:viewport,scope:'Actual Electron renderer viewport; does not validate physical display/DPI/cross-monitor behavior'});
-   for(const label of ['产品档案','图号库','PDF 文件中心','包材模板','制图任务','二维码管理','BOM 管理','外发资料']){
-    const navigation=page.getByRole('navigation',{name:'主导航'});if(!await navigation.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await navigation.getByRole('button',{name:label,exact:true}).click();
-    await page.getByRole('heading',{name:label,exact:true}).waitFor();
-    await page.waitForTimeout(150);if(label==='二维码管理')await assertQrListLayout(page,`${width}x${height}`);
-    if(['产品档案','PDF 文件中心','图号库','二维码管理'].includes(label))assert.equal(await page.locator('.table-pagination').count(),0,`${label} must use scrolling rather than traditional paging`);
-    const uiControls=await page.evaluate(()=>({hiddenToggleVisible:[...document.querySelectorAll('.navigation-toggle[hidden]')].some(e=>getComputedStyle(e).display!=='none'),selectHeights:[...document.querySelectorAll('.page-surface select')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect().height)}));
-    assert.equal(uiControls.hiddenToggleVisible,false);assert.ok(uiControls.selectHeights.every(height=>Math.abs(height-36)<1),`${label} controls must share 36px height`);
-    (report.uiControlConsistency??=[]).push({label,width,...uiControls});
-    if(width===1920&&label==='图号库'){
-     await page.getByRole('button',{name:'查看 / 管理',exact:true}).first().click();
-     const drawer=page.locator('.drawing-maintenance');await drawer.waitFor();assert.equal(await drawer.locator(':scope > .drawing-detail-group').count(),4);
-     const bounds=await drawer.evaluate(element=>{const r=element.closest('.module-detail').getBoundingClientRect();return {width:r.width,height:r.height};});
-     assert.ok(bounds.width>=600&&bounds.width<=690,`Drawing detail width ${bounds.width}`);
-     await page.screenshot({path:path.join(evidence,'Windows-V3-图号详情-1920.png')});await page.getByRole('button',{name:'关闭图号详情',exact:true}).click();
-    }
-    const shot=`Windows-综合改版-${label.replaceAll(' ','')}-${width}.png`;await page.screenshot({path:path.join(evidence,shot)});const png=fs.readFileSync(path.join(evidence,shot));const actualPng={width:png.readUInt32BE(16),height:png.readUInt32BE(20)};assert.equal(actualPng.width,Math.round(viewport.width*viewport.devicePixelRatio));assert.equal(actualPng.height,Math.round(viewport.height*viewport.devicePixelRatio));report.screenshots.push({file:shot,png:actualPng,viewport});fs.writeFileSync(path.join(evidence,'windows-comprehensive-viewports.json'),JSON.stringify({revision:report.revision,viewports:report.viewports,screenshots:report.screenshots},null,2));
-   }
+ assert.equal(versionFromDisk().revision, report.revision);
+ assert.equal(versionFromDisk().schemaVersion,26);
+ assert.equal(fs.existsSync(profileHome), false,'runner profile must be new');
+ const legacy=path.join(temporary,'体验版旧库夹具');
+ database('prepare',legacy);
+ const settingsPath=path.join(legacy,'settings.json');
+ const settings=JSON.parse(fs.readFileSync(settingsPath,'utf8'));
+ delete settings.workspaceRoot;
+ fs.writeFileSync(settingsPath,JSON.stringify(settings));
+ const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));
+ let app;
+ try {
+  app=await launch();const p=await ready(app,dialog);
+  assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);
+  assert.equal(await app.evaluate(({app})=>app.getVersion()),'1.6.2');
+  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1440,900));
+  const go=async(name)=>{const n=p.getByRole('navigation',{name:'主导航'});if(!await n.isVisible())await p.getByRole('button',{name:'展开导航'}).click();await n.getByRole('button',{name,exact:true}).click();};
+  const shot=async(name)=>{await p.screenshot({path:path.join(evidence,name+'.png')});report.screenshots.push(name);console.log('[windows verified]',name);};
+  await go('产品档案');
+  await p.getByRole('button',{name:'新建产品',exact:true}).click();
+  const drawer=p.getByRole('dialog');
+  await expect(drawer.getByRole('button',{name:'保存产品'})).toBeVisible();
+  await expect(p.locator('.products-compact table:visible')).toBeVisible();
+  await shot('01-new-product');
+  await drawer.getByRole('button',{name:'取消'}).click();
+  await p.getByRole('button',{name:'编辑 M1',exact:true}).click();
+  await expect(drawer.getByLabel('型号',{exact:true})).toHaveValue('M1');
+  await expect(drawer.getByRole('button',{name:'保存修改'})).toBeVisible();
+  await shot('02-edit-product');
+  await drawer.getByRole('button',{name:'取消'}).click();
+  const cell=p.locator('.products-compact table:visible td[data-column-key=model]').first();
+  assert.equal((await cell.textContent()).trim(),'M1');
+  await shot('03-product-list');
+  await go('BOM 管理');await expect(p.getByText('请选择产品型号',{exact:true})).toBeVisible();await expect(p.getByText('尚无当前 BOM',{exact:true})).toHaveCount(0);
+  await shot('04-bom-initial');
+  await p.getByLabel('BOM 产品型号').selectOption('5');await expect(p.getByText('当前 BOM',{exact:true}).first()).toBeVisible();await shot('05-bom-selected');
+  await go('PDF 文件中心');
+  // The migrated fixture may contain existing PDF indexes. Use a scoped search so the empty-state action is reachable.
+  const keyword=p.getByRole('searchbox',{name:'文件关键词'});await keyword.fill('unslop-no-such-pdf');await keyword.press('Enter');
+  await p.getByRole('button',{name:'设置资料根目录',exact:true}).click();
+  const rootInput=p.getByRole('textbox',{name:'资料根目录',exact:true});await expect(rootInput).toBeFocused();
+  const testRoot=path.join(temporary,'体验测试资料');fs.mkdirSync(testRoot);
+  await rootInput.fill(testRoot);await p.getByRole('button',{name:'保存根目录'}).click();await expect(keyword).toBeFocused();
+  await shot('06-pdf-root-return');
+  for(const [label,name] of [['图号规划 / 更新包材','07-planning'],['制图任务','08-tasks'],['外发资料','09-outbound'],['图号库','10-library'],['二维码管理','11-qr'],['包材模板','12-templates'],['编码字典','13-dictionary'],['迁移检查','14-migration']]){
+    await go(label);
+    if(name==='07-planning')await expect(p.getByText('图号预览：暂无候选图号')).toBeVisible();
+    if(name==='09-outbound')await expect(p.getByRole('button',{name:'预览文件',exact:true})).toBeVisible();
+    if(name==='12-templates')await p.getByRole('tab',{name:'模板匹配规则'}).click();
+    if(name==='13-dictionary')await p.getByRole('button',{name:'更多 品牌',exact:true}).click();
+    if(name==='14-migration')await expect(p.getByLabel('选择图号字典 Excel')).toBeAttached();
+    await shot(name);
   }
-  assert.deepEqual(errors,[]);report.rendererErrors=errors;
- }finally{dialog.child.kill();if(app)await app.close();}
- database('audit-upgrade',legacy);report.oldV15Upgrade={originalDirectoryRetained:true,settingsBytesPreserved:true,oldRowsAndSnapshotsPreserved:true,realMigrationBackupValidated:true,walAndRollback:JSON.parse(fs.readFileSync(path.join(legacy,'native-rollback-and-wal.json'),'utf8'))};
- // Exercise the reported zero-count failure through a real installed scan and navigation.
- const directoryRoot=path.join(legacy,'workspace','冰柜','SKU-M1','03.量产后的变更文件（已量产的产品看最新日期）','00.首批大货');
- const directoryPdf=path.join(directoryRoot,'02.0209.010.0401002-M1-铭牌及安装注意事项多语言生产定稿（转曲）.pdf'),unmatchedPdf=path.join(directoryRoot,'M1-补充资料（转曲）.pdf');
- const directoryHashes=[writePdf(directoryPdf,'Directory context matched drawing'),writePdf(unmatchedPdf,'Directory context unmatched drawing')];
- const beforeDirectoryScan=snapshot(path.join(legacy,'planner.db'));const bindingsBeforeScan=beforeDirectoryScan.drawing_appearance_bindings;
- app=await launch();try{
-  const page=await ready(app);const priorList=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());await go(page,'PDF 文件中心');await require('./verify-scan-ui.cjs')(page);
-  const counts=await page.evaluate(async()=>await(await fetch('/api/files/navigation?presence=present')).json());
-  const list=await page.evaluate(async()=>await(await fetch('/api/files?productId=5&presence=present')).json());
-  const directoryItems=list.items.filter(item=>[path.basename(directoryPdf),path.basename(unmatchedPdf)].includes(item.fileName));
-  // The all-active monitor can index these files before the explicit scan.
-  // Count existing non-fixture rows once and still require both concrete new instances.
-  const alreadyObserved=priorList.items.filter(item=>[path.basename(directoryPdf),path.basename(unmatchedPdf)].includes(item.fileName)).length;
-  const expectedTotal=priorList.total-alreadyObserved+2;
-  assert.equal(counts.products.find(item=>item.productId===5)?.count,expectedTotal);assert.equal(list.total,expectedTotal);assert.equal(directoryItems.length,2);assert.deepEqual(directoryItems.map(item=>item.matchStatus).sort(),['matched','unmatched']);
-  assert.ok(directoryItems.every(item=>item.materialBatchId&&item.conversionType==='outlined'));assert.ok(directoryItems.every(item=>item.materialBatchName.includes('首批大货')));
-  const afterDirectoryScan=snapshot(path.join(legacy,'planner.db'));for(const row of beforeDirectoryScan.pdf_files)assert.deepEqual(afterDirectoryScan.pdf_files.find(item=>item.id===row.id),row,'Narrowed scan scope must preserve original out-of-scope index rows');
-
-  const product=page.getByRole('button',{name:'产品 SKU · M1',exact:true});if(!await product.isVisible())await page.getByRole('button',{name:'产品／批次导航',exact:true}).click();await product.click();
-  await page.getByRole('checkbox',{name:`选择 ${path.basename(directoryPdf)}`,exact:true}).waitFor();await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
-  const unassociated=await page.evaluate(async()=>await(await fetch('/api/drawings?associationState=unassociated')).json());assert.ok(unassociated.items.some(item=>item.fullCode==='02.0209.010.0401002'));
-  assert.deepEqual(snapshot(path.join(legacy,'planner.db')).drawing_appearance_bindings,bindingsBeforeScan);
-  assert.equal(createHash('sha256').update(fs.readFileSync(directoryPdf)).digest('hex'),directoryHashes[0]);assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
-  await page.screenshot({path:path.join(evidence,'Windows-PDF-目录归类-无图号确认.png')});report.pdfDirectoryClassification={actualScan:true,productCount:list.total,listCount:list.total,newScopedFiles:2,oldOutOfScopeIndexRowsPreserved:true,matchedAndUnmatchedPreserved:true,unconfirmedDrawingStillUnassociated:true,noBindingWrites:true,originalFileHashesPreserved:true};
-  // Regressions: real renderer JSON requests and filtered counts must not change catalog membership.
-  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1920,1080));
-  const catalog=page.getByRole('navigation',{name:'资料导航'});await catalog.waitFor();
-  const productBranch=catalog.locator('.pdf-nav-product').filter({has:page.getByRole('button',{name:'产品 SKU · M1',exact:true})});
-  const expandProduct=productBranch.locator('.pdf-nav-expand').first();if(await expandProduct.getAttribute('aria-expanded')==='false')await expandProduct.click();
-  const fileFilters=page.getByRole('complementary',{name:'PDF 筛选',exact:true});
-  const setFileFilter=async(field,value)=>{if(!await fileFilters.isVisible())await page.getByRole('button',{name:'筛选',exact:true}).click();await fileFilters.getByRole('combobox',{name:field,exact:true}).selectOption(value);await fileFilters.getByRole('button',{name:'关闭',exact:true}).click();};
-  const fileSearch=page.getByRole('searchbox',{name:'文件关键词',exact:true});
-  await fileSearch.fill('no-file-matches-this-filter');await page.getByRole('heading',{name:'没有符合条件的 PDF',exact:true}).waitFor();
-  assert.ok(await productBranch.getByRole('button',{name:'批次 首批大货',exact:true}).count(),'Searching the list must keep the real batch under its product');
-  await page.getByRole('button',{name:'清除搜索',exact:true}).click();await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor();
-  const managementActions=[['ignore','排除所选文件'],['restore','恢复所选文件'],['clear','移除文件记录']];
-  for(const [action,button]of managementActions){
-    await setFileFilter('纳入范围',action==='restore'?'ignored':'included');
-    await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).check();
-    await page.getByRole('button',{name:button,exact:true}).click();const preview=page.getByRole('dialog',{name:'PDF 管理预览',exact:true});await preview.waitFor();
-    // Use the actual preview phrase so the check also covers renderer/server contract changes.
-    const text=await preview.locator('strong').first().textContent();const confirmation=text.split(' · ')[0];assert.ok(confirmation.length>0);
-    await preview.getByLabel('PDF 管理确认短语',{exact:true}).fill(confirmation);
-    await page.screenshot({path:path.join(evidence,`Windows-PDF管理-${action}-真实预览.png`)});
-    await preview.getByRole('button',{name:'确认处理',exact:true}).click();await preview.waitFor({state:'detached'});
-    await page.waitForFunction(async({name,action})=>{const result=await(await fetch('/api/files?managementState=all&presence=all')).json();const file=result.items.find(item=>item.fileName===name);return action==='clear'?!file:file?.managementState===(action==='ignore'?'ignored':'included');},{name:path.basename(unmatchedPdf),action});
-    assert.equal(createHash('sha256').update(fs.readFileSync(unmatchedPdf)).digest('hex'),directoryHashes[1]);
-  }
-  await setFileFilter('纳入范围','included');await require('./verify-scan-ui.cjs')(page);
-  await page.getByRole('checkbox',{name:`选择 ${path.basename(unmatchedPdf)}`,exact:true}).waitFor({timeout:45000});
-  report.pdfManagementButtons={actualRenderer:true,previewApplyIgnoreRestoreClear:true,originalFileHashPreserved:true,clearedIndexRediscovered:true,zeroCountDoesNotReparentBatch:true};
-  await go(page,'图号库');await page.getByRole('button',{name:'自动归类（全库）',exact:true}).click();
-  await page.locator('.drawing-association-result').waitFor({timeout:45000});
-  const drawingList=await page.evaluate(async()=>await(await fetch('/api/drawings?productId=5')).json());
-  assert.ok(drawingList.items.some(item=>item.fullCode==='02.0209.010.0401002'&&item.productId===5));
-  const drawingCounts=await page.evaluate(async()=>await(await fetch('/api/drawings/navigation-counts')).json());
-  assert.ok(drawingCounts.products.some(item=>item.productId===5&&item.count>0));
-  assert.ok(snapshot(path.join(legacy,'planner.db')).drawing_association_audit.length>0);
-  await page.screenshot({path:path.join(evidence,'Windows-图号一键归类-真实保存.png')});
-  const drawingCatalog=page.getByRole('navigation',{name:'图号导航'});
-  const drawingBranch=drawingCatalog.locator('.pdf-nav-product').filter({has:page.getByRole('button',{name:'产品 M1',exact:true})});
-  await drawingBranch.waitFor();
-  await page.getByLabel('关键词',{exact:true}).fill('no-drawing-matches-this-filter');await page.getByRole('button',{name:'查询',exact:true}).click();
-  await page.getByRole('heading',{name:'没有符合查询条件的图号',exact:true}).waitFor();
-  // Scan-only batches do not establish drawing business usage. Check the real product,
-  // while renderer tests separately cover batches with explicit BOM/outbound usage.
-  await drawingBranch.getByRole('button',{name:'产品 M1',exact:true}).getByLabel('0 个图号',{exact:true}).waitFor();
-  await page.screenshot({path:path.join(evidence,'Windows-图号筛选零结果-保留产品目录.png')});
-  await page.getByLabel('关键词',{exact:true}).fill('');await page.getByRole('button',{name:'查询',exact:true}).click();
-  report.drawingCatalogRefresh={productVisibleAfterClassification:true,zeroCountKeepsProduct:true};
-  await page.getByRole('button',{name:'02.0209.010.0401002',exact:true}).click();
-  const compactDrawer=page.locator('.drawing-maintenance');await compactDrawer.waitFor();
-  assert.equal(await compactDrawer.locator(':scope > .drawing-detail-group').count(),4);
-  const fileGeometry=await compactDrawer.locator('.drawing-file-row').evaluateAll(rows=>rows.map(row=>{
-    const filename=row.querySelector('.drawing-file-name'),action=row.querySelector('button');
-    const name=filename.getBoundingClientRect(),button=action.getBoundingClientRect(),card=row.getBoundingClientRect(),content=row.querySelector('.drawing-file-identity').getBoundingClientRect();
-    const style=getComputedStyle(row),nameStyle=getComputedStyle(filename),buttonStyle=getComputedStyle(action);
-    const insets=['paddingTop','paddingBottom','borderTopWidth','borderBottomWidth'].reduce((sum,key)=>sum+(parseFloat(style[key])||0),0);
-    return {display:style.display,height:card.height,contentHeight:content.height,insets,rowY:card.y+card.height/2,buttonY:button.y+button.height/2,overlap:name.right>button.left,nameWhiteSpace:nameStyle.whiteSpace,buttonWhiteSpace:buttonStyle.whiteSpace};
-  }));
-  const innerBackgrounds=await compactDrawer.locator('.drawing-detail-group .drawing-detail-section').evaluateAll(items=>items.map(e=>getComputedStyle(e).backgroundColor));assert.ok(innerBackgrounds.every(color=>color==='rgba(0, 0, 0, 0)'));
-  await page.screenshot({path:path.join(evidence,'Windows-UI修正-四板块文件行.png')});
-  assert.ok(fileGeometry.length>0);for(const row of fileGeometry){assert.equal(row.display,'flex');assert.ok(row.height>=48&&row.height<=Math.max(64,row.contentHeight+row.insets)+1);assert.ok(Math.abs(row.rowY-row.buttonY)<3);assert.equal(row.overlap,false);assert.equal(row.nameWhiteSpace,'nowrap');assert.equal(row.buttonWhiteSpace,'nowrap');}
-  await compactDrawer.getByRole('button',{name:'取消占号并删除',exact:true}).click();
-  await compactDrawer.getByText(/该图号存在历史扫描占用记录/).waitFor();
-  report.compactDrawingDrawer={fourGroups:true,fileGeometry,innerBackgrounds,historicalReleaseQualificationReachable:true,protectedHistoryReleaseBlocked:true};
-  report.oneClickDrawingClassification={actualRendererClick:true,realDatabaseSaved:true,productFilteredListContainsDrawing:true,navigationCountsNonzero:true,auditRecorded:true};
-
- }catch(error){await captureFailure(app,'pdf-directory',error);throw error;}finally{await app.close();}
- const beforeQr=snapshot(path.join(legacy,'planner.db'));const qrName='Windows原生手动售后卡';
- const firstPdf=path.join(temporary,'原生QR首次','M1-warranty (qagp85g).pdf'),replacementPdf=path.join(temporary,'原生QR替换','M1-warranty (qagp85g).pdf');
- const firstHash=writePdf(firstPdf,'Native QR first PDF'),replacementHash=writePdf(replacementPdf,'Native QR replacement PDF');assert.notEqual(firstHash,replacementHash);
- let linkedState,replacedState,qrObservationScope;
- app=await launch();try{
-  const page=await ready(app);assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);assert.equal(await app.evaluate(({app})=>app.getVersion()),version.applicationVersion);qrObservationScope=await observationScope(page,beforeQr);require('./verify-packaging-restart.cjs')(beforeQr,snapshot(path.join(legacy,'planner.db')),qrObservationScope);report.restartPreservesDatabase=true;
-  await go(page,'二维码管理');await assertQrListLayout(page,'before-native-association');const productRow=page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).locator('xpath=ancestor::tr');
-  const shortcut=productRow.getByRole('button',{name:'售后卡：未配置，关联文件',exact:true});await expect(shortcut).toHaveAttribute('title','售后卡：未配置，关联文件');await shortcut.click();
-  const modal=page.getByRole('dialog',{name:'手动关联二维码'});await modal.waitFor();
-  assert.equal(await modal.evaluate(element=>element.contains(document.activeElement)),true);
-  const modalCancel=modal.getByRole('button',{name:'取消',exact:true});await modalCancel.focus();await page.keyboard.press('Tab');assert.equal(await modal.evaluate(element=>element.contains(document.activeElement)),true);assert.equal(await modalCancel.evaluate(element=>element===document.activeElement),false);await page.keyboard.press('Shift+Tab');assert.equal(await modalCancel.evaluate(element=>element===document.activeElement),true);
-  report.qrModalKeyboardFocus={initialFocus:true,tabLoop:true};
-  const purpose=await page.evaluate(async()=>{const result=await(await fetch('/api/qr-purposes')).json();return result.items.find(p=>p.key==='warranty'&&p.englishName==='Warranty');});assert.ok(purpose);
-  assert.equal(await modal.getByLabel('手动二维码外观版本',{exact:true}).count(),0);assert.ok(!beforeQr.product_qr_codes.some(row=>row.product_id===5&&row.purpose_id===purpose.id&&row.deleted_at==null&&row.appearance_version_id==null),'Native test must not replace an existing shared Warranty QR');
-  await modal.getByLabel('手动二维码用途',{exact:true}).selectOption(String(purpose.id));await modal.getByLabel('手动二维码名称',{exact:true}).fill(qrName);await modal.getByLabel('手动二维码网址',{exact:true}).fill('https://qrs.ly/qagp85g');
-  await chooseAndCommitQr(page,firstPdf,'QR首次关联');linkedState=qrState(path.join(legacy,'planner.db'),qrName);assert.equal(linkedState.code.product_id,5);assert.equal(linkedState.code.purpose_id,purpose.id);assert.equal(linkedState.code.appearance_version_id,null);assert.equal(linkedState.code.status,'inactive');assert.equal(linkedState.code.target_url,'https://qrs.ly/qagp85g');assert.equal(linkedState.files.length,1);assert.equal(linkedState.files[0].absolute_path,firstPdf);assert.equal(linkedState.files[0].content_sha256,firstHash);assert.equal(linkedState.links[0].unlinked_at,null);assert.equal(linkedState.audit.length,1);assert.equal(linkedState.audit[0].event,'link');assertPreservedRows(beforeQr,snapshot(path.join(legacy,'planner.db')),qrObservationScope);
- }finally{await app.close();}
- // A fresh real Electron process must reload the new external file and metadata.
- app=await launch();try{
-  const page=await ready(app);assert.deepEqual(qrState(path.join(legacy,'planner.db'),qrName),linkedState);await go(page,'二维码管理');
-  await page.getByRole('button',{name:'展开 M1 的二维码用途',exact:true}).click();
-  const qrDetails=page.locator('.qr-manual-subtable').getByRole('table');
-  assert.deepEqual((await qrDetails.getByRole('columnheader').allTextContents()).map(text=>text.trim()),['用途','关联文件','网址','业务状态']);
-  await expect(qrDetails.getByRole('link',{name:'打开网址',exact:true}).filter({has:page.locator('svg')}).first()).toBeVisible();
-  await qrDetails.getByRole('button',{name:`查看 ${qrName}`,exact:true}).click();await page.getByRole('heading',{name:qrName,exact:true}).waitFor();
-  await page.getByText(firstPdf,{exact:true}).waitFor();await page.screenshot({path:path.join(evidence,'Windows-原生二维码PDF-关联后重启.png')});
-  await page.getByRole('button',{name:'更换文件',exact:true}).click();await chooseAndCommitQr(page,replacementPdf,'QR替换');replacedState=qrState(path.join(legacy,'planner.db'),qrName);assert.deepEqual(replacedState.code,linkedState.code);assert.equal(replacedState.links.length,2);assert.equal(replacedState.files[1].absolute_path,replacementPdf);assert.equal(replacedState.files[1].content_sha256,replacementHash);assert.equal(replacedState.links[1].unlinked_at,null);assert.ok(replacedState.links[0].unlinked_at);assert.deepEqual(replacedState.files[0],linkedState.files[0]);assert.deepEqual(replacedState.audit[0],linkedState.audit[0]);
-  await page.waitForFunction(()=>document.querySelector('details.qr-file-section')?.querySelectorAll('p').length===2);
-  await page.getByRole('button',{name:'解除关联',exact:true}).click();await page.getByText('已解除当前文件关联，历史记录保留。',{exact:true}).waitFor();
-  const unlinked=qrState(path.join(legacy,'planner.db'),qrName);assert.deepEqual(unlinked.code,linkedState.code);assert.equal(unlinked.links.length,2);assert.ok(unlinked.links.every(link=>link.unlinked_at));assert.deepEqual(unlinked.files,replacedState.files);assert.deepEqual(unlinked.audit.slice(0,2),replacedState.audit);assert.equal(unlinked.audit[2].event,'unlink');assertPreservedRows(beforeQr,snapshot(path.join(legacy,'planner.db')),qrObservationScope);
-  assert.equal(createHash('sha256').update(fs.readFileSync(firstPdf)).digest('hex'),firstHash);assert.equal(createHash('sha256').update(fs.readFileSync(replacementPdf)).digest('hex'),replacementHash);
-  report.nativeQrPdfPicker={actualNativeDialog:true,rendererSelectionPreviewCommit:true,fullWidthFilename:false,asciiParentheses:true,firstPagePixelComparisonObserved:true,sevenColumnProductList:true,noIndependentAppearancePicker:true,newRecordProductScoped:true,lowercasePurposeAndParenthesisSpaceValidated:true,firstFileHash:firstHash,replacementFileHash:replacementHash,restartPreservesLinkAndMetadata:true,replacementPreservesMetadataAndHistory:true,unlinkPreservesFilesAndAudit:true,oldV15RowsPreserved:true,qrCodeId:linkedState.code.id};
- }finally{await app.close();}
- app=await launch();try{const page=await ready(app);report.v4=await require('./verify-v4-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v41v42=await require('./verify-v41-v42-installed.cjs')({page,app,legacy,evidence,writePdf,snapshot,go});report.v5=await require('./verify-v5-installed.cjs')({page,app,legacy,evidence,snapshot,go,previous:report.v41v42});report.hotfix111=await require('./verify-1.1.1-installed.cjs')({page,app,legacy,evidence,writePdf,go});report.v51=await require('./verify-v51-mail.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),output:path.join(legacy,'v51-mail-exports'),evidence,writePdf,snapshot,databaseFile:path.join(legacy,'planner.db'),go});report.v52=await require('./verify-v52-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,writePdf,snapshot,databaseFile:path.join(legacy,'planner.db'),go});report.hotfix131=await require('./verify-1.3.1-mail-import.cjs')({page,app,source,evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,go});report.aitPackaging=await require('./verify-ait-packaging-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,writePdf,go,nativeDialog});report.confirmedRequirements=await require('./verify-confirmed-installed.cjs')({page,app,source,workspace:path.join(legacy,'workspace'),evidence,databaseFile:path.join(legacy,'planner.db'),snapshot,writePdf});}catch(error){await captureFailure(app,'v4',error);throw error;}finally{await app.close();}
- let beforeRestart=snapshot(path.join(legacy,'planner.db'));app=await launch();
- try{
-  const page=await ready(app);
-  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('table-layout:v1:pdf-files'))),report.v4.tableLayout);report.v4.layoutSurvivesRestart=true;
-  const resumed=await page.evaluate(async id=>{const response=await fetch('/api/packaging/tasks/'+id);if(!response.ok)throw new Error('Task restart retrieval failed');return response.json();},report.aitPackaging.unfinishedTaskId);
-  assert.equal(resumed.state,'active');assert.equal(resumed.productId,report.aitPackaging.productId);assert.ok(resumed.items.length);
-  assert.equal(resumed.items[0].mode,report.aitPackaging.unfinishedTaskMode);assert.deepEqual(resumed.items[0].parameters,report.aitPackaging.unfinishedTaskParameters);
-  report.aitPackaging.realProcessRestartPreservesTask=true;
-  await go(page,'外发资料');await page.getByText('编辑邮件草稿',{exact:true}).click();await page.getByRole('button',{name:'恢复已保存草稿',exact:true}).click();
-  for(const [field,value]of [['主题',report.v51.savedDraft.subject],['正文',report.v51.savedDraft.body],['收件人文本',report.v51.savedDraft.to],['抄送文本',report.v51.savedDraft.cc]])await expect(page.getByLabel(field,{exact:true})).toHaveValue(value);
-  const reopenedDraft=await page.evaluate(async()=>await(await fetch('/api/outbound-email-drafts/latest')).json());assert.deepEqual(reopenedDraft,report.v51.savedDraft);
-  await page.screenshot({path:path.join(evidence,'Windows-外发草稿-实际进程重启恢复.png')});report.outboundDraftRestart={actualProcessRestart:true,restoredThroughUi:true,packageId:reopenedDraft.packageId,productId:reopenedDraft.context.product.id,selectedBatchId:reopenedDraft.context.selectedMaterialBatchId,allSavedFieldsPreserved:true,noArchiveRegeneration:true};
- }finally{await app.close();}
- const afterRestart=snapshot(path.join(legacy,'planner.db'));
- require('./verify-packaging-restart.cjs')(beforeRestart,afterRestart,{pdfIndexIds:report.confirmedRequirements.monitorPdfIndexIds,productDirectories:report.confirmedRequirements.monitorProductDirectories});
- beforeRestart=afterRestart;report.nativeQrPdfPicker.unlinkSurvivesRestart=true;
- // Exercise both renderer recovery and the native menu with actual Windows pickers.
- const reselectionCopy=path.join(temporary,'reselection-copy');fs.cpSync(legacy,reselectionCopy,{recursive:true,filter:file=>path.basename(file)!=='backups'});
- const protectedTables=['drawing_numbers','historical_drawing_numbers','bom_versions','bom_items','outbound_packages','outbound_package_items','product_qr_codes','packaging_tasks','packaging_task_items'];
- const switchScope={pdfIndexIds:report.confirmedRequirements.monitorPdfIndexIds,productDirectories:report.confirmedRequirements.monitorProductDirectories};
- const businessRows=require('./verify-packaging-restart.cjs').businessRows;
- for(const table of protectedTables)assert.ok(Array.isArray(beforeRestart[table]),`Missing protected table ${table}`);
- const protectedBefore=Object.fromEntries(protectedTables.map(table=>[table,businessRows(beforeRestart,table,beforeRestart[table],switchScope)]));
- app=await launch();try{
-  let page=await ready(app);const profileBefore=fs.readFileSync(config,'utf8');
-  await page.getByRole('button',{name:'安全恢复',exact:true}).click();const recovery=page.getByRole('region',{name:'安全恢复面板',exact:true});
-  const cancelled=nativeDialog('reselect-cancel',undefined,'reselect-cancel');try{await recovery.getByRole('button',{name:'重新选择数据库',exact:true}).click();await cancelled.done;await recovery.getByText('已取消选择，继续使用原数据库',{exact:true}).waitFor();}finally{cancelled.child.kill();}
-  assert.equal(fs.readFileSync(config,'utf8'),profileBefore);assert.equal(await app.evaluate(({app})=>app.getPath('userData')),legacy);
-  for(const [label,directory]of [['other',reselectionCopy],['original',legacy]]){
-   const picker=nativeDialog('reselect',path.join(directory,'planner.db'),'reselect-'+label);
-   try{
-    await app.evaluate(({Menu})=>{const item=Menu.getApplicationMenu().items[0].submenu.items.find(item=>item.label==='安全恢复').submenu.items.find(item=>item.label==='重新选择数据库');item.click();});await picker.done;
-    await expect.poll(()=>app.evaluate(({app})=>app.getPath('userData')),{timeout:45000}).toBe(directory);
-    page=await app.firstWindow();await page.getByRole('heading',{name:'图号规划',exact:true}).waitFor({timeout:45000});
-    await expect.poll(async()=>page.evaluate(async()=>{try{return(await(await fetch('/api/health')).json()).status;}catch{return null;}})).toBe('ok');
-    assert.equal(JSON.parse(fs.readFileSync(config,'utf8')).dataDir,directory);
-    const selected=snapshot(path.join(directory,'planner.db'));for(const table of protectedTables)assert.deepEqual(businessRows(beforeRestart,table,selected[table],switchScope),protectedBefore[table],`Switch changed protected ${table}`);
-    await page.screenshot({path:path.join(evidence,'Windows-原生数据库重选-'+label+'.png')});
-   }finally{picker.child.kill();}
-  }
-  report.databaseReselection={actualNativePicker:true,rendererCancelPreservesProfile:true,nativeMenuSwitch:true,selectedOtherExistingDirectory:true,returnedOriginalDirectory:true,protectedBusinessRowsPreserved:true,backupsRequiredAndVerified:true};
- }catch(error){await captureFailure(app,'database-reselection',error);throw error;}finally{await app.close();}
- beforeRestart=snapshot(path.join(legacy,'planner.db'));
-
- // Real same-version reinstalls must ask again; ordinary restarts must not.
- const setup=path.join(evidence,'图号规划器-Windows-x64-安装包.exe');
- const markerFile=path.join(path.dirname(executable),'installation.id');
- const reinstall=()=>{const before=fs.readFileSync(markerFile,'utf8').trim();execFileSync(setup,['/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/DIR='+path.dirname(executable)],{timeout:120000,stdio:'inherit'});const after=fs.readFileSync(markerFile,'utf8').trim();assert.ok(after&&after!==before,'Every installation needs a new marker');return after;};
- const installationChoices=[];let priorFresh;
- for(let attempt=0;attempt<2;attempt++){
-  const installId=reinstall(),freshDialog=nativeDialog('fresh',undefined,`reinstall-${attempt}`);app=undefined;let freshData,beforeFreshRestart;
-  try{app=await launch();const page=await ready(app,freshDialog);freshData=await app.evaluate(({app})=>app.getPath('userData'));assert.equal(path.dirname(freshData),profileHome);assert.ok(path.basename(freshData)==='data'||path.basename(freshData).startsWith('data-'));if(priorFresh)assert.notEqual(freshData,priorFresh.data);
-   assert.equal(JSON.parse(fs.readFileSync(config,'utf8')).installationId,installId);
-   const all=snapshot(path.join(freshData,'planner.db'));for(const [name,rows]of Object.entries(all))if(!['schema_migrations','qr_purposes','qr_purpose_product_categories'].includes(name))assert.equal(rows.length,0,name);
-   assert.deepEqual(snapshot(path.join(legacy,'planner.db')),beforeRestart);if(priorFresh)assert.deepEqual(snapshot(path.join(priorFresh.data,'planner.db')),priorFresh.snapshot);
-   report.freshBusinessTablesEmpty=true;beforeFreshRestart=all;await page.screenshot({path:path.join(evidence,`Windows-重装后创建新数据库-${attempt}.png`)});
-  }finally{freshDialog.child.kill();if(app)await app.close();}
-  app=await launch();try{await ready(app);assert.equal(await app.evaluate(({app})=>app.getPath('userData')),freshData);assert.deepEqual(snapshot(path.join(freshData,'planner.db')),beforeFreshRestart);}finally{await app.close();}
-  priorFresh={data:freshData,snapshot:beforeFreshRestart};installationChoices.push({installId,newDataDirectory:freshData,promptedAfterReinstall:true,createdWithoutFileSelection:true,normalRestartReusesChoice:true,oldDataRetained:true});
- }
- report.installationChoice={actualInstaller:true,sameVersionReinstallChoices:installationChoices};report.freshRestartPreservesDatabase=true;
- fs.writeFileSync(path.join(evidence,'windows-comprehensive-verification.json'),JSON.stringify(report,null,2));
- console.log('Installed production profile, real v15 upgrade, WAL backup, rollback, restart and screenshots passed.');
-})().catch(error=>{fs.mkdirSync(evidence,{recursive:true});fs.writeFileSync(path.join(evidence,'windows-comprehensive-failure.txt'),error.stack||String(error));console.error(error);process.exitCode=1;});
+  await p.getByRole('button',{name:'安全恢复',exact:true}).click();await expect(p.getByRole('region',{name:'界面与服务维护'})).toBeVisible();await shot('15-safe-recovery');
+  report.version=versionFromDisk();report.profileWasIsolated=true;report.success=true;
+  fs.writeFileSync(path.join(evidence,'unslop-installed.json'),JSON.stringify(report,null,2));
+ }catch(error){if(app)await captureFailure(app,'unslop',error);throw error;}finally{if(app)await app.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});
+function versionFromDisk(){return JSON.parse(fs.readFileSync(path.join(appRoot,'acceptance-version.json'),'utf8'));}
