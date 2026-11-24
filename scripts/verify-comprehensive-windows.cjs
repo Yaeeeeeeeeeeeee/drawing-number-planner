@@ -72,9 +72,8 @@ async function ready(app,dialog){try{const page=await waitForNativeDesktopWindow
  const legacy=path.join(temporary,'体验版旧库夹具');
  database('prepare',legacy);
  const settingsPath=path.join(legacy,'settings.json');
- const settings=JSON.parse(fs.readFileSync(settingsPath,'utf8'));
- delete settings.workspaceRoot;
- fs.writeFileSync(settingsPath,JSON.stringify(settings));
+ // A never-configured profile has no settings.json. Keep the fixture's configured sample separately.
+ fs.renameSync(settingsPath,path.join(temporary,'original-fixture-settings.json'));
  const dialog=nativeDialog('existing',path.join(legacy,'planner.db'));
  let app;
  try {
