@@ -43,7 +43,6 @@ describe('PDF renderer-only preview isolation', () => {
     const desktop = vi.fn(); window.plannerDesktop = { showFileInFolder: desktop };
     const network = vi.fn(); vi.stubGlobal('fetch', network);
     render(<App api={new Proxy({}, { get: () => real }) as never} />);
-    fireEvent.click((await screen.findAllByRole('button',{name:/已加载 .* 个版本/}))[0]);
     await screen.findByText('说明书-001-源文件');
     expect(document.querySelector('.files-page .file-relative')).toBeNull();
     expect(document.querySelector('.file-match.matched .files-match-badge')).toHaveTextContent('已匹配');

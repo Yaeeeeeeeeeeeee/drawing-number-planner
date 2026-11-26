@@ -45,7 +45,7 @@ export class PackagingMonitor {
   pendingScans:this.scans.size,pendingDiscoveries:this.discoveries.size,lastCheckedAt:this.lastCheckedAt,error:this.error};}
  start():void{
   if(this.started||this.closed)return;this.started=true;
-  this.interval=setInterval(()=>{this.catchup=true;this.schedule();},this.intervalMs);this.interval.unref();
+  this.interval=setInterval(()=>{if(!this.watcher)this.catchup=true;this.schedule();},this.intervalMs);this.interval.unref();
   this.schedule();
  }
  /** Settings and task mutations can introduce scopes before a filesystem watcher exists. */
@@ -110,11 +110,15 @@ export class PackagingMonitor {
   }catch(error){this.error=message(error);}
   // All active products participate in formal02/03 watching. Temporary00 and
   // unfinished tasks only decide discovery work; neither grants scan membership.
+  const previous=this.known;
   this.known=new Map([...claims].filter(([,claim])=>claim.owners.size===1).map(([key,claim])=>[key,claim.directory]));
+  for(const [key,directory] of this.known)if(previous.get(key)?.productId!==directory.productId)this.scans.set(key,{root,relativePath:directory.relativePath,queuedAt:Date.now()});
   if([...claims.values()].some(claim=>claim.owners.size>1))this.error='部分产品共用同一资料目录，已暂停该目录的自动扫描';
+  const previousTasks=this.tasks;
   this.tasks=new Map(allTasks.filter(task=>!task.endedAt&&task.state==='active').filter(task=>{
    try{return this.known.get(toWorkspacePathKey(task.productDirectory))?.productId===task.productId;}catch{return false;}
   }).map(task=>[task.id,task]));
+  for(const id of this.tasks.keys())if(!previousTasks.has(id))this.discoveries.add(id);
   for(const id of this.discoveries)if(!this.tasks.has(id))this.discoveries.delete(id);
  }
  private async signal(root:string,fileName:string|undefined):Promise<void>{

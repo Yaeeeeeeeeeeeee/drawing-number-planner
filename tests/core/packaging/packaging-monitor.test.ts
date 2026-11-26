@@ -129,3 +129,13 @@ it('rechecks a queued product after another asynchronous scan before indexing a 
 it('refreshes active task discovery after its formal directory has been indexed',async()=>{
  const f=registered();f.tasks.push(task(f.first,'active','category/ONE-MODEL'));pdf(f.root,'category/ONE-MODEL/02.未转曲源文件/new.pdf');const observed:number[]=[];f.setDiscover(async()=>{observed.push((f.db.prepare('select count(*) n from pdf_files').get() as {n:number}).n);});monitor(f).start();await expect.poll(()=>observed.includes(1),{timeout:1000}).toBe(true);
 });
+
+it('keeps idle formal directories out of periodic rescans while the watcher is healthy',async()=>{
+ const f=registered();
+ const watcher=monitor(f,{intervalMs:40,debounceMs:5});
+ watcher.start();
+ await expect.poll(()=>watcher.status().watching && f.scans.length>0).toBe(true);
+ const count=f.scans.length;
+ await new Promise(resolve=>setTimeout(resolve,150));
+ expect(f.scans).toHaveLength(count);
+});

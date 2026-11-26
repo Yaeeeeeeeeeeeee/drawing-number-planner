@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-export interface LayoutColumn {key:string;label:string; width?:number; minWidth?:number; align?:'left'|'center'|'right'; locked?:'start'|'end'}
+export interface LayoutColumn {fill?:boolean;key:string;label:string; width?:number; minWidth?:number; align?:'left'|'center'|'right'; locked?:'start'|'end'}
 export function columnAlignment(c:LayoutColumn){
  if(c.align)return c.align;
  if(/^(sku|model|brand|name|fileName|filename)$/i.test(c.key))return 'left';
@@ -14,7 +14,7 @@ export function fitColumnWidths(columns:LayoutColumn[],widths:Record<string,numb
  const minimum=columns.reduce((sum,c)=>sum+columnMinimum(c),0);
  const budget=Math.max(available,minimum);
  const total=columns.reduce((sum,c)=>sum+result[c.key],0);
- if(!fixed&&total<=budget){result[columns.at(-1)!.key]+=budget-total;return result;}
+ if(!fixed&&total<=budget){result[(columns.find(column=>column.fill)??columns.at(-1)!).key]+=budget-total;return result;}
  const spare=budget-minimum;
  let weights=columns.map(c=>result[c.key]-columnMinimum(c));
  let weightTotal=weights.reduce((sum,width)=>sum+width,0);

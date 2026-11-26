@@ -126,3 +126,40 @@
 .files-page .files-filter-overlay>div {display:flex;justify-content:space-between;align-items:center;}
 .files-page .files-filter-overlay .files-filter {display:flex;flex-direction:column;align-items:stretch;}
 .files-page .files-filter-overlay .files-filter label {display:flex;flex-direction:column;gap:4px;}
+
+.files-page .files-tools-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  overflow-x: auto;
+  padding: 4px;
+}
+.files-page :is(.pdf-quick-filters, .files-list-actions) { display: flex; gap: 6px; }
+.files-page .files-tool-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+.files-page .files-filter-overlay .files-filter-heading {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border, #e5e5e5);
+}
+.files-page .files-filter-heading h2 { margin: 0; font-size: 17px; }
+.files-page .files-filter-overlay .files-filter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0;
+}
+.files-page .files-filter-overlay .files-filter label > :is(select, input) { width: 100%; min-width: 0; }
+.files-page .files-filter-overlay .files-filter label:has([aria-label="资料批次筛选"]),
+.files-page .files-clear-filters { grid-column: 1 / -1; }
+.files-page .files-clear-filters { justify-self: end; display: inline-flex; align-items: center; gap: 6px; }
+
+.files-page .file-workspace .pdf-nav-state.historical { border: 2px solid #727b85; background: transparent; border-radius: 50%; padding: 0; }
+.files-page .module-list td[data-column-key="actions"] .file-row-actions { width: 100%; display: flex; justify-content: center; flex-wrap: nowrap; }

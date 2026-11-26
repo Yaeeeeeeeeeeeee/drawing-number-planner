@@ -45,19 +45,14 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
-  it('keeps selection through group folding and clears it when a filter changes', async () => {
+  it('selects individual files directly and clears selection when a filter changes', async () => {
     const api=apiFixture(true);
     const historical={...file,id:20,fileName:'old-version.pdf',relativePath:'old-version.pdf',isPresent:false};
     api.searchPdfFiles.mockResolvedValue({items:[file,historical],total:2,page:1,pageSize:100});
     Object.assign(api,{previewPdfManagement:vi.fn()});
     render(<FilesPage api={api as never}/>);
-    const group=await screen.findByRole('button',{name:/已加载 2 个版本/});
-    expect(group).toHaveTextContent('包含缺失文件');
-    expect(screen.queryByRole('checkbox',{name:`选择 ${file.fileName}`})).not.toBeInTheDocument();
-    fireEvent.click(group);
+    expect(await screen.findByRole('checkbox',{name:'选择 old-version.pdf'})).toBeVisible();
     fireEvent.click(screen.getByRole('checkbox',{name:`选择 ${file.fileName}`}));
-    expect(screen.getByText('已选 1 条')).toBeVisible();
-    fireEvent.click(group);
     expect(screen.getByText('已选 1 条')).toBeVisible();
     fireEvent.click(screen.getByRole('button',{name:'筛选'}));
     fireEvent.change(screen.getByRole('combobox',{name:'匹配状态'}),{target:{value:'pending'}});
@@ -196,7 +191,7 @@ describe('FilesPage', () => {
 
     render(<FilesPage api={api as never} />);
 
-    fireEvent.click(await screen.findByRole('button',{name:/已加载 2 个版本/}));
+
     expect(await screen.findAllByText(file.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' })).toHaveLength(2);
     expect(screen.getByText('首批大货', { selector: '.files-batch-code' })).toBeVisible();
     expect(screen.getByText('20260309', { selector: '.files-batch-code' })).toBeVisible();
