@@ -2,6 +2,36 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
+// Run native SQLite on a separate Electron-as-Node process so Windows can
+// continue painting and dispatching input throughout validation and backup.
+const operations = ['validateProductionDatabase', 'backupProductionDatabase', 'prepareExistingProductionDatabase'];
+function runDatabaseOperation(operation, file) {
+  const {fork} = require('node:child_process');
+  return new Promise((resolve, reject) => {
+    const child = fork(__filename, [operation, file], {
+      execArgv: [], windowsHide: true, env: {...process.env, ELECTRON_RUN_AS_NODE: '1'},
+    });
+    let reply;
+    child.on('message', message => { reply = message; });
+    child.once('error', reject);
+    child.once('exit', code => {
+      if (code === 0 && reply?.ok) resolve(reply.value);
+      else reject(new Error(reply?.error || '数据库检查进程意外退出'));
+    });
+  });
+}
+if (require.main === module && process.send && operations.includes(process.argv[2])) {
+  (async () => {
+    try {
+      const value = await require('./initialize-empty-acceptance.cjs')[process.argv[2]](process.argv[3]);
+      process.send({ok:true, value});
+    } catch (error) {
+      process.exitCode = 1;
+      process.send({ok:false, error:String(error.message || error)});
+    }
+  })();
+}
+
 /** Ask once per installation, then reuse the chosen database. Never reset old data. */
 async function prepareProductionProfile({ appData, installationId, chooseMode, chooseDatabase, initializeDatabase, databaseSafety, forceSelection = false, beforeSwitch, verifyStartup, currentDataDir, confirmDatabase, activate, onProgress }) {
   const home = path.join(appData, 'DrawingNumberPlanner');
@@ -33,7 +63,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     return safety.validateProductionDatabase(file);
   };
 
-  const safety = databaseSafety ?? require('./initialize-empty-acceptance.cjs');
+  const safety = databaseSafety ?? Object.fromEntries(operations.map(name => [name, file => runDatabaseOperation(name, file)]));
   rejectLink(home);
   rejectLink(config);
   rejectLink(pending);
@@ -48,7 +78,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     if (!forceSelection && (!installationId || saved.installationId === installationId)) {
       rejectLink(saved.dataDir);
       await onProgress?.('正在检查已保存的数据库');
-      validateDatabase(path.join(saved.dataDir, 'planner.db'));
+      await validateDatabase(path.join(saved.dataDir, 'planner.db'));
       return fs.realpathSync.native(saved.dataDir);
     }
   }
@@ -64,7 +94,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
       // Missing/corrupt current databases cannot supply a verified backup.
       // Preserve the profile and let native recovery/reselection be retried.
       await onProgress?.('正在备份当前数据库');
-      safety.backupProductionDatabase(current);
+      await safety.backupProductionDatabase(current);
     }
   };
   let data;
@@ -92,7 +122,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     }
     file = runtimeFile;
     await onProgress?.('正在检查旧数据库的完整性与兼容性');
-    const summary = validateDatabase(file);
+    const summary = await validateDatabase(file);
     if (confirmDatabase && !await confirmDatabase({path:file, ...summary})) return null;
     await protectCurrent();
     await onProgress?.('正在准备所选数据库');
@@ -109,7 +139,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     }
     try {
       await initializeDatabase(path.join(data, 'planner.db'));
-      validateDatabase(path.join(data, 'planner.db'));
+      await validateDatabase(path.join(data, 'planner.db'));
     } catch (error) {
       fs.writeFileSync(path.join(data, 'first-start-error.txt'), String(error));
       throw error;

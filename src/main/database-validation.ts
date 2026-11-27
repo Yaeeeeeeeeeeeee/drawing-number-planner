@@ -3,7 +3,7 @@ import {dirname,join} from 'node:path';
 import {copyFileSync,existsSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {createDatabaseBackup} from '../db/backup.js';
-import {CURRENT_SCHEMA_VERSION,migrateDatabase} from '../db/migrations.js';
+import {CURRENT_SCHEMA_VERSION,isCurrentMigrationComplete,migrateDatabase} from '../db/migrations.js';
 
 function integrity(database: Database.Database): void {
   if (database.pragma('integrity_check', {simple:true}) !== 'ok'
@@ -70,6 +70,10 @@ function assertCurrentStructure(database: Database.Database): void {
 /** Validate the exact SQLite handle before any production migration or journal change. */
 export function validateProductionDatabaseConnection(database: Database.Database): void {
   integrity(database); ledger(database);
+  if (isCurrentMigrationComplete(database)) {
+    assertCurrentStructure(database);
+    return;
+  }
   const snapshot = database.serialize();
   // Serialization includes committed WAL pages; deserialize needs a private
   // rollback-journal header instead of trying to find the source WAL on disk.
@@ -95,8 +99,11 @@ export function validateProductionDatabase(file: string): {schemaVersion:number}
     // Rehearse here instead of serializing the entire database into a second copy.
     integrity(database); ledger(database);
     const {version} = database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as {version:number};
-    migrateDatabase(database,{databaseExists:true,createBackup(){}});
-    integrity(database); assertCurrentStructure(database);
+    if (!isCurrentMigrationComplete(database)) {
+      migrateDatabase(database,{databaseExists:true,createBackup(){}});
+      integrity(database);
+    }
+    assertCurrentStructure(database);
     return {schemaVersion: version};
   } finally { database?.close(); rmSync(scratch,{recursive:true,force:true}); }
 }

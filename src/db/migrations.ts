@@ -58,6 +58,14 @@ function hasBatchPathIndex(database: PlannerDatabase): boolean {
     where type = 'index' and name = 'material_batches_relative_path_nocase_unique'`).get());
 }
 
+function missingAssetRemovalColumn(database: PlannerDatabase): boolean {
+  return !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some(column => column.name === 'deleted_at');
+}
+
+export function isCurrentMigrationComplete(database: PlannerDatabase): boolean {
+  return currentVersion(database) === CURRENT_SCHEMA_VERSION && hasBatchPathIndex(database) && !missingAssetRemovalColumn(database);
+}
+
 function ensureBatchPathIndex(database: PlannerDatabase): void {
   const duplicates = database.prepare(`select count(*) as count from (
     select relative_path from material_batches
@@ -800,7 +808,7 @@ export function migrateDatabase(database: PlannerDatabase, safety: MigrationSafe
   const from = currentVersion(database);
   if (from > CURRENT_SCHEMA_VERSION) throw new Error(`数据库版本 ${from} 高于当前软件支持的版本 ${CURRENT_SCHEMA_VERSION}`);
   if (from >= CURRENT_SCHEMA_VERSION) {
-    const missingAssetRemoval = !(database.pragma('table_info(bom_item_assets)') as Array<{ name: string }>).some((column) => column.name === 'deleted_at');
+    const missingAssetRemoval = missingAssetRemovalColumn(database);
     if (!hasBatchPathIndex(database) || missingAssetRemoval) {
       if (safety.databaseExists) safety.createBackup();
       database.transaction(() => {
