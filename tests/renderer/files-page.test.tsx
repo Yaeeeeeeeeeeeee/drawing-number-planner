@@ -61,7 +61,7 @@ describe('FilesPage', () => {
     expect(screen.getByText('已选 1 条')).toBeVisible();
     await waitFor(()=>expect(screen.queryByRole('checkbox',{name:`选择 ${file.fileName}`})).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole('button',{name:'切换到已选文件'}));
-    expect(within(screen.getByRole('complementary',{name:'已选文件'})).getByText(file.fileName)).toBeVisible();
+    expect(within(screen.getByRole('complementary',{name:'已选文件'})).getByText(file.fileName.replace(/\.pdf$/i,''))).toBeVisible();
     fireEvent.click(screen.getByRole('button',{name:'关闭'}));
     fireEvent.click(screen.getByRole('button',{name:'筛选'}));
     expect(screen.getByRole('combobox',{name:'匹配状态'})).toHaveValue('pending');
@@ -70,11 +70,11 @@ describe('FilesPage', () => {
   it('left-aligns filename, batch and matched-code headers and body cells without changing row identities', async () => {
     const view = render(<FilesPage api={apiFixture(true) as never} />);
     await screen.findByText('02.0404.010.0401001-LOGO',{selector:'.file-primary'});
-    for (const key of ['name','batch','drawing']) {
-      expect(view.container.querySelector(`th[data-column-key="${key}"]`)).toHaveStyle({textAlign:'left'});
+    for (const key of ['name','batch','batchStatus','matchStatus','conversion','drawing']) {
+      expect(view.container.querySelector(`th[data-column-key="${key}"]`)).toHaveStyle({textAlign:['name','drawing'].includes(key)?'left':'center'});
       const cells=view.container.querySelectorAll(`tbody td[data-column-key="${key}"]`);
       expect(cells.length).toBeGreaterThan(0);
-      for(const cell of cells) expect(cell).toHaveStyle({textAlign:'left'});
+      for(const cell of cells) expect(cell).toHaveStyle({textAlign:['name','drawing'].includes(key)?'left':'center'});
     }
     expect(screen.getByRole('checkbox',{name:'选择 02.0404.010.0401001-LOGO.pdf'})).toBeVisible();
   });
@@ -275,8 +275,8 @@ describe('FilesPage', () => {
     expect(screen.getByText('1 转曲后')).toBeVisible();
     expect(screen.getByText(file.fileName.replace(/\.pdf$/i, ''))).toBeVisible();
     expect(screen.getByText(outlined.fileName.replace(/\.pdf$/i, ''))).toBeVisible();
-    expect(screen.getAllByText('转曲前', { selector: '.conversion-label' })).toHaveLength(3);
-    expect(screen.getByText('转曲后', { selector: '.conversion-label' })).toBeVisible();
+    expect(screen.getAllByText('转曲前', { selector: '.pdf-tag' })).toHaveLength(3);
+    expect(screen.getByText('转曲后', { selector: '.pdf-tag' })).toBeVisible();
   });
 
   it('refreshes the latest selected scope when a scan finishes after navigation changes', async () => {
@@ -318,8 +318,8 @@ describe('FilesPage', () => {
     expect(screen.getByText('删除/缺失')).toBeVisible();
     expect(screen.getByText('变化')).toBeVisible();
     expect(screen.getByText('二维码 · new.png', { selector: '.scan-change-group span' })).toBeVisible();
-    expect(screen.getByText('PDF · gone.pdf', { selector: '.scan-change-group span' })).toBeVisible();
-    expect(screen.getByText('PDF · edited.pdf', { selector: '.scan-change-group span' })).toBeVisible();
+    expect(screen.getByText('PDF · gone', { selector: '.scan-change-group span' })).toBeVisible();
+    expect(screen.getByText('PDF · edited', { selector: '.scan-change-group span' })).toBeVisible();
     expect(api.getFileScanChanges).toHaveBeenCalledWith(11);
     const collapseChanges = screen.getByRole('button', { name: '收起本次变化' });
     expect(collapseChanges).toHaveAttribute('aria-expanded', 'true');
@@ -348,7 +348,7 @@ describe('FilesPage', () => {
     const api = apiFixture(true); render(<FilesPage api={api as never} />);
 
     expect(await screen.findByText(pending.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' })).toBeVisible();
-    expect(screen.getByText('待确认', { selector: '.files-match-badge' })).toBeVisible();
+    expect(screen.getByText('待确认', { selector: '.pdf-tag.pending' })).toBeVisible();
     expect(screen.getByText('02.0404.010.0401000', { selector: '.code-cell' })).toBeVisible();
     expect(screen.getByText('invalid-format', { selector: '.files-match-reason' })).toBeVisible();
     expect(screen.queryByText('历史已占号')).not.toBeInTheDocument();
@@ -562,12 +562,11 @@ describe('PDF quick filters and scan scope',()=>{
   it('switches source, outlined, missing and all shortcuts without changing selected product scope',async()=>{
     const api=apiFixture(true);render(<FilesPage api={api as never} initialTarget={{productId:9}}/>);
     fireEvent.click(await screen.findByRole('button',{name:'筛选'}));
-    const quick=await screen.findByRole('group',{name:'PDF 快捷筛选'});
-    for(const [name,conversionType,presence] of [['仅源文件','source','all'],['仅转曲后','outlined','all'],['仅缺失','','missing'],['全部','','all']]){
-      fireEvent.click(within(quick).getByRole('button',{name}));
+    expect(screen.queryByRole('group',{name:'PDF 快捷筛选'})).toBeNull();
+    for(const [conversionType,presence] of [['source','all'],['outlined','all'],['','missing'],['','all']]){
+      fireEvent.change(screen.getByLabelText('转曲类型'),{target:{value:conversionType}});
+      fireEvent.change(screen.getByLabelText('存在状态'),{target:{value:presence}});
       await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenCalledWith(expect.objectContaining({productId:9,conversionType,presence})));
-      await waitFor(()=>expect(within(quick).getByRole('button',{name})).toBeEnabled());
-      expect(within(quick).getByRole('button',{name})).toHaveAttribute('aria-pressed','true');
     }
     expect(api.scanPdfFiles).not.toHaveBeenCalled();
   });

@@ -105,9 +105,10 @@
 }
 .files-page .layout-table .file-row-actions .files-action-icon:disabled { opacity: .45; }
 .files-page .layout-table .expanded-table-row > td {
-  padding: 8px 12px;
+  padding: 6px 16px 6px 22px;
   text-align: left;
-  background: var(--ws-panel);
+  background: color-mix(in srgb,var(--ws-surface,#fff) 94%,var(--ws-text,#222));
+  border-bottom:1px solid color-mix(in srgb,var(--ws-surface,#fff) 80%,var(--ws-text,#222));
 }
 
 :root .engineering-workspace .page-surface .file-cleanup-toolbar.files-management-toolbar {--ws-control-height:34px;}
@@ -121,7 +122,7 @@
 .files-page .files-management-toolbar .files-management-icon {display:inline-flex;align-items:center;justify-content:center;width:34px;min-width:34px;padding:7px;}
 .files-page .files-management-toolbar .files-management-icon svg {flex:none;}
 
-.files-page tr[aria-selected=true]{background:#e2edf6}
+
 .files-page .files-filter-overlay {position:fixed;z-index:100;right:0;top:0;bottom:0;width:min(380px,90vw);overflow:auto;background:var(--ws-surface,#fff);box-shadow:-6px 0 24px #0003;padding:20px;}
 .files-page .files-filter-overlay>div {display:flex;justify-content:space-between;align-items:center;}
 .files-page .files-filter-overlay .files-filter {display:flex;flex-direction:column;align-items:stretch;}
@@ -183,3 +184,20 @@
   content:attr(title); position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:160;
   padding:5px 10px; background:#252a30; color:white; border-radius:4px; pointer-events:none; font-size:13px;
 }
+
+.files-page .layout-table tbody tr[aria-selected=true] > td {
+  background: color-mix(in srgb,var(--ws-surface,#fff) 97%,var(--ws-text,#222));
+  border-bottom:1px solid color-mix(in srgb,var(--ws-surface,#fff) 85%,var(--ws-text,#222));
+}
+.files-page .expanded-table-row p {margin:2px 0;}
+.files-page .layout-table .files-batch-code {text-align:center;}
+.files-page .pdf-tag {
+  display:inline-flex; align-items:center; justify-content:center; height:22px;
+  padding:0 7px; border-radius:5px; font-size:12px; line-height:1; white-space:nowrap;
+  background:#edf0f2; color:#56616b;
+}
+.files-page .pdf-tag:is(.current,.matched) {background:#e4f2e8;color:#34674b;}
+.files-page .pdf-tag:is(.unmatched,.pending,.indeterminate) {background:#faf0d9;color:#795d2d;}
+.files-page .pdf-tag.conflict {background:#f9e6e4;color:#964d48;}
+.files-page .pdf-tag.outlined {background:#e6eef5;color:#46647e;}
+.files-page .pdf-tag.source {background:#efebf5;color:#655574;}

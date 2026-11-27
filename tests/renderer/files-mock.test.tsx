@@ -10,9 +10,9 @@ describe('PDF renderer-only preview isolation', () => {
     const real = vi.fn(() => { throw new Error('REAL API MUST NOT RUN'); });
     render(<App api={new Proxy({}, { get: () => real }) as never} />);
     await screen.findAllByText('多图号冲突');
-    const row = document.querySelector('.file-match.conflict')!.closest('tr')!;
+    const row = document.querySelector('.pdf-tag.conflict')!.closest('tr')!;
     expect(row.querySelector('.presence-label.present')).toHaveTextContent('存在');
-    expect(row.querySelector('.file-match.conflict')).toHaveTextContent('多图号冲突');
+    expect(row.querySelector('.pdf-tag.conflict')).toHaveTextContent('多图号冲突');
     expect(real).not.toHaveBeenCalled();
   });
   it('shows and copies the complete indexed path without file or network access', async () => {
@@ -32,7 +32,7 @@ describe('PDF renderer-only preview isolation', () => {
     expect(writeText).toHaveBeenCalledWith(full.textContent);
     expect(full.closest('td')).toHaveAttribute('colspan', '10');
     expect(document.querySelector('.files-full-name')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '收起路径' }));
+    summaries[0].focus(); fireEvent.click(summaries[0]);
     expect(document.querySelector('.files-path-full')).toBeNull();
     expect(summaries[0]).toHaveFocus();
     expect(real).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
@@ -45,8 +45,8 @@ describe('PDF renderer-only preview isolation', () => {
     render(<App api={new Proxy({}, { get: () => real }) as never} />);
     await screen.findByText('说明书-001-源文件');
     expect(document.querySelector('.files-page .file-relative')).toBeNull();
-    expect(document.querySelector('.file-match.matched .files-match-badge')).toHaveTextContent('已匹配');
-    expect(document.querySelector('.files-batch.current .files-status')).toHaveTextContent('当前批次');
+    expect(document.querySelector('.pdf-tag.matched')).toHaveTextContent('已匹配');
+    expect(document.querySelector('.pdf-tag.current')).toHaveTextContent('当前批次');
     expect(screen.getAllByRole('checkbox')[0]).toBeDisabled();
     expect(screen.queryByText(/仅缺失记录可选/)).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /大小/ })).not.toBeInTheDocument();
@@ -91,10 +91,10 @@ describe('PDF renderer-only preview isolation', () => {
     fireEvent.change(screen.getByLabelText('存在状态'), { target: { value: 'all' } });
     fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     await screen.findByText('说明书-001-源文件');
-    expect(document.querySelector('.file-match.pending .files-match-badge')?.textContent).toBe('待确认');
-    expect(document.querySelector('.file-match.conflict .files-match-badge')?.textContent).toBe('多图号冲突');
+    expect(document.querySelector('.pdf-tag.pending')?.textContent).toBe('待确认');
+    expect(document.querySelector('.pdf-tag.conflict')?.textContent).toBe('多图号冲突');
     fireEvent.click(screen.getByRole('checkbox',{name:'选择 说明书-001-源文件.pdf'}));
-    fireEvent.click(screen.getByRole('button',{name:'清理已选索引记录 (1)'}));
+    fireEvent.click(screen.getByRole('button',{name:'移除文件记录'}));
     fireEvent.click(screen.getByRole('button', { name: '确认清理索引记录' }));
     await screen.findByText('已清理 1 条缺失 PDF 索引记录');
     expect(screen.queryByText('说明书-001-源文件')).not.toBeInTheDocument();

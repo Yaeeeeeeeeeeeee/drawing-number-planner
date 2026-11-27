@@ -1,3 +1,4 @@
+import { pdfFileName } from '../format/pdf-file-name';
 import {useRef,useState} from 'react';
 import type {MaterialBatchView,ProductView} from '../data/client';
 import type {PdfManagementApi,PdfClassificationPreview,PdfClassificationResult} from '../data/pdf-management-client';
@@ -36,7 +37,7 @@ export function PdfClassificationDialog({api,ids,products,batches,onClose,onSave
  <button className="secondary-button" disabled={busy||hasApplied||!product||!batch} onClick={()=>void showPreview()}>预览归属</button>
  {parts.length>1&&<><p role="status">已完成：{parts.filter(part=>part.status==='done').reduce((n,part)=>n+part.ids.length,0)} / {selectedIds.length} 条</p><ul>{parts.map(part=><li key={part.number}>第 {part.number} 批 · {part.ids.length} 条 · {part.status==='done'?'已完成':part.status==='failed'?'处理失败':part.status==='applying'?'处理中':part.status==='ready'?'待确认':part.status==='preview-failed'?'预检失败':'预检中'}</li>)}</ul></>}
  {error&&<p className="error-banner" role="alert">{error}</p>}
- {preview&&<><h3>原归属 → 目标归属</h3>{preview.conflicts.length>0&&<p className="error-banner" role="alert">{preview.conflicts.length} 个文件存在图号归属冲突。确认仅修改所选 PDF 的产品和批次，图号原归属及历史引用保持。</p>}<ul className="pdf-classification-preview">{preview.entries.map(e=><li key={e.id}><strong>{e.fileName}</strong><span>{productLabel(e.previousProductId)} / {batchLabel(e.previousMaterialBatchId)} → {productLabel(e.productId)} / {batchLabel(e.materialBatchId)}</span>{e.conflict&&<span className="error-banner">{e.conflict}</span>}</li>)}</ul>
+ {preview&&<><h3>原归属 → 目标归属</h3>{preview.conflicts.length>0&&<p className="error-banner" role="alert">{preview.conflicts.length} 个文件存在图号归属冲突。确认仅修改所选 PDF 的产品和批次，图号原归属及历史引用保持。</p>}<ul className="pdf-classification-preview">{preview.entries.map(e=><li key={e.id}><strong>{pdfFileName(e.fileName)}</strong><span>{productLabel(e.previousProductId)} / {batchLabel(e.previousMaterialBatchId)} → {productLabel(e.productId)} / {batchLabel(e.materialBatchId)}</span>{e.conflict&&<span className="error-banner">{e.conflict}</span>}</li>)}</ul>
  <label>归纳原因<textarea aria-label="归纳原因" value={reason} disabled={busy} onChange={e=>setReason(e.target.value)}/></label><label className="pdf-classification-confirm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/>已核对原归属与目标归属</label></>}
  <div className="pdf-classification-actions"><button className="secondary-button" disabled={busy} onClick={onClose}>取消</button><button className="primary-button" disabled={busy||!preview||!confirmed||!reason.trim()} onClick={()=>void save()}>{busy?'处理中…':hasFailed?'重试失败批次':'确认归纳'}</button></div>
  </div></div>;

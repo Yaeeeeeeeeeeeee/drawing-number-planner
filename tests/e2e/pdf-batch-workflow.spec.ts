@@ -38,8 +38,8 @@ test('real category scan and501-file selection use two guarded batches without t
     const toolbar=page.getByRole('region',{name:'PDF 索引管理'});
     const height=(await toolbar.boundingBox())!.height;
     const boxes=page.getByRole('checkbox',{name:/^选择 /});
-    for(let index=0;index<10;index++) await boxes.nth(index).check();
-    await expect(toolbar.getByText('已选 10 条')).toBeVisible();
+    for(let index=0;index<13;index++) await boxes.nth(index).check();
+    await expect(toolbar.getByText('已选 13 条')).toBeVisible();
     await toolbar.getByRole('button',{name:'全选已加载文件'}).click();
     await toolbar.getByRole('button',{name:'查看已选文件'}).click();
     const drawer=page.getByRole('complementary',{name:'已选文件',exact:true});
@@ -52,9 +52,10 @@ test('real category scan and501-file selection use two guarded batches without t
     await expect(drawer.getByRole('heading',{name:'已选文件（99）'})).toBeVisible();
     await drawer.getByRole('button',{name:'切换到文件筛选'}).click();
     const filter=page.getByRole('complementary',{name:'PDF 筛选'});
+    await page.screenshot({path:join(screenshots,'pdf-filter-1440.png')});
     await filter.getByRole('button',{name:'切换到已选文件'}).click();
-    await drawer.getByRole('button',{name:'清空全部选择'}).click();
     await drawer.getByRole('button',{name:'关闭'}).click();
+    await page.getByRole('button',{name:'清空全部选择'}).click();
     await expect(toolbar.getByText('已选 0 条')).toBeVisible();
     const table=page.locator('.table-wrap').first();
     for(const count of [200,300,400,500,501]){
