@@ -70,18 +70,18 @@ it('keeps the six management actions in two groups and applies each state-specif
  const api={...fixture(),previewPdfClassification:vi.fn(),applyPdfClassification:vi.fn()};
  api.searchPdfFiles.mockResolvedValue({items:[{...item,id:1,fileName:'normal.pdf'},{...item,id:2,fileName:'excluded.pdf',managementState:'ignored'}],total:2,page:1,pageSize:100});
  render(<FilesPage api={api as never}/>);await screen.findByText('normal',{selector:'.file-primary'});
- expect(screen.queryByRole('region',{name:'PDF 索引管理'})).not.toBeInTheDocument();
+ expect(screen.getByText('已选 0 条')).toBeVisible();
  fireEvent.click(screen.getByRole('checkbox',{name:'选择 excluded.pdf'}));
  const toolbar=screen.getByRole('region',{name:'PDF 索引管理'});
  const groups=within(toolbar).getAllByRole('group').filter(group=>group.parentElement===toolbar);expect(groups).toHaveLength(2);
  for(const button of within(toolbar).getAllByRole('button')){expect(button.querySelector('svg')).not.toBeNull();expect(button.textContent).toBe('');expect(button).toHaveAttribute('title',button.getAttribute('aria-label'));}
- expect(within(groups[0]).getAllByRole('button').map(button=>button.getAttribute('aria-label'))).toEqual(['全选','取消选择','人工归纳']);
- expect(within(groups[1]).getAllByRole('button').map(button=>button.getAttribute('aria-label'))).toEqual(['排除所选文件','恢复所选文件','移除文件记录']);
+ expect(within(groups[0]).getAllByRole('button').map(button=>button.getAttribute('aria-label'))).toEqual(['全选已加载文件','取消选择','查看已选文件']);
+ expect(within(groups[1]).getAllByRole('button').map(button=>button.getAttribute('aria-label'))).toEqual(['人工归纳','排除所选文件','恢复所选文件','移除文件记录']);
  expect(screen.getByRole('button',{name:'排除所选文件'})).toBeDisabled();expect(screen.getByRole('button',{name:'恢复所选文件'})).toBeEnabled();
  fireEvent.click(screen.getByRole('button',{name:'恢复所选文件'}));await waitFor(()=>expect(api.previewPdfManagement).toHaveBeenCalledWith({ids:[2],action:'restore'}));
- fireEvent.click(screen.getByRole('button',{name:'取消'}));fireEvent.click(screen.getByRole('button',{name:'全选'}));
+ fireEvent.click(screen.getByRole('button',{name:'取消'}));fireEvent.click(screen.getByRole('button',{name:'全选已加载文件'}));
  fireEvent.click(screen.getByRole('button',{name:'排除所选文件'}));await waitFor(()=>expect(api.previewPdfManagement).toHaveBeenCalledWith({ids:[1],action:'ignore'}));
- fireEvent.click(screen.getByRole('button',{name:'取消'}));fireEvent.click(screen.getByRole('button',{name:'取消选择'}));expect(screen.queryByRole('region',{name:'PDF 索引管理'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'取消'}));fireEvent.click(screen.getByRole('button',{name:'取消选择'}));expect(screen.getByText('已选 0 条')).toBeVisible();
 });
 function batchFixture(allowed=true){
  const batch={id:7,productId:1,name:'01.首批',relativePath:'actual/batch',displayRevision:0};

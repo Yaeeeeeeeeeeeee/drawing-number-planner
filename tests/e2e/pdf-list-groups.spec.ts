@@ -9,7 +9,7 @@ import {DictionaryService} from '../../src/core/dictionaries/dictionary-service'
 import {ProductService} from '../../src/core/products/product-service';
 import {existsSync} from 'node:fs';
 if(existsSync('/usr/bin/chromium')) test.use({launchOptions:{executablePath:'/usr/bin/chromium'}});
-test('shows every scanned file directly and clears selection on filtering',async({page})=>{
+test('shows every scanned file directly and preserves selection on filtering',async({page})=>{
  test.setTimeout(60_000);
  const data=mkdtempSync(join(tmpdir(),'pdf-list-e2e-')),root=join(data,'library');mkdirSync(root);writeFileSync(join(data,'settings.json'),JSON.stringify({workspaceRoot:root}));
  const server=await startServer({port:0,dataDir:data,allowedOrigins:['http://127.0.0.1:5176']});
@@ -30,16 +30,19 @@ test('shows every scanned file directly and clears selection on filtering',async
     if(response.status!==409) expect(response.status, await response.text()).toBe(200);
     return response.status;
   }).toBe(200);
-  await vite.listen();await page.setViewportSize({width:1600,height:900});await page.goto('http://127.0.0.1:5176/');
+  await vite.listen();await page.setViewportSize({width:1280,height:900});await page.goto('http://127.0.0.1:5176/');
   const nav=page.getByRole('navigation',{name:'主导航'});if(!await nav.isVisible())await page.getByRole('button',{name:'展开导航',exact:true}).click();await nav.getByRole('button',{name:'PDF 文件中心',exact:true}).click();
   await expect(page.getByRole('button',{name:/已加载 .* 个版本/})).toHaveCount(0);await expect(page.getByRole('checkbox',{name:`选择 ${names[0]}`,exact:true})).toHaveCount(2);const before=db.prepare('select * from pdf_files order by id').all();await expect(page.getByRole('checkbox',{name:`选择 ${names[2]}`})).toBeVisible();
   await page.getByRole('checkbox',{name:`选择 ${names[2]}`}).check();await expect(page.getByText('已选 1 条',{exact:true})).toBeVisible();
   const evidence=join(process.cwd(),'test-results/confirmed-requirements');mkdirSync(evidence,{recursive:true});await page.screenshot({path:join(evidence,'pdf-list-flat.png')});
-  await page.getByRole('searchbox',{name:'文件关键词',exact:true}).fill('历史');await expect(page.getByText('已选 1 条',{exact:true})).toHaveCount(0);await expect(page.getByRole('checkbox',{name:`选择 ${names[2]}`})).toBeVisible();await page.screenshot({path:join(evidence,'pdf-list-history-search.png')});const last = page.getByRole('checkbox',{name:`选择 ${names[2]}`});
+  await page.getByRole('searchbox',{name:'文件关键词',exact:true}).fill('历史');await expect(page.getByText('已选 1 条',{exact:true})).toBeVisible();await expect(page.getByRole('checkbox',{name:`选择 ${names[2]}`})).toBeVisible();await page.screenshot({path:join(evidence,'pdf-list-history-search.png')});const last = page.getByRole('checkbox',{name:`选择 ${names[2]}`});
   const footer = await page.getByRole('status',{name:'当前列表加载进度'}).boundingBox();
   const lastBox = await last.boundingBox();
   expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(footer!.y);
-  await last.check();await page.getByRole('button',{name:'待关联产品'}).click();await expect(page.getByText('已选 1 条',{exact:true})).toHaveCount(0);
+  await last.check();
+  const openTree=page.getByRole('button',{name:'产品／批次导航',exact:true});
+  if(await openTree.isVisible()) await openTree.click();
+  await page.getByRole('button',{name:'待关联产品'}).click();await expect(page.getByText('已选 1 条',{exact:true})).toHaveCount(0);
   expect(db.prepare('select * from pdf_files order by id').all()).toEqual(before);paths.forEach(path=>expect(readFileSync(path)).toEqual(bytes));
  }finally{await vite.close();await server.close();db.close();rmSync(data,{recursive:true,force:true});}
 });

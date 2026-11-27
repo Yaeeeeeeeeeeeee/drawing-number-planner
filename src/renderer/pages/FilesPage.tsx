@@ -1,7 +1,7 @@
 import {groupPdfFiles} from './pdf-list-groups';
 import {scanExecutionLabel, scanExecutionProgress, useOwnedScanProgress, useScanProgress} from './useScanProgress';
 import type { FileScanRunView } from '../../core/files/file-types';
-import { ListChecks, Square, FolderInput, CircleOff, RotateCcw, Trash2, FileText, FolderOpen, Files, FilePenLine, Spline, FileQuestionMark, SlidersHorizontal, RefreshCw, X } from 'lucide-react';
+import { ListChecks, Square, FolderInput, EyeOff, Undo2, Search, PanelRightOpen, RotateCcw, Trash2, FileText, FolderOpen, Files, FilePenLine, Spline, FileQuestionMark, SlidersHorizontal, RefreshCw, X } from 'lucide-react';
 import { isSourcePdfPath } from '../../core/files/material-directory-policy';
 import type { AppearanceApi } from '../data/appearance-client';
 import { plannerQueryCache, publishSuccessfulFileScan, queryKey, scanRunFromSummary, useSuccessfulFileScan } from '../data/query-cache';
@@ -122,7 +122,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const [products, setProducts] = useState<ProductView[]>([]);
   const [batches, setBatches] = useState<MaterialBatchView[]>([]);
   const [total, setTotal] = useState(0);
-  const [filterOpen,setFilterOpen]=useState(false);
+  const [drawer,setDrawer]=useState<'filters'|'selection'|null>(null);
   const [filters, setFilters] = useState(() => initialTarget ? {...initialFilters, keyword: initialTarget.fullCode ?? ''} : initialFilters);
   const [navigationScope, setNavigationScope] = useState<PdfNavigationScope>(() => targetScope(initialTarget));
   const processedTarget = useRef(JSON.stringify(initialTarget));
@@ -181,7 +181,16 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const taskActive = readOwnedScan ? Boolean(ownedScan.status?.active) : !!scanProgress.task&&['queued','running','finalizing'].includes(scanProgress.task.status);
   const scanUnavailable = saving || scanning || taskActive || !settings.configured || !settings.available
     || Boolean(readOwnedScan && !ownedScan.status);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]); const [pendingCleanupIds, setPendingCleanupIds] = useState<number[] | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<PdfFileView[]>([]);
+  const selectedIds = selectedFiles.map(file => file.id);
+  function setSelectedIds(change: number[] | ((previous: number[]) => number[])) {
+    setSelectedFiles(previous => {
+      const byId = new Map([...previous, ...files].map(file => [file.id, file]));
+      const ids = typeof change === 'function' ? change(previous.map(file => file.id)) : change;
+      return ids.flatMap(id => byId.get(id) ?? []);
+    });
+  }
+  const [pendingCleanupIds, setPendingCleanupIds] = useState<number[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [indexClearPreview, setIndexClearPreview] = useState<FileIndexClearPreviewView | null>(null);
   const [indexClearConfirming, setIndexClearConfirming] = useState(false); const [indexClearPhrase, setIndexClearPhrase] = useState('');
@@ -219,7 +228,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
         if (updateCounts && latestSearch.current.values === values) void refreshNavigation(values);
         return;
       }
-      setFiles(result.items); setSelectedIds(current=>current.filter(id=>result.items.some(file=>file.id===id))); setTotal(result.total); latestSearch.current.page=result.page;
+      setFiles(result.items); setSelectedFiles(current => { const latest = new Map(result.items.map(file => [file.id, file])); return current.map(file => latest.get(file.id) ?? file); }); setTotal(result.total); latestSearch.current.page=result.page;
       if (updateCounts) void refreshNavigation(values);
     } catch (reason) {if(request===searchRequest.current)setError(reason instanceof Error?reason.message:'PDF 文件加载失败');}
     finally {if(request===searchRequest.current)setLoading(false);}
@@ -429,7 +438,8 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       setError('文件变更日期的结束日期不能早于开始日期');
       return;
     }
-    resetListSelection();
+    setSelectedRowId(null);
+    setExpandedPathId(null);
     setFiles([]);
     setFilters(values);
     void search(values, 1);
@@ -438,6 +448,7 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   const setFilter = (key: keyof typeof filters, value: string) => applyFilters({...filters,[key]:value});
   const managementAvailable = Boolean(api.previewPdfManagement) || classificationAvailable;
   const selectableFiles = managementAvailable ? files : files.filter(file => !file.isPresent);
+  const selectAllLabel = managementAvailable ? '全选已加载文件' : '全选已加载缺失记录';
   const refreshList = () => {
     plannerQueryCache.invalidate('pdf:');
     const {values, page, scope} = latestSearch.current;
@@ -531,7 +542,6 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
   };
   const tableId = navigationScope.productId ? 'pdf-files-model' : 'pdf-files';
   const listRows = useMemo(() => groupPdfFiles(files).flatMap(group => group.files), [files]);
-  const selectedFiles=files.filter(file=>selectedIds.includes(file.id));
   const excludableIds=selectedFiles.filter(file=>!file.managementState||file.managementState==='included').map(file=>file.id);
   const restorableIds=selectedFiles.filter(file=>file.managementState==='ignored'||file.managementState==='needs_review').map(file=>file.id);
   const navigation = ({collapseControl}: {collapseControl: ReactNode}) => <PdfProductBatchNavigation collapseControl={collapseControl} products={products} onDeleteBatch={api.previewMaterialBatchDeletion && api.deleteMaterialBatch ? batch=>void previewBatchDeletion(batch):undefined} onRenameBatch={api.renameMaterialBatch ? batch => {setRenameBatch(batch);setBatchName(batch.name);} : undefined} batches={batches} counts={navigationCounts} usageBatches={usageBatches} scope={navigationScope}
@@ -623,49 +633,54 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
     {mock && scanning && <section className="scan-comparison" role="status"><span>正在模拟扫描 · 仅处理内存样例，不读取文件</span><button type="button" className="secondary-button" onClick={() => void api.listLocalTasks().then(tasks => { const task = tasks.find(item => item.status === 'running'); if (task) return api.cancelLocalTask(task.id); }).catch(reason => setError(String(reason)))}>取消模拟扫描</button></section>}
 
     <ModuleWorkspace fileWorkspace resizable hideLayoutReset navigation={navigation} detailLabel="" onCloseDetail={() => {}}>
-    <div className="files-filter-controls">
-      <div className="files-list-search" role="search" aria-label="搜索当前 PDF 列表">
+    <div className="pdf-command-row">
+      <div className="pdf-search-field" role="search" aria-label="搜索当前 PDF 列表">
+        <Search size={17} aria-hidden="true"/>
         <input ref={keywordRef} type="search" aria-label="文件关键词" placeholder="搜索文件名 / 图号" maxLength={500} value={filters.keyword} onChange={event => setFilter('keyword', event.target.value)} />
-        {filters.keyword && <button type="button" className="text-button" onClick={() => setFilter('keyword', '')}>清除搜索</button>}
+        {filters.keyword && <button type="button" aria-label="清除搜索" title="清除搜索" onClick={() => setFilter('keyword', '')}><X size={16}/></button>}
       </div>
+      <button className="secondary-button files-tool-icon" title="筛选" aria-label="筛选" aria-expanded={drawer==='filters'} onClick={()=>setDrawer(drawer==='filters'?null:'filters')}><SlidersHorizontal size={18}/></button>
+      <button className="secondary-button files-tool-icon" title="刷新列表" aria-label="刷新列表" disabled={loading} onClick={refreshList}><RefreshCw size={18}/></button>
     </div>
-    {filterOpen && <aside id="pdf-filter-panel" className="files-filter-overlay" aria-label="PDF 筛选">
-      <div className="files-filter-heading"><h2>筛选 PDF</h2><button className="secondary-button files-tool-icon" type="button" aria-label="关闭" title="关闭" onClick={() => setFilterOpen(false)}><X size={18} aria-hidden="true" /></button></div>
-      {filterPanel}
-    </aside>}
-    <div className="files-tools-row">
+    <section className="file-cleanup-toolbar files-management-toolbar" aria-label="PDF 索引管理">
+      <div className="files-selection-actions" role="group" aria-label="文件选择与归纳">
+        <button aria-label={selectAllLabel} title={selectAllLabel} className="files-management-icon secondary-button" disabled={managementBusy || loading || cleaning || !selectableFiles.length} onClick={() => setSelectedIds(current => [...new Set([...current,...selectableFiles.map(file => file.id)])])}><ListChecks size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="取消选择" title="取消选择" className="files-management-icon secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => setSelectedIds([])}><Square size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+
+        <span className="files-selection-count">已选 {selectedIds.length} 条</span><button aria-label="查看已选文件" title="查看已选文件" className="files-management-icon secondary-button" aria-expanded={drawer==='selection'} disabled={!selectedIds.length} onClick={()=>setDrawer('selection')}><PanelRightOpen size={18}/></button>
+      </div>
+      <div className="files-record-actions" role="group" aria-label="文件纳入与记录">
+        <button aria-label="人工归纳" title="人工归纳" className="files-management-icon secondary-button" disabled={!classificationAvailable || managementBusy || !selectedIds.length} onClick={()=>setClassifying(true)}><FolderInput size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="排除所选文件" title="排除所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !excludableIds.length} onClick={()=>void previewManagement(excludableIds,'ignore')}><EyeOff size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="恢复所选文件" title="恢复所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !restorableIds.length} onClick={()=>void previewManagement(restorableIds,'restore')}><Undo2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+        <button aria-label="移除文件记录" title="移除文件记录" className="files-management-icon secondary-button files-remove-record" disabled={managementBusy || cleaning || !selectedIds.length || (managementAvailable && !api.previewPdfManagement)} onClick={()=>managementAvailable ? void previewManagement(selectedIds,'clear') : requestCleanup(selectedIds)}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+      </div>
+    </section>
+    {drawer && <aside className="files-filter-overlay" aria-label={drawer==='filters'?'PDF 筛选':'已选文件'} onKeyDown={event=>{if(event.key==='Escape')setDrawer(null);}}>
+      <header className="files-filter-heading"><h2>{drawer==='filters'?'文件筛选':`已选文件（${selectedIds.length}）`}</h2>
+        <button className="secondary-button files-tool-icon" aria-label={drawer==='filters'?'切换到已选文件':'切换到文件筛选'} title={drawer==='filters'?'切换到已选文件':'切换到文件筛选'} onClick={()=>setDrawer(drawer==='filters'?'selection':'filters')}>{drawer==='filters'?<PanelRightOpen size={18}/>:<SlidersHorizontal size={18}/>}</button>
+        <button className="secondary-button files-tool-icon" aria-label="关闭" title="关闭" onClick={()=>setDrawer(null)}><X size={18}/></button>
+      </header>
+      {drawer==='filters'?<>
     <div className="pdf-quick-filters" role="group" aria-label="PDF 快捷筛选">
       {pdfQuickFilters.map(({ label, icon: Icon, conversionType, presence }) => {
         const selected = latestSearch.current.values.conversionType === conversionType && latestSearch.current.values.presence === presence;
         return <button key={label} type="button" title={label} aria-label={label} aria-pressed={selected}
-          className={`files-tool-icon ${selected ? 'primary-button' : 'secondary-button'}`} disabled={loading || scanning}
+          className={`files-tool-icon ${selected ? 'primary-button' : 'secondary-button'}`} disabled={scanning}
           onClick={() => applyFilters({ ...filters, conversionType, presence })}>
           <Icon size={18} aria-hidden="true" />
         </button>;
       })}
     </div>
-      <div className="files-list-actions" role="group" aria-label="PDF 列表操作">
-        <button className="secondary-button files-tool-icon" type="button" aria-label="筛选" title="筛选" aria-expanded={filterOpen} aria-controls={filterOpen ? 'pdf-filter-panel' : undefined} onClick={() => setFilterOpen(value => !value)}><SlidersHorizontal size={18} aria-hidden="true" /></button>
-        <button className="secondary-button files-tool-icon" type="button" aria-label="刷新列表" title="刷新列表" disabled={loading} onClick={refreshList}><RefreshCw size={18} aria-hidden="true" /></button>
-        {selectableFiles.length > 0 && <button className="secondary-button files-tool-icon" type="button"
-          aria-label={managementAvailable ? '全选已加载文件' : '全选已加载缺失记录'} title={managementAvailable ? '全选已加载文件' : '全选已加载缺失记录'}
-          disabled={loading || cleaning || managementBusy} onClick={() => setSelectedIds(selectableFiles.map(file => file.id))}><ListChecks size={18} aria-hidden="true" /></button>}
-      </div>
-    </div>
-    <p className="files-stat-scope">列表筛选不限制扫描；当前型号扫描包含源文件和全部量产批次。</p>
-    {selectedIds.length > 0 && (api.previewPdfManagement || classificationAvailable) && <section className="file-cleanup-toolbar files-management-toolbar" aria-label="PDF 索引管理">
-      <div className="files-selection-actions" role="group" aria-label="文件选择与归纳">
-        <button aria-label="全选" title="全选" className="files-management-icon secondary-button" disabled={managementBusy || !files.length} onClick={() => setSelectedIds(files.map(file => file.id))}><ListChecks size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-        <button aria-label="取消选择" title="取消选择" className="files-management-icon secondary-button" disabled={managementBusy || !selectedIds.length} onClick={() => setSelectedIds([])}><Square size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-        <button aria-label="人工归纳" title="人工归纳" className="files-management-icon secondary-button" disabled={!classificationAvailable || managementBusy || !selectedIds.length} onClick={()=>setClassifying(true)}><FolderInput size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-        <span className="files-selection-count">已选 {selectedIds.length} 条</span><details><summary>查看已选文件</summary>{selectedFiles.map(file=><div key={file.id}>{file.fileName}</div>)}</details>
-      </div>
-      <div className="files-record-actions" role="group" aria-label="文件纳入与记录">
-        <button aria-label="排除所选文件" title="排除所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !excludableIds.length} onClick={()=>void previewManagement(excludableIds,'ignore')}><CircleOff size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-        <button aria-label="恢复所选文件" title="恢复所选文件" className="files-management-icon secondary-button" disabled={!api.previewPdfManagement || managementBusy || !restorableIds.length} onClick={()=>void previewManagement(restorableIds,'restore')}><RotateCcw size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-        <button aria-label="移除文件记录" title="移除文件记录" className="files-management-icon secondary-button files-remove-record" disabled={!api.previewPdfManagement || managementBusy || !selectedIds.length} onClick={()=>void previewManagement(selectedIds,'clear')}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-      </div>
-    </section>}
+        {filterPanel}
+      </>:<>
+        <button className="secondary-button files-tool-icon" title="清空全部选择" aria-label="清空全部选择" disabled={!selectedIds.length || managementBusy} onClick={()=>setSelectedIds([])}><Square size={18}/></button>
+        <ul className="pdf-selected-list">{selectedFiles.map(file=><li key={file.id}>
+          <FileText size={17}/><span title={file.relativePath}><strong>{file.fileName}</strong><small>{file.relativePath}</small></span>
+          <button className="files-tool-icon secondary-button" aria-label={`取消选择 ${file.fileName}`} title="取消选择此文件" disabled={managementBusy} onClick={()=>toggleSelection(file.id)}><X size={16}/></button>
+        </li>)}</ul>
+      </>}
+    </aside>}
     {classifying && <PdfClassificationDialog api={{previewPdfClassification:input=>api.previewPdfClassification!(input),applyPdfClassification:input=>locally(()=>api.applyPdfClassification!(input))}} ids={selectedIds} products={products} batches={batches} onClose={()=>setClassifying(false)} onSaved={async (updated,conflictCount=0,progress)=>{
       plannerQueryCache.invalidate(); if(progress&&!progress.complete)setSelectedIds(current=>current.filter(id=>!progress.completedIds.includes(id)));else{setClassifying(false);setSelectedIds([]);} setMessage(`已归纳 ${updated} 条 PDF${conflictCount?`；${conflictCount} 条图号关联冲突保留原归属`:``}`);
       const resources=await Promise.allSettled([api.listProducts({status:'all'}),api.listMaterialBatches({}),api.getDrawingNavigation?.()]);
@@ -703,13 +718,6 @@ function FilesWorkspace({ api, mock, initialTarget, active }: { api: PlannerApi 
       <input aria-label="批次显示名称" maxLength={200} value={batchName} onChange={event => setBatchName(event.target.value)} />
       <button className="secondary-button" disabled={managementBusy} onClick={() => setRenameBatch(null)}>取消</button>
       <button className="primary-button" disabled={managementBusy || !batchName.trim()} onClick={() => void saveBatchName()}>保存显示名称</button>
-    </section>}
-    {!managementAvailable && selectedIds.length > 0 && <section className="file-cleanup-toolbar" aria-label="缺失 PDF 索引清理">
-      <span>已选 {selectedIds.length} 条缺失索引记录</span>
-      <div>
-        <button className="secondary-button" type="button" disabled={cleaning} onClick={() => setSelectedIds([])}>取消选择</button>
-        <button className="text-button danger" type="button" disabled={cleaning} onClick={() => requestCleanup(selectedIds)}>清理已选索引记录 ({selectedIds.length})</button>
-      </div>
     </section>}
     {pendingCleanupIds && <section className="file-cleanup-confirmation" role="dialog" aria-label="确认清理 PDF 索引记录">
       <strong>请再次确认清理 {pendingCleanupIds.length} 条缺失 PDF 索引记录</strong>

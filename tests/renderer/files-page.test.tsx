@@ -45,7 +45,7 @@ function apiFixture(configured = false) {
 }
 
 describe('FilesPage', () => {
-  it('selects individual files directly and clears selection when a filter changes', async () => {
+  it('selects individual files directly and preserves selection when a filter changes', async () => {
     const api=apiFixture(true);
     const historical={...file,id:20,fileName:'old-version.pdf',relativePath:'old-version.pdf',isPresent:false};
     api.searchPdfFiles.mockResolvedValue({items:[file,historical],total:2,page:1,pageSize:100});
@@ -55,9 +55,13 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('checkbox',{name:`选择 ${file.fileName}`}));
     expect(screen.getByText('已选 1 条')).toBeVisible();
     fireEvent.click(screen.getByRole('button',{name:'筛选'}));
+    api.searchPdfFiles.mockResolvedValue({items:[historical],total:1,page:1,pageSize:100});
     fireEvent.change(screen.getByRole('combobox',{name:'匹配状态'}),{target:{value:'pending'}});
     await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({matchStatus:'pending'})));
-    expect(screen.queryByText('已选 1 条')).not.toBeInTheDocument();
+    expect(screen.getByText('已选 1 条')).toBeVisible();
+    await waitFor(()=>expect(screen.queryByRole('checkbox',{name:`选择 ${file.fileName}`})).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button',{name:'切换到已选文件'}));
+    expect(within(screen.getByRole('complementary',{name:'已选文件'})).getByText(file.fileName)).toBeVisible();
     fireEvent.click(screen.getByRole('button',{name:'关闭'}));
     fireEvent.click(screen.getByRole('button',{name:'筛选'}));
     expect(screen.getByRole('combobox',{name:'匹配状态'})).toHaveValue('pending');
@@ -386,7 +390,7 @@ describe('FilesPage', () => {
     await screen.findByText(missing.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
 
     fireEvent.click(screen.getByRole('checkbox',{name:`选择 ${missing.fileName}`}));
-    fireEvent.click(screen.getByRole('button',{name:'清理已选索引记录 (1)'}));
+    fireEvent.click(screen.getByRole('button',{name:'移除文件记录'}));
     expect(await screen.findByText('此操作只清理数据库索引记录，不会删除磁盘文件，也不会释放历史图号。')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '确认清理索引记录' }));
 
@@ -404,11 +408,11 @@ describe('FilesPage', () => {
     expect(screen.getByRole('checkbox', { name: `选择 ${file.fileName}` })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '全选已加载缺失记录' }));
     expect(screen.getByRole('checkbox', { name: `选择 ${missing.fileName}` })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: '清理已选索引记录 (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: '移除文件记录' }));
     fireEvent.click(await screen.findByRole('button', { name: '确认清理索引记录' }));
 
     await waitFor(() => expect(api.cleanupPdfFiles).toHaveBeenCalledWith([missing.id]));
-    await waitFor(() => expect(screen.queryByRole('region', { name: '缺失 PDF 索引清理' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', {name:'移除文件记录'})).toBeDisabled());
   });
 
   it('uses a configured-root two-step phrase confirmation before clearing the library index', async () => {
@@ -466,7 +470,7 @@ describe('FilesPage', () => {
     render(<FilesPage api={api as never} />);
     await screen.findByText(missing.fileName.replace(/\.pdf$/i, ''), { selector: '.file-primary' });
     fireEvent.click(screen.getByRole('checkbox',{name:`选择 ${missing.fileName}`}));
-    fireEvent.click(screen.getByRole('button',{name:'清理已选索引记录 (1)'}));
+    fireEvent.click(screen.getByRole('button',{name:'移除文件记录'}));
     expect(await screen.findByRole('dialog', { name: '确认清理 PDF 索引记录' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: '清空资料库索引' }));
@@ -557,6 +561,7 @@ describe('PDF quick filters and scan scope',()=>{
   beforeEach(()=>Object.defineProperty(window,'innerWidth',{configurable:true,value:1600}));
   it('switches source, outlined, missing and all shortcuts without changing selected product scope',async()=>{
     const api=apiFixture(true);render(<FilesPage api={api as never} initialTarget={{productId:9}}/>);
+    fireEvent.click(await screen.findByRole('button',{name:'筛选'}));
     const quick=await screen.findByRole('group',{name:'PDF 快捷筛选'});
     for(const [name,conversionType,presence] of [['仅源文件','source','all'],['仅转曲后','outlined','all'],['仅缺失','','missing'],['全部','','all']]){
       fireEvent.click(within(quick).getByRole('button',{name}));
@@ -578,7 +583,7 @@ describe('PDF quick filters and scan scope',()=>{
     const dates={modifiedFrom:new Date(2026,10,1,0,0,0,0).toISOString(),modifiedTo:new Date(2026,10,2,23,59,59,999).toISOString(),materialBatchId:2};
     await waitFor(()=>expect(api.searchPdfFiles).toHaveBeenLastCalledWith(expect.objectContaining({...dates,productId:9})));
     await waitFor(()=>expect(getPdfFileNavigation).toHaveBeenCalledWith(expect.objectContaining(dates)));
-    expect(screen.getByText('列表筛选不限制扫描；当前型号扫描包含源文件和全部量产批次。')).toBeVisible();
+    expect(screen.queryByText('列表筛选不限制扫描；当前型号扫描包含源文件和全部量产批次。')).toBeNull();
     fireEvent.click(screen.getByRole('button',{name:'扫描当前型号'}));
     await waitFor(()=>expect(scanProduct).toHaveBeenCalledWith(9));expect(scanProduct.mock.calls[0]).toEqual([9]);expect(api.scanPdfFiles).not.toHaveBeenCalled();
     expect(await screen.findByText('当前型号扫描完成')).toBeVisible();
