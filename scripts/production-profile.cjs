@@ -3,7 +3,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
 /** Ask once per installation, then reuse the chosen database. Never reset old data. */
-async function prepareProductionProfile({ appData, installationId, chooseMode, chooseDatabase, initializeDatabase, databaseSafety, forceSelection = false, beforeSwitch, verifyStartup, currentDataDir, confirmDatabase, activate }) {
+async function prepareProductionProfile({ appData, installationId, chooseMode, chooseDatabase, initializeDatabase, databaseSafety, forceSelection = false, beforeSwitch, verifyStartup, currentDataDir, confirmDatabase, activate, onProgress }) {
   const home = path.join(appData, 'DrawingNumberPlanner');
   const config = path.join(home, 'profile.json');
   const pending = path.join(home, 'profile-switch-pending.json');
@@ -47,6 +47,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
     // Portable packages have no installation marker and keep the stable profile.
     if (!forceSelection && (!installationId || saved.installationId === installationId)) {
       rejectLink(saved.dataDir);
+      await onProgress?.('正在检查已保存的数据库');
       validateDatabase(path.join(saved.dataDir, 'planner.db'));
       return fs.realpathSync.native(saved.dataDir);
     }
@@ -62,6 +63,7 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
       rejectLink(path.join(current, 'planner.db'));
       // Missing/corrupt current databases cannot supply a verified backup.
       // Preserve the profile and let native recovery/reselection be retried.
+      await onProgress?.('正在备份当前数据库');
       safety.backupProductionDatabase(current);
     }
   };
@@ -89,9 +91,11 @@ async function prepareProductionProfile({ appData, installationId, chooseMode, c
       throw Error('所选数据库与服务使用的 planner.db 不一致，不会创建替代空库。');
     }
     file = runtimeFile;
+    await onProgress?.('正在检查旧数据库的完整性与兼容性');
     const summary = validateDatabase(file);
     if (confirmDatabase && !await confirmDatabase({path:file, ...summary})) return null;
     await protectCurrent();
+    await onProgress?.('正在准备所选数据库');
     await safety.prepareExistingProductionDatabase(file);
   } else if (mode === 'fresh') {
     await protectCurrent();

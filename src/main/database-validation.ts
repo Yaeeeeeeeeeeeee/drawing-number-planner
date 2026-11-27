@@ -91,8 +91,13 @@ export function validateProductionDatabase(file: string): {schemaVersion:number}
     copyFileSync(file,snapshotFile);
     if (existsSync(file+'-wal')) copyFileSync(file+'-wal',snapshotFile+'-wal');
     database = new Database(snapshotFile,{fileMustExist:true});
-    validateProductionDatabaseConnection(database);
-    return {schemaVersion: (database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as {version:number}).version};
+    // This handle already belongs to the disposable copy (including committed WAL).
+    // Rehearse here instead of serializing the entire database into a second copy.
+    integrity(database); ledger(database);
+    const {version} = database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as {version:number};
+    migrateDatabase(database,{databaseExists:true,createBackup(){}});
+    integrity(database); assertCurrentStructure(database);
+    return {schemaVersion: version};
   } finally { database?.close(); rmSync(scratch,{recursive:true,force:true}); }
 }
 /** Reuse the protected transaction and independently verified migration backup. */

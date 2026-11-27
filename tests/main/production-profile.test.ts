@@ -210,6 +210,11 @@ it.each([true, false])('production entry reads the installer marker outside reso
   let reused: string | undefined;
   const errors: string[] = [];
   const electron = {
+    BrowserWindow: class {
+      webContents = { executeJavaScript: async () => {} };
+      async loadURL() {}
+      show() {}
+    },
     app: {
       requestSingleInstanceLock: () => true,
       whenReady: async () => {},
@@ -282,4 +287,16 @@ it('reports the attempted database in a failed reinstall verification without co
   expect(messages[0].detail).toContain(join(target,'planner.db'));
   expect(readFileSync(config)).toEqual(previous);
   expect(JSON.parse(readFileSync(config,'utf8')).dataDir).toBe(old);
+});
+
+it('reports old database preparation and remembered-profile validation before returning', async () => {
+  const { old, input } = fixture();
+  const stages: string[] = [];
+  const onProgress = (stage: string) => stages.push(stage);
+  await prepareProductionProfile({ ...input, onProgress });
+  expect(stages).toEqual(['正在检查旧数据库的完整性与兼容性', '正在准备所选数据库']);
+  stages.length = 0;
+  await prepareProductionProfile({ ...input, onProgress });
+  expect(stages).toEqual(['正在检查已保存的数据库']);
+  expectOldPreserved(old);
 });
